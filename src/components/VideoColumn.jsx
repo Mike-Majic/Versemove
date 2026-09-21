@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import MediaEditor from './social/MediaEditor';
 import { publishContent, listContentsForPlacement, toggleContentLike } from '../data/contents';
 import { analyzeImageElement, extractVideoFrame } from '../data/localVision';
+import { searchYoutubeVideos, youtubeEmbedUrl } from '../data/youtubeSearch';
 import './VideoColumn.css';
 
 function loadVideoElement(src) {
@@ -20,12 +21,107 @@ function placementKey(p) {
   return `${p.world}:${p.category ?? ''}:${p.subfamily ?? ''}`;
 }
 
+// Scheda "Cerca su YouTube": qui si guardano video interi (a differenza di
+// Musica, dove lo stesso motore di ricerca serve solo per ascoltare, vedi
+// data/youtubeSearch.js) incorporati dentro l'app, senza uscire su
+// youtube.com. Un video selezionato resta grande sopra i risultati, che
+// restano sotto per poterne scegliere un altro senza dover tornare indietro.
+function YoutubeVideoTab() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError('');
+    setSearched(true);
+    try {
+      const result = await searchYoutubeVideos(query);
+      setResults(result);
+    } catch (err) {
+      setError(
+        err.message === 'timeout'
+          ? 'La ricerca ci sta mettendo troppo a rispondere. Controlla la connessione e riprova.'
+          : err.message === 'quota'
+            ? 'Limite giornaliero di ricerche raggiunto. Riprova domani.'
+            : 'Impossibile cercare su YouTube ora. Riprova più tardi.'
+      );
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rb-video-yt">
+      <p className="rb-video-yt-note">🌍 Cerca e guarda video da YouTube, senza uscire da Versemove.</p>
+      <div className="rb-video-yt-search-row">
+        <input
+          type="text"
+          placeholder="Cerca un video..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              search();
+            }
+          }}
+        />
+        <button type="button" className="rb-video-upload-btn" onClick={search}>Cerca</button>
+      </div>
+
+      {loading && <p className="rb-video-yt-status">Cerco su YouTube...</p>}
+      {error && <p className="rb-video-yt-status rb-video-yt-error">{error}</p>}
+      {!loading && !error && searched && results.length === 0 && (
+        <p className="rb-video-yt-status">Nessun video trovato.</p>
+      )}
+
+      {selected && (
+        <div className="rb-video-yt-player">
+          <iframe
+            key={selected.id}
+            src={youtubeEmbedUrl(selected.id)}
+            title={selected.title}
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            frameBorder="0"
+          />
+          <div className="rb-video-yt-player-info">
+            <strong>{selected.title}</strong>
+            <p>{selected.artist}</p>
+          </div>
+        </div>
+      )}
+
+      <ul className="rb-video-yt-results">
+        {results.map((v) => (
+          <li key={v.id} className={`rb-video-yt-result ${selected?.id === v.id ? 'active' : ''}`}>
+            <button type="button" onClick={() => setSelected(v)}>
+              {v.artworkUrl ? <img src={v.artworkUrl} alt="" /> : <div className="rb-video-yt-result-empty">🎬</div>}
+              <div>
+                <strong>{v.title}</strong>
+                <p>{v.artist}</p>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // Video del mondo Arte & Musica: caricati su Supabase (data/contents.js),
 // non più come object URL locali (che si perdevano ricaricando la pagina) —
 // ora restano davvero. Al caricamento si estrae un fotogramma e si analizza
 // gratis nel browser (data/localVision.js) per suggerire tag e altri mondi
 // dove ripubblicare lo stesso video (like sempre condivisi, mai duplicati).
 export default function VideoColumn({ user, onOpenAuth }) {
+  const [tab, setTab] = useState('community'); // 'community' | 'youtube'
   const [videos, setVideos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [draftFile, setDraftFile] = useState(null);
@@ -143,6 +239,32 @@ export default function VideoColumn({ user, onOpenAuth }) {
 
   return (
     <div className="rb-video-column">
+      <div className="rb-video-header">
+        <div>
+          <h3>Video</h3>
+          <p>Clip brevi della community, oppure video interi cercati su YouTube.</p>
+        </div>
+        {tab === 'community' && (
+          <div className="rb-video-upload-btns">
+            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(cameraInputRef)}>📹 Registra</button>
+            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(fileInputRef)}>🎬 Galleria</button>
+          </div>
+        )}
+      </div>
+
+      <div className="rb-video-tabs">
+        <button type="button" className={`rb-video-tab ${tab === 'community' ? 'active' : ''}`} onClick={() => setTab('community')}>
+          Caricati dalla community
+        </button>
+        <button type="button" className={`rb-video-tab ${tab === 'youtube' ? 'active' : ''}`} onClick={() => setTab('youtube')}>
+          Cerca su YouTube
+        </button>
+      </div>
+
+      {tab === 'youtube' ? (
+        <YoutubeVideoTab />
+      ) : (
+        <>
       <input
         ref={cameraInputRef}
         type="file"
@@ -152,17 +274,6 @@ export default function VideoColumn({ user, onOpenAuth }) {
         onChange={onFileChosen}
       />
       <input ref={fileInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={onFileChosen} />
-
-      <div className="rb-video-header">
-        <div>
-          <h3>Video</h3>
-          <p>Clip brevi della community. Modifica gratuita: solo un taglio inizio/fine, niente montaggio pesante.</p>
-        </div>
-        <div className="rb-video-upload-btns">
-          <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(cameraInputRef)}>📹 Registra</button>
-          <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(fileInputRef)}>🎬 Galleria</button>
-        </div>
-      </div>
 
       {showForm && draftUrl && (
         <div className="rb-video-form">
@@ -245,6 +356,8 @@ export default function VideoColumn({ user, onOpenAuth }) {
             setEditing(false);
           }}
         />
+      )}
+        </>
       )}
     </div>
   );

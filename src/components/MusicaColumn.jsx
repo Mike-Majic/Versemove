@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   listMyPlaylists,
   createPlaylist,
@@ -6,16 +6,17 @@ import {
   addTrackToPlaylist,
   removeTrackFromPlaylist,
 } from '../data/musicPlaylists';
-import { searchTracks } from '../data/musicSearch';
+import { searchYoutubeVideos, youtubeEmbedUrl } from '../data/youtubeSearch';
 import { listFollowingProfiles } from '../data/follows';
 import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import './MusicaColumn.css';
 
-// Bottone play/pausa + copertina + titolo/artista, riusato sia per i
-// risultati di ricerca sia per i brani dentro una playlist: un solo
-// <audio> per colonna (passato via props), così partendo un brano si
-// ferma da solo quello prima, senza doverlo gestire ad ogni chiamante.
+// Copertina/titolo/artista + bottone play-pausa, riusato per i risultati di
+// ricerca, i brani di una playlist e i "brani che ti piacciono": non
+// riproduce nulla da solo, segnala solo quale brano è quello "in
+// riproduzione" (playingId) a chi lo usa — la riproduzione vera è un'unica
+// barra condivisa in fondo alla colonna (vedi NowPlayingBar).
 function TrackRow({ track, playingId, onTogglePlay, action }) {
   const isPlaying = playingId === track.id;
   return (
@@ -34,6 +35,32 @@ function TrackRow({ track, playingId, onTogglePlay, action }) {
       </button>
       {action}
     </li>
+  );
+}
+
+// Player unico e fisso in fondo alla colonna: un solo video YouTube alla
+// volta, piccolo apposta (qui si ascolta, non si guarda — per guardare
+// video interi c'è la categoria Video nel mondo Arte). L'id viene sempre
+// dalla risposta dell'API di ricerca o da un brano già salvato, mai da un
+// link incollato a mano.
+function NowPlayingBar({ track, onClose }) {
+  if (!track) return null;
+  return (
+    <div className="rb-musica-now-playing">
+      <iframe
+        key={track.id}
+        className="rb-musica-now-playing-frame"
+        src={youtubeEmbedUrl(track.id)}
+        title={track.title}
+        allow="autoplay; encrypted-media"
+        frameBorder="0"
+      />
+      <div className="rb-musica-now-playing-info">
+        <strong>{track.title}</strong>
+        <p>{track.artist}</p>
+      </div>
+      <button type="button" className="rb-musica-now-playing-close" onClick={onClose} aria-label="Ferma">✕</button>
+    </div>
   );
 }
 
@@ -102,34 +129,16 @@ function AddToPlaylistMenu({ playlists, onAdd, onCreateAndAdd }) {
   );
 }
 
-// Scheda "Cerca musica": ricerca in tempo reale su iTunes Search API
-// (data/musicSearch.js), gratuita e senza chiave, stesso principio già
-// usato per il catalogo libri della Libreria. Solo anteprime da 30
-// secondi (nessun servizio gratuito senza account fa ascoltare canzoni
-// intere legalmente), ma su brani e copertine veri, milioni di titoli.
-function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
+// Scheda "Cerca musica": ricerca in tempo reale su YouTube (data/youtubeSearch.js,
+// serve una chiave API — quota gratuita limitata, vedi commento lì), ascolto
+// diretto dentro l'app tramite la barra in fondo (NowPlayingBar), senza mai
+// uscire su youtube.com.
+function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd, playingId, onTogglePlay }) {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
-  const [playingId, setPlayingId] = useState(null);
-  const audioRef = useRef(null);
-
-  useEffect(() => () => audioRef.current?.pause(), []);
-
-  const togglePlay = (track) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingId === track.id) {
-      audio.pause();
-      setPlayingId(null);
-      return;
-    }
-    audio.src = track.previewUrl;
-    audio.play();
-    setPlayingId(track.id);
-  };
 
   const search = async () => {
     if (!query.trim()) return;
@@ -137,13 +146,15 @@ function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
     setError('');
     setSearched(true);
     try {
-      const result = await searchTracks(query);
+      const result = await searchYoutubeVideos(query);
       setTracks(result);
     } catch (err) {
       setError(
         err.message === 'timeout'
           ? 'La ricerca ci sta mettendo troppo a rispondere. Controlla la connessione e riprova.'
-          : 'Impossibile raggiungere il catalogo musicale ora. Riprova più tardi.'
+          : err.message === 'quota'
+            ? 'Limite giornaliero di ricerche raggiunto. Riprova domani.'
+            : 'Impossibile cercare su YouTube ora. Riprova più tardi.'
       );
       setTracks([]);
     } finally {
@@ -153,9 +164,7 @@ function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
 
   return (
     <div className="rb-musica-search">
-      <p className="rb-musica-note">
-        🌍 Cerca tra milioni di brani reali — anteprima di 30 secondi per ognuno, come una vetrina.
-      </p>
+      <p className="rb-musica-note">🌍 Cerca ed ascolta da YouTube, senza uscire da Versemove.</p>
       <div className="rb-musica-search-row">
         <input
           type="text"
@@ -174,13 +183,11 @@ function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
         </button>
       </div>
 
-      {loading && <p className="rb-musica-status">Cerco nel catalogo...</p>}
+      {loading && <p className="rb-musica-status">Cerco su YouTube...</p>}
       {error && <p className="rb-musica-status rb-musica-error">{error}</p>}
       {!loading && !error && searched && tracks.length === 0 && (
         <p className="rb-musica-status">Nessun brano trovato.</p>
       )}
-
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} />
 
       <ul className="rb-musica-track-list">
         {tracks.map((t) => (
@@ -188,7 +195,7 @@ function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
             key={t.id}
             track={t}
             playingId={playingId}
-            onTogglePlay={togglePlay}
+            onTogglePlay={onTogglePlay}
             action={
               <AddToPlaylistMenu
                 playlists={playlists}
@@ -203,28 +210,10 @@ function MusicSearchTab({ playlists, onAddTrack, onCreatePlaylistAndAdd }) {
   );
 }
 
-// Dentro una playlist aperta: i brani salvati, ognuno riascoltabile
-// (stessa anteprima di 30s) e rimovibile; il file audio resta quello di
-// iTunes, qui si salva solo il riferimento (vedi data/musicPlaylists.js).
-function PlaylistDetail({ playlist, onBack, onDelete, onRemoveTrack }) {
-  const [playingId, setPlayingId] = useState(null);
-  const audioRef = useRef(null);
-
-  useEffect(() => () => audioRef.current?.pause(), []);
-
-  const togglePlay = (track) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingId === track.id) {
-      audio.pause();
-      setPlayingId(null);
-      return;
-    }
-    audio.src = track.preview_url;
-    audio.play();
-    setPlayingId(track.id);
-  };
-
+// Dentro una playlist aperta: i brani salvati (id video YouTube +
+// titolo/canale/copertina, vedi data/musicPlaylists.js), ognuno riascoltabile
+// dalla stessa barra condivisa e rimovibile.
+function PlaylistDetail({ playlist, onBack, onDelete, onRemoveTrack, playingId, onTogglePlay }) {
   return (
     <div className="rb-musica-playlist-detail">
       <div className="rb-musica-playlist-detail-header">
@@ -236,15 +225,13 @@ function PlaylistDetail({ playlist, onBack, onDelete, onRemoveTrack }) {
         <button type="button" className="rb-musica-delete-btn" onClick={() => onDelete(playlist.id)}>Elimina playlist</button>
       </div>
 
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} />
-
       <ul className="rb-musica-track-list">
         {playlist.tracks.map((t) => (
           <TrackRow
             key={t.id}
-            track={{ id: t.id, title: t.title, artist: t.artist, artworkUrl: t.artwork_url, previewUrl: t.preview_url }}
+            track={{ id: t.track_id, title: t.title, artist: t.artist, artworkUrl: t.artwork_url }}
             playingId={playingId}
-            onTogglePlay={togglePlay}
+            onTogglePlay={onTogglePlay}
             action={
               <button type="button" className="rb-musica-remove-btn" onClick={() => onRemoveTrack(t.id)} title="Rimuovi dalla playlist">
                 ✕
@@ -260,7 +247,7 @@ function PlaylistDetail({ playlist, onBack, onDelete, onRemoveTrack }) {
 
 // Scheda "Le mie playlist": stile Facebook/Spotify "preferiti" — crea
 // playlist, aggiunge brani trovati con la ricerca, le riascolta.
-function PlaylistsTab({ playlists, onCreate, onDelete, onRemoveTrack, openPlaylistId, onOpenPlaylist }) {
+function PlaylistsTab({ playlists, onCreate, onDelete, onRemoveTrack, openPlaylistId, onOpenPlaylist, playingId, onTogglePlay }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newNome, setNewNome] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -290,6 +277,8 @@ function PlaylistsTab({ playlists, onCreate, onDelete, onRemoveTrack, openPlayli
         onBack={() => onOpenPlaylist(null)}
         onDelete={onDelete}
         onRemoveTrack={(trackId) => onRemoveTrack(openPlaylist.id, trackId)}
+        playingId={playingId}
+        onTogglePlay={onTogglePlay}
       />
     );
   }
@@ -345,30 +334,13 @@ function PlaylistsTab({ playlists, onCreate, onDelete, onRemoveTrack, openPlayli
 // playlist, chi si segue (riusa data/follows.js, stesso sistema del mondo
 // Social) e i brani salvati in una qualunque playlist, riascoltabili da
 // qui senza dover entrare in ognuna (deduplicati per brano).
-function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBackToPrimary }) {
+function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBackToPrimary, playingId, onTogglePlay }) {
   const [following, setFollowing] = useState(() => (user ? null : []));
-  const [playingId, setPlayingId] = useState(null);
-  const audioRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
     listFollowingProfiles().then(setFollowing);
   }, [user]);
-
-  useEffect(() => () => audioRef.current?.pause(), []);
-
-  const togglePlay = (track) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingId === track.id) {
-      audio.pause();
-      setPlayingId(null);
-      return;
-    }
-    audio.src = track.previewUrl;
-    audio.play();
-    setPlayingId(track.id);
-  };
 
   const likedTracks = useMemo(() => {
     const seen = new Set();
@@ -377,7 +349,7 @@ function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBac
       for (const t of p.tracks) {
         if (seen.has(t.track_id)) continue;
         seen.add(t.track_id);
-        out.push({ id: t.id, title: t.title, artist: t.artist, artworkUrl: t.artwork_url, previewUrl: t.preview_url, addedAt: t.added_at });
+        out.push({ id: t.track_id, title: t.title, artist: t.artist, artworkUrl: t.artwork_url, addedAt: t.added_at });
       }
     }
     return out.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt)).slice(0, 15);
@@ -433,13 +405,12 @@ function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBac
 
           <div className="rb-musica-profile-section">
             <h4>Brani che ti piacciono</h4>
-            <audio ref={audioRef} onEnded={() => setPlayingId(null)} />
             {likedTracks.length === 0 ? (
               <p className="rb-musica-status">Nessun brano salvato ancora.</p>
             ) : (
               <ul className="rb-musica-track-list">
                 {likedTracks.map((t) => (
-                  <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={togglePlay} action={null} />
+                  <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={onTogglePlay} action={null} />
                 ))}
               </ul>
             )}
@@ -451,13 +422,17 @@ function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBac
 }
 
 // Sostituisce la vecchia categoria Musica generica (dati finti, sempre
-// "Nessun risultato"): ora è playlist personali + ricerca reale, stesso
-// impianto della Libreria (community/catalogo mondiale) ma per la musica.
+// "Nessun risultato"): playlist personali (schema DB proprio) + ricerca e
+// ascolto reali su YouTube, con un unico player condiviso da tutte le
+// schede/colonne (NowPlayingBar) così passare da "Cerca musica" a una
+// playlist non interrompe quello che si sta ascoltando a meno di premere
+// play su qualcos'altro.
 export default function MusicaColumn({ category, user, onOpenAuth }) {
   const [tab, setTab] = useState('playlist'); // 'playlist' | 'cerca'
   const [playlists, setPlaylists] = useState(() => (user ? null : []));
   const [openPlaylistId, setOpenPlaylistId] = useState(null);
   const [mobileView, setMobileView] = useState('primary');
+  const [nowPlaying, setNowPlaying] = useState(null);
   const isDesktop = useIsDesktopLayout();
 
   useEffect(() => {
@@ -471,6 +446,10 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
       return true;
     }
     return false;
+  };
+
+  const togglePlay = (track) => {
+    setNowPlaying((prev) => (prev?.id === track.id ? null : track));
   };
 
   const handleCreate = async (nome, descrizione) => {
@@ -544,6 +523,8 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
             onRemoveTrack={handleRemoveTrack}
             openPlaylistId={openPlaylistId}
             onOpenPlaylist={setOpenPlaylistId}
+            playingId={nowPlaying?.id ?? null}
+            onTogglePlay={togglePlay}
           />
         )
       ) : (
@@ -551,6 +532,8 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
           playlists={playlists ?? []}
           onAddTrack={handleAddTrack}
           onCreatePlaylistAndAdd={handleCreatePlaylistAndAdd}
+          playingId={nowPlaying?.id ?? null}
+          onTogglePlay={togglePlay}
         />
       )}
     </>
@@ -563,17 +546,22 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
       isDesktop={isDesktop}
       onOpenPlaylist={openFromSidebar}
       onBackToPrimary={() => setMobileView('primary')}
+      playingId={nowPlaying?.id ?? null}
+      onTogglePlay={togglePlay}
     />
   );
 
   return (
-    <TwoColumnSwitcher
-      primary={primaryContent}
-      secondary={secondaryContent}
-      primaryLabel={category.label}
-      secondaryLabel="Il mio profilo"
-      mobileView={mobileView}
-      onMobileViewChange={setMobileView}
-    />
+    <>
+      <TwoColumnSwitcher
+        primary={primaryContent}
+        secondary={secondaryContent}
+        primaryLabel={category.label}
+        secondaryLabel="Il mio profilo"
+        mobileView={mobileView}
+        onMobileViewChange={setMobileView}
+      />
+      <NowPlayingBar track={nowPlaying} onClose={() => setNowPlaying(null)} />
+    </>
   );
 }
