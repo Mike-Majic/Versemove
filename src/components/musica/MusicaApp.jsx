@@ -8,6 +8,8 @@ import {
 } from '../../data/musicPlaylists';
 import { searchYoutubeVideos, youtubeEmbedUrl } from '../../data/youtubeSearch';
 import { recordRecentPlay, listRecentPlays } from '../../data/musicClips';
+import useYoutubeBridge, { formatPlaybackTime } from '../shared/useYoutubeBridge';
+import AddToPlaylistMenu from '../shared/AddToPlaylistMenu';
 import MusicaClip from './MusicaClip';
 import MusicaEsplora from './MusicaEsplora';
 import './MusicaApp.css';
@@ -47,45 +49,28 @@ function TrackRow({ track, playingId, onTogglePlay, action }) {
 
 // Mini-player fisso sopra la navigazione in basso: un solo video YouTube alla
 // volta (l'id viene sempre dalla ricerca o da un brano salvato, mai da un
-// link incollato). enablejsapi=1 nell'url (vedi data/youtubeSearch.js) fa sì
-// che il player incorporato mandi da solo eventi postMessage alla pagina:
-// li usiamo per la barra di avanzamento sottile e per passare al brano
-// successivo della coda quando uno finisce, senza dover incorporare tutto
-// l'iframe_api ufficiale.
-function NowPlayingBar({ track, onClose, onEnded, hasNext }) {
-  const iframeRef = useRef(null);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    setProgress(0);
-    if (!track) return undefined;
-    const onMessage = (e) => {
-      if (typeof e.origin !== 'string' || !e.origin.includes('youtube')) return;
-      let data;
-      try {
-        data = JSON.parse(e.data);
-      } catch {
-        return;
-      }
-      if (data.event === 'infoDelivery' && data.info) {
-        const { currentTime, duration, playerState } = data.info;
-        if (typeof currentTime === 'number' && typeof duration === 'number' && duration > 0) {
-          setProgress(currentTime / duration);
-        }
-        if (playerState === 0) onEnded?.();
-      }
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id]);
+// link incollato). Controlli classici (play/pausa, stop, avanti, indietro,
+// aggiungi a preferiti/playlist, barra di scorrimento trascinabile) tramite
+// useYoutubeBridge, che manda i comandi all'iframe incorporato con
+// enablejsapi=1 (vedi data/youtubeSearch.js) invece di limitarsi ad
+// ascoltarne solo gli eventi.
+function NowPlayingBar({ track, onClose, onEnded, hasNext, hasPrev, onPrev, playlists, onAddTrack, onCreatePlaylistAndAdd }) {
+  const { iframeRef, isPlaying, duration, currentTime, togglePlay, stop, seekTo } = useYoutubeBridge(track?.id, { onEnded });
+  const [dragValue, setDragValue] = useState(null);
 
   if (!track) return null;
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const sliderValue = dragValue ?? progress;
+  const shownTime = dragValue !== null ? dragValue * duration : currentTime;
+
+  const commitSeek = () => {
+    if (dragValue !== null && duration > 0) seekTo(dragValue * duration);
+    setDragValue(null);
+  };
+
   return (
     <div className="rb-musica-now-playing">
-      <div className="rb-musica-now-playing-progress">
-        <div className="rb-musica-now-playing-progress-fill" style={{ width: `${Math.min(100, progress * 100)}%` }} />
-      </div>
       <div className="rb-musica-now-playing-row">
         <iframe
           key={track.id}
@@ -100,78 +85,39 @@ function NowPlayingBar({ track, onClose, onEnded, hasNext }) {
           <strong>{track.title}</strong>
           <p>{track.artist}</p>
         </div>
-        {hasNext && (
-          <button type="button" className="rb-musica-now-playing-next" onClick={onEnded} aria-label="Successivo" title="Successivo">
-            ⏭
+        <div className="rb-musica-now-playing-controls">
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onPrev} disabled={!hasPrev} aria-label="Precedente" title="Precedente">⏮</button>
+          <button type="button" className="rb-musica-now-playing-ctrl rb-musica-now-playing-ctrl-main" onClick={togglePlay} aria-label={isPlaying ? 'Pausa' : 'Riproduci'} title={isPlaying ? 'Pausa' : 'Riproduci'}>
+            {isPlaying ? '⏸' : '▶️'}
           </button>
-        )}
-        <button type="button" className="rb-musica-now-playing-close" onClick={onClose} aria-label="Ferma">✕</button>
-      </div>
-    </div>
-  );
-}
-
-// Popover per scegliere in quale playlist mettere un brano, con la
-// possibilità di crearne una al volo.
-function AddToPlaylistMenu({ playlists, onAdd, onCreateAndAdd }) {
-  const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-
-  return (
-    <div className="rb-musica-add-menu">
-      <button type="button" className="rb-musica-add-btn" onClick={() => setOpen((v) => !v)}>
-        + Playlist
-      </button>
-      {open && (
-        <div className="rb-musica-add-popover">
-          {playlists.length > 0 && (
-            <ul>
-              {playlists.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onAdd(p.id);
-                      setOpen(false);
-                    }}
-                  >
-                    {p.nome}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!creating ? (
-            <button type="button" className="rb-musica-add-new-btn" onClick={() => setCreating(true)}>
-              + Nuova playlist
-            </button>
-          ) : (
-            <div className="rb-musica-add-new-form">
-              <input
-                type="text"
-                placeholder="Nome playlist"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                maxLength={60}
-                autoFocus
-              />
-              <button
-                type="button"
-                disabled={!newName.trim()}
-                onClick={() => {
-                  onCreateAndAdd(newName);
-                  setNewName('');
-                  setCreating(false);
-                  setOpen(false);
-                }}
-              >
-                Crea e aggiungi
-              </button>
-            </div>
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={stop} aria-label="Stop" title="Stop">⏹</button>
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onEnded} disabled={!hasNext} aria-label="Successivo" title="Successivo">⏭</button>
+          {playlists && (
+            <AddToPlaylistMenu
+              compact
+              playlists={playlists}
+              onAdd={(playlistId) => onAddTrack(playlistId, track)}
+              onCreateAndAdd={(nome) => onCreatePlaylistAndAdd(nome, track)}
+            />
           )}
         </div>
-      )}
+        <button type="button" className="rb-musica-now-playing-close" onClick={onClose} aria-label="Ferma">✕</button>
+      </div>
+      <div className="rb-musica-now-playing-seek">
+        <span className="rb-musica-now-playing-time">{formatPlaybackTime(shownTime)}</span>
+        <input
+          type="range"
+          className="rb-musica-now-playing-range"
+          min={0}
+          max={1000}
+          value={Math.round(sliderValue * 1000)}
+          onChange={(e) => setDragValue(Number(e.target.value) / 1000)}
+          onMouseUp={commitSeek}
+          onTouchEnd={commitSeek}
+          disabled={duration === 0}
+        />
+        <span className="rb-musica-now-playing-time">{formatPlaybackTime(duration)}</span>
+      </div>
     </div>
   );
 }
@@ -703,6 +649,14 @@ export default function MusicaApp({ user, onOpenAuth }) {
     }
   };
 
+  const retreatQueue = () => {
+    const prev = queueIndex - 1;
+    if (prev < 0) return;
+    setQueueIndex(prev);
+    setNowPlaying(queue[prev]);
+    recordRecentPlay(queue[prev]);
+  };
+
   const likedTracks = useMemo(() => {
     const seen = new Set();
     const out = [];
@@ -801,6 +755,11 @@ export default function MusicaApp({ user, onOpenAuth }) {
         onClose={() => setNowPlaying(null)}
         onEnded={advanceQueue}
         hasNext={queueIndex + 1 < queue.length}
+        hasPrev={queueIndex > 0}
+        onPrev={retreatQueue}
+        playlists={user ? (playlists ?? []) : null}
+        onAddTrack={handleAddTrack}
+        onCreatePlaylistAndAdd={handleCreatePlaylistAndAdd}
       />
       <BottomNav tab={tab} onChange={setTab} />
     </div>

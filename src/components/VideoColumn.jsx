@@ -3,6 +3,9 @@ import MediaEditor from './social/MediaEditor';
 import { publishContent, listContentsForPlacement, toggleContentLike } from '../data/contents';
 import { analyzeImageElement, extractVideoFrame } from '../data/localVision';
 import { searchYoutubeVideos, youtubeEmbedUrl } from '../data/youtubeSearch';
+import { listMyPlaylists, createPlaylist, addTrackToPlaylist } from '../data/musicPlaylists';
+import useYoutubeBridge, { formatPlaybackTime } from './shared/useYoutubeBridge';
+import AddToPlaylistMenu from './shared/AddToPlaylistMenu';
 import './VideoColumn.css';
 
 function loadVideoElement(src) {
@@ -26,13 +29,71 @@ function placementKey(p) {
 // data/youtubeSearch.js) incorporati dentro l'app, senza uscire su
 // youtube.com. Un video selezionato resta grande sopra i risultati, che
 // restano sotto per poterne scegliere un altro senza dover tornare indietro.
-function YoutubeVideoTab() {
+// Controlli classici (play/pausa, stop, avanti/indietro nei risultati,
+// aggiungi a preferiti/playlist, barra di scorrimento) tramite lo stesso
+// ponte postMessage usato dal mini-player di Musica (useYoutubeBridge): le
+// playlist sono le stesse di Musica, un video è solo un "brano" con id
+// YouTube, titolo, artista/canale e copertina.
+function YoutubeVideoTab({ user, onOpenAuth }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [playlists, setPlaylists] = useState(null);
+  const [dragValue, setDragValue] = useState(null);
+
+  useEffect(() => {
+    if (!user) {
+      setPlaylists(null);
+      return;
+    }
+    listMyPlaylists().then(setPlaylists);
+  }, [user]);
+
+  const selectedIndex = selected ? results.findIndex((v) => v.id === selected.id) : -1;
+  const hasPrev = selectedIndex > 0;
+  const hasNext = selectedIndex >= 0 && selectedIndex < results.length - 1;
+
+  const { iframeRef, isPlaying, duration, currentTime, togglePlay, stop, seekTo } = useYoutubeBridge(selected?.id, {
+    onEnded: () => {
+      if (hasNext) setSelected(results[selectedIndex + 1]);
+    },
+  });
+
+  const requireAuth = () => {
+    if (!user) {
+      onOpenAuth?.();
+      return true;
+    }
+    return false;
+  };
+
+  const handleAddTrack = async (playlistId, track) => {
+    if (requireAuth()) return;
+    const { track: saved, error: err } = await addTrackToPlaylist(playlistId, track);
+    if (err) return;
+    setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, tracks: [saved, ...p.tracks] } : p)));
+  };
+
+  const handleCreatePlaylistAndAdd = async (nome, track) => {
+    if (requireAuth()) return;
+    const { playlist, error: err } = await createPlaylist({ nome });
+    if (err) return;
+    const { track: saved, error: trackError } = await addTrackToPlaylist(playlist.id, track);
+    const finalPlaylist = trackError ? playlist : { ...playlist, tracks: [saved] };
+    setPlaylists((prev) => [finalPlaylist, ...(prev ?? [])]);
+  };
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const sliderValue = dragValue ?? progress;
+  const shownTime = dragValue !== null ? dragValue * duration : currentTime;
+
+  const commitSeek = () => {
+    if (dragValue !== null && duration > 0) seekTo(dragValue * duration);
+    setDragValue(null);
+  };
 
   const search = async () => {
     if (!query.trim()) return;
@@ -85,15 +146,49 @@ function YoutubeVideoTab() {
         <div className="rb-video-yt-player">
           <iframe
             key={selected.id}
+            ref={iframeRef}
             src={youtubeEmbedUrl(selected.id)}
             title={selected.title}
             allow="autoplay; encrypted-media; fullscreen"
             allowFullScreen
             frameBorder="0"
           />
-          <div className="rb-video-yt-player-info">
-            <strong>{selected.title}</strong>
-            <p>{selected.artist}</p>
+          <div className="rb-video-yt-player-seek">
+            <span className="rb-video-yt-player-time">{formatPlaybackTime(shownTime)}</span>
+            <input
+              type="range"
+              className="rb-video-yt-player-range"
+              min={0}
+              max={1000}
+              value={Math.round(sliderValue * 1000)}
+              onChange={(e) => setDragValue(Number(e.target.value) / 1000)}
+              onMouseUp={commitSeek}
+              onTouchEnd={commitSeek}
+              disabled={duration === 0}
+            />
+            <span className="rb-video-yt-player-time">{formatPlaybackTime(duration)}</span>
+          </div>
+          <div className="rb-video-yt-player-bottom">
+            <div className="rb-video-yt-player-info">
+              <strong>{selected.title}</strong>
+              <p>{selected.artist}</p>
+            </div>
+            <div className="rb-video-yt-player-controls">
+              <button type="button" onClick={() => hasPrev && setSelected(results[selectedIndex - 1])} disabled={!hasPrev} aria-label="Precedente" title="Precedente">⏮</button>
+              <button type="button" className="rb-video-yt-player-ctrl-main" onClick={togglePlay} aria-label={isPlaying ? 'Pausa' : 'Riproduci'} title={isPlaying ? 'Pausa' : 'Riproduci'}>
+                {isPlaying ? '⏸' : '▶️'}
+              </button>
+              <button type="button" onClick={stop} aria-label="Stop" title="Stop">⏹</button>
+              <button type="button" onClick={() => hasNext && setSelected(results[selectedIndex + 1])} disabled={!hasNext} aria-label="Successivo" title="Successivo">⏭</button>
+              {playlists && (
+                <AddToPlaylistMenu
+                  compact
+                  playlists={playlists}
+                  onAdd={(playlistId) => handleAddTrack(playlistId, selected)}
+                  onCreateAndAdd={(nome) => handleCreatePlaylistAndAdd(nome, selected)}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -262,7 +357,7 @@ export default function VideoColumn({ user, onOpenAuth }) {
       </div>
 
       {tab === 'youtube' ? (
-        <YoutubeVideoTab />
+        <YoutubeVideoTab user={user} onOpenAuth={onOpenAuth} />
       ) : (
         <>
       <input
