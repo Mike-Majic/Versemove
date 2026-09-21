@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { getNowPlayingMovies, getUpcomingMovies } from '../../data/tmdb';
 import { getTmdbReactionsSummary, toggleTmdbReaction } from '../../data/culturalReactions';
 import ReactionButtons from './ReactionButtons';
+import EmptyState from '../EmptyState';
+import Skeleton from '../Skeleton';
 import './cultural.css';
 
 function MovieCard({ movie, summary, onToggle, onShowReactors }) {
@@ -95,9 +97,13 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
 
       <div className="rb-cultural-panel-header"><h4>Al cinema ora</h4></div>
       {nowPlaying === null ? (
-        <p className="rb-cultural-status">Carico...</p>
+        <div className="rb-cultural-skeleton-list" aria-hidden="true">
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+        </div>
       ) : nowPlaying.length === 0 && !error ? (
-        <p className="rb-cultural-status">Nessun film disponibile ora.</p>
+        <EmptyState icon="🎬" title="Nessun film disponibile ora" subtitle="Riprova più tardi." />
       ) : (
         <ul className="rb-cultural-list">
           {nowPlaying.map((m) => (
@@ -108,9 +114,12 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
 
       <div className="rb-cultural-panel-header"><h4>Prossimamente</h4></div>
       {upcoming === null ? (
-        <p className="rb-cultural-status">Carico...</p>
+        <div className="rb-cultural-skeleton-list" aria-hidden="true">
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+        </div>
       ) : upcoming.length === 0 && !error ? (
-        <p className="rb-cultural-status">Nessuna anteprima disponibile ora.</p>
+        <EmptyState icon="🍿" title="Nessuna anteprima disponibile ora" subtitle="Riprova più tardi." />
       ) : (
         <ul className="rb-cultural-list">
           {upcoming.map((m) => (

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchFreeBooks } from '../data/freeBooksApi';
+import EmptyState from './EmptyState';
+import Skeleton from './Skeleton';
 import './FreeBooksCatalog.css';
 
 const SORT_OPTIONS = [
@@ -215,10 +217,16 @@ export default function FreeBooksCatalog() {
         </label>
       </div>
 
-      {loading && <p className="rb-freebooks-status">Cerco nel catalogo...</p>}
-      {error && <p className="rb-freebooks-status rb-freebooks-error">{error}</p>}
+      {loading && (
+        <div className="rb-freebooks-skeleton-list" aria-hidden="true">
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+        </div>
+      )}
+      {error && <EmptyState icon="⚠️" title="Catalogo non raggiungibile" subtitle={error} />}
       {!loading && !error && searched && books.length === 0 && (
-        <p className="rb-freebooks-status">Nessun libro trovato con questo titolo o autore.</p>
+        <EmptyState icon="📖" title="Nessun libro trovato" subtitle="Prova un altro titolo o autore." />
       )}
       {!loading && !error && count !== null && books.length > 0 && (
         <p className="rb-freebooks-count">{count} {count === 1 ? 'risultato leggibile subito' : 'risultati leggibili subito'}</p>

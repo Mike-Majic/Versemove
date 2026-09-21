@@ -9,6 +9,8 @@ import {
   addClipComment,
 } from '../../data/musicClips';
 import { compressVideoClip, isCompressionSupported } from '../../data/videoCompress';
+import EmptyState from '../EmptyState';
+import Skeleton from '../Skeleton';
 import './MusicaClip.css';
 
 const MAX_DURATION_SEC = 60;
@@ -40,8 +42,16 @@ function CommentsSheet({ clipId, onClose }) {
           <button type="button" onClick={onClose} aria-label="Chiudi">✕</button>
         </div>
         <ul className="rb-clip-comments-list">
-          {comments === null && <li className="rb-clip-comments-status">Carico...</li>}
-          {comments?.length === 0 && <li className="rb-clip-comments-status">Nessun commento ancora — il primo sei tu.</li>}
+          {comments === null && (
+            <li aria-hidden="true">
+              <Skeleton lines={2} />
+            </li>
+          )}
+          {comments?.length === 0 && (
+            <li>
+              <EmptyState icon="💬" title="Nessun commento ancora" subtitle="Il primo sei tu." />
+            </li>
+          )}
           {comments?.map((c) => (
             <li key={c.id}>{c.text}</li>
           ))}
@@ -265,10 +275,13 @@ export default function MusicaClip({ user, onOpenAuth }) {
   return (
     <div className="rb-clip-feed-wrap">
       {clips === null ? (
-        <p className="rb-clip-status">Carico le clip...</p>
+        <div className="rb-clip-skeleton-list" aria-hidden="true">
+          <Skeleton lines={2} />
+          <Skeleton lines={2} />
+        </div>
       ) : clips.length === 0 ? (
         <div className="rb-clip-empty">
-          <p>Nessuna clip ancora — sii il primo a caricarne una.</p>
+          <EmptyState icon="🎬" title="Nessuna clip ancora" subtitle="Sii il primo a caricarne una." />
         </div>
       ) : (
         <ul className="rb-clip-feed">

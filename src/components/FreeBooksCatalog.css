@@ -141,8 +141,11 @@
   margin: 0;
 }
 
-.rb-freebooks-error {
-  color: #ff8080;
+.rb-freebooks-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
 }
 
 .rb-freebooks-count {

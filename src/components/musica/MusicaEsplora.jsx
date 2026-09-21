@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { searchYoutubeVideos, getVideoViewCounts } from '../../data/youtubeSearch';
+import EmptyState from '../EmptyState';
+import Skeleton from '../Skeleton';
 import './MusicaEsplora.css';
 
 const TILES = [
@@ -146,8 +148,13 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
       {results && (
         <section className="rb-esplora-section">
           <h4>{results.title}</h4>
-          {loadingSection === results.title && <p className="rb-esplora-status">Carico...</p>}
-          {error && <p className="rb-esplora-status rb-esplora-error">{error}</p>}
+          {loadingSection === results.title && (
+            <div className="rb-esplora-skeleton-row" aria-hidden="true">
+              <Skeleton lines={2} />
+              <Skeleton lines={2} />
+            </div>
+          )}
+          {error && <EmptyState icon="⚠️" title="Sezione non disponibile" subtitle={error} />}
           <ul className="rb-esplora-results-list">
             {results.items.map((it) => (
               <li key={it.id}>
@@ -167,9 +174,14 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
 
       <section className="rb-esplora-section">
         <h4>Nuovi album e singoli</h4>
-        {loadingAuto.album && <p className="rb-esplora-status">Carico...</p>}
+        {loadingAuto.album && (
+          <div className="rb-esplora-skeleton-row" aria-hidden="true">
+            <Skeleton lines={2} />
+            <Skeleton lines={2} />
+          </div>
+        )}
         {newReleases && newReleases.length > 0 && <SquareCarousel items={newReleases} onSelect={onTogglePlay} />}
-        {newReleases?.length === 0 && <p className="rb-esplora-status">Non disponibile ora.</p>}
+        {newReleases?.length === 0 && <EmptyState icon="💿" title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
 
       <section className="rb-esplora-section" id="rb-esplora-mood-anchor">
@@ -195,7 +207,12 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
 
       <section className="rb-esplora-section">
         <h4>Tendenze</h4>
-        {loadingAuto.tendenze && <p className="rb-esplora-status">Carico...</p>}
+        {loadingAuto.tendenze && (
+          <div className="rb-esplora-skeleton-row" aria-hidden="true">
+            <Skeleton lines={2} />
+            <Skeleton lines={2} />
+          </div>
+        )}
         {trending && trending.length > 0 && (
           <ol className="rb-esplora-trending-list">
             {trending.map((it, i) => (
@@ -212,14 +229,19 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
             ))}
           </ol>
         )}
-        {trending?.length === 0 && <p className="rb-esplora-status">Non disponibile ora.</p>}
+        {trending?.length === 0 && <EmptyState icon="📈" title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
 
       <section className="rb-esplora-section">
         <h4>Nuovi video</h4>
-        {loadingAuto.video && <p className="rb-esplora-status">Carico...</p>}
+        {loadingAuto.video && (
+          <div className="rb-esplora-skeleton-row" aria-hidden="true">
+            <Skeleton lines={2} />
+            <Skeleton lines={2} />
+          </div>
+        )}
         {newVideos && newVideos.length > 0 && <WideCarousel items={newVideos} onSelect={onTogglePlay} />}
-        {newVideos?.length === 0 && <p className="rb-esplora-status">Non disponibile ora.</p>}
+        {newVideos?.length === 0 && <EmptyState icon="🎬" title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
     </div>
   );

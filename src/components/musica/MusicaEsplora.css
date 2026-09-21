@@ -39,8 +39,10 @@
   margin: 0;
 }
 
-.rb-esplora-error {
-  color: #ff8080;
+.rb-esplora-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .rb-esplora-results-list {

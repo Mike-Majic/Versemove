@@ -82,6 +82,13 @@
   color: rgba(245, 245, 247, 0.55);
 }
 
+.rb-cultural-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
+}
+
 .rb-cultural-error {
   color: #ff8080;
 }

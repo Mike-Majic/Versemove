@@ -5,6 +5,7 @@ import { findCityMatch, getCityInfo, distanceKm, isUnlimitedDistance } from '../
 import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import FreeBooksCatalog from './FreeBooksCatalog';
+import EmptyState from './EmptyState';
 import './CategoryColumn.css';
 import './LibreriaColumn.css';
 
@@ -96,8 +97,8 @@ export default function LibreriaColumn({ category, initialSubfamily = '', locati
         ))}
       </div>
 
+      {results.length === 0 && <EmptyState icon="📚" title="Nessun risultato" subtitle="Prova un altro titolo, autore o filtro." />}
       <ul className="rb-arte-results-list">
-        {results.length === 0 && <li className="rb-arte-no-results">Nessun risultato.</li>}
         {results.map((r) => (
           <li key={r.id} className="rb-arte-result-card">
             <div className="rb-arte-result-thumb" />
@@ -153,13 +154,11 @@ export default function LibreriaColumn({ category, initialSubfamily = '', locati
       </div>
 
       {!myCity && (
-        <p className="rb-arte-no-results">
-          Imposta la tua città nel filtro "Dove" di Impostazioni per vedere chi è nelle vicinanze.
-        </p>
+        <EmptyState icon="📍" title="Imposta la tua città" subtitle='Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.' />
       )}
 
       {myCity && nearbyPeople.length === 0 && (
-        <p className="rb-arte-no-results">Nessuno nelle vicinanze per ora, in questa categoria.</p>
+        <EmptyState icon="👥" title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
       )}
 
       {myCity && nearbyPeople.length > 0 && (

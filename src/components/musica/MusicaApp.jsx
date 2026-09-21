@@ -12,6 +12,8 @@ import useYoutubeBridge, { formatPlaybackTime } from '../shared/useYoutubeBridge
 import AddToPlaylistMenu from '../shared/AddToPlaylistMenu';
 import MusicaClip from './MusicaClip';
 import MusicaEsplora from './MusicaEsplora';
+import EmptyState from '../EmptyState';
+import Skeleton from '../Skeleton';
 import './MusicaApp.css';
 
 const HOME_CHIPS = [
@@ -140,6 +142,7 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
         <button type="button" className="rb-musica-play-all-btn" onClick={() => onPlayAll(playlist.tracks)}>▶️ Riproduci tutti</button>
       )}
 
+      {playlist.tracks.length === 0 && <EmptyState icon="🎧" title="Nessun brano qui ancora" subtitle="Aggiungi brani da Esplora o dalla ricerca." />}
       <ul className="rb-musica-track-list">
         {playlist.tracks.map((t) => (
           <TrackRow
@@ -156,7 +159,6 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
             }
           />
         ))}
-        {playlist.tracks.length === 0 && <li className="rb-musica-empty">Nessun brano qui ancora.</li>}
       </ul>
     </div>
   );
@@ -339,10 +341,16 @@ function MusicaHome({
               <button type="button" className="rb-musica-play-all-btn" onClick={() => onPlayAll(tracks)}>▶️ Riproduci tutti</button>
             )}
           </div>
-          {loading && <p className="rb-musica-status">Carico...</p>}
-          {error && <p className="rb-musica-status rb-musica-error">{error}</p>}
+          {loading && (
+            <div className="rb-musica-skeleton-list" aria-hidden="true">
+              <Skeleton lines={2} />
+              <Skeleton lines={2} />
+              <Skeleton lines={2} />
+            </div>
+          )}
+          {error && <EmptyState icon="⚠️" title="Sezione non disponibile" subtitle={error} />}
           {!loading && !error && tracks.length === 0 && (
-            <p className="rb-musica-status">Nessun brano qui ancora — prova un altro filtro o cerca in Esplora.</p>
+            <EmptyState icon="🎵" title="Nessun brano qui ancora" subtitle="Prova un altro filtro o cerca in Esplora." />
           )}
           <ul className="rb-musica-track-list">
             {tracks.map((t) => (
@@ -508,9 +516,12 @@ function MusicaRaccolta({
         <section className="rb-musica-section">
           <h4>Ascoltati di recente</h4>
           {recent === null ? (
-            <p className="rb-musica-status">Carico...</p>
+            <div className="rb-musica-skeleton-list" aria-hidden="true">
+              <Skeleton lines={2} />
+              <Skeleton lines={2} />
+            </div>
           ) : recent.length === 0 ? (
-            <p className="rb-musica-status">Non hai ancora ascoltato nulla.</p>
+            <EmptyState icon="🕘" title="Non hai ancora ascoltato nulla" />
           ) : (
             <ul className="rb-musica-track-list">
               {recent.map((t) => (
@@ -530,9 +541,7 @@ function MusicaRaccolta({
       </div>
 
       {!user ? (
-        <p className="rb-musica-status">
-          <button type="button" className="rb-musica-inline-link" onClick={onOpenAuth}>Accedi</button> per creare playlist e vedere i tuoi brani.
-        </p>
+        <EmptyState icon="🔒" title="Accedi per continuare" subtitle="Serve un account per creare playlist e vedere i tuoi brani." actions={[{ label: 'Accedi', primary: true, onClick: onOpenAuth }]} />
       ) : chip === 'playlist' ? (
         <>
           <div className="rb-musica-raccolta-toolbar">
@@ -564,14 +573,16 @@ function MusicaRaccolta({
           </div>
         </>
       ) : chip === 'brani' ? (
-        <ul className="rb-musica-track-list">
-          {likedTracks.length === 0 && <li className="rb-musica-empty">Nessun brano salvato ancora.</li>}
-          {likedTracks.map((t) => (
-            <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={onTogglePlay} action={null} />
-          ))}
-        </ul>
+        <>
+          {likedTracks.length === 0 && <EmptyState icon="🎵" title="Nessun brano salvato ancora" />}
+          <ul className="rb-musica-track-list">
+            {likedTracks.map((t) => (
+              <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={onTogglePlay} action={null} />
+            ))}
+          </ul>
+        </>
       ) : (
-        <p className="rb-musica-status">Non hai ancora contenuti in questa categoria.</p>
+        <EmptyState icon="📂" title="Non hai ancora contenuti in questa categoria" />
       )}
 
       {user && !showNewForm && (

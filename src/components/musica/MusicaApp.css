@@ -262,10 +262,11 @@
   color: #ff8080;
 }
 
-.rb-musica-empty {
-  list-style: none;
-  font-size: 12px;
-  color: rgba(245, 245, 247, 0.5);
+.rb-musica-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
 }
 
 .rb-musica-inline-link {
