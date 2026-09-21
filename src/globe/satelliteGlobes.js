@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
+import { makeLabelSprite } from './categoryShell';
 
 // Stesso raggio del globo grande (vedi networkOverlay.js): i satelliti si
 // posizionano in proporzione a questo, non a un valore a sé.
@@ -18,18 +19,31 @@ const GLOBE_RADIUS = 100;
 // fuori da quel guscio, non appoggiati sopra.
 const ORBIT_RADIUS = GLOBE_RADIUS * 1.85;
 const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
+// Livello di suddivisione dell'icosaedro alla base della rete: fisso, non
+// legato al livello di qualità grafica (a differenza del globo grande, un
+// satellite costa pochissimo qualunque sia il dettaglio — sono solo
+// LineSegments/Points, niente ombreggiatura — quindi non c'è motivo di
+// variarlo). Farlo dipendere dalla qualità causava un difetto concreto: se
+// "Auto" declassava il livello a metà sessione (FPS reali bassi, vedi
+// fx/quality.js), TUTTI i satelliti cambiavano forma di colpo, da sfera
+// densa a poliedro spigoloso, proprio mentre l'utente li guardava.
+const SATELLITE_DETAIL = 1;
 
 // Disposizione fissa attorno al globo grande, pensata sullo schizzo
 // dell'utente: due in alto (sinistra/destra), due in basso, uno di lato —
 // tutti ben dentro il campo visivo della camera di partenza, mai a ridosso
 // del bordo dove verrebbero tagliati. az/el in gradi (azimut rispetto al
-// "davanti" della camera, elevazione sopra/sotto l'equatore).
+// "davanti" della camera, elevazione sopra/sotto l'equatore). L'elevazione
+// dello slot più alto (l'ultimo) resta più bassa degli altri apposta: deve
+// lasciare spazio sopra di sé alla sua etichetta col nome del mondo (vedi
+// buildSatelliteMesh), altrimenti su schermi più bassi verrebbe tagliata
+// dal bordo superiore.
 const LAYOUT = [
   { az: -22, el: 13 },
   { az: 22, el: 12 },
   { az: -24, el: -14 },
   { az: 23, el: -13 },
-  { az: 1, el: 20 },
+  { az: 1, el: 15 },
 ];
 
 function sphereFromAzEl(az, el, radius) {
@@ -74,13 +88,15 @@ function easeOutCubic(t) {
 // linguaggio visivo del guscio del globo grande — vedi networkOverlay.js
 // buildNetworkShell) colorato del mondo che rappresenta, più un nucleo quasi
 // invisibile solo per il click/hover (una LineSegments da sola non è comoda
-// da raycastare con precisione). Niente facce piene, niente etichette: lo
-// schizzo dell'utente li vuole solo come piccoli globi a rete che fluttuano,
-// non come poligoni colorati pieni.
-function buildSatelliteMesh(world, quality) {
+// da raycastare con precisione) e il nome del mondo sempre visibile sopra
+// (stessa etichetta a pillola scura delle categorie sul globo grande — vedi
+// categoryShell.js makeLabelSprite — ma senza il triangolo colorato dietro,
+// qui non c'è una faccia da riempire). Niente facce piene: lo schizzo
+// dell'utente li vuole come piccoli globi a rete che fluttuano.
+function buildSatelliteMesh(world) {
   const group = new THREE.Group();
 
-  const coreGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, quality.detail);
+  const coreGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, SATELLITE_DETAIL);
   const coreMaterial = new THREE.MeshBasicMaterial({
     color: world.color,
     transparent: true,
@@ -112,12 +128,17 @@ function buildSatelliteMesh(world, quality) {
   const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
   group.add(nodes);
 
+  const { sprite: label } = makeLabelSprite(world.label, SATELLITE_RADIUS * 1.1);
+  label.position.set(0, SATELLITE_RADIUS * 1.6, 0);
+  group.add(label);
+
   group.userData.worldId = world.id;
   group.userData.hitMesh = core;
   group.userData.opacityMeshes = [
     { mesh: core, baseOpacity: 0.07 },
     { mesh: net, baseOpacity: 0.85 },
     { mesh: nodes, baseOpacity: 1 },
+    { mesh: label, baseOpacity: 1 },
   ];
   group.userData.bobPhase = Math.random() * Math.PI * 2;
   group.userData.bobSpeed = 0.35 + Math.random() * 0.15;
@@ -136,20 +157,22 @@ function buildSatelliteMesh(world, quality) {
 // visibili adesso) e lo aggiunge come oggetto in più nella STESSA
 // scena/renderer del globo grande — mai un secondo <Globe>/renderer, che su
 // mobile non reggerebbe. A differenza della Fase 2a/2b, qui i satelliti si
-// costruiscono UNA SOLA VOLTA (a questa chiamata) e non vengono più
-// ricreati ad ogni cambio di mondo: warp() si limita a chiamare
-// setActiveWorld(), che mostra/nasconde e riposiziona gli stessi oggetti già
-// pronti. Ricreare geometrie/materiali (quindi ricompilare gli shader) ad
-// ogni warp era il vero costo del blocco misurato durante il volo — qui non
-// succede più durante l'uso normale, solo quando cambia davvero la qualità
-// grafica (vedi WorldGlobe.jsx, che richiama questa funzione da zero solo in
-// quel caso, mai per un semplice cambio di mondo).
-export function buildSatelliteGlobes({ worlds, quality }) {
+// costruiscono UNA SOLA VOLTA IN ASSOLUTO (WorldGlobe.jsx la chiama da un
+// effetto con deps [], mai più) e non vengono mai più ricreati: warp() si
+// limita a chiamare setActiveWorld(), che mostra/nasconde e riposiziona gli
+// stessi oggetti già pronti. Ricreare geometrie/materiali (quindi
+// ricompilare gli shader) ad ogni warp era il vero costo del blocco
+// misurato durante il volo; farlo dipendere dalla qualità grafica (prima
+// versione di questo commento) risolveva quello ma introduceva un difetto
+// nuovo — i satelliti cambiavano forma a metà sessione se "Auto" declassava
+// la qualità — per questo ora la geometria non dipende più da nessun
+// livello di qualità (vedi SATELLITE_DETAIL sopra).
+export function buildSatelliteGlobes({ worlds }) {
   const group = new THREE.Group();
   group.name = 'rb-satellite-globes';
 
   const satellites = worlds.map((world) => {
-    const mesh = buildSatelliteMesh(world, quality);
+    const mesh = buildSatelliteMesh(world);
     group.add(mesh);
     return mesh;
   });

@@ -8,7 +8,7 @@ import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../glo
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
-import { getGlobeQuality, getMiniGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
+import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
 
 // Esperimento: continenti con contorni reali (GeoJSON) al posto dei puntini.
@@ -513,24 +513,23 @@ export default function WorldGlobe({
   // I 5 globi satellite (i mondi non attivi) vivono nella STESSA scena/
   // renderer del globo grande — mai un secondo <Globe>, che vorrebbe dire un
   // secondo WebGLRenderer per ognuno e su mobile non reggerebbe (vedi
-  // globe/satelliteGlobes.js). Un satellite per mondo si costruisce UNA
-  // SOLA VOLTA qui (o di nuovo solo se cambia davvero la qualità grafica,
-  // `quality` nelle deps): ricrearli ad ogni warp costringeva il driver a
-  // ricompilare gli shader dei loro materiali ad ogni cambio di mondo, il
-  // vero costo del blocco misurato durante il volo (~250ms). Il cambio di
-  // mondo attivo (sotto) si limita a mostrare/nascondere/riposizionare
-  // questi stessi oggetti già pronti.
+  // globe/satelliteGlobes.js). Un satellite per mondo si costruisce UNA SOLA
+  // VOLTA IN ASSOLUTO qui (deps [], mai più): ricrearli ad ogni warp
+  // costringeva il driver a ricompilare gli shader dei loro materiali ad
+  // ogni cambio di mondo, il vero costo del blocco misurato durante il volo
+  // (~250ms). La loro geometria non dipende dal livello di qualità grafica
+  // (vedi SATELLITE_DETAIL in satelliteGlobes.js): farla dipendere causava
+  // un cambio di forma a scatto se "Auto" declassava la qualità a metà
+  // sessione, proprio mentre l'utente li guardava. Il cambio di mondo
+  // attivo (sotto) si limita a mostrare/nascondere/riposizionare questi
+  // stessi oggetti già pronti.
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return undefined;
     const scene = g.scene();
-    const sats = buildSatelliteGlobes({ worlds: WORLDS, quality: getMiniGlobeQuality() });
+    const sats = buildSatelliteGlobes({ worlds: WORLDS });
     scene.add(sats.group);
     satellitesRef.current = sats;
-    // Un pool appena (ri)costruito non ha ancora nessun satellite
-    // posizionato: il prossimo effetto (world.id) deve farlo senza
-    // l'animazione di comparsa, come se non fosse mai successo nulla.
-    hasPositionedSatellitesRef.current = false;
     globeActivity.wake();
     return () => {
       scene.remove(sats.group);
@@ -538,7 +537,7 @@ export default function WorldGlobe({
       satellitesRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality]);
+  }, []);
 
   // Quale mondo è attivo adesso (quindi quali 5 sono satelliti, e dove):
   // nessuna geometria/materiale nuovo, solo setActiveWorld() sul pool già
@@ -551,7 +550,7 @@ export default function WorldGlobe({
     globeActivity.wake();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world.id, quality]);
+  }, [world.id]);
 
   // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
   // giro di disegno del globo grande (un wrapper attorno a renderer.render,

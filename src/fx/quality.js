@@ -3,11 +3,12 @@
 // frame rate cala e resta basso), gli altri tre sono scelte esplicite fatte
 // dall'utente in Impostazioni. Persistito in localStorage come sound.js.
 //
-// Pensato già da ora per la scena a 6 globi della Fase 2 (un globo grande
-// attivo + 5 satelliti fluttuanti più leggeri, vedi MINI_GLOBE_QUALITY):
-// GLOBE_QUALITY sotto è il budget del globo GRANDE, che dovrà restare
-// sostenibile anche quando i 5 satelliti gli staranno intorno, non più solo
-// mentre è l'unico globo in scena.
+// GLOBE_QUALITY sotto è il budget del solo globo GRANDE. I 5 satelliti
+// fluttuanti (Fase 2, src/globe/satelliteGlobes.js) non hanno un budget qui:
+// costano così poco (solo LineSegments/Points, niente ombreggiatura) che
+// farli dipendere dalla qualità non ha senso — e causava un difetto vero,
+// un cambio di forma a scatto se "Auto" declassava a metà sessione. La loro
+// geometria è fissa (SATELLITE_DETAIL in satelliteGlobes.js).
 
 const STORAGE_KEY = 'rb-quality-mode';
 const MODES = ['auto', 'high', 'medium', 'low'];
@@ -20,18 +21,6 @@ export const GLOBE_QUALITY = {
   high: { pixelRatioCap: 2, antialias: true, atmosphere: true },
   medium: { pixelRatioCap: 1.5, antialias: true, atmosphere: true },
   low: { pixelRatioCap: 1, antialias: false, atmosphere: false },
-};
-
-// Budget dei 5 globi satellite (Fase 2, src/globe/satelliteGlobes.js): vivono
-// nella STESSA scena/renderer del globo grande (un solo WebGLRenderer in
-// tutta la pagina, vedi WorldGlobe.jsx), quindi non hanno un proprio
-// pixelRatio da limitare — la sola leva è quanti nodi ha la rete di ciascuna
-// sfera. `detail` è il livello di suddivisione passato a
-// THREE.IcosahedronGeometry (0 = 20 facce/rete essenziale, 1 = 80, 2 = 320).
-export const MINI_GLOBE_QUALITY = {
-  high: { detail: 2 },
-  medium: { detail: 1 },
-  low: { detail: 0 },
 };
 
 export function getQualityMode() {
@@ -94,10 +83,6 @@ export function getResolvedTier() {
 
 export function getGlobeQuality(tier = getResolvedTier()) {
   return GLOBE_QUALITY[tier] ?? GLOBE_QUALITY.medium;
-}
-
-export function getMiniGlobeQuality(tier = getResolvedTier()) {
-  return MINI_GLOBE_QUALITY[tier] ?? MINI_GLOBE_QUALITY.medium;
 }
 
 const FPS_SAMPLE_MS = 3000;
