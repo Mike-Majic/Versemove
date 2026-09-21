@@ -1,12 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import WorldGlobe, { CATEGORY_FLY_MS } from './components/WorldGlobe';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { CATEGORY_FLY_MS } from './fx/timing';
 import TopBar from './components/TopBar';
-import SettingsPanel from './components/SettingsPanel';
-import ProfileModal from './components/ProfileModal';
-import AuthModal from './components/AuthModal';
-import ArteExplorer from './components/ArteExplorer';
-import BambiniGameExplorer from './components/BambiniGameExplorer';
-import SocialWorldExplorer from './components/social/SocialWorldExplorer';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
@@ -27,20 +21,11 @@ import { BAMBINI_CATEGORIES, resolveCategoryQuery as resolveBambiniCategoryQuery
 import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQuery } from './data/incontriCategories';
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
 import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
-import IncontriLiveExplorer from './components/incontri/IncontriLiveExplorer';
-import LavoroWorldExplorer from './components/lavoro/LavoroWorldExplorer';
 import AccessGate from './components/AccessGate';
 import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
-import EventLikersModal from './components/EventLikersModal';
-import ReactorsModal from './components/cultural/ReactorsModal';
-import FriendChatModal from './components/FriendChatModal';
-import DMHub from './components/DMHub';
-import AdminPanel from './components/AdminPanel';
-import ProfileSettingsPanel from './components/ProfileSettingsPanel';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
-import PasswordRecoveryModal from './components/PasswordRecoveryModal';
 import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile } from './data/accounts';
 import {
   getFriends,
@@ -53,9 +38,32 @@ import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
-import NotificationsPanel from './components/NotificationsPanel';
 import { supabase } from './data/supabaseClient';
+import PageLoading from './components/PageLoading';
 import './App.css';
+
+// Componenti pesanti o aperti solo su richiesta, caricati al bisogno invece
+// che nel bundle iniziale (React.lazy + Suspense, vedi fallback PageLoading
+// qui sotto e nei singoli punti d'uso). WorldGlobe da solo si porta dietro
+// Three.js + react-globe.gl, il pezzo più grosso di tutti: è nel proprio
+// chunk a parte anche solo per questo.
+const WorldGlobe = lazy(() => import('./components/WorldGlobe'));
+const ArteExplorer = lazy(() => import('./components/ArteExplorer'));
+const BambiniGameExplorer = lazy(() => import('./components/BambiniGameExplorer'));
+const SocialWorldExplorer = lazy(() => import('./components/social/SocialWorldExplorer'));
+const IncontriLiveExplorer = lazy(() => import('./components/incontri/IncontriLiveExplorer'));
+const LavoroWorldExplorer = lazy(() => import('./components/lavoro/LavoroWorldExplorer'));
+const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+const ProfileModal = lazy(() => import('./components/ProfileModal'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const EventLikersModal = lazy(() => import('./components/EventLikersModal'));
+const ReactorsModal = lazy(() => import('./components/cultural/ReactorsModal'));
+const FriendChatModal = lazy(() => import('./components/FriendChatModal'));
+const DMHub = lazy(() => import('./components/DMHub'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const ProfileSettingsPanel = lazy(() => import('./components/ProfileSettingsPanel'));
+const PasswordRecoveryModal = lazy(() => import('./components/PasswordRecoveryModal'));
+const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'));
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
 const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
@@ -768,97 +776,109 @@ export default function App() {
         </div>
       )}
 
-      <WorldGlobe
-        world={world}
-        users={globeUsers}
-        onSelectUser={setSelectedUser}
-        containerRef={containerRef}
-        flyTo={flyTo}
-        categories={categorySet?.categories ?? null}
-        activeCategory={activeArteCategory}
-        onCategorySelect={toggleArteCategory}
-        onCategoryPositionsReady={setArteCategoryPositions}
-        events={world.id === 'social' ? visibleEvents : []}
-        onSelectEvent={(eventId) => setEventLikersId(eventId)}
-      />
+      <Suspense fallback={<PageLoading />}>
+        <WorldGlobe
+          world={world}
+          users={globeUsers}
+          onSelectUser={setSelectedUser}
+          containerRef={containerRef}
+          flyTo={flyTo}
+          categories={categorySet?.categories ?? null}
+          activeCategory={activeArteCategory}
+          onCategorySelect={toggleArteCategory}
+          onCategoryPositionsReady={setArteCategoryPositions}
+          events={world.id === 'social' ? visibleEvents : []}
+          onSelectEvent={(eventId) => setEventLikersId(eventId)}
+        />
+      </Suspense>
 
       {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && (
-        <ArteExplorer
-          world={world}
-          categorySet={categorySet}
-          activeCategory={activeArteCategory}
-          onToggleCategory={toggleArteCategory}
-          onSearchCategory={flyToArteCategory}
-          initialSubfamily={arteInitialSubfamily}
-          locationFilters={locationFilters}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          favorites={favoriteCategories}
-          onToggleFavorite={toggleFavoriteCategory}
-          onShowReactors={setCulturalReactorsView}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <ArteExplorer
+            world={world}
+            categorySet={categorySet}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            initialSubfamily={arteInitialSubfamily}
+            locationFilters={locationFilters}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+            onShowReactors={setCulturalReactorsView}
+          />
+        </Suspense>
       )}
 
       {world.id === 'bambini' && (
-        <BambiniGameExplorer
-          world={world}
-          activeCategory={activeArteCategory}
-          onToggleCategory={toggleArteCategory}
-          onSearchCategory={flyToArteCategory}
-          onGameOpenChange={setGameplayActive}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          favorites={favoriteCategories}
-          onToggleFavorite={toggleFavoriteCategory}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <BambiniGameExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            onGameOpenChange={setGameplayActive}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
       )}
 
       {world.id === 'incontri' && isAdult(user?.dataNascita) && (
-        <IncontriLiveExplorer
-          world={world}
-          activeCategory={activeArteCategory}
-          onToggleCategory={toggleArteCategory}
-          onSearchCategory={flyToArteCategory}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
-          initialMatchTab={incontriInitialTab}
-          onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
-          favorites={favoriteCategories}
-          onToggleFavorite={toggleFavoriteCategory}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <IncontriLiveExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
+            initialMatchTab={incontriInitialTab}
+            onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
       )}
 
       {world.id === 'lavoro' && isAdult(user?.dataNascita) && (
-        <LavoroWorldExplorer
-          world={world}
-          activeCategory={activeArteCategory}
-          onToggleCategory={toggleArteCategory}
-          onSearchCategory={flyToArteCategory}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          favorites={favoriteCategories}
-          onToggleFavorite={toggleFavoriteCategory}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <LavoroWorldExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
       )}
 
       {world.id === 'social' && (
-        <SocialWorldExplorer
-          world={world}
-          activeCategory={activeArteCategory}
-          favorites={favoriteCategories}
-          onToggleFavorite={toggleFavoriteCategory}
-          onToggleCategory={toggleArteCategory}
-          onSearchCategory={flyToArteCategory}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          locationFilters={locationFilters}
-          onNavigateToCategory={navigateToCategory}
-          events={visibleEvents}
-          onCreateEvent={createEvent}
-          onToggleEventLike={toggleEventLike}
-          onOpenEventLikers={(eventId) => setEventLikersId(eventId)}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <SocialWorldExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            locationFilters={locationFilters}
+            onNavigateToCategory={navigateToCategory}
+            events={visibleEvents}
+            onCreateEvent={createEvent}
+            onToggleEventLike={toggleEventLike}
+            onOpenEventLikers={(eventId) => setEventLikersId(eventId)}
+          />
+        </Suspense>
       )}
 
       {/* Ogni mondo richiede un account per essere esplorato: su Incontri e
@@ -913,65 +933,73 @@ export default function App() {
         ))}
       </nav>
 
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onApply={() => {
-          applyArteFilter();
-          setSettingsOpen(false);
-        }}
-        user={user}
-        onOpenAuth={() => setAuthOpen(true)}
-        onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-        filters={filters}
-        setFilters={setFilters}
-        locationFilters={locationFilters}
-        setLocationFilters={setLocationFilters}
-        visibility={visibility}
-        setVisibility={setVisibility}
-        onResetFilters={() => {
-          setFilters(DEFAULT_FILTERS);
-          setLocationFilters(DEFAULT_LOCATION_FILTERS);
-          setArteFilter(DEFAULT_ARTE_FILTER);
-          setVisibility(DEFAULT_VISIBILITY);
-        }}
-        friends={friends}
-        onUnfriend={(id) => {
-          removeFriendApi(id);
-          setFriends((prev) => prev.filter((f) => f !== id));
-        }}
-        onAccountDeleted={() => {
-          setUser(null);
-          setAuthOpen(false);
-          setSettingsOpen(false);
-          setAdminOpen(false);
-          setProfileSettingsOpen(false);
-          setFriendsModalOpen(false);
-          setActiveFriendChatId(null);
-          setEventLikersId(null);
-          setSelectedUser(null);
-          setAccountDeletedNotice(true);
-        }}
-      />
+      {settingsOpen && (
+        <Suspense fallback={<PageLoading />}>
+          <SettingsPanel
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            onApply={() => {
+              applyArteFilter();
+              setSettingsOpen(false);
+            }}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+            filters={filters}
+            setFilters={setFilters}
+            locationFilters={locationFilters}
+            setLocationFilters={setLocationFilters}
+            visibility={visibility}
+            setVisibility={setVisibility}
+            onResetFilters={() => {
+              setFilters(DEFAULT_FILTERS);
+              setLocationFilters(DEFAULT_LOCATION_FILTERS);
+              setArteFilter(DEFAULT_ARTE_FILTER);
+              setVisibility(DEFAULT_VISIBILITY);
+            }}
+            friends={friends}
+            onUnfriend={(id) => {
+              removeFriendApi(id);
+              setFriends((prev) => prev.filter((f) => f !== id));
+            }}
+            onAccountDeleted={() => {
+              setUser(null);
+              setAuthOpen(false);
+              setSettingsOpen(false);
+              setAdminOpen(false);
+              setProfileSettingsOpen(false);
+              setFriendsModalOpen(false);
+              setActiveFriendChatId(null);
+              setEventLikersId(null);
+              setSelectedUser(null);
+              setAccountDeletedNotice(true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {friendsModalOpen && (
-        <DMHub
-          initialTab={dmHubInitialTab}
-          onClose={() => setFriendsModalOpen(false)}
-          onOpenChat={(friendId) => {
-            setFriendsModalOpen(false);
-            setActiveFriendChatId(friendId);
-          }}
-          onFriendsChanged={refreshFriendsState}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <DMHub
+            initialTab={dmHubInitialTab}
+            onClose={() => setFriendsModalOpen(false)}
+            onOpenChat={(friendId) => {
+              setFriendsModalOpen(false);
+              setActiveFriendChatId(friendId);
+            }}
+            onFriendsChanged={refreshFriendsState}
+          />
+        </Suspense>
       )}
 
       {notificationsOpen && (
-        <NotificationsPanel
-          onClose={() => setNotificationsOpen(false)}
-          onRead={() => setUnreadNotifCount(0)}
-          onNavigate={openNotificationTarget}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <NotificationsPanel
+            onClose={() => setNotificationsOpen(false)}
+            onRead={() => setUnreadNotifCount(0)}
+            onNavigate={openNotificationTarget}
+          />
+        </Suspense>
       )}
 
       {notifToast && (
@@ -983,76 +1011,104 @@ export default function App() {
         </button>
       )}
 
-      <ProfileModal
-        user={selectedUser}
-        world={world}
-        onClose={() => setSelectedUser(null)}
-        viewer={user}
-        onOpenAuth={() => setAuthOpen(true)}
-      />
+      {selectedUser && (
+        <Suspense fallback={<PageLoading />}>
+          <ProfileModal
+            user={selectedUser}
+            world={world}
+            onClose={() => setSelectedUser(null)}
+            viewer={user}
+            onOpenAuth={() => setAuthOpen(true)}
+          />
+        </Suspense>
+      )}
 
-      <EventLikersModal
-        event={visibleEvents.find((e) => e.id === eventLikersId) ?? null}
-        user={user}
-        onOpenAuth={() => setAuthOpen(true)}
-        friends={friends}
-        friendRequestsSent={friendRequestsSent}
-        onSendRequest={sendFriendRequest}
-        onOpenChat={(friendId) => {
-          setEventLikersId(null);
-          setActiveFriendChatId(friendId);
-        }}
-        onClose={() => setEventLikersId(null)}
-      />
+      {eventLikersId && (
+        <Suspense fallback={<PageLoading />}>
+          <EventLikersModal
+            event={visibleEvents.find((e) => e.id === eventLikersId) ?? null}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            friends={friends}
+            friendRequestsSent={friendRequestsSent}
+            onSendRequest={sendFriendRequest}
+            onOpenChat={(friendId) => {
+              setEventLikersId(null);
+              setActiveFriendChatId(friendId);
+            }}
+            onClose={() => setEventLikersId(null)}
+          />
+        </Suspense>
+      )}
 
       {culturalReactorsView && (
-        <ReactorsModal
-          title={culturalReactorsView.title}
-          subtitle={culturalReactorsView.subtitle}
-          reactors={culturalReactorsView.reactors}
-          user={user}
-          onOpenAuth={() => setAuthOpen(true)}
-          friends={friends}
-          friendRequestsSent={friendRequestsSent}
-          onSendRequest={sendFriendRequest}
-          onOpenChat={(friendId) => {
-            setCulturalReactorsView(null);
-            setActiveFriendChatId(friendId);
-          }}
-          onClose={() => setCulturalReactorsView(null)}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <ReactorsModal
+            title={culturalReactorsView.title}
+            subtitle={culturalReactorsView.subtitle}
+            reactors={culturalReactorsView.reactors}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            friends={friends}
+            friendRequestsSent={friendRequestsSent}
+            onSendRequest={sendFriendRequest}
+            onOpenChat={(friendId) => {
+              setCulturalReactorsView(null);
+              setActiveFriendChatId(friendId);
+            }}
+            onClose={() => setCulturalReactorsView(null)}
+          />
+        </Suspense>
       )}
 
       {activeFriendChatId && (
-        <FriendChatModal
-          friendId={activeFriendChatId}
-          user={user}
-          onClose={() => setActiveFriendChatId(null)}
-          onMessagesRead={refreshUnread}
-        />
+        <Suspense fallback={<PageLoading />}>
+          <FriendChatModal
+            friendId={activeFriendChatId}
+            user={user}
+            onClose={() => setActiveFriendChatId(null)}
+            onMessagesRead={refreshUnread}
+          />
+        </Suspense>
       )}
 
-      {adminOpen && <AdminPanel user={user} onClose={() => setAdminOpen(false)} />}
+      {adminOpen && (
+        <Suspense fallback={<PageLoading />}>
+          <AdminPanel user={user} onClose={() => setAdminOpen(false)} />
+        </Suspense>
+      )}
 
-      <ProfileSettingsPanel
-        open={profileSettingsOpen}
-        onClose={() => setProfileSettingsOpen(false)}
-        user={user}
-        onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-        favoriteCategories={favoriteCategories}
-      />
+      {profileSettingsOpen && (
+        <Suspense fallback={<PageLoading />}>
+          <ProfileSettingsPanel
+            open={profileSettingsOpen}
+            onClose={() => setProfileSettingsOpen(false)}
+            user={user}
+            onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+            favoriteCategories={favoriteCategories}
+          />
+        </Suspense>
+      )}
 
-      <AuthModal
-        open={authReady && authOpen}
-        onClose={() => setAuthOpen(false)}
-        onLogin={(u, notice) => {
-          setUser(u);
-          setAuthOpen(false);
-          if (notice) setSignupNotice(notice);
-        }}
-      />
+      {authOpen && (
+        <Suspense fallback={<PageLoading />}>
+          <AuthModal
+            open={authReady && authOpen}
+            onClose={() => setAuthOpen(false)}
+            onLogin={(u, notice) => {
+              setUser(u);
+              setAuthOpen(false);
+              if (notice) setSignupNotice(notice);
+            }}
+          />
+        </Suspense>
+      )}
 
-      <PasswordRecoveryModal open={passwordRecoveryOpen} onClose={() => setPasswordRecoveryOpen(false)} />
+      {passwordRecoveryOpen && (
+        <Suspense fallback={<PageLoading />}>
+          <PasswordRecoveryModal open={passwordRecoveryOpen} onClose={() => setPasswordRecoveryOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

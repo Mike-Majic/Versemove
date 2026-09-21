@@ -9,6 +9,8 @@ import EventComposer from './EventComposer';
 import EventCard from './EventCard';
 import SuggestedUsers from './SuggestedUsers';
 import TrendingGroups from './TrendingGroups';
+import EmptyState from '../EmptyState';
+import Skeleton from '../Skeleton';
 import { computeRelevance } from '../../data/socialPosts';
 import {
   fetchFeed,
@@ -643,7 +645,7 @@ export default function SocialFeed({
             </button>
           )}
 
-          {eventsSorted.length === 0 && <p className="rb-social-empty">Nessun evento in programma al momento.</p>}
+          {eventsSorted.length === 0 && <EmptyState icon="📅" title="Nessun evento in programma" subtitle="Sii il primo a crearne uno per il mondo Social." />}
           <ul className="rb-event-list">
             {eventsSorted.map((event) => (
               <EventCard
@@ -673,11 +675,17 @@ export default function SocialFeed({
             )
           )}
 
-          {loading && posts.length === 0 && <p className="rb-social-empty">Caricamento del feed...</p>}
-          {hasLocationFilter && feedTab === 'foryou' && !isGroupView && regionalForYou.length === 0 && (
-            <p className="rb-social-empty">Nessun post ancora da questa zona.</p>
+          {loading && posts.length === 0 && (
+            <div className="rb-feed-skeleton-list" aria-hidden="true">
+              <Skeleton lines={3} />
+              <Skeleton lines={2} />
+              <Skeleton lines={3} />
+            </div>
           )}
-          {emptyStateMessage && <p className="rb-social-empty">{emptyStateMessage}</p>}
+          {hasLocationFilter && feedTab === 'foryou' && !isGroupView && regionalForYou.length === 0 && (
+            <EmptyState icon="📍" title="Nessun post da questa zona" subtitle="Prova ad allargare il filtro Luogo nelle Impostazioni." />
+          )}
+          {emptyStateMessage && <EmptyState icon="💬" title={emptyStateMessage} />}
 
           <ul className="rb-post-list">
             {displayedItems.map(({ post, trendingRank }, i) => (
@@ -725,9 +733,11 @@ export default function SocialFeed({
         <p>{user ? `${myPosts.length} pubblicati` : 'Accedi per vedere i tuoi post'}</p>
       </div>
 
-      {!user && <p className="rb-social-empty">Accedi per pubblicare e monitorare i tuoi post.</p>}
+      {!user && (
+        <EmptyState icon="🔒" title="Accedi per pubblicare" subtitle="Serve un account per pubblicare e monitorare i tuoi post." actions={[{ label: 'Accedi', primary: true, onClick: onOpenAuth }]} />
+      )}
       {user && myPosts.length === 0 && (
-        <p className="rb-social-empty">Non hai ancora pubblicato nulla. Scrivi il tuo primo post nel feed!</p>
+        <EmptyState icon="📝" title="Non hai ancora pubblicato nulla" subtitle="Scrivi il tuo primo post nel feed!" />
       )}
 
       {user && myPosts.length > 0 && (

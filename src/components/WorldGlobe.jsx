@@ -6,12 +6,9 @@ import { loadLandDots } from '../globe/landDots';
 import { loadLandGeo } from '../globe/landGeo';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
+import { CATEGORY_FLY_MS } from '../fx/timing';
+import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
-
-// Durata dell'animazione "volo" della camera verso una categoria/città:
-// esportata così chi apre un pannello dopo il volo (App.jsx) può aspettare
-// esattamente questo tempo, invece di un numero magico duplicato altrove.
-export const CATEGORY_FLY_MS = 1800;
 
 // Esperimento: continenti con contorni reali (GeoJSON) al posto dei puntini.
 // Per tornare al vecchio sistema basta rimettere questa a false, il codice
@@ -161,6 +158,13 @@ export default function WorldGlobe({
   const landPointsRef = useRef(null);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [landPolygons, setLandPolygons] = useState([]);
+  // Qualità grafica (Impostazioni -> Effetti, o "Auto" con downgrade da FPS
+  // reali, vedi fx/quality.js): pixelRatio e atmosfera restano reattivi a
+  // caldo qui sotto; l'antialias del renderer invece si decide una sola
+  // volta alla creazione (rendererConfig più giù, useMemo su mount) perché
+  // WebGLRenderer non permette di cambiarlo senza ricrearlo da zero.
+  const [quality, setQuality] = useState(() => getGlobeQuality());
+  const initialAntialias = useMemo(() => getGlobeQuality().antialias, []);
   // Vista attuale della camera (altitudine + centro): guida il livello di
   // raggruppamento dei marker (vedi clusterUsers). Non basta ascoltare
   // l'evento "change" dei controlli: i voli programmati (pointOfView su
@@ -298,6 +302,25 @@ export default function WorldGlobe({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Segue i cambi di qualità (scelta esplicita in Impostazioni, o downgrade
+  // automatico da FPS bassi in modalità "Auto") e li applica al renderer già
+  // creato: pixelRatio a caldo, atmosfera tramite la prop dichiarativa più
+  // giù (vedi <Globe showAtmosphere>).
+  useEffect(() => {
+    const unsubscribe = subscribeQualityMode(() => setQuality(getGlobeQuality()));
+    const stopMonitor = startAutoQualityMonitor();
+    return () => {
+      unsubscribe();
+      stopMonitor();
+    };
+  }, []);
+
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g) return;
+    g.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
+  }, [quality.pixelRatioCap]);
 
   // Materiale opaco (non trasparente): evitiamo che il globo finisca nel canale di
   // rendering "trasparente" insieme ai puntini, che causava sfarfallio/z-fighting
@@ -539,9 +562,10 @@ export default function WorldGlobe({
     <div className="rb-globe-shell" ref={containerRef}>
       <Globe
         ref={globeRef}
+        rendererConfig={{ antialias: initialAntialias, alpha: true }}
         globeMaterial={globeMaterial}
         backgroundColor="rgba(0,0,0,0)"
-        showAtmosphere
+        showAtmosphere={quality.atmosphere}
         atmosphereColor={world.atmosphereColor}
         atmosphereAltitude={0.3}
         polygonsData={USE_REALISTIC_CONTINENTS ? landPolygons : []}

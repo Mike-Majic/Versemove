@@ -125,6 +125,10 @@
   color: rgba(245, 245, 247, 0.5);
 }
 
+.rb-arte-no-results-wrap {
+  list-style: none;
+}
+
 .rb-arte-uploaded-list {
   list-style: none;
   margin: 0 0 16px;

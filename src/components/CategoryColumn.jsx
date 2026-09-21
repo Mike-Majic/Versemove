@@ -5,6 +5,7 @@ import { findCityMatch, getCityInfo, distanceKm, isUnlimitedDistance } from '../
 import { listContentsForPlacement, toggleContentLike } from '../data/contents';
 import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
+import EmptyState from './EmptyState';
 import './CategoryColumn.css';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
@@ -168,7 +169,11 @@ export default function CategoryColumn({
       )}
 
       <ul className="rb-arte-results-list">
-        {results.length === 0 && <li className="rb-arte-no-results">Nessun risultato.</li>}
+        {results.length === 0 && (
+          <li className="rb-arte-no-results-wrap">
+            <EmptyState icon="🔍" title="Nessun risultato" subtitle="Prova un'altra ricerca o un altro filtro." />
+          </li>
+        )}
         {results.map((r) => (
           <li key={r.id} className="rb-arte-result-card">
             <div className="rb-arte-result-thumb" />
@@ -197,13 +202,11 @@ export default function CategoryColumn({
       </div>
 
       {!myCity && (
-        <p className="rb-arte-no-results">
-          Imposta la tua città nel filtro "Dove" di Impostazioni per vedere chi è nelle vicinanze.
-        </p>
+        <EmptyState icon="📍" title="Imposta la tua città" subtitle={`Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.`} />
       )}
 
       {myCity && nearbyPeople.length === 0 && (
-        <p className="rb-arte-no-results">Nessuno nelle vicinanze per ora, in questa categoria.</p>
+        <EmptyState icon="🧭" title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
       )}
 
       {myCity && nearbyPeople.length > 0 && (

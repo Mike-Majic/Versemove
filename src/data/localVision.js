@@ -1,6 +1,3 @@
-import '@tensorflow/tfjs';
-import * as cocoSsd from '@tensorflow-models/coco-ssd';
-
 // Riconoscimento del contenuto di foto/video DENTRO al browser di chi
 // pubblica, gratuito: nessuna chiamata a un server, nessun costo per
 // caricamento. Due parti, entrambe reali (non finte):
@@ -17,9 +14,19 @@ import * as cocoSsd from '@tensorflow-models/coco-ssd';
 // vede prima di postare, può togliere quello che non c'entra e aggiungere
 // i suoi tag — mai un'etichetta piazzata a sua insaputa.
 
+// TensorFlow.js + coco-ssd sono il pezzo più pesante di questo file (oltre
+// 1MB): caricati solo qui, al primo utilizzo vero (prima foto/video
+// analizzato), non al semplice apertura del composer o della colonna — vedi
+// Fase 1 "effetto wow". `await import(...)` invece di un import statico in
+// cima al file è quello che fa la differenza: il resto del modulo (le
+// euristiche sui pixel, sempre leggere) resta disponibile subito.
 let modelPromise = null;
 function getModel() {
-  if (!modelPromise) modelPromise = cocoSsd.load();
+  if (!modelPromise) {
+    modelPromise = Promise.all([import('@tensorflow/tfjs'), import('@tensorflow-models/coco-ssd')]).then(
+      ([, cocoSsd]) => cocoSsd.load()
+    );
+  }
   return modelPromise;
 }
 

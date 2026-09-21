@@ -94,6 +94,37 @@
   font-weight: 700;
 }
 
+/* Selettore "Effetti" (Auto/Massimi/Leggeri/Ridotti, vedi fx/quality.js):
+   4 bottoni segmentati invece di una <select>, coerente con
+   .rb-auth-segmented in shared.css ma qui a 4 opzioni su una sola riga. */
+.rb-settings-quality-field {
+  margin-top: 14px;
+}
+
+.rb-settings-quality-options {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rb-settings-quality-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(245, 245, 247, 0.7);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 7px 4px;
+  cursor: pointer;
+}
+
+.rb-settings-quality-btn.active {
+  background: var(--accent, #1d9bf0);
+  border-color: var(--accent, #1d9bf0);
+  color: #06151f;
+}
+
 .rb-settings-close-confirm {
   background: rgba(245, 197, 66, 0.1);
   border: 1px solid rgba(245, 197, 66, 0.4);

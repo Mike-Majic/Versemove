@@ -6,6 +6,7 @@ import { resetAccountPassword, setOwnWorlds, deleteOwnAccount } from '../data/ac
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
 import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
+import { getQualityMode, setQualityMode } from '../fx/quality';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import './SettingsPanel.css';
@@ -13,6 +14,12 @@ import './SettingsPanel.css';
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
 const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
 const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
+const QUALITY_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'high', label: 'Massimi' },
+  { value: 'medium', label: 'Leggeri' },
+  { value: 'low', label: 'Ridotti' },
+];
 
 // Riga di titolo cliccabile che apre/chiude il contenuto sotto — stesso
 // linguaggio visivo di rb-settings-nav-btn (che porta a un'altra vista),
@@ -455,6 +462,8 @@ export default function SettingsPanel({
   const [draftVisibility, setDraftVisibility] = useState(visibility);
   const [draftSound, setDraftSound] = useState(true);
   const [soundBaseline, setSoundBaseline] = useState(true);
+  const [draftQuality, setDraftQuality] = useState('auto');
+  const [qualityBaseline, setQualityBaseline] = useState('auto');
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -465,6 +474,9 @@ export default function SettingsPanel({
     const sound = isSoundEnabled();
     setDraftSound(sound);
     setSoundBaseline(sound);
+    const quality = getQualityMode();
+    setDraftQuality(quality);
+    setQualityBaseline(quality);
     setCloseConfirmOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -484,7 +496,8 @@ export default function SettingsPanel({
     JSON.stringify(draftFilters) !== JSON.stringify(filters) ||
     JSON.stringify(draftLocationFilters) !== JSON.stringify(locationFilters) ||
     JSON.stringify(draftVisibility) !== JSON.stringify(visibility) ||
-    draftSound !== soundBaseline;
+    draftSound !== soundBaseline ||
+    draftQuality !== qualityBaseline;
 
   const handleReset = () => {
     setDraftFilters(DEFAULT_FILTERS);
@@ -497,6 +510,7 @@ export default function SettingsPanel({
     setLocationFilters(draftLocationFilters);
     setVisibility(draftVisibility);
     setSoundEnabled(draftSound);
+    setQualityMode(draftQuality);
     (onApply ?? onClose)();
   };
 
@@ -554,6 +568,27 @@ export default function SettingsPanel({
               <span className="rb-toggle-slider" />
             </span>
           </label>
+
+          <div className="rb-field rb-settings-quality-field">
+            <span className="rb-toggle-text-row">
+              <strong>Effetti</strong>
+              <InfoBadge text="Quanto sono ricchi gli effetti grafici del globo (nitidezza, atmosfera). 'Auto' sceglie da solo in base al dispositivo e si adatta se il telefono/PC fatica." />
+            </span>
+            <div className="rb-settings-quality-options" role="radiogroup" aria-label="Livello effetti grafici">
+              {QUALITY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={draftQuality === opt.value}
+                  className={`rb-settings-quality-btn ${draftQuality === opt.value ? 'active' : ''}`}
+                  onClick={() => setDraftQuality(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         <CollapsibleSection

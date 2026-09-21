@@ -1,0 +1,54 @@
+.rb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 32px 16px;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rb-empty-state-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 35%, transparent);
+  margin-bottom: 6px;
+  animation: rb-empty-state-float 3s ease-in-out infinite;
+}
+
+@keyframes rb-empty-state-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.rb-empty-state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(245, 245, 247, 0.92);
+  margin: 0;
+}
+
+.rb-empty-state-subtitle {
+  font-size: 12.5px;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 320px;
+}
+
+.rb-empty-state-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-empty-state-icon {
+    animation: none;
+  }
+}
