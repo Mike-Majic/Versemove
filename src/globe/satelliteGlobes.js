@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { makeLabelSprite } from './categoryShell';
+import { getDotTexture } from './dotTexture';
+import { buildShellNodeGeometry } from './networkOverlay';
 
 // Stesso raggio del globo grande (vedi networkOverlay.js): i satelliti si
 // posizionano in proporzione a questo, non a un valore a sé.
@@ -12,8 +13,11 @@ const GLOBE_RADIUS = 100;
 // resta poco più di metà del raggio del globo prima di uscire dall'inquadratura
 // in verticale — per questo l'orbita e gli angoli sotto sono volutamente
 // stretti, misurati con uno screenshot reale (non solo calcolati a tavolino).
-const ORBIT_RADIUS = GLOBE_RADIUS * 1.55;
-const SATELLITE_RADIUS = GLOBE_RADIUS * 0.09;
+// Tenuti volutamente oltre il raggio del guscio a rete del globo grande (128,
+// vedi networkOverlay.buildNetworkShell) così i satelliti fluttuano chiaramente
+// fuori da quel guscio, non appoggiati sopra.
+const ORBIT_RADIUS = GLOBE_RADIUS * 1.85;
+const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
 
 // Disposizione fissa attorno al globo grande, pensata sullo schizzo
 // dell'utente: due in alto (sinistra/destra), due in basso, uno di lato —
@@ -21,11 +25,11 @@ const SATELLITE_RADIUS = GLOBE_RADIUS * 0.09;
 // del bordo dove verrebbero tagliati. az/el in gradi (azimut rispetto al
 // "davanti" della camera, elevazione sopra/sotto l'equatore).
 const LAYOUT = [
-  { az: -24, el: 15 },
-  { az: 24, el: 14 },
-  { az: -26, el: -16 },
-  { az: 25, el: -15 },
-  { az: 1, el: 23 },
+  { az: -22, el: 13 },
+  { az: 22, el: 12 },
+  { az: -24, el: -14 },
+  { az: 23, el: -13 },
+  { az: 1, el: 20 },
 ];
 
 function sphereFromAzEl(az, el, radius) {
@@ -66,83 +70,90 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
-// Un satellite = una sfera piena semi-trasparente colorata del mondo, più un
-// wireframe leggermente più grande sopra (solo su qualità medium/high, vedi
-// fx/quality.js) per leggerla subito come "un piccolo globo" e non una
-// pallina piatta. L'etichetta col nome resta nascosta finché non ci si passa
-// sopra (vedi setHoveredWorldId più sotto) — mai un'etichetta fissa che
-// affollerebbe la scena con 5 mondi intorno a quello attivo.
-function buildSatelliteMesh(world, quality, animateSpawn) {
+// Un satellite = un piccolo globo "a rete" (bordi + nodi luminosi, stesso
+// linguaggio visivo del guscio del globo grande — vedi networkOverlay.js
+// buildNetworkShell) colorato del mondo che rappresenta, più un nucleo quasi
+// invisibile solo per il click/hover (una LineSegments da sola non è comoda
+// da raycastare con precisione). Niente facce piene, niente etichette: lo
+// schizzo dell'utente li vuole solo come piccoli globi a rete che fluttuano,
+// non come poligoni colorati pieni.
+function buildSatelliteMesh(world, quality) {
   const group = new THREE.Group();
 
-  const geometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, quality.detail);
-  const material = new THREE.MeshPhongMaterial({
+  const coreGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, quality.detail);
+  const coreMaterial = new THREE.MeshBasicMaterial({
     color: world.color,
     transparent: true,
-    opacity: 0.42,
-    shininess: 12,
+    opacity: 0.07,
+    depthWrite: false,
   });
-  const sphere = new THREE.Mesh(geometry, material);
-  sphere.userData.worldId = world.id;
-  sphere.userData.isSatellite = true;
-  group.add(sphere);
+  const core = new THREE.Mesh(coreGeometry, coreMaterial);
+  core.userData.worldId = world.id;
+  core.userData.isSatellite = true;
+  group.add(core);
 
-  const opacityMeshes = [{ mesh: sphere, baseOpacity: 0.42 }];
+  const netMaterial = new THREE.LineBasicMaterial({
+    color: world.color,
+    transparent: true,
+    opacity: 0.85,
+  });
+  const net = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeometry), netMaterial);
+  group.add(net);
 
-  if (quality.showWireframe) {
-    const wireGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS * 1.015, quality.detail);
-    const wireMaterial = new THREE.MeshBasicMaterial({
-      color: world.color,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const wireMesh = new THREE.Mesh(wireGeometry, wireMaterial);
-    group.add(wireMesh);
-    opacityMeshes.push({ mesh: wireMesh, baseOpacity: 0.5 });
-  }
-
-  const { sprite } = makeLabelSprite(world.label, SATELLITE_RADIUS * 1.05);
-  sprite.position.set(0, SATELLITE_RADIUS * 1.75, 0);
-  sprite.visible = false;
-  group.add(sprite);
+  const nodeMaterial = new THREE.PointsMaterial({
+    color: world.color,
+    size: SATELLITE_RADIUS * 0.22,
+    map: getDotTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+  const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
+  group.add(nodes);
 
   group.userData.worldId = world.id;
-  group.userData.hitMesh = sphere;
-  group.userData.label = sprite;
-  group.userData.opacityMeshes = opacityMeshes;
+  group.userData.hitMesh = core;
+  group.userData.opacityMeshes = [
+    { mesh: core, baseOpacity: 0.07 },
+    { mesh: net, baseOpacity: 0.85 },
+    { mesh: nodes, baseOpacity: 1 },
+  ];
   group.userData.bobPhase = Math.random() * Math.PI * 2;
   group.userData.bobSpeed = 0.35 + Math.random() * 0.15;
   group.userData.spinSpeed = 0.06 + Math.random() * 0.05;
-  // Se non deve materializzarsi (primo montaggio, vedi buildSatelliteGlobes),
-  // nasce già "vecchio" (createdAtMs molto nel passato): update() lo trova
-  // già a scala/opacità piene dal primissimo frame.
-  group.userData.createdAtMs = animateSpawn ? performance.now() : -Infinity;
+  // Impostato per davvero da setActiveWorld() quando il satellite diventa
+  // visibile: finché resta -Infinity l'oggetto è comunque invisibile
+  // (group.visible = false qui sotto), quindi non ha nessun effetto grafico.
+  group.userData.createdAtMs = -Infinity;
+  group.userData.basePos = null;
+  group.visible = false;
 
   return group;
 }
 
-// Costruisce il gruppo dei globi satellite (tutti i mondi tranne quello
-// attivo, al massimo LAYOUT.length) e lo aggiunge come oggetto in PIU' nella
-// stessa scena/renderer del globo grande — mai un secondo <Globe>/renderer,
-// che su mobile non reggerebbe (vedi il commento di chi ha chiesto questa
-// fase). Il chiamante (WorldGlobe.jsx) decide quando costruirlo/distruggerlo
-// e quando chiamare update() ad ogni frame.
-export function buildSatelliteGlobes({ worlds, activeWorldId, quality, animateSpawn = true }) {
+// Costruisce UN SATELLITE PERSISTENTE PER OGNI MONDO (non solo quelli
+// visibili adesso) e lo aggiunge come oggetto in più nella STESSA
+// scena/renderer del globo grande — mai un secondo <Globe>/renderer, che su
+// mobile non reggerebbe. A differenza della Fase 2a/2b, qui i satelliti si
+// costruiscono UNA SOLA VOLTA (a questa chiamata) e non vengono più
+// ricreati ad ogni cambio di mondo: warp() si limita a chiamare
+// setActiveWorld(), che mostra/nasconde e riposiziona gli stessi oggetti già
+// pronti. Ricreare geometrie/materiali (quindi ricompilare gli shader) ad
+// ogni warp era il vero costo del blocco misurato durante il volo — qui non
+// succede più durante l'uso normale, solo quando cambia davvero la qualità
+// grafica (vedi WorldGlobe.jsx, che richiama questa funzione da zero solo in
+// quel caso, mai per un semplice cambio di mondo).
+export function buildSatelliteGlobes({ worlds, quality }) {
   const group = new THREE.Group();
   group.name = 'rb-satellite-globes';
 
-  const satellites = worlds
-    .filter((w) => w.id !== activeWorldId)
-    .slice(0, LAYOUT.length)
-    .map((world, i) => {
-      const mesh = buildSatelliteMesh(world, quality, animateSpawn);
-      const basePos = sphereFromAzEl(LAYOUT[i].az, LAYOUT[i].el, ORBIT_RADIUS);
-      mesh.position.copy(basePos);
-      mesh.userData.basePos = basePos;
-      group.add(mesh);
-      return mesh;
-    });
+  const satellites = worlds.map((world) => {
+    const mesh = buildSatelliteMesh(world, quality);
+    group.add(mesh);
+    return mesh;
+  });
+  const satellitesById = new Map(satellites.map((s) => [s.userData.worldId, s]));
 
   // Stato del warp in corso (Fase 2b, vedi WorldGlobe.jsx): quale satellite
   // sta "crescendo" verso la camera e da quando. Un solo warp alla volta —
@@ -157,9 +168,32 @@ export function buildSatelliteGlobes({ worlds, activeWorldId, quality, animateSp
   }
 
   function getWorldLatLng(worldId) {
-    const sat = satellites.find((s) => s.userData.worldId === worldId);
-    if (!sat) return null;
+    const sat = satellitesById.get(worldId);
+    if (!sat?.userData.basePos) return null;
     return vectorToLatLng(sat.userData.basePos);
+  }
+
+  // Mostra come satelliti tutti i mondi tranne quello attivo (al massimo
+  // LAYOUT.length), nella disposizione fissa di sempre. Non tocca mai
+  // geometrie/materiali: solo visibilità, posizione e — se richiesto — un
+  // riavvio dell'animazione di comparsa sui satelliti ora visibili.
+  function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
+    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId).slice(0, LAYOUT.length);
+    const visibleIds = new Set(visibleWorlds.map((w) => w.id));
+    const nowMs = performance.now();
+
+    satellites.forEach((sat) => {
+      sat.visible = visibleIds.has(sat.userData.worldId);
+    });
+
+    visibleWorlds.forEach((world, i) => {
+      const sat = satellitesById.get(world.id);
+      if (!sat) return;
+      const basePos = sphereFromAzEl(LAYOUT[i].az, LAYOUT[i].el, ORBIT_RADIUS);
+      sat.userData.basePos = basePos;
+      sat.position.copy(basePos);
+      if (animateSpawn) sat.userData.createdAtMs = nowMs;
+    });
   }
 
   // Galleggiamento verticale (oscillazione sin, ampiezza minima) + rotazione
@@ -170,7 +204,9 @@ export function buildSatelliteGlobes({ worlds, activeWorldId, quality, animateSp
   function update(elapsedSec, deltaSec) {
     const nowMs = performance.now();
     for (const sat of satellites) {
+      if (!sat.visible) continue;
       const { basePos, bobPhase, bobSpeed, spinSpeed, createdAtMs, worldId, opacityMeshes } = sat.userData;
+      if (!basePos) continue;
 
       const spawnAge = nowMs - createdAtMs;
       const spawnT = spawnAge >= SPAWN_MS ? 1 : easeOutCubic(Math.max(0, spawnAge) / SPAWN_MS);
@@ -193,13 +229,7 @@ export function buildSatelliteGlobes({ worlds, activeWorldId, quality, animateSp
   }
 
   function getHitMeshes() {
-    return satellites.map((s) => s.userData.hitMesh);
-  }
-
-  function setHoveredWorldId(worldId) {
-    for (const sat of satellites) {
-      sat.userData.label.visible = sat.userData.worldId === worldId;
-    }
+    return satellites.filter((s) => s.visible).map((s) => s.userData.hitMesh);
   }
 
   function dispose() {
@@ -214,5 +244,5 @@ export function buildSatelliteGlobes({ worlds, activeWorldId, quality, animateSp
     });
   }
 
-  return { group, satellites, update, getHitMeshes, setHoveredWorldId, setWarpTarget, getWorldLatLng, dispose };
+  return { group, satellites, setActiveWorld, update, getHitMeshes, setWarpTarget, getWorldLatLng, dispose };
 }

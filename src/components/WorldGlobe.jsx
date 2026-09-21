@@ -167,11 +167,9 @@ export default function WorldGlobe({
   const categoryShellRef = useRef(null);
   const landPointsRef = useRef(null);
   const satellitesRef = useRef(null);
-  const satPointerRef = useRef(null);
-  const hoverRaycaster = useMemo(() => new THREE.Raycaster(), []);
   const warpFlashRef = useRef(null);
   const warpingRef = useRef(false);
-  const hasBuiltSatellitesRef = useRef(false);
+  const hasPositionedSatellitesRef = useRef(false);
   // Letto dal polling a 250ms sotto (interval con deps [], serve un ref e
   // non solo la prop per restare aggiornato senza far ripartire l'intervallo).
   const activeCategoryRef = useRef(activeCategory);
@@ -218,18 +216,6 @@ export default function WorldGlobe({
       // polling della vista qui sopra, nessun ciclo nuovo da pagare.
       if (categoryShellRef.current) {
         updateCategoryLabelVisibility(g, categoryShellRef.current, activeCategoryRef.current);
-      }
-      // Nome del globo satellite sotto al puntatore (solo mouse, non touch:
-      // il tocco seleziona subito, non ha un "passaggio sopra" da mostrare):
-      // stesso giro di polling, un raycast in più costa pochissimo ogni 250ms.
-      if (satellitesRef.current) {
-        if (satPointerRef.current) {
-          hoverRaycaster.setFromCamera(satPointerRef.current, g.camera());
-          const hits = hoverRaycaster.intersectObjects(satellitesRef.current.getHitMeshes());
-          satellitesRef.current.setHoveredWorldId(hits[0]?.object.userData.worldId ?? null);
-        } else {
-          satellitesRef.current.setHoveredWorldId(null);
-        }
       }
     }, 250);
     return () => clearInterval(interval);
@@ -527,26 +513,24 @@ export default function WorldGlobe({
   // I 5 globi satellite (i mondi non attivi) vivono nella STESSA scena/
   // renderer del globo grande — mai un secondo <Globe>, che vorrebbe dire un
   // secondo WebGLRenderer per ognuno e su mobile non reggerebbe (vedi
-  // globe/satelliteGlobes.js). Si ricostruiscono ad ogni cambio di mondo
-  // attivo (quello appena lasciato torna satellite, quello appena raggiunto
-  // sparisce dalla lista).
+  // globe/satelliteGlobes.js). Un satellite per mondo si costruisce UNA
+  // SOLA VOLTA qui (o di nuovo solo se cambia davvero la qualità grafica,
+  // `quality` nelle deps): ricrearli ad ogni warp costringeva il driver a
+  // ricompilare gli shader dei loro materiali ad ogni cambio di mondo, il
+  // vero costo del blocco misurato durante il volo (~250ms). Il cambio di
+  // mondo attivo (sotto) si limita a mostrare/nascondere/riposizionare
+  // questi stessi oggetti già pronti.
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return undefined;
     const scene = g.scene();
-    // Al primissimo montaggio i satelliti compaiono normalmente (niente
-    // narrativa di "arrivo"); da lì in poi ogni ricostruzione segue un
-    // cambio di mondo — quasi sempre un warp (Fase 2b) — e il mondo appena
-    // lasciato si materializza al proprio posto invece di comparire di scatto.
-    const sats = buildSatelliteGlobes({
-      worlds: WORLDS,
-      activeWorldId: world.id,
-      quality: getMiniGlobeQuality(),
-      animateSpawn: hasBuiltSatellitesRef.current,
-    });
-    hasBuiltSatellitesRef.current = true;
+    const sats = buildSatelliteGlobes({ worlds: WORLDS, quality: getMiniGlobeQuality() });
     scene.add(sats.group);
     satellitesRef.current = sats;
+    // Un pool appena (ri)costruito non ha ancora nessun satellite
+    // posizionato: il prossimo effetto (world.id) deve farlo senza
+    // l'animazione di comparsa, come se non fosse mai successo nulla.
+    hasPositionedSatellitesRef.current = false;
     globeActivity.wake();
     return () => {
       scene.remove(sats.group);
@@ -554,7 +538,20 @@ export default function WorldGlobe({
       satellitesRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world.id]);
+  }, [quality]);
+
+  // Quale mondo è attivo adesso (quindi quali 5 sono satelliti, e dove):
+  // nessuna geometria/materiale nuovo, solo setActiveWorld() sul pool già
+  // costruito sopra — l'unica cosa che un warp deve davvero fare a runtime.
+  useEffect(() => {
+    const sats = satellitesRef.current;
+    if (!sats) return undefined;
+    sats.setActiveWorld(world.id, { animateSpawn: hasPositionedSatellitesRef.current });
+    hasPositionedSatellitesRef.current = true;
+    globeActivity.wake();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id, quality]);
 
   // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
   // giro di disegno del globo grande (un wrapper attorno a renderer.render,
@@ -667,34 +664,6 @@ export default function WorldGlobe({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onWarpArrived]);
-
-  // Posizione del puntatore per l'hover dei satelliti (letta dal polling a
-  // 250ms sopra, non da un handler che raycasta ad ogni movimento — troppo
-  // costoso per qualcosa che deve solo mostrare un nome). Solo mouse: su
-  // touch non esiste un "passaggio sopra" prima del tocco.
-  useEffect(() => {
-    if (isTouchDevice) return undefined;
-    const g = globeRef.current;
-    if (!g) return undefined;
-    const canvas = g.renderer().domElement;
-    const onMove = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      satPointerRef.current = {
-        x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        y: -((e.clientY - rect.top) / rect.height) * 2 + 1,
-      };
-    };
-    const onLeave = () => {
-      satPointerRef.current = null;
-    };
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerleave', onLeave);
-    return () => {
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerleave', onLeave);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const g = globeRef.current;

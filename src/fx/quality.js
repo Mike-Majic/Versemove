@@ -25,14 +25,13 @@ export const GLOBE_QUALITY = {
 // Budget dei 5 globi satellite (Fase 2, src/globe/satelliteGlobes.js): vivono
 // nella STESSA scena/renderer del globo grande (un solo WebGLRenderer in
 // tutta la pagina, vedi WorldGlobe.jsx), quindi non hanno un proprio
-// pixelRatio da limitare — la sola leva è quanti nodi ha ciascuna sfera.
-// `detail` è il livello di suddivisione passato a THREE.IcosahedronGeometry
-// (0 = 20 facce, 1 = 80, 2 = 320): "low" resta al minimo, niente contorno a
-// wireframe sopra.
+// pixelRatio da limitare — la sola leva è quanti nodi ha la rete di ciascuna
+// sfera. `detail` è il livello di suddivisione passato a
+// THREE.IcosahedronGeometry (0 = 20 facce/rete essenziale, 1 = 80, 2 = 320).
 export const MINI_GLOBE_QUALITY = {
-  high: { detail: 2, showWireframe: true },
-  medium: { detail: 1, showWireframe: true },
-  low: { detail: 0, showWireframe: false },
+  high: { detail: 2 },
+  medium: { detail: 1 },
+  low: { detail: 0 },
 };
 
 export function getQualityMode() {
