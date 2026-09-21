@@ -516,6 +516,35 @@ function FavoriteCategoriesList({ favoriteCategories }) {
   );
 }
 
+// Anteprima di come il profilo appare agli altri: gli stessi dati
+// pubblici mostrati in giro per l'app (avatar, nickname, spunta
+// verificato, tipo account) — nome/cognome non compaiono perché non sono
+// mai mostrati agli altri utenti, solo usati per la verifica documento.
+// Città e bio restano fuori: servono solo al mazzo del mondo Incontri
+// (Impostazioni → Profilo Incontri), non sono un dato di profilo generale.
+function ProfilePreviewCard({ user }) {
+  const pronomi = user.pronomi || (user.genere === 'donna' ? 'Lei (she/her)' : user.genere === 'uomo' ? 'Lui (he/him)' : '');
+  return (
+    <div className="rb-profile-preview">
+      <p className="rb-profile-preview-label">Anteprima — così ti vedono gli altri utenti</p>
+      <div className="rb-profile-preview-card">
+        <img className="rb-profile-preview-avatar" src={user.avatar} alt={user.nickname} />
+        <div className="rb-profile-preview-info">
+          <div className="rb-profile-preview-name-row">
+            <strong>{user.nickname}</strong>
+            {user.verificato && <span className="rb-verified-badge" title="Account verificato">✓</span>}
+          </div>
+          {user.tipoAccount === 'azienda' ? (
+            <span className="rb-profile-preview-tag">🏢 {user.ragioneSociale || 'Azienda'}</span>
+          ) : (
+            pronomi && <span className="rb-profile-preview-tag">{pronomi}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [] }) {
   const [tab, setTab] = useState('profilo');
   const [nickname, setNickname] = useState(user?.nickname ?? '');
@@ -594,7 +623,14 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
         {tab === 'profilo' && (
           <>
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
+            <ProfilePreviewCard user={user} />
+          </>
+        )}
 
+        {tab === 'album' && <AlbumsPanel />}
+
+        {tab === 'account' && (
+          <>
             <FieldGroup
               title="Nickname"
               ruleText={NICKNAME_RULE_TEXT}
@@ -623,12 +659,10 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
                 <input type="text" placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} maxLength={40} />
               </div>
             </FieldGroup>
+
+            <AccountTab user={user} onUpdateUser={onUpdateUser} />
           </>
         )}
-
-        {tab === 'album' && <AlbumsPanel />}
-
-        {tab === 'account' && <AccountTab user={user} onUpdateUser={onUpdateUser} />}
 
         {urgentField && (
           <ModalOverlay onClose={() => setUrgentField(null)} className="rb-profile-confirm-overlay">
