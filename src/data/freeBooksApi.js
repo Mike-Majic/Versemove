@@ -32,19 +32,33 @@ async function fetchJson(url, signal) {
   }
 }
 
-export async function searchFreeBooks(query, { signal } = {}) {
+// Ordinamenti esposti in UI -> parametro sort di Archive.org ("" = rilevanza,
+// l'ordinamento di default, quindi nessun parametro sort da aggiungere).
+const SORT_PARAMS = {
+  relevance: null,
+  newest: 'year desc',
+  popular: 'downloads desc',
+};
+
+export async function searchFreeBooks(query, { signal, sort = 'relevance', yearFrom, yearTo } = {}) {
   // mediatype:texts = libri (non audio/video/software); -access-restricted-item:true
   // esclude tutto ciò che richiederebbe un account per essere aperto.
-  const q = `${query.trim()} AND mediatype:texts AND -access-restricted-item:true`;
+  let q = `${query.trim()} AND mediatype:texts AND -access-restricted-item:true`;
+  if (yearFrom || yearTo) {
+    q += ` AND year:[${yearFrom || '0'} TO ${yearTo || '9999'}]`;
+  }
   const params = [
     `q=${encodeURIComponent(q)}`,
     'fl[]=identifier',
     'fl[]=title',
     'fl[]=creator',
+    'fl[]=year',
     `rows=${RESULTS_LIMIT}`,
     'output=json',
-  ].join('&');
-  const url = `${SEARCH_BASE}?${params}`;
+  ];
+  const sortParam = SORT_PARAMS[sort];
+  if (sortParam) params.push(`sort[]=${encodeURIComponent(sortParam)}`);
+  const url = `${SEARCH_BASE}?${params.join('&')}`;
 
   let data;
   try {
@@ -63,6 +77,7 @@ export async function searchFreeBooks(query, { signal } = {}) {
         id: d.identifier,
         title: d.title || 'Senza titolo',
         authors: (Array.isArray(d.creator) ? d.creator.join(', ') : d.creator) || 'Autore sconosciuto',
+        year: d.year || null,
         cover: `${COVER_BASE}/${d.identifier}`,
         readUrl: `https://archive.org/details/${d.identifier}`,
         // Il lettore incorporato (stesso principio già usato per

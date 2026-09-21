@@ -37,6 +37,9 @@ export default function FreeBooksCatalog() {
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
   const [reading, setReading] = useState(null);
+  const [sort, setSort] = useState('relevance');
+  const [yearFrom, setYearFrom] = useState('');
+  const [yearTo, setYearTo] = useState('');
   const abortRef = useRef(null);
 
   const search = async () => {
@@ -54,7 +57,12 @@ export default function FreeBooksCatalog() {
     setBooks([]);
     setCount(null);
     try {
-      const result = await searchFreeBooks(query, { signal: controller.signal });
+      const result = await searchFreeBooks(query, {
+        signal: controller.signal,
+        sort,
+        yearFrom: yearFrom.trim(),
+        yearTo: yearTo.trim(),
+      });
       setBooks(result.books);
       setCount(result.count);
     } catch (err) {
@@ -114,6 +122,37 @@ export default function FreeBooksCatalog() {
         </button>
       </div>
 
+      <div className="rb-freebooks-filters-row">
+        <label className="rb-freebooks-filter">
+          <span>Ordina per</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="relevance">Rilevanza</option>
+            <option value="newest">Più recenti</option>
+            <option value="popular">Più popolari</option>
+          </select>
+        </label>
+        <label className="rb-freebooks-filter">
+          <span>Anno da</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder="1990"
+            value={yearFrom}
+            onChange={(e) => setYearFrom(e.target.value)}
+          />
+        </label>
+        <label className="rb-freebooks-filter">
+          <span>Anno a</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder="2020"
+            value={yearTo}
+            onChange={(e) => setYearTo(e.target.value)}
+          />
+        </label>
+      </div>
+
       {loading && <p className="rb-freebooks-status">Cerco nel catalogo...</p>}
       {error && <p className="rb-freebooks-status rb-freebooks-error">{error}</p>}
       {!loading && !error && searched && books.length === 0 && (
@@ -133,7 +172,7 @@ export default function FreeBooksCatalog() {
             )}
             <div className="rb-freebooks-info">
               <strong>{b.title}</strong>
-              <p>{b.authors}</p>
+              <p>{b.authors}{b.year ? ` · ${b.year}` : ''}</p>
               <button type="button" className="rb-freebooks-read-btn" onClick={() => setReading(b)}>
                 Leggi qui
               </button>

@@ -40,6 +40,34 @@
   cursor: pointer;
 }
 
+.rb-freebooks-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rb-freebooks-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-freebooks-filter select,
+.rb-freebooks-filter input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #f5f5f7;
+  font-size: 12.5px;
+}
+
+.rb-freebooks-filter input {
+  width: 72px;
+}
+
 .rb-freebooks-status {
   font-size: 12.5px;
   color: rgba(245, 245, 247, 0.6);
