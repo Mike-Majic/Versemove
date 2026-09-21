@@ -1,0 +1,815 @@
+.rb-musicapp {
+  position: absolute;
+  top: 76px;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 92vw);
+  background: rgba(10, 6, 16, 0.92);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-radius: 18px;
+  overflow: hidden;
+  pointer-events: auto;
+  color: #f5f5f7;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #8b5cf6) 18%, transparent);
+}
+
+@media (max-width: 480px) {
+  .rb-musicapp {
+    top: 168px;
+    bottom: 26px;
+    width: calc(100vw - 28px);
+  }
+}
+
+.rb-musicapp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 60px 16px 16px;
+}
+
+/* ---- Nav in basso ---- */
+.rb-musica-bottomnav {
+  display: flex;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(6, 4, 12, 0.9);
+  flex-shrink: 0;
+}
+
+.rb-musica-bottomnav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: rgba(245, 245, 247, 0.55);
+  font-size: 10.5px;
+  padding: 8px 4px 10px;
+  cursor: pointer;
+}
+
+.rb-musica-bottomnav-btn.active {
+  color: var(--accent, #8b5cf6);
+}
+
+.rb-musica-bottomnav-icon {
+  font-size: 18px;
+}
+
+/* ---- Mini-player ---- */
+.rb-musica-now-playing {
+  flex-shrink: 0;
+  background: rgba(18, 12, 28, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rb-musica-now-playing-progress {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rb-musica-now-playing-progress-fill {
+  height: 100%;
+  background: var(--accent, #8b5cf6);
+  transition: width 0.3s linear;
+}
+
+.rb-musica-now-playing-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.rb-musica-now-playing-frame {
+  width: 64px;
+  height: 36px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.rb-musica-now-playing-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-musica-now-playing-info strong {
+  display: block;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-musica-now-playing-info p {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-musica-now-playing-next,
+.rb-musica-now-playing-close {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  color: #f5f5f7;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* ---- Righe brano ---- */
+.rb-musica-track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rb-musica-track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 7px 9px;
+}
+
+.rb-musica-track-art,
+.rb-musica-track-art-empty {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rb-musica-track-art-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rb-musica-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-musica-track-info strong {
+  display: block;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-musica-track-info p {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-musica-play-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.rb-musica-status {
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.55);
+  margin: 6px 0;
+}
+
+.rb-musica-error {
+  color: #ff8080;
+}
+
+.rb-musica-empty {
+  list-style: none;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-musica-inline-link {
+  background: none;
+  border: none;
+  color: var(--accent, #8b5cf6);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ---- Sezioni ---- */
+.rb-musica-section {
+  margin-top: 18px;
+}
+
+.rb-musica-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rb-musica-section h4 {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+}
+
+.rb-musica-play-all-btn {
+  background: var(--accent, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---- Chip ---- */
+.rb-musica-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.rb-musica-chip {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(245, 245, 247, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rb-musica-chip.active {
+  background: var(--accent, #8b5cf6);
+  border-color: var(--accent, #8b5cf6);
+  color: #0d0714;
+}
+
+/* ---- Home: sfondo sfumato dalla copertina in riproduzione ---- */
+.rb-musica-home {
+  position: relative;
+  margin: -60px -16px -16px;
+  padding: 60px 16px 16px;
+  min-height: 100%;
+}
+
+.rb-musica-home-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(50px) saturate(1.3);
+  opacity: 0.35;
+  transform: scale(1.2);
+  z-index: 0;
+}
+
+.rb-musica-home::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 6, 16, 0.2), rgba(10, 6, 16, 0.95) 70%);
+  z-index: 0;
+}
+
+.rb-musica-home-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Selezione rapida (griglia 3x3 a pagine) ---- */
+.rb-musica-quickpicks-scroll {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.rb-musica-quickpicks-page {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.rb-musica-qp-tile {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px;
+  color: #f5f5f7;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.rb-musica-qp-tile strong {
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.rb-musica-qp-mosaic {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.rb-musica-qp-mosaic span {
+  background: rgba(255, 255, 255, 0.08);
+  background-size: cover;
+  background-position: center;
+}
+
+.rb-musica-qp-mosaic-empty {
+  grid-column: span 2;
+  grid-row: span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.rb-musica-qp-avatar {
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.rb-musica-quickpicks-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.rb-musica-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.rb-musica-dot.active {
+  background: var(--accent, #8b5cf6);
+}
+
+/* ---- Aggiungi a playlist ---- */
+.rb-musica-add-menu {
+  position: relative;
+}
+
+.rb-musica-add-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f5f5f7;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 5px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rb-musica-add-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 160px;
+  background: rgba(10, 8, 18, 0.97);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 30;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.rb-musica-add-popover ul {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.rb-musica-add-popover button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #f5f5f7;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rb-musica-add-popover button:hover {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 22%, transparent);
+}
+
+.rb-musica-add-new-btn {
+  color: var(--accent, #8b5cf6) !important;
+  font-weight: 600;
+}
+
+.rb-musica-add-new-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+}
+
+.rb-musica-add-new-form input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #f5f5f7;
+  font-size: 12px;
+}
+
+.rb-musica-add-new-form button {
+  background: var(--accent, #8b5cf6);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rb-musica-add-new-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- Dettaglio playlist ---- */
+.rb-musica-playlist-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rb-musica-back-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.rb-musica-playlist-detail-header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-musica-playlist-detail-header strong {
+  font-size: 14px;
+}
+
+.rb-musica-playlist-detail-desc {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-musica-delete-btn,
+.rb-musica-remove-btn {
+  background: rgba(255, 56, 96, 0.16);
+  border: 1px solid rgba(255, 56, 96, 0.4);
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rb-musica-remove-btn {
+  padding: 3px 7px;
+}
+
+/* ---- Raccolta ---- */
+.rb-musica-raccolta {
+  position: relative;
+  min-height: calc(100% - 44px);
+}
+
+.rb-musica-raccolta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rb-musica-raccolta-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.rb-musica-raccolta-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rb-musica-raccolta-search {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #f5f5f7;
+  font-size: 12px;
+  width: 130px;
+}
+
+.rb-musica-icon-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f5f5f7;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.rb-musica-raccolta-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.rb-musica-playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.rb-musica-playlist-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px;
+  color: #f5f5f7;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rb-musica-playlist-card strong {
+  font-size: 12px;
+}
+
+.rb-musica-playlist-card span {
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-musica-playlist-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  overflow: hidden;
+}
+
+.rb-musica-playlist-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rb-musica-playlist-cover-liked {
+  background: color-mix(in srgb, #ec4899 25%, transparent);
+}
+
+.rb-musica-playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rb-musica-playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 7px 9px;
+  color: #f5f5f7;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rb-musica-playlist-row .rb-musica-playlist-cover {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.rb-musica-playlist-row strong {
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.rb-musica-playlist-row span {
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-musica-fab {
+  position: sticky;
+  bottom: 10px;
+  left: 100%;
+  transform: translateX(0);
+  margin-top: 16px;
+  display: block;
+  margin-left: auto;
+  background: var(--accent, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.rb-musica-new-playlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.rb-musica-new-playlist-form input,
+.rb-musica-new-playlist-form textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #f5f5f7;
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: none;
+}
+
+.rb-musica-new-playlist-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rb-musica-new-playlist-actions button {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rb-musica-new-playlist-submit {
+  background: var(--accent, #8b5cf6) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.rb-musica-new-playlist-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- Dropdown custom ---- */
+.rb-musica-select {
+  position: relative;
+}
+
+.rb-musica-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 35%, transparent);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #f5f5f7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rb-musica-select-arrow {
+  color: var(--accent, #8b5cf6);
+  transition: transform 0.15s ease;
+}
+
+.rb-musica-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.rb-musica-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  list-style: none;
+  margin: 0;
+  padding: 5px;
+  background: rgba(10, 8, 18, 0.97);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  z-index: 20;
+}
+
+.rb-musica-select-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #f5f5f7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rb-musica-select-menu button:hover {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 22%, transparent);
+}
+
+.rb-musica-select-menu button.active {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 35%, transparent);
+  font-weight: 600;
+}

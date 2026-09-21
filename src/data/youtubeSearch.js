@@ -11,6 +11,7 @@
 // da tutti gli utenti del sito, si azzera il giorno dopo).
 const YOUTUBE_API_KEY = 'AIzaSyA3j42RV7jQGD-pIGTkDWJCjDfN0M8Fl-Y';
 const YOUTUBE_SEARCH_BASE = 'https://www.googleapis.com/youtube/v3/search';
+const YOUTUBE_VIDEOS_BASE = 'https://www.googleapis.com/youtube/v3/videos';
 
 const SEARCH_TIMEOUT_MS = 20000;
 
@@ -34,8 +35,9 @@ async function fetchJson(url) {
   }
 }
 
-export async function searchYoutubeVideos(query, limit = 15) {
-  const url = `${YOUTUBE_SEARCH_BASE}?part=snippet&type=video&maxResults=${limit}&q=${encodeURIComponent(query.trim())}&key=${YOUTUBE_API_KEY}`;
+export async function searchYoutubeVideos(query, limit = 15, { order } = {}) {
+  const orderParam = order ? `&order=${order}` : '';
+  const url = `${YOUTUBE_SEARCH_BASE}?part=snippet&type=video&maxResults=${limit}&q=${encodeURIComponent(query.trim())}&key=${YOUTUBE_API_KEY}${orderParam}`;
   let data;
   try {
     data = await fetchJson(url);
@@ -53,9 +55,33 @@ export async function searchYoutubeVideos(query, limit = 15) {
     }));
 }
 
+// Le viste reali non arrivano dalla ricerca (search.list non le include):
+// serve una seconda chiamata mirata sugli id già trovati. Usata con
+// parsimonia (solo per "Tendenze" in Esplora, una volta per apertura scheda)
+// perché la quota gratuita è condivisa da tutto il sito.
+export async function getVideoViewCounts(videoIds) {
+  if (!videoIds.length) return {};
+  const url = `${YOUTUBE_VIDEOS_BASE}?part=statistics&id=${videoIds.join(',')}&key=${YOUTUBE_API_KEY}`;
+  let data;
+  try {
+    data = await fetchJson(url);
+  } catch (err) {
+    if (err.message !== 'timeout') throw err;
+    data = await fetchJson(url);
+  }
+  const map = {};
+  for (const it of data.items ?? []) map[it.id] = Number(it.statistics?.viewCount ?? 0);
+  return map;
+}
+
 // URL di incorporazione ufficiale, costruito solo dall'id video validato
 // dalla risposta dell'API (mai da un link incollato a mano): dominio
 // -nocookie, meno tracciamento finché non si preme play.
 export function youtubeEmbedUrl(videoId) {
-  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+  // enablejsapi=1: senza caricare lo script ufficiale iframe_api, basta
+  // questo parametro perché il player mandi da solo eventi postMessage
+  // (onStateChange, infoDelivery con currentTime/duration) alla pagina che
+  // lo ospita — usato per la barra di avanzamento e il "successivo" del
+  // mini-player condiviso (vedi components/musica/MusicaApp.jsx).
+  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
 }
