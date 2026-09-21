@@ -26,8 +26,10 @@ const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
 // variarlo). Farlo dipendere dalla qualità causava un difetto concreto: se
 // "Auto" declassava il livello a metà sessione (FPS reali bassi, vedi
 // fx/quality.js), TUTTI i satelliti cambiavano forma di colpo, da sfera
-// densa a poliedro spigoloso, proprio mentre l'utente li guardava.
-const SATELLITE_DETAIL = 1;
+// densa a poliedro spigoloso, proprio mentre l'utente li guardava. Al
+// massimo (320 facce): costando comunque pochissimo, tanto vale la rete più
+// fitta possibile, quella che si legge meglio come "sfera" e non "poliedro".
+const SATELLITE_DETAIL = 2;
 
 // Disposizione fissa attorno al globo grande, pensata sullo schizzo
 // dell'utente: due in alto (sinistra/destra), due in basso, uno di lato —
@@ -86,13 +88,14 @@ function easeOutCubic(t) {
 
 // Un satellite = un piccolo globo "a rete" (bordi + nodi luminosi, stesso
 // linguaggio visivo del guscio del globo grande — vedi networkOverlay.js
-// buildNetworkShell) colorato del mondo che rappresenta, più un nucleo quasi
-// invisibile solo per il click/hover (una LineSegments da sola non è comoda
-// da raycastare con precisione) e il nome del mondo sempre visibile sopra
-// (stessa etichetta a pillola scura delle categorie sul globo grande — vedi
-// categoryShell.js makeLabelSprite — ma senza il triangolo colorato dietro,
-// qui non c'è una faccia da riempire). Niente facce piene: lo schizzo
-// dell'utente li vuole come piccoli globi a rete che fluttuano.
+// buildNetworkShell) colorato del mondo che rappresenta, con un nucleo
+// pieno semi-trasparente sotto la rete (come il globo grande, che ha la
+// Terra piena sotto il proprio guscio): senza un corpo pieno la sola rete
+// si legge come uno scheletro spigoloso invece che come una sfera. Il nome
+// del mondo resta sempre visibile sopra (stessa etichetta a pillola scura
+// delle categorie sul globo grande — vedi categoryShell.js makeLabelSprite
+// — ma senza il triangolo colorato dietro, qui non c'è una faccia da
+// riempire).
 function buildSatelliteMesh(world) {
   const group = new THREE.Group();
 
@@ -100,7 +103,7 @@ function buildSatelliteMesh(world) {
   const coreMaterial = new THREE.MeshBasicMaterial({
     color: world.color,
     transparent: true,
-    opacity: 0.07,
+    opacity: 0.3,
     depthWrite: false,
   });
   const core = new THREE.Mesh(coreGeometry, coreMaterial);
@@ -135,7 +138,7 @@ function buildSatelliteMesh(world) {
   group.userData.worldId = world.id;
   group.userData.hitMesh = core;
   group.userData.opacityMeshes = [
-    { mesh: core, baseOpacity: 0.07 },
+    { mesh: core, baseOpacity: 0.3 },
     { mesh: net, baseOpacity: 0.85 },
     { mesh: nodes, baseOpacity: 1 },
     { mesh: label, baseOpacity: 1 },
