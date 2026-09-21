@@ -1,5 +1,5 @@
 // Configurazione dei "mondi" del mappamondo interattivo.
-// Ordine dello swipe a due dita: bambini -> social -> lavoro -> arte -> nerd -> incontri -> (torna a bambini).
+// Ordine dello swipe a due dita: bambini -> social -> lavoro -> arte -> nerd -> incontri -> vetrina -> (torna a bambini).
 // Il mondo blu (Social) è quello principale: è il primo che si vede all'apertura dell'app.
 export const WORLDS = [
   {
@@ -63,6 +63,16 @@ export const WORLDS = [
     globeColor: '#1f0409',
     atmosphereColor: '#ff3860',
     textOnGlobe: '#ffeaf0',
+  },
+  {
+    id: 'vetrina',
+    label: 'Vetrina',
+    tagline: 'Novità in mostra',
+    color: '#ec4899',
+    colorSoft: 'rgba(236, 72, 153, 0.18)',
+    globeColor: '#1f0416',
+    atmosphereColor: '#ec4899',
+    textOnGlobe: '#ffeaf7',
   },
 ];
 

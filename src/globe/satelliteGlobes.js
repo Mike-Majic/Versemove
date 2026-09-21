@@ -31,52 +31,74 @@ const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
 // fitta possibile, quella che si legge meglio come "sfera" e non "poliedro".
 const SATELLITE_DETAIL = 2;
 
-// Disposizione fissa attorno al globo grande, pensata sullo schizzo
-// dell'utente: due in alto (sinistra/destra), due in basso, uno di lato.
-// azFrac/elFrac sono FRAZIONI (-1..1) di metà campo visivo orizzontale e
-// verticale, non gradi assoluti: il fov della camera (vedi
-// node_modules/three-render-objects) è 50° VERTICALI fissi, ma quello
-// ORIZZONTALE dipende dall'aspect ratio dello schermo (largo su desktop,
-// stretto su telefono in verticale) — con angoli assoluti tarati su un
-// monitor, su un telefono in verticale il campo orizzontale reale si
-// restringe così tanto che quasi tutti i satelliti finiscono fuori
-// inquadratura o accalcati al centro (bug osservato: solo 1 di 5 visibile).
-// Usare una frazione del campo REALE, ricalcolata ad ogni chiamata con la
-// camera attuale (vedi slotAzEl), li tiene sempre dentro inquadratura su
-// qualunque proporzione di schermo. Frazioni derivate dagli angoli assoluti
-// originari (tarati a vista su desktop, aspect ~1.4) divisi per il relativo
-// mezzo-campo di quell'aspect ratio. L'elevazione dello slot più alto
-// (l'ultimo) resta più bassa degli altri apposta: deve lasciare spazio
-// sopra di sé alla sua etichetta col nome del mondo (vedi buildSatelliteMesh).
+// Disposizione attorno al globo grande, sparsa in profondità come un
+// sistema solare (non tutti sulla stessa fascia frontale): quattro
+// "vicini" davanti (due in alto, due in basso), uno chiaramente sopra, uno
+// di lato/dietro, più vicino al globo e parzialmente coperto da lui.
+//
+// Ogni slot è una FRAZIONE (-1..1) di metà campo visivo orizzontale e
+// verticale, ricalcolata ad ogni chiamata sulla camera ATTUALE (vedi
+// slotAzEl) — resta sempre dentro inquadratura e cliccabile su qualunque
+// proporzione di schermo (il fov orizzontale della camera dipende
+// dall'aspect ratio, stretto su telefono in verticale; con angoli assoluti
+// quasi tutti finivano fuori inquadratura su mobile, bug osservato più
+// volte: prima con 1 solo satellite su 5 visibile, poi di nuovo col sesto
+// slot "dietro/di lato", invisibile su schermi stretti finché usava gradi
+// assoluti). `radiusFactor` (default 1) scala ORBIT_RADIUS: più vicino al
+// globo (quindi in parte dentro/coperto dal suo guscio a rete, radius 128 —
+// vedi networkOverlay.buildNetworkShell) invece che fluttuare fuori, ben
+// visibile, come gli altri — dà l'effetto "sistema solare" di profondità
+// pur restando sempre dentro inquadratura e cliccabile.
 const LAYOUT = [
-  { azFrac: -0.656, elFrac: 0.52 },
-  { azFrac: 0.656, elFrac: 0.48 },
-  { azFrac: -0.715, elFrac: -0.56 },
-  { azFrac: 0.685, elFrac: -0.52 },
-  { azFrac: 0.03, elFrac: 0.6 },
+  { azFrac: -0.656, elFrac: 0.5, radiusFactor: 0.85 },
+  { azFrac: 0.656, elFrac: 0.46, radiusFactor: 1 },
+  { azFrac: -0.715, elFrac: -0.56, radiusFactor: 1 },
+  { azFrac: 0.685, elFrac: -0.52, radiusFactor: 0.9 },
+  { azFrac: 0.04, elFrac: 0.78, radiusFactor: 0.68 },
+  { azFrac: 0.22, elFrac: -0.1, radiusFactor: 0.55 },
 ];
 
-function sphereFromAzEl(az, el, radius) {
-  const azRad = THREE.MathUtils.degToRad(az);
-  const elRad = THREE.MathUtils.degToRad(el);
-  return new THREE.Vector3(
-    radius * Math.cos(elRad) * Math.sin(azRad),
-    radius * Math.sin(elRad),
-    radius * Math.cos(elRad) * Math.cos(azRad)
-  );
-}
-
-// Az/el reali (gradi) di uno slot per la camera ATTUALE: la sua metà-fov
-// verticale è camera.fov/2 (fisso), quella orizzontale si ricava
-// dall'aspect ratio corrente (formula standard PerspectiveCamera).
+// Az/el reali (gradi) di uno slot per la camera ATTUALE: metà-fov verticale
+// = camera.fov/2, fisso; quella orizzontale si ricava dall'aspect ratio
+// corrente (formula standard PerspectiveCamera).
 function slotAzEl(slot, camera) {
   const halfV = camera.fov / 2;
   const halfH = THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(halfV)) * camera.aspect));
   return { az: slot.azFrac * halfH, el: slot.elFrac * halfV };
 }
 
-// Inversa di sphereFromAzEl, in lat/lng invece che az/el: stessa formula di
-// vectorToPolar in categoryShell.js (coordinate three-globe). Serve al warp
+// Posizione (relativa all'origine, cioè al centro del globo grande) di un
+// punto az/el gradi, MA rispetto agli assi ATTUALI della camera (la sua
+// direzione "verso l'origine", il suo "destra" e il suo "su"), non agli
+// assi fissi del mondo. Indispensabile perché la camera ruota da sola
+// (rotazione automatica, vedi WorldGlobe.jsx): posizionare i satelliti sugli
+// assi FISSI del mondo (come faceva la prima versione) li teneva "davanti
+// alla camera" solo nell'istante in cui venivano posizionati — un attimo
+// dopo la camera aveva già girato altrove e loro restavano indietro, fuori
+// dall'inquadratura (bug osservato: sfere sparite dopo 2-3 secondi). Va
+// richiamata ad ogni fotogramma (vedi update()), non solo al cambio di
+// mondo, altrimenti lo stesso problema si ripresenta identico.
+const _towardCamera = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3();
+const _worldUp = new THREE.Vector3(0, 1, 0);
+function positionFromCamera(camera, az, el, radius) {
+  camera.getWorldDirection(_towardCamera).negate(); // dall'origine VERSO la camera
+  _right.crossVectors(_worldUp, _towardCamera).normalize();
+  _up.crossVectors(_towardCamera, _right).normalize();
+  const azRad = THREE.MathUtils.degToRad(az);
+  const elRad = THREE.MathUtils.degToRad(el);
+  const fwd = radius * Math.cos(elRad) * Math.cos(azRad);
+  const side = radius * Math.cos(elRad) * Math.sin(azRad);
+  const height = radius * Math.sin(elRad);
+  return new THREE.Vector3()
+    .addScaledVector(_towardCamera, fwd)
+    .addScaledVector(_right, side)
+    .addScaledVector(_up, height);
+}
+
+// Inversa di positionFromCamera, in lat/lng invece che az/el/camera: stessa
+// formula di vectorToPolar in categoryShell.js (coordinate three-globe). Serve al warp
 // (Fase 2b, vedi WorldGlobe.jsx) per puntare la camera verso la direzione di
 // un satellite con g.pointOfView({lat, lng, ...}) — l'unica API che
 // react-globe.gl offre per orientare la camera, non un target XYZ diretto.
@@ -239,25 +261,27 @@ export function buildSatelliteGlobes({ worlds }) {
       if (!sat) return;
       sat.userData.slotIndex = i;
       const { az, el } = slotAzEl(LAYOUT[i], camera);
-      const basePos = sphereFromAzEl(az, el, ORBIT_RADIUS);
-      sat.userData.basePos = basePos;
-      sat.position.copy(basePos);
+      sat.userData.az = az;
+      sat.userData.el = el;
+      sat.userData.radius = ORBIT_RADIUS * (LAYOUT[i].radiusFactor ?? 1);
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
   }
 
-  // Ricalcola solo la posizione (mai la visibilità) dei satelliti già
-  // visibili, usando la camera attuale: chiamata quando cambia l'aspect
-  // ratio dello schermo (resize, rotazione del telefono) SENZA un cambio di
-  // mondo — altrimenti la disposizione tarata su una proporzione resterebbe
-  // quella anche dopo che lo schermo è cambiato forma.
+  // Ricalcola az/el (mai la visibilità) dei satelliti già visibili, usando
+  // la camera attuale: chiamata quando cambia l'aspect ratio dello schermo
+  // (resize, rotazione del telefono) SENZA un cambio di mondo — altrimenti
+  // la disposizione tarata su una proporzione resterebbe quella anche dopo
+  // che lo schermo è cambiato forma. La posizione vera e propria (che
+  // dipende anche dall'ORIENTAMENTO della camera, non solo dal suo aspect
+  // ratio) si ricalcola comunque ad ogni fotogramma in update().
   function repositionForViewport(camera) {
     satellites.forEach((sat) => {
       if (!sat.visible || sat.userData.slotIndex === undefined) return;
-      const { az, el } = slotAzEl(LAYOUT[sat.userData.slotIndex], camera);
-      const basePos = sphereFromAzEl(az, el, ORBIT_RADIUS);
-      sat.userData.basePos = basePos;
-      sat.position.copy(basePos);
+      const slot = LAYOUT[sat.userData.slotIndex];
+      const { az, el } = slotAzEl(slot, camera);
+      sat.userData.az = az;
+      sat.userData.el = el;
     });
   }
 
@@ -266,12 +290,15 @@ export function buildSatelliteGlobes({ worlds }) {
   // crescita durante il warp) sopra. elapsedSec/deltaSec vengono da
   // WorldGlobe.jsx, agganciati allo stesso giro di rendering del globo
   // grande (si fermano quando lui si ferma per risparmiare CPU).
-  function update(elapsedSec, deltaSec) {
+  function update(elapsedSec, deltaSec, camera) {
     const nowMs = performance.now();
     for (const sat of satellites) {
       if (!sat.visible) continue;
-      const { basePos, bobPhase, bobSpeed, spinSpeed, createdAtMs, worldId, opacityMeshes } = sat.userData;
-      if (!basePos) continue;
+      const { az, el, radius, bobPhase, bobSpeed, spinSpeed, createdAtMs, worldId, opacityMeshes } = sat.userData;
+      if (az === undefined || radius === undefined) continue;
+
+      const basePos = positionFromCamera(camera, az, el, radius);
+      sat.userData.basePos = basePos;
 
       const spawnAge = nowMs - createdAtMs;
       const spawnT = spawnAge >= SPAWN_MS ? 1 : easeOutCubic(Math.max(0, spawnAge) / SPAWN_MS);

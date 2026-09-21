@@ -21,6 +21,7 @@ import { BAMBINI_CATEGORIES, resolveCategoryQuery as resolveBambiniCategoryQuery
 import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQuery } from './data/incontriCategories';
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
 import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
+import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import AccessGate from './components/AccessGate';
 import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
@@ -85,6 +86,9 @@ const CATEGORY_WORLDS = {
   social: { categories: SOCIAL_CATEGORIES, resolveQuery: resolveSocialCategoryQuery },
   // Lavoro: solo "Live" per ora, apre il pannello delle dirette invece di CategoryColumn.
   lavoro: { categories: LAVORO_CATEGORIES, resolveQuery: resolveLavoroCategoryQuery },
+  // Vetrina: solo "Novità" per ora, nessun contenuto editoriale ancora —
+  // CategoryColumn mostra da sé lo stato vuoto con featured/results vuoti.
+  vetrina: { categories: VETRINA_CATEGORIES, featured: {}, results: {}, resolveQuery: resolveVetrinaCategoryQuery },
 };
 
 // Aspetta che l'utente finisca di digitare prima di far "volare" il globo sulla città cercata.

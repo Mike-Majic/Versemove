@@ -580,7 +580,7 @@ export default function WorldGlobe({
     let lastElapsed = 0;
     renderer.render = (scene, camera) => {
       const elapsed = (performance.now() - startedAt) / 1000;
-      satellitesRef.current?.update(elapsed, elapsed - lastElapsed);
+      satellitesRef.current?.update(elapsed, elapsed - lastElapsed, camera);
       lastElapsed = elapsed;
       originalRender(scene, camera);
     };
