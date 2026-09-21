@@ -34,6 +34,7 @@ import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import EventLikersModal from './components/EventLikersModal';
+import ReactorsModal from './components/cultural/ReactorsModal';
 import FriendChatModal from './components/FriendChatModal';
 import DMHub from './components/DMHub';
 import AdminPanel from './components/AdminPanel';
@@ -186,6 +187,10 @@ export default function App() {
   const [friendsModalOpen, setFriendsModalOpen] = useState(false);
   const [dmHubInitialTab, setDmHubInitialTab] = useState('messaggi');
   const [eventLikersId, setEventLikersId] = useState(null);
+  // Chi ha reagito "Lo voglio vedere"/"Mi è piaciuto" a un film/evento delle
+  // categorie culturali (Cinema/Teatro/Arte/Live): { title, subtitle,
+  // reactors } quando aperto, null quando chiuso (vedi ReactorsModal).
+  const [culturalReactorsView, setCulturalReactorsView] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
   // Notifiche (match/super like): il numero non letto sulla campanella, il
   // pannello, il toast quando ne arriva una nuova in tempo reale, e su
@@ -790,6 +795,7 @@ export default function App() {
           onOpenAuth={() => setAuthOpen(true)}
           favorites={favoriteCategories}
           onToggleFavorite={toggleFavoriteCategory}
+          onShowReactors={setCulturalReactorsView}
         />
       )}
 
@@ -1000,6 +1006,24 @@ export default function App() {
         }}
         onClose={() => setEventLikersId(null)}
       />
+
+      {culturalReactorsView && (
+        <ReactorsModal
+          title={culturalReactorsView.title}
+          subtitle={culturalReactorsView.subtitle}
+          reactors={culturalReactorsView.reactors}
+          user={user}
+          onOpenAuth={() => setAuthOpen(true)}
+          friends={friends}
+          friendRequestsSent={friendRequestsSent}
+          onSendRequest={sendFriendRequest}
+          onOpenChat={(friendId) => {
+            setCulturalReactorsView(null);
+            setActiveFriendChatId(friendId);
+          }}
+          onClose={() => setCulturalReactorsView(null)}
+        />
+      )}
 
       {activeFriendChatId && (
         <FriendChatModal

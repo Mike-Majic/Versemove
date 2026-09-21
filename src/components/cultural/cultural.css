@@ -1,0 +1,254 @@
+.rb-cultural-column {
+  position: absolute;
+  top: 76px;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, 92vw);
+  background: rgba(10, 6, 16, 0.9);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-radius: 18px;
+  padding: 64px 20px 20px;
+  overflow-y: auto;
+  pointer-events: auto;
+  color: #f5f5f7;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #8b5cf6) 18%, transparent);
+}
+
+@media (max-width: 480px) {
+  .rb-cultural-column {
+    top: 168px;
+    bottom: 26px;
+    width: calc(100vw - 28px);
+  }
+}
+
+.rb-cultural-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.rb-cultural-header h3 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+
+.rb-cultural-header p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-cultural-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.rb-cultural-tab {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(245, 245, 247, 0.8);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rb-cultural-tab.active {
+  background: var(--accent, #8b5cf6);
+  border-color: var(--accent, #8b5cf6);
+  color: #0d0714;
+}
+
+.rb-cultural-add-btn {
+  flex-shrink: 0;
+  background: var(--accent, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-cultural-status {
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-cultural-error {
+  color: #ff8080;
+}
+
+.rb-cultural-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.rb-cultural-form input,
+.rb-cultural-form textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #f5f5f7;
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+}
+
+.rb-cultural-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rb-cultural-form-actions button {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.rb-cultural-form-submit {
+  background: var(--accent, #8b5cf6) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.rb-cultural-form-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rb-cultural-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rb-cultural-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-cultural-card-info strong {
+  font-size: 14.5px;
+}
+
+.rb-cultural-card-meta {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-cultural-card-desc {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-cultural-delete-btn {
+  align-self: flex-start;
+  background: rgba(255, 56, 96, 0.16);
+  border: 1px solid rgba(255, 56, 96, 0.4);
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ---- Reazioni condivise ---- */
+.rb-cultural-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rb-cultural-reaction-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rb-cultural-reaction-btn.active {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-color: var(--accent, #8b5cf6);
+}
+
+.rb-cultural-panel-header h4 {
+  margin: 18px 0 10px;
+  font-size: 13.5px;
+}
+
+.rb-cinema-card {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.rb-cinema-card img,
+.rb-cinema-poster-empty {
+  width: 70px;
+  height: 100px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.rb-cinema-card .rb-cultural-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-cinema-card .rb-cultural-reactions {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.rb-cultural-reaction-count {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: rgba(245, 245, 247, 0.8);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-right: 4px;
+}

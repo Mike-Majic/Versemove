@@ -3,8 +3,13 @@ import LibreriaColumn from './LibreriaColumn';
 import FotografiaColumn from './FotografiaColumn';
 import VideoColumn from './VideoColumn';
 import MusicaApp from './musica/MusicaApp';
+import PodcastColumn from './PodcastColumn';
+import CinemaColumn from './cultural/CinemaColumn';
+import CommunityEventsColumn from './cultural/CommunityEventsColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import './shared/categoryExplorerShell.css';
+
+const COMMUNITY_EVENT_CATEGORIES = new Set(['teatro', 'arti-visive', 'live']);
 
 // Guscio di navigazione categorie, generico per qualunque mondo che abbia un
 // proprio set di categorie (categorySet = { categories, featured, results,
@@ -24,6 +29,7 @@ export default function ArteExplorer({
   onOpenAuth,
   favorites = [],
   onToggleFavorite,
+  onShowReactors,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
 
@@ -69,6 +75,19 @@ export default function ArteExplorer({
             <VideoColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'musica' ? (
             <MusicaApp key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : category.id === 'podcast' ? (
+            <PodcastColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
+          ) : category.id === 'cinema' ? (
+            <CinemaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} />
+          ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
+            <CommunityEventsColumn
+              key={category.id}
+              categoryId={category.id}
+              label={category.label}
+              user={user}
+              onOpenAuth={onOpenAuth}
+              onShowReactors={onShowReactors}
+            />
           ) : (
             <CategoryColumn
               key={category.id}
