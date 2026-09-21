@@ -3,105 +3,111 @@ import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
 
-// Stesso raggio del globo grande (vedi networkOverlay.js): i satelliti si
-// posizionano in proporzione a questo, non a un valore a sé.
-const GLOBE_RADIUS = 100;
+// Raggio (in unità di scena) del guscio a rete del globo grande — vedi
+// networkOverlay.buildNetworkShell(radius=128) — usato qui solo per il
+// test "il globo mi nasconde il satellite?" (occlusione), non per
+// posizionare niente: i satelliti ora vivono in coordinate ASSOLUTE e
+// FISSE (vedi SLOTS sotto), non più in proporzione a un raggio d'orbita.
+const OCCLUSION_RADIUS = 128;
 
-// Distanza dal centro a cui fluttuano i satelliti. Il campo visivo della
-// camera di three-render-objects è una PerspectiveCamera "di serie" (fov 50,
-// vedi node_modules/three-render-objects): a distanza di partenza (altitudine
-// 2.4 => camera a GLOBE_RADIUS*3.4 dal centro, vedi three-globe/polar2Cartesian)
-// resta poco più di metà del raggio del globo prima di uscire dall'inquadratura
-// in verticale — per questo l'orbita e gli angoli sotto sono volutamente
-// stretti, misurati con uno screenshot reale (non solo calcolati a tavolino).
-// Tenuti volutamente oltre il raggio del guscio a rete del globo grande (128,
-// vedi networkOverlay.buildNetworkShell) così i satelliti fluttuano chiaramente
-// fuori da quel guscio, non appoggiati sopra.
-const ORBIT_RADIUS = GLOBE_RADIUS * 1.85;
-const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
-// Livello di suddivisione dell'icosaedro alla base della rete: fisso, non
-// legato al livello di qualità grafica (a differenza del globo grande, un
-// satellite costa pochissimo qualunque sia il dettaglio — sono solo
-// LineSegments/Points, niente ombreggiatura — quindi non c'è motivo di
-// variarlo). Farlo dipendere dalla qualità causava un difetto concreto: se
-// "Auto" declassava il livello a metà sessione (FPS reali bassi, vedi
-// fx/quality.js), TUTTI i satelliti cambiavano forma di colpo, da sfera
-// densa a poliedro spigoloso, proprio mentre l'utente li guardava. Al
-// massimo (320 facce): costando comunque pochissimo, tanto vale la rete più
-// fitta possibile, quella che si legge meglio come "sfera" e non "poliedro".
+// Raggio intrinseco della geometria di un satellite (fisso, uguale per
+// tutti: mai ricreata, vedi buildSatelliteGlobes). La dimensione APPARENTE
+// varia invece per slot tramite una scala (vedi SLOTS.radius sotto e
+// slotScale in setActiveWorld) — cambiare solo la scala, mai la geometria,
+// evita di ricompilare gli shader ad ogni cambio di mondo (il costo vero
+// del blocco durante il warp misurato in origine, vedi commento più giù).
+const SATELLITE_RADIUS = 30;
 const SATELLITE_DETAIL = 2;
 
-// Disposizione attorno al globo grande, sparsa in profondità come un
-// sistema solare (non tutti sulla stessa fascia frontale): quattro
-// "vicini" davanti (due in alto, due in basso), uno chiaramente sopra, uno
-// di lato/dietro, più vicino al globo e parzialmente coperto da lui.
-//
-// Ogni slot è una FRAZIONE (-1..1) di metà campo visivo orizzontale e
-// verticale, ricalcolata ad ogni chiamata sulla camera ATTUALE (vedi
-// slotAzEl) — resta sempre dentro inquadratura e cliccabile su qualunque
-// proporzione di schermo (il fov orizzontale della camera dipende
-// dall'aspect ratio, stretto su telefono in verticale; con angoli assoluti
-// quasi tutti finivano fuori inquadratura su mobile, bug osservato più
-// volte: prima con 1 solo satellite su 5 visibile, poi di nuovo col sesto
-// slot "dietro/di lato", invisibile su schermi stretti finché usava gradi
-// assoluti). `radiusFactor` (default 1) scala ORBIT_RADIUS: più vicino al
-// globo (quindi in parte dentro/coperto dal suo guscio a rete, radius 128 —
-// vedi networkOverlay.buildNetworkShell) invece che fluttuare fuori, ben
-// visibile, come gli altri — dà l'effetto "sistema solare" di profondità
-// pur restando sempre dentro inquadratura e cliccabile.
-const LAYOUT = [
-  { azFrac: -0.656, elFrac: 0.5, radiusFactor: 0.85 },
-  { azFrac: 0.656, elFrac: 0.46, radiusFactor: 1 },
-  { azFrac: -0.715, elFrac: -0.56, radiusFactor: 1 },
-  { azFrac: 0.685, elFrac: -0.52, radiusFactor: 0.9 },
-  { azFrac: 0.04, elFrac: 0.78, radiusFactor: 0.68 },
-  { azFrac: 0.22, elFrac: -0.1, radiusFactor: 0.55 },
+// Sei posizioni FISSE in coordinate di scena (raggio del globo grande =
+// 100), sparse nelle tre dimensioni attorno a lui — non su un'unica fascia
+// frontale — per avere vera profondità/parallasse mentre la camera gira,
+// invece di restare "attaccati" a lei. Coordinate scelte a mano guardando
+// la scena (compresa una sesta, nello stesso stile, per il sesto mondo
+// possibile — Vetrina — che le prime cinque non coprivano). `radius`
+// (22-45) è il raggio APPARENTE voluto per quello slot: più vicino/grande
+// per chi deve leggersi come "in primo piano", più piccolo per chi è
+// dietro — la prospettiva fa il resto.
+const SLOTS = [
+  { pos: [320, 180, -260], radius: 26 }, // dietro-sopra a destra
+  { pos: [-360, 40, 120], radius: 36 }, // sinistra, più vicino
+  { pos: [-200, -230, -80], radius: 42 }, // sotto a sinistra, il più vicino
+  { pos: [60, 260, -380], radius: 22 }, // dietro in alto, il più lontano
+  { pos: [300, -170, 160], radius: 36 }, // destra in basso, davanti
+  { pos: [-90, -300, 210], radius: 30 }, // sotto, davanti (sesto slot)
 ];
 
-// Az/el reali (gradi) di uno slot per la camera ATTUALE: metà-fov verticale
-// = camera.fov/2, fisso; quella orizzontale si ricava dall'aspect ratio
-// corrente (formula standard PerspectiveCamera).
-function slotAzEl(slot, camera) {
-  const halfV = camera.fov / 2;
-  const halfH = THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(halfV)) * camera.aspect));
-  return { az: slot.azFrac * halfH, el: slot.elFrac * halfV };
+// Ampiezza (unità di scena) del galleggiamento sinusoidale verticale: fissa
+// per tutti, non più proporzionale al raggio del satellite (era così
+// quando i satelliti erano piccoli e vicini alla camera; ora sono grandi e
+// lontani, un valore assoluto si legge meglio).
+const BOB_AMPLITUDE = 8;
+
+// Orbita propria lenta attorno all'asse verticale del globo (radianti al
+// secondo): un giro completo dura 2-5 minuti, quasi impercettibile
+// istante per istante ma quel tanto che basta a non restare mai
+// perfettamente fermi. Il segno (orario/antiorario) è casuale per
+// satellite. Nota sul "mai nascosto": la camera gira da sola su questo
+// stesso asse ogni 7 secondi (vedi WorldGlobe.jsx autoRotateSpeed) — molto
+// più veloce di questa deriva lenta — quindi qualunque punto attorno al
+// globo, satelliti compresi, torna comunque inquadrato più volte al
+// minuto SENZA bisogno di inseguire attivamente la camera: un primo
+// tentativo che lo faceva (ruotava il satellite verso la direzione della
+// camera ogni volta che usciva dai bordi) è stato scartato perché portava
+// il satellite a passare vicinissimo alla camera stessa, facendolo
+// esplodere di dimensione in prospettiva (bug visto in uno screenshot di
+// verifica). Resta solo la difesa sotto (MIN_CAMERA_DISTANCE), che quel
+// bug specifico lo previene senza inseguire nessuno.
+const ORBIT_SPEED_MIN = 0.02;
+const ORBIT_SPEED_MAX = 0.05;
+
+// Distanza minima dalla camera: se l'orbita porta un satellite più vicino
+// di così, viene respinto lungo la stessa direzione fino a questa
+// distanza (la direzione — quindi "da che parte si vede" — resta la
+// stessa, solo la prospettiva non lo fa più esplodere di dimensione). A
+// questa distanza anche il satellite più grande (raggio 42, vedi SLOTS)
+// ha una dimensione angolare paragonabile al globo grande, mai dominante.
+const MIN_CAMERA_DISTANCE = 280;
+
+// Distanza dalla camera oltre la quale un satellite comincia a sbiadire
+// (profondità atmosferica, come una foschia leggera) e a cui arriva alla
+// sua opacità minima.
+const FOG_NEAR = 420;
+const FOG_FAR = 950;
+const FOG_MIN_OPACITY = 0.4;
+// Quanto sbiadisce, IN PIÙ rispetto alla foschia sopra, un satellite che
+// il globo sta bloccando alla vista in questo istante (mai a zero secco:
+// la camera che gira da sola lo scopre di nuovo in meno di un secondo,
+// vedi nota sopra — un'opacità residua bassa invece di zero evita un
+// pop-in/pop-out di scatto quando rientra).
+const OCCLUDED_OPACITY_FACTOR = 0.15;
+
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+// Il globo (sfera opaca + guscio a rete, raggio OCCLUSION_RADIUS) blocca
+// la vista fra la camera e il satellite? Intersezione raggio/sfera
+// standard, sfera centrata nell'origine (il centro del globo grande).
+const _occDir = new THREE.Vector3();
+function isOccludedByGlobe(pos, camera) {
+  const camPos = camera.position;
+  _occDir.copy(pos).sub(camPos);
+  const distToSat = _occDir.length();
+  _occDir.normalize();
+  const b = camPos.dot(_occDir);
+  const c = camPos.lengthSq() - OCCLUSION_RADIUS * OCCLUSION_RADIUS;
+  const discriminant = b * b - c;
+  if (discriminant <= 0) return false;
+  const t1 = -b - Math.sqrt(discriminant);
+  return t1 > 0 && t1 < distToSat;
 }
 
-// Posizione (relativa all'origine, cioè al centro del globo grande) di un
-// punto az/el gradi, MA rispetto agli assi ATTUALI della camera (la sua
-// direzione "verso l'origine", il suo "destra" e il suo "su"), non agli
-// assi fissi del mondo. Indispensabile perché la camera ruota da sola
-// (rotazione automatica, vedi WorldGlobe.jsx): posizionare i satelliti sugli
-// assi FISSI del mondo (come faceva la prima versione) li teneva "davanti
-// alla camera" solo nell'istante in cui venivano posizionati — un attimo
-// dopo la camera aveva già girato altrove e loro restavano indietro, fuori
-// dall'inquadratura (bug osservato: sfere sparite dopo 2-3 secondi). Va
-// richiamata ad ogni fotogramma (vedi update()), non solo al cambio di
-// mondo, altrimenti lo stesso problema si ripresenta identico.
-const _towardCamera = new THREE.Vector3();
-const _right = new THREE.Vector3();
-const _up = new THREE.Vector3();
-const _worldUp = new THREE.Vector3(0, 1, 0);
-function positionFromCamera(camera, az, el, radius) {
-  camera.getWorldDirection(_towardCamera).negate(); // dall'origine VERSO la camera
-  _right.crossVectors(_worldUp, _towardCamera).normalize();
-  _up.crossVectors(_towardCamera, _right).normalize();
-  const azRad = THREE.MathUtils.degToRad(az);
-  const elRad = THREE.MathUtils.degToRad(el);
-  const fwd = radius * Math.cos(elRad) * Math.cos(azRad);
-  const side = radius * Math.cos(elRad) * Math.sin(azRad);
-  const height = radius * Math.sin(elRad);
-  return new THREE.Vector3()
-    .addScaledVector(_towardCamera, fwd)
-    .addScaledVector(_right, side)
-    .addScaledVector(_up, height);
-}
-
-// Inversa di positionFromCamera, in lat/lng invece che az/el/camera: stessa
-// formula di vectorToPolar in categoryShell.js (coordinate three-globe). Serve al warp
-// (Fase 2b, vedi WorldGlobe.jsx) per puntare la camera verso la direzione di
-// un satellite con g.pointOfView({lat, lng, ...}) — l'unica API che
-// react-globe.gl offre per orientare la camera, non un target XYZ diretto.
+// Inversa di un vettore posizione, in lat/lng invece che coordinate XYZ
+// (stessa formula di vectorToPolar in categoryShell.js, coordinate
+// three-globe). Serve al warp (Fase 2b, vedi WorldGlobe.jsx) per puntare
+// la camera verso la DIREZIONE di un satellite con g.pointOfView({lat,
+// lng, ...}) — l'unica API che react-globe.gl offre per orientare la
+// camera, non un target XYZ diretto. Funziona qualunque sia la distanza
+// reale del satellite: conta solo la sua direzione dall'origine.
 function vectorToLatLng(v) {
   const n = v.clone().normalize();
   const phi = Math.acos(Math.max(-1, Math.min(1, n.y)));
@@ -182,15 +188,16 @@ function buildSatelliteMesh(world) {
     { mesh: nodes, baseOpacity: 1 },
     { mesh: label, baseOpacity: 1 },
   ];
+  // Fase/velocità del galleggiamento e della rotazione propria: proprietà
+  // del SATELLITE (non dello slot), così restano coerenti anche se lo
+  // stesso satellite cambia slot da un warp all'altro.
   group.userData.bobPhase = Math.random() * Math.PI * 2;
-  // Un ciclo completo su-giù (basso->alto->basso) dura ~10 secondi:
-  // bobSpeed è la pulsazione (2π/periodo), con una piccola variazione
-  // casuale per satellite così non fluttuano tutti in perfetta sincronia.
   group.userData.bobSpeed = ((2 * Math.PI) / 10) * (0.95 + Math.random() * 0.1);
   group.userData.spinSpeed = 0.06 + Math.random() * 0.05;
-  // Impostato per davvero da setActiveWorld() quando il satellite diventa
-  // visibile: finché resta -Infinity l'oggetto è comunque invisibile
-  // (group.visible = false qui sotto), quindi non ha nessun effetto grafico.
+  // Impostati per davvero da setActiveWorld() quando il satellite diventa
+  // visibile: finché createdAtMs resta -Infinity l'oggetto è comunque
+  // invisibile (group.visible = false qui sotto), quindi non ha nessun
+  // effetto grafico.
   group.userData.createdAtMs = -Infinity;
   group.userData.basePos = null;
   group.visible = false;
@@ -199,19 +206,15 @@ function buildSatelliteMesh(world) {
 }
 
 // Costruisce UN SATELLITE PERSISTENTE PER OGNI MONDO (non solo quelli
-// visibili adesso) e lo aggiunge come oggetto in più nella STESSA
-// scena/renderer del globo grande — mai un secondo <Globe>/renderer, che su
-// mobile non reggerebbe. A differenza della Fase 2a/2b, qui i satelliti si
-// costruiscono UNA SOLA VOLTA IN ASSOLUTO (WorldGlobe.jsx la chiama da un
-// effetto con deps [], mai più) e non vengono mai più ricreati: warp() si
-// limita a chiamare setActiveWorld(), che mostra/nasconde e riposiziona gli
-// stessi oggetti già pronti. Ricreare geometrie/materiali (quindi
-// ricompilare gli shader) ad ogni warp era il vero costo del blocco
-// misurato durante il volo; farlo dipendere dalla qualità grafica (prima
-// versione di questo commento) risolveva quello ma introduceva un difetto
-// nuovo — i satelliti cambiavano forma a metà sessione se "Auto" declassava
-// la qualità — per questo ora la geometria non dipende più da nessun
-// livello di qualità (vedi SATELLITE_DETAIL sopra).
+// visibili adesso) e lo aggiunge DIRETTAMENTE alla scena del globo grande
+// (g.scene() in WorldGlobe.jsx) — mai dentro un gruppo che ruota, mai un
+// secondo <Globe>/renderer (su mobile non reggerebbe). A differenza della
+// Fase 2a/2b, qui i satelliti si costruiscono UNA SOLA VOLTA IN ASSOLUTO
+// (WorldGlobe.jsx la chiama da un effetto con deps [], mai più) e non
+// vengono mai più ricreati: warp() si limita a chiamare setActiveWorld(),
+// che mostra/nasconde e riposiziona gli stessi oggetti già pronti.
+// Ricreare geometrie/materiali (quindi ricompilare gli shader) ad ogni
+// warp era il vero costo del blocco misurato durante il volo.
 export function buildSatelliteGlobes({ worlds }) {
   const group = new THREE.Group();
   group.name = 'rb-satellite-globes';
@@ -242,13 +245,14 @@ export function buildSatelliteGlobes({ worlds }) {
   }
 
   // Mostra come satelliti tutti i mondi tranne quello attivo (al massimo
-  // LAYOUT.length), nella disposizione fissa di sempre — riproporzionata
-  // sulla camera ATTUALE (vedi slotAzEl) così resta dentro inquadratura su
-  // qualunque proporzione di schermo. Non tocca mai geometrie/materiali:
-  // solo visibilità, posizione e — se richiesto — un riavvio
+  // SLOTS.length), assegnando ad ognuno uno slot FISSO in coordinate
+  // assolute (vedi SLOTS) — la posizione vera e propria (slot + orbita
+  // lenta + galleggiamento + eventuale correzione) si calcola poi ad ogni
+  // fotogramma in update(). Non tocca mai geometrie/materiali: solo
+  // visibilità e stato di posizionamento, più — se richiesto — un riavvio
   // dell'animazione di comparsa sui satelliti ora visibili.
-  function setActiveWorld(activeWorldId, camera, { animateSpawn = true } = {}) {
-    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId).slice(0, LAYOUT.length);
+  function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
+    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId).slice(0, SLOTS.length);
     const visibleIds = new Set(visibleWorlds.map((w) => w.id));
     const nowMs = performance.now();
 
@@ -259,63 +263,72 @@ export function buildSatelliteGlobes({ worlds }) {
     visibleWorlds.forEach((world, i) => {
       const sat = satellitesById.get(world.id);
       if (!sat) return;
-      sat.userData.slotIndex = i;
-      const { az, el } = slotAzEl(LAYOUT[i], camera);
-      sat.userData.az = az;
-      sat.userData.el = el;
-      sat.userData.radius = ORBIT_RADIUS * (LAYOUT[i].radiusFactor ?? 1);
+      const slot = SLOTS[i];
+      sat.userData.basePosRef = new THREE.Vector3(...slot.pos);
+      sat.userData.slotScale = slot.radius / SATELLITE_RADIUS;
+      // Riparte da angolo 0 (cioè esattamente la posizione dello slot,
+      // quella scelta a mano) ad ogni cambio di mondo attivo: l'orbita
+      // lenta e l'eventuale correzione (vedi update()) accumulano da lì.
+      sat.userData.orbitAngle = 0;
+      sat.userData.baseOrbitSpeed =
+        (ORBIT_SPEED_MIN + Math.random() * (ORBIT_SPEED_MAX - ORBIT_SPEED_MIN)) * (Math.random() < 0.5 ? -1 : 1);
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
   }
 
-  // Ricalcola az/el (mai la visibilità) dei satelliti già visibili, usando
-  // la camera attuale: chiamata quando cambia l'aspect ratio dello schermo
-  // (resize, rotazione del telefono) SENZA un cambio di mondo — altrimenti
-  // la disposizione tarata su una proporzione resterebbe quella anche dopo
-  // che lo schermo è cambiato forma. La posizione vera e propria (che
-  // dipende anche dall'ORIENTAMENTO della camera, non solo dal suo aspect
-  // ratio) si ricalcola comunque ad ogni fotogramma in update().
-  function repositionForViewport(camera) {
-    satellites.forEach((sat) => {
-      if (!sat.visible || sat.userData.slotIndex === undefined) return;
-      const slot = LAYOUT[sat.userData.slotIndex];
-      const { az, el } = slotAzEl(slot, camera);
-      sat.userData.az = az;
-      sat.userData.el = el;
-    });
-  }
-
-  // Galleggiamento verticale (oscillazione sin, ampiezza minima) + rotazione
-  // propria lenta, più le due animazioni temporanee (materializzazione e
-  // crescita durante il warp) sopra. elapsedSec/deltaSec vengono da
-  // WorldGlobe.jsx, agganciati allo stesso giro di rendering del globo
-  // grande (si fermano quando lui si ferma per risparmiare CPU).
+  // Galleggiamento + rotazione propria + orbita lenta indipendente attorno
+  // al globo, più le due animazioni temporanee (materializzazione e
+  // crescita durante il warp) sopra. Una sola difesa attiva per fotogramma:
+  // se l'orbita porterebbe il satellite più vicino di MIN_CAMERA_DISTANCE
+  // alla camera, lo si respinge (stessa direzione, solo distanza minima
+  // garantita) — evita che l'oggetto esploda di dimensione in prospettiva
+  // senza mai bloccare o deviare l'orbita stessa. elapsedSec/deltaSec
+  // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
+  // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
+  const _toCam = new THREE.Vector3();
   function update(elapsedSec, deltaSec, camera) {
     const nowMs = performance.now();
+    const camPos = camera.position;
+
     for (const sat of satellites) {
       if (!sat.visible) continue;
-      const { az, el, radius, bobPhase, bobSpeed, spinSpeed, createdAtMs, worldId, opacityMeshes } = sat.userData;
-      if (az === undefined || radius === undefined) continue;
+      const ud = sat.userData;
+      if (!ud.basePosRef) continue;
 
-      const basePos = positionFromCamera(camera, az, el, radius);
-      sat.userData.basePos = basePos;
+      ud.orbitAngle += ud.baseOrbitSpeed * deltaSec;
+      const basePos = ud.basePosRef.clone().applyAxisAngle(Y_AXIS, ud.orbitAngle);
+      basePos.y += Math.sin(elapsedSec * ud.bobSpeed + ud.bobPhase) * BOB_AMPLITUDE;
 
-      const spawnAge = nowMs - createdAtMs;
+      _toCam.copy(basePos).sub(camPos);
+      const distToCam = _toCam.length();
+      if (distToCam < MIN_CAMERA_DISTANCE) {
+        _toCam.setLength(MIN_CAMERA_DISTANCE);
+        basePos.copy(camPos).add(_toCam);
+      }
+
+      ud.basePos = basePos;
+      sat.position.copy(basePos);
+      sat.rotation.y += ud.spinSpeed * deltaSec;
+
+      let depthFactor = THREE.MathUtils.clamp(
+        THREE.MathUtils.mapLinear(camPos.distanceTo(basePos), FOG_NEAR, FOG_FAR, 1, FOG_MIN_OPACITY),
+        FOG_MIN_OPACITY,
+        1
+      );
+      if (isOccludedByGlobe(basePos, camera)) depthFactor *= OCCLUDED_OPACITY_FACTOR;
+
+      const spawnAge = nowMs - ud.createdAtMs;
       const spawnT = spawnAge >= SPAWN_MS ? 1 : easeOutCubic(Math.max(0, spawnAge) / SPAWN_MS);
 
-      const bob = Math.sin(elapsedSec * bobSpeed + bobPhase) * (SATELLITE_RADIUS * 0.3);
-      sat.position.set(basePos.x, basePos.y + bob, basePos.z);
-      sat.rotation.y += spinSpeed * deltaSec;
-
       let warpScale = 1;
-      if (worldId === warpState.targetWorldId && warpState.startMs !== null) {
+      if (ud.worldId === warpState.targetWorldId && warpState.startMs !== null) {
         const wt = Math.min(1, (nowMs - warpState.startMs) / warpState.durationMs);
         warpScale = 1 + (WARP_GROW_SCALE - 1) * easeOutCubic(wt);
       }
 
-      sat.scale.setScalar(spawnT * warpScale);
-      opacityMeshes.forEach(({ mesh, baseOpacity }) => {
-        mesh.material.opacity = baseOpacity * spawnT;
+      sat.scale.setScalar(ud.slotScale * spawnT * warpScale);
+      ud.opacityMeshes.forEach(({ mesh, baseOpacity }) => {
+        mesh.material.opacity = baseOpacity * spawnT * depthFactor;
       });
     }
   }
@@ -340,7 +353,6 @@ export function buildSatelliteGlobes({ worlds }) {
     group,
     satellites,
     setActiveWorld,
-    repositionForViewport,
     update,
     getHitMeshes,
     setWarpTarget,

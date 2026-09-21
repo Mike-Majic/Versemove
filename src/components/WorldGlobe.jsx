@@ -98,6 +98,19 @@ function makeClusterEl(cluster, world, onExpand) {
 // di profili sarebbe di nuovo il problema di partenza (e anche lento).
 const NEARBY_DEGREES = 1;
 
+// Altitudine di partenza della camera (unità react-globe.gl: distanza dal
+// centro = raggio globo * (1 + altitude)). Tenuta più lontana apposta
+// (prima 2.4): a questa distanza il globo grande occupa circa il 45-50%
+// dell'altezza dello schermo, lasciando spazio ai satelliti in "sistema
+// solare" (vedi globe/satelliteGlobes.js) di stare visibilmente più in là,
+// invece di accalcarsi appena fuori dal suo bordo.
+const DEFAULT_ALTITUDE = 4.2;
+// Piano di clipping lontano della camera: di serie (vedi
+// three-render-objects) è troppo vicino per le posizioni assolute dei
+// satelliti (fino a ~450-500 unità dal centro, più l'orbita lenta), che
+// altrimenti verrebbero tagliati via invece di sbiadire in lontananza.
+const CAMERA_FAR = 5000;
+
 // Quanto dura al massimo la rotazione automatica del globo prima di fermarsi.
 const AUTO_ROTATE_MS = 10000;
 // Dopo quanto tempo senza interazioni il globo smette di essere ridisegnato
@@ -191,7 +204,7 @@ export default function WorldGlobe({
   // categoria/città/grumo) non passano da li', quindi si controlla con un
   // piccolo polling, abbastanza leggero da non pesare (legge tre numeri
   // ogni 250ms).
-  const [view, setView] = useState({ altitude: 2.4, lat: 0, lng: 0 });
+  const [view, setView] = useState({ altitude: DEFAULT_ALTITUDE, lat: 0, lng: 0 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -539,32 +552,22 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Quale mondo è attivo adesso (quindi quali 5 sono satelliti, e dove):
+  // Quale mondo è attivo adesso (quindi quali sono satelliti, e dove):
   // nessuna geometria/materiale nuovo, solo setActiveWorld() sul pool già
   // costruito sopra — l'unica cosa che un warp deve davvero fare a runtime.
+  // Le posizioni sono assolute (vedi satelliteGlobes.js SLOTS), non legate
+  // alla camera: non serve più ricalcolarle al resize/rotazione schermo, ci
+  // pensa già la correzione anti-sparizione dentro update() ad ogni frame.
   useEffect(() => {
     const g = globeRef.current;
     const sats = satellitesRef.current;
     if (!g || !sats) return undefined;
-    sats.setActiveWorld(world.id, g.camera(), { animateSpawn: hasPositionedSatellitesRef.current });
+    sats.setActiveWorld(world.id, { animateSpawn: hasPositionedSatellitesRef.current });
     hasPositionedSatellitesRef.current = true;
     globeActivity.wake();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.id]);
-
-  // Se cambia la proporzione dello schermo (resize, rotazione del telefono)
-  // senza un cambio di mondo, i satelliti già visibili vanno riposizionati
-  // sulla nuova camera — altrimenti la disposizione resterebbe tarata sulla
-  // proporzione precedente (bug osservato: su schermi molto stretti in
-  // verticale gli angoli tarati su desktop finiscono quasi tutti fuori
-  // inquadratura, vedi satelliteGlobes.js).
-  useEffect(() => {
-    const g = globeRef.current;
-    const sats = satellitesRef.current;
-    if (!g || !sats) return;
-    sats.repositionForViewport(g.camera());
-  }, [size]);
 
   // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
   // giro di disegno del globo grande (un wrapper attorno a renderer.render,
@@ -626,7 +629,7 @@ export default function WorldGlobe({
         // in posizioni diverse dalla disposizione consueta a seconda di quale
         // satellite si è cliccato — la vista di arrivo deve essere sempre la
         // stessa, comoda e prevedibile.
-        g.pointOfView({ lat: 0, lng: 0, altitude: 2.4 }, 0);
+        g.pointOfView({ lat: 0, lng: 0, altitude: DEFAULT_ALTITUDE }, 0);
         onWarpArrived(worldId);
         window.setTimeout(() => {
           warpFlashRef.current?.classList.remove('active');
@@ -686,7 +689,9 @@ export default function WorldGlobe({
     // ogni 7 secondi.
     g.controls().autoRotateSpeed = 60 / 7;
     g.controls().enableZoom = true;
-    g.pointOfView({ altitude: 2.4 }, 0);
+    g.camera().far = CAMERA_FAR;
+    g.camera().updateProjectionMatrix();
+    g.pointOfView({ altitude: DEFAULT_ALTITUDE }, 0);
     if (isTouchDevice) globeActivity.wake();
     else globeActivity.startAutoRotate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
