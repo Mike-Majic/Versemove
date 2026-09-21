@@ -4,6 +4,30 @@
   touch-action: none;
 }
 
+/* Copre lo scambio del warp fra mondi (Fase 2b, vedi WorldGlobe.jsx
+   runWarp): il globo grande e i satelliti sono due sistemi visivi diversi
+   (contorni reali contro icosaedro), un flash breve nasconde lo scatto
+   dello scambio invece di un morph continuo fra i due. */
+.rb-globe-warp-flash {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 6;
+}
+
+.rb-globe-warp-flash.active {
+  opacity: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-globe-warp-flash {
+    transition: none;
+  }
+}
+
 .rb-marker {
   cursor: pointer;
   transform: translate(-50%, -100%);

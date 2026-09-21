@@ -174,6 +174,12 @@ export default function App() {
   const [ownPosition, setOwnPosition] = useState(null);
   const geoWatchIdRef = useRef(null);
   const [flyTo, setFlyTo] = useState(null);
+  // Richiesta di warp verso un mondo (Fase 2b): sia un satellite cliccato sul
+  // globo sia il selettore a icone qui sotto passano da qui, così la stessa
+  // animazione parte da entrambi i punti invece di duplicarla. `ts` cambia
+  // sempre, anche cliccando due volte lo stesso mondo, per far ripartire
+  // l'effect in WorldGlobe.jsx anche in quel caso.
+  const [warpRequest, setWarpRequest] = useState(null);
   // Eventi del mondo Social e sistema di amicizie: sollevati qui (non dentro
   // SocialFeed) perché servono anche a WorldGlobe (marker quadrato sul
   // globo) e ai due sono montati insieme quando si è nel mondo Social.
@@ -789,9 +795,11 @@ export default function App() {
           onCategoryPositionsReady={setArteCategoryPositions}
           events={world.id === 'social' ? visibleEvents : []}
           onSelectEvent={(eventId) => setEventLikersId(eventId)}
-          onSelectWorld={(worldId) => {
+          warpRequest={warpRequest}
+          onWarpArrived={(worldId) => {
             const i = WORLDS.findIndex((w) => w.id === worldId);
             if (i !== -1) setIndex(i);
+            setWarpRequest(null);
           }}
         />
       </Suspense>
@@ -928,7 +936,10 @@ export default function App() {
             key={w.id}
             className={`rb-world-dot ${i === index ? 'active' : ''}`}
             style={{ '--dot-color': w.color }}
-            onClick={() => setIndex(i)}
+            onClick={() => {
+              if (w.id === world.id) return;
+              setWarpRequest({ worldId: w.id, ts: Date.now() });
+            }}
             aria-label={`Vai al mondo ${w.label}`}
             title={w.label}
           >

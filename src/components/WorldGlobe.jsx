@@ -104,6 +104,13 @@ const AUTO_ROTATE_MS = 10000;
 // (serve anche a far finire le transizioni/inerzie della camera).
 const IDLE_MS = 3000;
 
+// Durate del warp fra mondi (Fase 2b, vedi runWarp più sotto): volo della
+// camera + crescita del satellite, poi il flash che copre lo scambio.
+// Insieme restano sotto il tetto di 900ms per transizione del prompt
+// "effetto wow" originale.
+const WARP_DIVE_MS = 550;
+const WARP_FLASH_MS = 150;
+
 // Raggruppa gli utenti secondo il livello adatto all'altitudine attuale:
 // per nazione se sei molto lontano, per città a media/vicina distanza. Solo
 // il gruppo (città) su cui la camera è effettivamente centrata si apre nei
@@ -152,7 +159,8 @@ export default function WorldGlobe({
   onCategoryPositionsReady,
   events = [],
   onSelectEvent,
-  onSelectWorld,
+  onWarpArrived,
+  warpRequest,
 }) {
   const globeRef = useRef();
   const overlayRef = useRef(null);
@@ -161,6 +169,9 @@ export default function WorldGlobe({
   const satellitesRef = useRef(null);
   const satPointerRef = useRef(null);
   const hoverRaycaster = useMemo(() => new THREE.Raycaster(), []);
+  const warpFlashRef = useRef(null);
+  const warpingRef = useRef(false);
+  const hasBuiltSatellitesRef = useRef(false);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [landPolygons, setLandPolygons] = useState([]);
   // Qualità grafica (Impostazioni -> Effetti, o "Auto" con downgrade da FPS
@@ -517,7 +528,17 @@ export default function WorldGlobe({
     const g = globeRef.current;
     if (!g) return undefined;
     const scene = g.scene();
-    const sats = buildSatelliteGlobes({ worlds: WORLDS, activeWorldId: world.id, quality: getMiniGlobeQuality() });
+    // Al primissimo montaggio i satelliti compaiono normalmente (niente
+    // narrativa di "arrivo"); da lì in poi ogni ricostruzione segue un
+    // cambio di mondo — quasi sempre un warp (Fase 2b) — e il mondo appena
+    // lasciato si materializza al proprio posto invece di comparire di scatto.
+    const sats = buildSatelliteGlobes({
+      worlds: WORLDS,
+      activeWorldId: world.id,
+      quality: getMiniGlobeQuality(),
+      animateSpawn: hasBuiltSatellitesRef.current,
+    });
+    hasBuiltSatellitesRef.current = true;
     scene.add(sats.group);
     satellitesRef.current = sats;
     globeActivity.wake();
@@ -553,11 +574,63 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Click su un satellite: per ora passa subito al mondo scelto (il volo
-  // scenografico della Fase 2b arriva dopo, qui si posa solo la base).
+  // Il warp vero e proprio (Fase 2b): la camera vola verso la direzione del
+  // satellite scelto mentre lui cresce, un flash copre lo scambio (il globo
+  // grande è un sistema visivo diverso dal satellite — contorni reali contro
+  // icosaedro leggero, vedi satelliteGlobes.js — un morph continuo fra i due
+  // richiederebbe unificarli, fuori scopo qui), poi la camera torna alla
+  // vista di sempre sul nuovo mondo e onWarpArrived lo rende quello attivo
+  // (App.jsx cambia `world`, i satelliti si ricostruiscono da soli, vedi
+  // sopra). Rispetta prefers-reduced-motion: in quel caso passa dritto al
+  // nuovo mondo, senza volo né flash.
+  const runWarp = (worldId) => {
+    if (warpingRef.current || !onWarpArrived) return;
+    const g = globeRef.current;
+    const sats = satellitesRef.current;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const latLng = sats?.getWorldLatLng(worldId);
+    if (!g || !sats || !latLng || reduceMotion) {
+      onWarpArrived(worldId);
+      return;
+    }
+
+    warpingRef.current = true;
+    globeActivity.stopAutoRotate();
+    globeActivity.wake(WARP_DIVE_MS + WARP_FLASH_MS + 600);
+    sats.setWarpTarget(worldId, WARP_DIVE_MS);
+    g.pointOfView({ lat: latLng.lat, lng: latLng.lng, altitude: 1.1 }, WARP_DIVE_MS);
+
+    window.setTimeout(() => {
+      warpFlashRef.current?.classList.add('active');
+      window.setTimeout(() => {
+        sats.setWarpTarget(null);
+        // lat/lng espliciti (non solo altitude): altrimenti la camera resta
+        // orientata verso la direzione del satellite appena raggiunto, e i
+        // nuovi satelliti (compreso il mondo appena lasciato) apparirebbero
+        // in posizioni diverse dalla disposizione consueta a seconda di quale
+        // satellite si è cliccato — la vista di arrivo deve essere sempre la
+        // stessa, comoda e prevedibile.
+        g.pointOfView({ lat: 0, lng: 0, altitude: 2.4 }, 0);
+        onWarpArrived(worldId);
+        window.setTimeout(() => {
+          warpFlashRef.current?.classList.remove('active');
+          warpingRef.current = false;
+        }, 80);
+      }, WARP_FLASH_MS);
+    }, WARP_DIVE_MS);
+  };
+
+  // Scorciatoia da App.jsx: il selettore a icone a destra fa partire lo
+  // stesso identico warp di un click sul satellite, non un cambio istantaneo.
+  useEffect(() => {
+    if (warpRequest) runWarp(warpRequest.worldId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warpRequest]);
+
+  // Click su un satellite: fa partire il warp verso quel mondo.
   useEffect(() => {
     const g = globeRef.current;
-    if (!g || !onSelectWorld) return undefined;
+    if (!g || !onWarpArrived) return undefined;
     const canvas = g.renderer().domElement;
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -577,7 +650,7 @@ export default function WorldGlobe({
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
       const hits = raycaster.intersectObjects(satellitesRef.current.getHitMeshes());
-      if (hits.length > 0) onSelectWorld(hits[0].object.userData.worldId);
+      if (hits.length > 0) runWarp(hits[0].object.userData.worldId);
     };
 
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -586,7 +659,8 @@ export default function WorldGlobe({
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointerup', onPointerUp);
     };
-  }, [onSelectWorld]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onWarpArrived]);
 
   // Posizione del puntatore per l'hover dei satelliti (letta dal polling a
   // 250ms sopra, non da un handler che raycasta ad ogni movimento — troppo
@@ -714,6 +788,7 @@ export default function WorldGlobe({
         width={size.width}
         height={size.height}
       />
+      <div className="rb-globe-warp-flash" ref={warpFlashRef} aria-hidden="true" />
     </div>
   );
 }
