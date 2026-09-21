@@ -7,23 +7,32 @@
 // catalogo, con copertina e artista veri.
 const ITUNES_SEARCH_BASE = 'https://itunes.apple.com/search';
 
-const SEARCH_TIMEOUT_MS = 15000;
+const SEARCH_TIMEOUT_MS = 20000;
 
-export async function searchTracks(query, limit = 25) {
-  const url = `${ITUNES_SEARCH_BASE}?term=${encodeURIComponent(query.trim())}&media=music&entity=song&limit=${limit}`;
+async function fetchJson(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
-  let res;
   try {
-    res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`richiesta fallita (${res.status})`);
+    return await res.json();
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('timeout');
     throw err;
   } finally {
     clearTimeout(timeout);
   }
-  if (!res.ok) throw new Error(`richiesta fallita (${res.status})`);
-  const data = await res.json();
+}
+
+export async function searchTracks(query, limit = 25) {
+  const url = `${ITUNES_SEARCH_BASE}?term=${encodeURIComponent(query.trim())}&media=music&entity=song&limit=${limit}`;
+  let data;
+  try {
+    data = await fetchJson(url);
+  } catch (err) {
+    if (err.message !== 'timeout') throw err;
+    data = await fetchJson(url);
+  }
   return (data.results ?? [])
     .filter((t) => t.previewUrl)
     .map((t) => ({

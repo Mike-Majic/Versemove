@@ -40,6 +40,20 @@ export async function getFollowing() {
   }
 }
 
+// Profili completi (nickname/avatar) di chi l'utente loggato segue già —
+// serve al pannello "Chi segui" (es. nel profilo musicale della Musica).
+export async function listFollowingProfiles() {
+  try {
+    const ids = await getFollowing();
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase.from('public_profiles').select('id, nickname, username, avatar_url').in('id', ids);
+    if (error || !data) return [];
+    return data.map((p) => ({ id: p.id, name: p.nickname || p.username || 'Utente', avatar: p.avatar_url || '' }));
+  } catch {
+    return [];
+  }
+}
+
 // Qualche profilo reale non ancora seguito, per il widget "Persone da
 // seguire" — legge dalla vista public_profiles (nome pubblico/avatar,
 // mai i campi personali di profiles).

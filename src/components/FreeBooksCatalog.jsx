@@ -3,6 +3,28 @@ import { searchFreeBooks } from '../data/freeBooksApi';
 import ExternalLinkButton from './ExternalLinkButton';
 import './FreeBooksCatalog.css';
 
+// Copertina di scorta per i libri che nel catalogo non ne hanno una (capita
+// spesso con edizioni/traduzioni più rare): un libro chiuso disegnato al
+// volo, negli stessi colori del mondo Arte, invece di un'icona spoglia.
+function BookCoverPlaceholder() {
+  return (
+    <svg className="rb-freebooks-cover rb-freebooks-cover-placeholder" viewBox="0 0 52 76" width="52" height="76" aria-hidden="true">
+      <defs>
+        <linearGradient id="rb-book-cover-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="var(--accent, #8b5cf6)" />
+          <stop offset="1" stopColor="#2c1c4d" />
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="50" height="74" rx="3" fill="url(#rb-book-cover-grad)" stroke="rgba(255,255,255,0.25)" />
+      <rect x="1" y="1" width="9" height="74" rx="2" fill="rgba(0,0,0,0.25)" />
+      <line x1="19" y1="21" x2="43" y2="21" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="19" y1="29" x2="39" y2="29" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="19" y1="37" x2="35" y2="37" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="35" cy="58" r="9" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 // Catalogo mondiale dei libri liberi da diritti d'autore, in tempo reale
 // (Project Gutenberg via Gutendex): niente lista incorporata nell'app,
 // perché "tutti i libri gratuiti che esistono nel mondo" sono troppi per
@@ -76,7 +98,7 @@ export default function FreeBooksCatalog() {
             {b.cover ? (
               <img className="rb-freebooks-cover" src={b.cover} alt="" loading="lazy" />
             ) : (
-              <div className="rb-freebooks-cover rb-freebooks-cover-placeholder">📖</div>
+              <BookCoverPlaceholder />
             )}
             <div className="rb-freebooks-info">
               <strong>{b.title}</strong>

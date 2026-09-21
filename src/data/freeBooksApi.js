@@ -9,23 +9,35 @@ const GUTENDEX_BASE = 'https://gutendex.com/books/';
 // Un fetch senza timeout può restare appeso per minuti se la connessione è
 // lenta o si blocca a metà (capitato su rete mobile): qui si arrende da solo
 // dopo SEARCH_TIMEOUT_MS, con un messaggio diverso da un errore generico.
-const SEARCH_TIMEOUT_MS = 15000;
+// Gutendex è un servizio gratuito gestito dalla community, senza garanzie di
+// uptime: a volte è solo lento a "svegliarsi", quindi un timeout riprova UNA
+// volta sola prima di arrendersi davvero (un errore vero, es. 404, non lo fa).
+const SEARCH_TIMEOUT_MS = 20000;
 
-export async function searchFreeBooks(query, page = 1) {
-  const url = `${GUTENDEX_BASE}?search=${encodeURIComponent(query.trim())}&page=${page}`;
+async function fetchJson(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
-  let res;
   try {
-    res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`richiesta fallita (${res.status})`);
+    return await res.json();
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('timeout');
     throw err;
   } finally {
     clearTimeout(timeout);
   }
-  if (!res.ok) throw new Error(`richiesta fallita (${res.status})`);
-  const data = await res.json();
+}
+
+export async function searchFreeBooks(query, page = 1) {
+  const url = `${GUTENDEX_BASE}?search=${encodeURIComponent(query.trim())}&page=${page}`;
+  let data;
+  try {
+    data = await fetchJson(url);
+  } catch (err) {
+    if (err.message !== 'timeout') throw err;
+    data = await fetchJson(url);
+  }
   return {
     count: data.count,
     hasMore: Boolean(data.next),

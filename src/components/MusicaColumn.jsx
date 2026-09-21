@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   listMyPlaylists,
   createPlaylist,
@@ -7,6 +7,9 @@ import {
   removeTrackFromPlaylist,
 } from '../data/musicPlaylists';
 import { searchTracks } from '../data/musicSearch';
+import { listFollowingProfiles } from '../data/follows';
+import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
+import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import './MusicaColumn.css';
 
 // Bottone play/pausa + copertina + titolo/artista, riusato sia per i
@@ -338,6 +341,115 @@ function PlaylistsTab({ playlists, onCreate, onDelete, onRemoveTrack, openPlayli
   );
 }
 
+// Colonna destra "Il mio profilo musicale": scorciatoia alle proprie
+// playlist, chi si segue (riusa data/follows.js, stesso sistema del mondo
+// Social) e i brani salvati in una qualunque playlist, riascoltabili da
+// qui senza dover entrare in ognuna (deduplicati per brano).
+function MusicProfileSidebar({ playlists, user, isDesktop, onOpenPlaylist, onBackToPrimary }) {
+  const [following, setFollowing] = useState(() => (user ? null : []));
+  const [playingId, setPlayingId] = useState(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+    listFollowingProfiles().then(setFollowing);
+  }, [user]);
+
+  useEffect(() => () => audioRef.current?.pause(), []);
+
+  const togglePlay = (track) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playingId === track.id) {
+      audio.pause();
+      setPlayingId(null);
+      return;
+    }
+    audio.src = track.previewUrl;
+    audio.play();
+    setPlayingId(track.id);
+  };
+
+  const likedTracks = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const p of playlists) {
+      for (const t of p.tracks) {
+        if (seen.has(t.track_id)) continue;
+        seen.add(t.track_id);
+        out.push({ id: t.id, title: t.title, artist: t.artist, artworkUrl: t.artwork_url, previewUrl: t.preview_url, addedAt: t.added_at });
+      }
+    }
+    return out.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt)).slice(0, 15);
+  }, [playlists]);
+
+  return (
+    <div className="rb-musica-profile">
+      {!isDesktop && (
+        <button type="button" className="rb-musica-mobile-back" onClick={onBackToPrimary}>← Torna a Musica</button>
+      )}
+      <div className="rb-musica-header">
+        <h3>Il mio profilo musicale</h3>
+      </div>
+
+      {!user ? (
+        <p className="rb-musica-status">Accedi per vedere le tue playlist, chi segui e i brani che ti piacciono.</p>
+      ) : (
+        <>
+          <div className="rb-musica-profile-section">
+            <h4>Le mie playlist</h4>
+            {playlists.length === 0 ? (
+              <p className="rb-musica-status">Non hai ancora playlist.</p>
+            ) : (
+              <ul className="rb-musica-profile-playlist-list">
+                {playlists.map((p) => (
+                  <li key={p.id}>
+                    <button type="button" onClick={() => onOpenPlaylist(p.id)}>
+                      🎧 {p.nome} <span>({p.tracks.length})</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rb-musica-profile-section">
+            <h4>Chi segui</h4>
+            {following === null ? (
+              <p className="rb-musica-status">Carico...</p>
+            ) : following.length === 0 ? (
+              <p className="rb-musica-status">Non segui ancora nessuno.</p>
+            ) : (
+              <ul className="rb-musica-profile-follow-list">
+                {following.map((f) => (
+                  <li key={f.id}>
+                    {f.avatar ? <img src={f.avatar} alt="" /> : <span className="rb-musica-follow-avatar-empty">👤</span>}
+                    <span>{f.name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rb-musica-profile-section">
+            <h4>Brani che ti piacciono</h4>
+            <audio ref={audioRef} onEnded={() => setPlayingId(null)} />
+            {likedTracks.length === 0 ? (
+              <p className="rb-musica-status">Nessun brano salvato ancora.</p>
+            ) : (
+              <ul className="rb-musica-track-list">
+                {likedTracks.map((t) => (
+                  <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={togglePlay} action={null} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Sostituisce la vecchia categoria Musica generica (dati finti, sempre
 // "Nessun risultato"): ora è playlist personali + ricerca reale, stesso
 // impianto della Libreria (community/catalogo mondiale) ma per la musica.
@@ -345,6 +457,8 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
   const [tab, setTab] = useState('playlist'); // 'playlist' | 'cerca'
   const [playlists, setPlaylists] = useState(() => (user ? null : []));
   const [openPlaylistId, setOpenPlaylistId] = useState(null);
+  const [mobileView, setMobileView] = useState('primary');
+  const isDesktop = useIsDesktopLayout();
 
   useEffect(() => {
     if (!user) return;
@@ -398,8 +512,14 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
     );
   };
 
-  return (
-    <div className="rb-musica-column">
+  const openFromSidebar = (playlistId) => {
+    setTab('playlist');
+    setOpenPlaylistId(playlistId);
+    if (!isDesktop) setMobileView('primary');
+  };
+
+  const primaryContent = (
+    <>
       <div className="rb-musica-header">
         <h3>{category.label}</h3>
       </div>
@@ -433,6 +553,27 @@ export default function MusicaColumn({ category, user, onOpenAuth }) {
           onCreatePlaylistAndAdd={handleCreatePlaylistAndAdd}
         />
       )}
-    </div>
+    </>
+  );
+
+  const secondaryContent = (
+    <MusicProfileSidebar
+      playlists={playlists ?? []}
+      user={user}
+      isDesktop={isDesktop}
+      onOpenPlaylist={openFromSidebar}
+      onBackToPrimary={() => setMobileView('primary')}
+    />
+  );
+
+  return (
+    <TwoColumnSwitcher
+      primary={primaryContent}
+      secondary={secondaryContent}
+      primaryLabel={category.label}
+      secondaryLabel="Il mio profilo"
+      mobileView={mobileView}
+      onMobileViewChange={setMobileView}
+    />
   );
 }
