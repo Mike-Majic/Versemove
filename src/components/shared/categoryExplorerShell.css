@@ -4,16 +4,20 @@
    Il contenuto vero e proprio (griglia categorie, colonne, sottofamiglie)
    sta in CategoryColumn.css — qui c'è solo la cornice, uguale ovunque. */
 
-/* z-index 1015+ (non solo il minimo per stare sopra alla topbar/tagline):
-   il globo (react-globe.gl) assegna ai marker HTML uno z-index inline
-   dinamico proporzionale al numero di marker visibili in quel momento, che
-   con molti profili ravvicinati può superare qualunque valore "piccolo" —
-   senza questo margine, zoomando i marker finiscono sopra ai pannelli. */
+/* z-index sopra sia al globo che alla topbar: il globo (react-globe.gl)
+   assegna ai marker HTML uno z-index inline dinamico proporzionale al
+   numero di marker visibili in quel momento, che con molti profili
+   ravvicinati può superare qualunque valore "piccolo" — senza un margine
+   alto, zoomando i marker finiscono sopra ai pannelli. Deve anche stare
+   sopra a .rb-topbar (z-index 1030, vedi TopBar.css): la X e la stellina
+   in alto (vedi .rb-arte-top-controls sotto) cadono nella stessa fascia
+   verticale della topbar, e uno z-index inferiore al suo la farebbe
+   intercettare i click anche se i bottoni sembrano disegnati sopra. */
 .rb-arte-explorer {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 1015;
+  z-index: 1031;
 }
 
 /* Sotto il breakpoint mobile i pannelli diventano a schermo intero (vedi
