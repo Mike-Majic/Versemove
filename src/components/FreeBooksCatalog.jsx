@@ -1,6 +1,72 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { searchFreeBooks } from '../data/freeBooksApi';
 import './FreeBooksCatalog.css';
+
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Rilevanza' },
+  { value: 'newest', label: 'Più recenti' },
+  { value: 'popular', label: 'Più popolari' },
+];
+
+// Menu a tendina disegnato su misura invece del <select> nativo del browser:
+// quello di sistema apre un popup bianco squadrato che stona con lo stile
+// dell'app (vetro scuro, accento viola). Stesso comportamento, aspetto
+// coerente.
+function CustomSelect({ value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  const current = options.find((o) => o.value === value);
+
+  return (
+    <div className="rb-freebooks-select" ref={ref}>
+      <button
+        type="button"
+        className="rb-freebooks-select-btn"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span>{current?.label}</span>
+        <svg
+          className={`rb-freebooks-select-arrow${open ? ' open' : ''}`}
+          width="10"
+          height="6"
+          viewBox="0 0 10 6"
+          aria-hidden="true"
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="rb-freebooks-select-menu">
+          {options.map((o) => (
+            <li key={o.value}>
+              <button
+                type="button"
+                className={o.value === value ? 'active' : ''}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+              >
+                {o.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // Copertina di scorta per i libri che nel catalogo non ne hanno una (capita
 // spesso con edizioni/traduzioni più rare): un libro chiuso disegnato al
@@ -123,14 +189,10 @@ export default function FreeBooksCatalog() {
       </div>
 
       <div className="rb-freebooks-filters-row">
-        <label className="rb-freebooks-filter">
+        <div className="rb-freebooks-filter">
           <span>Ordina per</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="relevance">Rilevanza</option>
-            <option value="newest">Più recenti</option>
-            <option value="popular">Più popolari</option>
-          </select>
-        </label>
+          <CustomSelect value={sort} options={SORT_OPTIONS} onChange={setSort} />
+        </div>
         <label className="rb-freebooks-filter">
           <span>Anno da</span>
           <input

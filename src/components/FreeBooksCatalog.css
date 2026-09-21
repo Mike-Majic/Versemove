@@ -54,7 +54,6 @@
   color: rgba(245, 245, 247, 0.55);
 }
 
-.rb-freebooks-filter select,
 .rb-freebooks-filter input {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -62,10 +61,78 @@
   padding: 6px 9px;
   color: #f5f5f7;
   font-size: 12.5px;
+  width: 72px;
 }
 
-.rb-freebooks-filter input {
-  width: 72px;
+.rb-freebooks-select {
+  position: relative;
+}
+
+.rb-freebooks-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 118px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 35%, transparent);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #f5f5f7;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.rb-freebooks-select-btn:hover {
+  border-color: color-mix(in srgb, var(--accent, #8b5cf6) 60%, transparent);
+}
+
+.rb-freebooks-select-arrow {
+  flex-shrink: 0;
+  color: var(--accent, #8b5cf6);
+  transition: transform 0.15s ease;
+}
+
+.rb-freebooks-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.rb-freebooks-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 5px;
+  background: rgba(10, 8, 18, 0.97);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 45%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  z-index: 20;
+}
+
+.rb-freebooks-select-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #f5f5f7;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rb-freebooks-select-menu button:hover {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 22%, transparent);
+}
+
+.rb-freebooks-select-menu button.active {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 35%, transparent);
+  font-weight: 600;
 }
 
 .rb-freebooks-status {
