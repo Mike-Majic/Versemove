@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MINIGAMES, resolveCategoryQuery } from '../games/registry';
 import MiniGameShell from './minigames/MiniGameShell';
+import FavoriteStarButton from './shared/FavoriteStarButton';
 import './shared/categoryExplorerShell.css';
 import './BambiniGameExplorer.css';
 
@@ -11,7 +12,17 @@ import './BambiniGameExplorer.css';
 // sfogliare, sono esperienze a sé. onGameOpenChange avvisa App.jsx quando un
 // gioco è aperto/chiuso, per disattivare lo swipe/le frecce di cambio mondo
 // mentre si gioca (alcuni giochi, es. Snake, usano le stesse frecce).
-export default function BambiniGameExplorer({ world, activeCategory, onToggleCategory, onSearchCategory, onGameOpenChange }) {
+export default function BambiniGameExplorer({
+  world,
+  activeCategory,
+  onToggleCategory,
+  onSearchCategory,
+  onGameOpenChange,
+  user,
+  onOpenAuth,
+  favorites = [],
+  onToggleFavorite,
+}) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
   const game = MINIGAMES.find((g) => g.id === activeCategory) ?? null;
@@ -39,15 +50,26 @@ export default function BambiniGameExplorer({ world, activeCategory, onToggleCat
       {game && (
         <>
           <div className="rb-arte-top-controls">
-            <button
-              type="button"
-              className="rb-arte-close-all-btn rb-bambini-close-btn"
-              onClick={() => onToggleCategory(null)}
-              aria-label="Chiudi il gioco"
-              title="Chiudi il gioco"
-            >
-              ✕
-            </button>
+            <div className="rb-arte-top-controls-row">
+              <button
+                type="button"
+                className="rb-arte-close-all-btn rb-bambini-close-btn"
+                onClick={() => onToggleCategory(null)}
+                aria-label="Chiudi il gioco"
+                title="Chiudi il gioco"
+              >
+                ✕
+              </button>
+              <FavoriteStarButton
+                worldId={world.id}
+                categoryId={game.id}
+                categoryLabel={game.label}
+                favorites={favorites}
+                onToggle={onToggleFavorite}
+                user={user}
+                onOpenAuth={onOpenAuth}
+              />
+            </div>
 
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input

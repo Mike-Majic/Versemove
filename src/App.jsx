@@ -38,6 +38,7 @@ import FriendChatModal from './components/FriendChatModal';
 import FriendsModal from './components/FriendsModal';
 import AdminPanel from './components/AdminPanel';
 import ProfileSettingsPanel from './components/ProfileSettingsPanel';
+import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
 import PasswordRecoveryModal from './components/PasswordRecoveryModal';
 import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile } from './data/accounts';
 import {
@@ -196,6 +197,10 @@ export default function App() {
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  // Categorie preferite (stellina accanto alla X di ogni pannello categoria,
+  // vedi FavoriteStarButton): caricate una volta per sessione, aggiornate
+  // subito quando l'utente ne aggiunge/togliene una.
+  const [favoriteCategories, setFavoriteCategories] = useState([]);
   // Timer del pannello che deve ancora aprirsi a volo finito (vedi
   // flyToCategoryThenOpen): tenerlo in un ref per poterlo annullare se nel
   // frattempo si sceglie un'altra categoria o si cambia mondo.
@@ -452,6 +457,26 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) {
+      setFavoriteCategories([]);
+      return;
+    }
+    listMyFavoriteCategories().then(setFavoriteCategories);
+  }, [user?.id]);
+
+  const toggleFavoriteCategory = async ({ worldId, categoryId, categoryLabel }, currentlyFavorite) => {
+    if (currentlyFavorite) {
+      setFavoriteCategories((prev) => prev.filter((f) => !(f.worldId === worldId && f.categoryId === categoryId)));
+      const { error } = await removeFavoriteCategory({ worldId, categoryId });
+      if (error) listMyFavoriteCategories().then(setFavoriteCategories);
+      return;
+    }
+    setFavoriteCategories((prev) => [...prev, { worldId, categoryId, categoryLabel }]);
+    const { error } = await addFavoriteCategory({ worldId, categoryId, categoryLabel });
+    if (error) listMyFavoriteCategories().then(setFavoriteCategories);
+  };
 
   const totalUnreadMessages = useMemo(() => {
     let total = 0;
@@ -767,6 +792,8 @@ export default function App() {
           locationFilters={locationFilters}
           user={user}
           onOpenAuth={() => setAuthOpen(true)}
+          favorites={favoriteCategories}
+          onToggleFavorite={toggleFavoriteCategory}
         />
       )}
 
@@ -777,6 +804,10 @@ export default function App() {
           onToggleCategory={toggleArteCategory}
           onSearchCategory={flyToArteCategory}
           onGameOpenChange={setGameplayActive}
+          user={user}
+          onOpenAuth={() => setAuthOpen(true)}
+          favorites={favoriteCategories}
+          onToggleFavorite={toggleFavoriteCategory}
         />
       )}
 
@@ -791,6 +822,8 @@ export default function App() {
           onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
           initialMatchTab={incontriInitialTab}
           onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
+          favorites={favoriteCategories}
+          onToggleFavorite={toggleFavoriteCategory}
         />
       )}
 
@@ -802,6 +835,8 @@ export default function App() {
           onSearchCategory={flyToArteCategory}
           user={user}
           onOpenAuth={() => setAuthOpen(true)}
+          favorites={favoriteCategories}
+          onToggleFavorite={toggleFavoriteCategory}
         />
       )}
 
@@ -809,6 +844,8 @@ export default function App() {
         <SocialWorldExplorer
           world={world}
           activeCategory={activeArteCategory}
+          favorites={favoriteCategories}
+          onToggleFavorite={toggleFavoriteCategory}
           onToggleCategory={toggleArteCategory}
           onSearchCategory={flyToArteCategory}
           user={user}
@@ -984,6 +1021,7 @@ export default function App() {
         onClose={() => setProfileSettingsOpen(false)}
         user={user}
         onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+        favoriteCategories={favoriteCategories}
       />
 
       <AuthModal

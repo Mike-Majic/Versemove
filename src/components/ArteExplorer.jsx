@@ -3,6 +3,7 @@ import LibreriaColumn from './LibreriaColumn';
 import FotografiaColumn from './FotografiaColumn';
 import VideoColumn from './VideoColumn';
 import MusicaApp from './musica/MusicaApp';
+import FavoriteStarButton from './shared/FavoriteStarButton';
 import './shared/categoryExplorerShell.css';
 
 // Guscio di navigazione categorie, generico per qualunque mondo che abbia un
@@ -21,6 +22,8 @@ export default function ArteExplorer({
   locationFilters,
   user,
   onOpenAuth,
+  favorites = [],
+  onToggleFavorite,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
 
@@ -29,15 +32,26 @@ export default function ArteExplorer({
       {category && (
         <>
           <div className="rb-arte-top-controls">
-            <button
-              type="button"
-              className="rb-arte-close-all-btn"
-              onClick={() => onToggleCategory(null)}
-              aria-label="Chiudi le colonne"
-              title="Chiudi le colonne"
-            >
-              ✕
-            </button>
+            <div className="rb-arte-top-controls-row">
+              <button
+                type="button"
+                className="rb-arte-close-all-btn"
+                onClick={() => onToggleCategory(null)}
+                aria-label="Chiudi le colonne"
+                title="Chiudi le colonne"
+              >
+                ✕
+              </button>
+              <FavoriteStarButton
+                worldId={world.id}
+                categoryId={category.id}
+                categoryLabel={category.label}
+                favorites={favorites}
+                onToggle={onToggleFavorite}
+                user={user}
+                onOpenAuth={onOpenAuth}
+              />
+            </div>
           </div>
 
           {category.id === 'libreria' ? (

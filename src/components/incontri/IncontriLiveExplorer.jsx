@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery } from '../../data/incontriCategories';
 import MatchColumn from './MatchColumn';
+import FavoriteStarButton from '../shared/FavoriteStarButton';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Incontri: stesso pattern di ArteExplorer
@@ -17,6 +18,8 @@ export default function IncontriLiveExplorer({
   onOpenChat,
   initialMatchTab,
   onConsumeInitialMatchTab,
+  favorites = [],
+  onToggleFavorite,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -39,15 +42,26 @@ export default function IncontriLiveExplorer({
       {category && (
         <>
           <div className="rb-arte-top-controls">
-            <button
-              type="button"
-              className="rb-arte-close-all-btn"
-              onClick={() => onToggleCategory(null)}
-              aria-label="Chiudi le colonne"
-              title="Chiudi le colonne"
-            >
-              ✕
-            </button>
+            <div className="rb-arte-top-controls-row">
+              <button
+                type="button"
+                className="rb-arte-close-all-btn"
+                onClick={() => onToggleCategory(null)}
+                aria-label="Chiudi le colonne"
+                title="Chiudi le colonne"
+              >
+                ✕
+              </button>
+              <FavoriteStarButton
+                worldId={world.id}
+                categoryId={category.id}
+                categoryLabel={category.label}
+                favorites={favorites}
+                onToggle={onToggleFavorite}
+                user={user}
+                onOpenAuth={onOpenAuth}
+              />
+            </div>
 
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input

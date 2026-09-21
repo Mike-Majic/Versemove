@@ -9,6 +9,7 @@ import {
 } from '../data/accounts';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
+import { WORLDS } from '../data/worlds';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import './ProfileSettingsPanel.css';
@@ -482,7 +483,40 @@ function AccountTab({ user, onUpdateUser }) {
 // (tipo/fatturazione/genere/pronomi), organizzati in schede per restare
 // leggibile. Mondi abilitati e blocco contatti vivono nel pannello
 // Impostazioni generale (SettingsPanel), insieme al resto della privacy.
-export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser }) {
+// Lista delle categorie preferite (stellina, vedi FavoriteStarButton),
+// raggruppate nell'ordine dei mondi (verde, blu, bianco, viola, giallo,
+// rosso — lo stesso di data/worlds.js): ogni nome categoria è una pillola
+// con lo sfondo del colore del suo mondo, testo sempre nel colore standard
+// del resto dell'app.
+function FavoriteCategoriesList({ favoriteCategories }) {
+  const byWorld = WORLDS.map((w) => ({
+    world: w,
+    items: favoriteCategories.filter((f) => f.worldId === w.id),
+  })).filter((g) => g.items.length > 0);
+
+  if (byWorld.length === 0) {
+    return <p className="rb-profile-favorites-empty">Nessuna categoria preferita ancora — clicca la stellina ☆ accanto alla X quando apri una categoria.</p>;
+  }
+
+  return (
+    <div className="rb-profile-favorites">
+      {byWorld.map(({ world, items }) => (
+        <div key={world.id} className="rb-profile-favorites-group">
+          <h4>{world.label}</h4>
+          <div className="rb-profile-favorites-chips">
+            {items.map((f) => (
+              <span key={f.categoryId} className="rb-profile-favorites-chip" style={{ backgroundColor: world.color }}>
+                {f.categoryLabel}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [] }) {
   const [tab, setTab] = useState('profilo');
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [nickErr, setNickErr] = useState('');
@@ -551,8 +585,11 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
         <div className="rb-profile-tabs">
           <button type="button" className={tab === 'profilo' ? 'active' : ''} onClick={() => setTab('profilo')}>Profilo</button>
           <button type="button" className={tab === 'album' ? 'active' : ''} onClick={() => setTab('album')}>Album</button>
+          <button type="button" className={tab === 'preferiti' ? 'active' : ''} onClick={() => setTab('preferiti')}>Preferiti</button>
           <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
         </div>
+
+        {tab === 'preferiti' && <FavoriteCategoriesList favoriteCategories={favoriteCategories} />}
 
         {tab === 'profilo' && (
           <>
