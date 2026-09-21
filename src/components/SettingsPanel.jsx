@@ -454,13 +454,18 @@ export default function SettingsPanel({
   const [draftLocationFilters, setDraftLocationFilters] = useState(locationFilters);
   const [draftVisibility, setDraftVisibility] = useState(visibility);
   const [draftSound, setDraftSound] = useState(true);
+  const [soundBaseline, setSoundBaseline] = useState(true);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setDraftFilters(filters);
     setDraftLocationFilters(locationFilters);
     setDraftVisibility(visibility);
-    setDraftSound(isSoundEnabled());
+    const sound = isSoundEnabled();
+    setDraftSound(sound);
+    setSoundBaseline(sound);
+    setCloseConfirmOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -470,6 +475,16 @@ export default function SettingsPanel({
   const updateLocation = (key, value) => setDraftLocationFilters((f) => ({ ...f, [key]: value }));
   const togglePersonalizzaSub = (name) => setPersonalizzaSub((s) => (s === name ? '' : name));
   const distanzaUnlimited = draftLocationFilters.distance >= MAX_DISTANCE_KM;
+
+  // Vero se la bozza si è mossa da quanto è già applicato: mostra
+  // l'avviso "Modifiche non applicate" e fa chiedere conferma prima di
+  // chiudere col ✕ (unico modo di chiudere il pannello: lo sfondo non
+  // chiude mai nulla, vedi ModalOverlay.jsx).
+  const isDirty =
+    JSON.stringify(draftFilters) !== JSON.stringify(filters) ||
+    JSON.stringify(draftLocationFilters) !== JSON.stringify(locationFilters) ||
+    JSON.stringify(draftVisibility) !== JSON.stringify(visibility) ||
+    draftSound !== soundBaseline;
 
   const handleReset = () => {
     setDraftFilters(DEFAULT_FILTERS);
@@ -485,13 +500,32 @@ export default function SettingsPanel({
     (onApply ?? onClose)();
   };
 
+  const requestClose = () => {
+    if (isDirty) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    onClose();
+  };
+
   return (
     <ModalOverlay onClose={onClose} className="rb-settings-overlay">
       <aside className="rb-settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rb-settings-header">
           <h2>Impostazioni</h2>
-          <button className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+          <button className="rb-close-btn" onClick={requestClose} aria-label="Chiudi">✕</button>
         </div>
+
+        {closeConfirmOpen && (
+          <div className="rb-settings-close-confirm">
+            <p>Hai modifiche non applicate. Chiudere comunque?</p>
+            <div className="rb-settings-close-confirm-actions">
+              <button type="button" onClick={() => setCloseConfirmOpen(false)}>Annulla</button>
+              <button type="button" onClick={onClose}>Scarta e chiudi</button>
+              <button type="button" className="rb-apply-filters-btn" onClick={handleApply}>Applica e chiudi</button>
+            </div>
+          </div>
+        )}
 
         <div className="rb-filter-actions">
           <button type="button" className="rb-reset-filters-btn" onClick={handleReset}>
@@ -501,7 +535,9 @@ export default function SettingsPanel({
             Applica
           </button>
         </div>
-        <p className="rb-settings-hint">Le modifiche qui sotto valgono solo dopo aver premuto "Applica".</p>
+        <p className="rb-settings-hint">
+          {isDirty ? <span className="rb-settings-dirty-badge">● Modifiche non applicate</span> : 'Le modifiche qui sotto valgono solo dopo aver premuto "Applica".'}
+        </p>
 
         <section className="rb-settings-section rb-settings-section-first">
           <label className="rb-toggle-row">
