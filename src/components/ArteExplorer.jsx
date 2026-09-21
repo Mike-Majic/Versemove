@@ -3,6 +3,7 @@ import CategoryColumn from './CategoryColumn';
 import LibreriaColumn from './LibreriaColumn';
 import FotografiaColumn from './FotografiaColumn';
 import VideoColumn from './VideoColumn';
+import MusicaColumn from './MusicaColumn';
 import './shared/categoryExplorerShell.css';
 
 // Guscio di navigazione categorie, generico per qualunque mondo che abbia un
@@ -80,6 +81,8 @@ export default function ArteExplorer({
             <FotografiaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'video' ? (
             <VideoColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : category.id === 'musica' ? (
+            <MusicaColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
           ) : (
             <CategoryColumn
               key={category.id}
