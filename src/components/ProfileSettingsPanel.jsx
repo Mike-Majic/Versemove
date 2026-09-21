@@ -6,6 +6,8 @@ import {
   nameCooldownRemaining,
   updateAccountDetails,
   uploadAvatar,
+  uploadAttachment,
+  getCurrentAccount,
   getMyLinkedAccount,
   linkSecondAccount,
   unlinkMyAccount,
@@ -14,10 +16,15 @@ import {
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
+import { updateOwnDatingProfile } from '../data/incontri';
+import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import './ProfileSettingsPanel.css';
+
+const CITTA_MAX = 80;
+const BIO_MAX = 300;
 
 const NICKNAME_RULE_TEXT =
   'Il nickname si può cambiare al massimo una volta a settimana, e non può essere uguale a quello di un altro utente.';
@@ -672,6 +679,125 @@ function AccountLinkPanel({ user, onClose }) {
   );
 }
 
+// Città e bio mostrate nel mazzo del mondo Incontri (get_match_candidates):
+// spostate qui da Impostazioni perché sono dati personali del profilo come
+// gli altri in questa scheda, aggiornabili quando si vuole — non più un
+// "filtro" con Applica. Salvataggio immediato, come nickname/nome.
+function DatingProfileSection({ user, onUpdateUser }) {
+  const [citta, setCitta] = useState(user?.citta ?? '');
+  const [bio, setBio] = useState(user?.bio ?? '');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setError('');
+    setSuccess('');
+    setBusy(true);
+    const { error: err } = await updateOwnDatingProfile(citta.trim(), bio.trim());
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSuccess('Profilo Incontri aggiornato.');
+    onUpdateUser?.({ ...user, citta: citta.trim(), bio: bio.trim() });
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Profilo Incontri</strong></div>
+      <p className="rb-profile-link-hint">Città e bio mostrate agli altri nel mazzo del mondo Incontri.</p>
+      <label className="rb-field">
+        <span className="rb-field-label-row">
+          Città
+          <span className="rb-profile-link-hint" style={{ margin: 0 }}>{citta.length}/{CITTA_MAX}</span>
+        </span>
+        <input type="text" value={citta} maxLength={CITTA_MAX} onChange={(e) => setCitta(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span className="rb-field-label-row">
+          Bio
+          <span className="rb-profile-link-hint" style={{ margin: 0 }}>{bio.length}/{BIO_MAX}</span>
+        </span>
+        <textarea rows={3} value={bio} maxLength={BIO_MAX} onChange={(e) => setBio(e.target.value)} />
+      </label>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {success && <p className="rb-profile-field-success">{success}</p>}
+      <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
+        {busy ? 'Un attimo…' : 'Salva'}
+      </button>
+    </div>
+  );
+}
+
+// Apre un documento in una nuova scheda: il bucket "attachments" è privato,
+// serve un url firmato temporaneo (stesso meccanismo usato dal pannello
+// admin per la verifica documenti, vedi AdminPanel.jsx).
+async function openDocument(att) {
+  const { data, error } = await supabase.storage.from('attachments').createSignedUrl(att.path, 60);
+  if (!error && data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+}
+
+// Documenti personali (es. curriculum, documento d'identità): stesso
+// bucket privato usato per gli allegati in registrazione (data/accounts.js
+// uploadAttachment), qui si possono aggiungere anche dopo. Chi potrà
+// vederli e con quale consenso (es. le aziende per il CV) è da decidere:
+// per ora solo caricamento e anteprima per il proprietario.
+function DocumentsSection({ user, onUpdateUser }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true);
+    setError('');
+    for (const file of files) {
+      const { error: err } = await uploadAttachment(user.id, file);
+      if (err) setError(err);
+    }
+    const fresh = await getCurrentAccount();
+    if (fresh) onUpdateUser(fresh);
+    setUploading(false);
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Documenti</strong></div>
+      <p className="rb-profile-link-hint">
+        Carica documenti personali (es. curriculum, documento d'identità). Per ora solo tu puoi vederli qui;
+        a chi e come renderli visibili (es. alle aziende per il CV) lo decideremo più avanti.
+      </p>
+      {(user.attachments ?? []).length > 0 && (
+        <ul className="rb-profile-documents-list">
+          {user.attachments.map((att, i) => (
+            <li key={i}>
+              <button type="button" onClick={() => openDocument(att)} title={att.name}>
+                📄 {att.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      <button type="button" className="rb-profile-save-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+        {uploading ? 'Caricamento...' : '+ Carica documento'}
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        multiple
+        hidden
+        onChange={handleFiles}
+      />
+    </div>
+  );
+}
+
 // Anteprima di come il profilo appare agli altri: gli stessi dati
 // pubblici mostrati in giro per l'app (avatar, nickname, spunta
 // verificato, tipo account) — nome/cognome non compaiono perché non sono
@@ -780,6 +906,8 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
           <>
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
             <ProfilePreviewCard user={user} />
+            <DatingProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <DocumentsSection user={user} onUpdateUser={onUpdateUser} />
           </>
         )}
 

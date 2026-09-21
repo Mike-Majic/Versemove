@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
-import { ARTE_CATEGORIES } from '../data/arteCategories';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
 import { resetAccountPassword, setOwnWorlds, deleteOwnAccount } from '../data/accounts';
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
-import { updateOwnDatingProfile } from '../data/incontri';
+import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import './SettingsPanel.css';
+
+const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
+const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
+const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
 
 // Riga di titolo cliccabile che apre/chiude il contenuto sotto — stesso
 // linguaggio visivo di rb-settings-nav-btn (che porta a un'altra vista),
@@ -47,58 +50,6 @@ function CollapsibleSection({ title, infoText, open, onToggle, children, level =
         </div>
       )}
     </Wrapper>
-  );
-}
-
-// Vista "Filtri avanzati": lasciata com'era, non tocchiamo questa per ora.
-function AdvancedFiltersView({ onBack, onClose, arteFilter, setArteFilter }) {
-  const selectedArteCategory = ARTE_CATEGORIES.find((c) => c.id === arteFilter.category) ?? null;
-
-  return (
-    <>
-      <div className="rb-settings-header">
-        <button type="button" className="rb-settings-back-btn" onClick={onBack}>
-          ← Impostazioni
-        </button>
-        <button className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-      </div>
-      <h2 className="rb-settings-subtitle">Filtri avanzati</h2>
-
-      <section className="rb-settings-section rb-settings-section-first">
-        <h3>Arte & Musica</h3>
-        <p className="rb-settings-hint">Vai dritto a una categoria (ed eventualmente a una sottofamiglia) del mondo Arte & Musica.</p>
-
-        <label className="rb-field">
-          <span>Categoria</span>
-          <select
-            value={arteFilter.category}
-            onChange={(e) => setArteFilter({ category: e.target.value, subfamily: '' })}
-          >
-            <option value="">Nessuna categoria</option>
-            {ARTE_CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
-          </select>
-        </label>
-
-        {selectedArteCategory && (
-          <label className="rb-field">
-            <span>Sottofamiglia</span>
-            <select
-              value={arteFilter.subfamily}
-              onChange={(e) => setArteFilter({ category: arteFilter.category, subfamily: e.target.value })}
-            >
-              <option value="">Tutte</option>
-              {selectedArteCategory.subfamilies.map((sf) => (
-                <option key={sf} value={sf}>{sf}</option>
-              ))}
-            </select>
-          </label>
-        )}
-      </section>
-
-      <p className="rb-settings-footnote">Altri filtri avanzati arriveranno qui, senza affollare le Impostazioni principali.</p>
-    </>
   );
 }
 
@@ -167,72 +118,14 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
   );
 }
 
-const CITTA_MAX = 80;
-const BIO_MAX = 300;
-
-// Città e bio mostrate nel mazzo del mondo Incontri (get_match_candidates):
-// nessuna RPC le restituisce nel profilo account normale, quindi partono
-// vuote finché non sono già salvate una volta (user.citta/user.bio, vedi
-// mapProfile in data/accounts.js).
-function DatingProfileSection({ user, onOpenAuth, onUpdateUser }) {
-  const [citta, setCitta] = useState(user?.citta ?? '');
-  const [bio, setBio] = useState(user?.bio ?? '');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  if (!user) {
-    return (
-      <button type="button" className="rb-settings-nav-btn" onClick={onOpenAuth}>
-        <span><strong>Accedi per impostare il tuo profilo Incontri</strong></span>
-        <span aria-hidden="true">→</span>
-      </button>
-    );
-  }
-
-  const save = async () => {
-    setError('');
-    setSuccess('');
-    setBusy(true);
-    const { error: err } = await updateOwnDatingProfile(citta.trim(), bio.trim());
-    setBusy(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setSuccess('Profilo Incontri aggiornato.');
-    onUpdateUser?.({ ...user, citta: citta.trim(), bio: bio.trim() });
-  };
-
-  return (
-    <>
-      <p className="rb-settings-hint">Città e bio mostrate agli altri nel mazzo del mondo Incontri.</p>
-      <label className="rb-field">
-        <span className="rb-field-label-row">
-          Città
-          <span className="rb-settings-hint" style={{ margin: 0 }}>{citta.length}/{CITTA_MAX}</span>
-        </span>
-        <input type="text" value={citta} maxLength={CITTA_MAX} onChange={(e) => setCitta(e.target.value)} />
-      </label>
-      <label className="rb-field">
-        <span className="rb-field-label-row">
-          Bio
-          <span className="rb-settings-hint" style={{ margin: 0 }}>{bio.length}/{BIO_MAX}</span>
-        </span>
-        <textarea rows={3} value={bio} maxLength={BIO_MAX} onChange={(e) => setBio(e.target.value)} />
-      </label>
-      {error && <p className="rb-privacy-error">{error}</p>}
-      {success && <p className="rb-privacy-success">{success}</p>}
-      <button type="button" className="rb-reset-filters-btn" onClick={save} disabled={busy}>
-        {busy ? 'Un attimo…' : 'Salva'}
-      </button>
-    </>
-  );
-}
-
-// Vista "Privacy": tre sotto-voci (Utenti, Posizione, Sicurezza e accesso),
-// una alla volta come il resto del pannello.
-function PrivacyView({ onBack, onClose, user, onOpenAuth, friends, onUnfriend, visibility, setVisibility }) {
+// Sezione "Privacy": tre sotto-voci (Utenti, Posizione, Sicurezza e
+// accesso). Inline nel flusso principale delle Impostazioni (non più una
+// pagina a parte raggiunta con un pulsante+indietro): "Posizione" agisce
+// sul draft (visibility/setVisibility qui sono in realtà il draft passato
+// dal genitore), confermato solo cliccando "Applica" come gli altri filtri.
+// Utenti (blocco contatti) e Sicurezza restano azioni immediate: non sono
+// filtri di visualizzazione, toccano subito il server.
+function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibility, setVisibility }) {
   const [sub, setSub] = useState('');
   const [blocked, setBlocked] = useState([]);
   const [profilesMap, setProfilesMap] = useState(new Map());
@@ -312,14 +205,6 @@ function PrivacyView({ onBack, onClose, user, onOpenAuth, friends, onUnfriend, v
 
   return (
     <>
-      <div className="rb-settings-header">
-        <button type="button" className="rb-settings-back-btn" onClick={onBack}>
-          ← Impostazioni
-        </button>
-        <button className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-      </div>
-      <h2 className="rb-settings-subtitle">Privacy</h2>
-
       <CollapsibleSection
         level="sub"
         title="Utenti"
@@ -534,6 +419,15 @@ function DeleteAccountSection({ user, onAccountDeleted }) {
   );
 }
 
+// Tutti i filtri di visualizzazione (Suono, Luogo, Mostrami/età, Posizione)
+// vivono qui come una "bozza": partono allineati a quanto è già attivo
+// (filters/locationFilters/visibility, gli stessi che filtrano davvero il
+// globo in App.jsx) ogni volta che il pannello si apre, e toccano lo stato
+// vero solo quando si clicca "Applica" — prima, muovere uno slider o
+// spuntare una casella cambia solo l'anteprima qui dentro. "Mondi" (dentro
+// Personalizza) e le azioni di Privacy → Utenti/Sicurezza restano invece
+// immediate: sono mutazioni vere sull'account (RPC), non filtri client, e
+// hanno già un loro pulsante "Salva"/azione dedicato.
 export default function SettingsPanel({
   open,
   onClose,
@@ -545,56 +439,51 @@ export default function SettingsPanel({
   setFilters,
   locationFilters,
   setLocationFilters,
-  arteFilter,
-  setArteFilter,
   visibility,
   setVisibility,
-  onResetFilters,
   friends,
   onUnfriend,
   onAccountDeleted,
 }) {
-  const [view, setView] = useState('main');
   const [luogoOpen, setLuogoOpen] = useState(false);
   const [personalizzaOpen, setPersonalizzaOpen] = useState(false);
   const [personalizzaSub, setPersonalizzaSub] = useState('');
-  const [incontriProfileOpen, setIncontriProfileOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+
+  const [draftFilters, setDraftFilters] = useState(filters);
+  const [draftLocationFilters, setDraftLocationFilters] = useState(locationFilters);
+  const [draftVisibility, setDraftVisibility] = useState(visibility);
+  const [draftSound, setDraftSound] = useState(true);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraftFilters(filters);
+    setDraftLocationFilters(locationFilters);
+    setDraftVisibility(visibility);
+    setDraftSound(isSoundEnabled());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
-  const updateFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
-  const updateLocation = (key, value) => setLocationFilters((f) => ({ ...f, [key]: value }));
+  const updateFilter = (key, value) => setDraftFilters((f) => ({ ...f, [key]: value }));
+  const updateLocation = (key, value) => setDraftLocationFilters((f) => ({ ...f, [key]: value }));
   const togglePersonalizzaSub = (name) => setPersonalizzaSub((s) => (s === name ? '' : name));
-  const distanzaUnlimited = locationFilters.distance >= MAX_DISTANCE_KM;
+  const distanzaUnlimited = draftLocationFilters.distance >= MAX_DISTANCE_KM;
 
-  if (view === 'advanced') {
-    return (
-      <ModalOverlay onClose={onClose} className="rb-settings-overlay">
-        <aside className="rb-settings-panel" onClick={(e) => e.stopPropagation()}>
-          <AdvancedFiltersView onBack={() => setView('main')} onClose={onClose} arteFilter={arteFilter} setArteFilter={setArteFilter} />
-        </aside>
-      </ModalOverlay>
-    );
-  }
+  const handleReset = () => {
+    setDraftFilters(DEFAULT_FILTERS);
+    setDraftLocationFilters(DEFAULT_LOCATION_FILTERS);
+    setDraftVisibility(DEFAULT_VISIBILITY);
+  };
 
-  if (view === 'privacy') {
-    return (
-      <ModalOverlay onClose={onClose} className="rb-settings-overlay">
-        <aside className="rb-settings-panel" onClick={(e) => e.stopPropagation()}>
-          <PrivacyView
-            onBack={() => setView('main')}
-            onClose={onClose}
-            user={user}
-            onOpenAuth={onOpenAuth}
-            friends={friends}
-            onUnfriend={onUnfriend}
-            visibility={visibility}
-            setVisibility={setVisibility}
-          />
-        </aside>
-      </ModalOverlay>
-    );
-  }
+  const handleApply = () => {
+    setFilters(draftFilters);
+    setLocationFilters(draftLocationFilters);
+    setVisibility(draftVisibility);
+    setSoundEnabled(draftSound);
+    (onApply ?? onClose)();
+  };
 
   return (
     <ModalOverlay onClose={onClose} className="rb-settings-overlay">
@@ -605,13 +494,47 @@ export default function SettingsPanel({
         </div>
 
         <div className="rb-filter-actions">
-          <button type="button" className="rb-reset-filters-btn" onClick={onResetFilters}>
+          <button type="button" className="rb-reset-filters-btn" onClick={handleReset}>
             Azzera tutti i filtri
           </button>
-          <button type="button" className="rb-apply-filters-btn" onClick={onApply ?? onClose}>
+          <button type="button" className="rb-apply-filters-btn" onClick={handleApply}>
             Applica
           </button>
         </div>
+        <p className="rb-settings-hint">Le modifiche qui sotto valgono solo dopo aver premuto "Applica".</p>
+
+        <section className="rb-settings-section rb-settings-section-first">
+          <label className="rb-toggle-row">
+            <span className="rb-toggle-text-row">
+              <strong>Suono</strong>
+              <InfoBadge text="Attiva o disattiva gli effetti sonori dell'app (es. i suoni del globo)." />
+            </span>
+            <span className="rb-toggle">
+              <input
+                type="checkbox"
+                checked={draftSound}
+                onChange={(e) => setDraftSound(e.target.checked)}
+              />
+              <span className="rb-toggle-slider" />
+            </span>
+          </label>
+        </section>
+
+        <CollapsibleSection
+          title="Privacy"
+          infoText="Utenti, posizione, sicurezza e accesso."
+          open={privacyOpen}
+          onToggle={() => setPrivacyOpen((v) => !v)}
+        >
+          <PrivacySectionContent
+            user={user}
+            onOpenAuth={onOpenAuth}
+            friends={friends}
+            onUnfriend={onUnfriend}
+            visibility={draftVisibility}
+            setVisibility={setDraftVisibility}
+          />
+        </CollapsibleSection>
 
         <CollapsibleSection
           title="Luogo"
@@ -621,7 +544,7 @@ export default function SettingsPanel({
         >
           <label className="rb-field">
             <span>Continente</span>
-            <select value={locationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
+            <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
               <option value="">Tutti i continenti</option>
               {CONTINENTS.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -631,7 +554,7 @@ export default function SettingsPanel({
 
           <label className="rb-field">
             <span>Regione</span>
-            <select value={locationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
+            <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
               <option value="">Tutte le regioni</option>
               {REGIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -644,17 +567,17 @@ export default function SettingsPanel({
             <input
               type="text"
               placeholder="Es. Roma"
-              value={locationFilters.city}
+              value={draftLocationFilters.city}
               onChange={(e) => updateLocation('city', e.target.value)}
             />
           </label>
 
           <label className="rb-field">
             <span className="rb-field-label-row">
-              Distanza: {distanzaUnlimited ? 'tutto il mondo' : `${locationFilters.distance} km`}
+              Distanza: {distanzaUnlimited ? 'tutto il mondo' : `${draftLocationFilters.distance} km`}
               <InfoBadge text="Trascina la barra tutta a destra per non avere nessun limite di distanza: verranno considerate le persone di tutto il mondo, non solo quelle entro un certo raggio dalla città impostata sopra." />
             </span>
-            <input type="range" min={1} max={MAX_DISTANCE_KM} value={locationFilters.distance}
+            <input type="range" min={1} max={MAX_DISTANCE_KM} value={draftLocationFilters.distance}
               onChange={(e) => updateLocation('distance', Number(e.target.value))} />
           </label>
         </CollapsibleSection>
@@ -678,7 +601,7 @@ export default function SettingsPanel({
                 {['Tutti', 'Uomo', 'Donna'].map((opt) => (
                   <button
                     key={opt}
-                    className={`rb-chip ${filters.gender === opt ? 'active' : ''}`}
+                    className={`rb-chip ${draftFilters.gender === opt ? 'active' : ''}`}
                     onClick={() => updateFilter('gender', opt)}
                   >
                     {opt}
@@ -688,12 +611,12 @@ export default function SettingsPanel({
             </label>
 
             <label className="rb-field">
-              <span>Età: {filters.ageMin}–{filters.ageMax}</span>
+              <span>Età: {draftFilters.ageMin}–{draftFilters.ageMax}</span>
               <div className="rb-range-row">
-                <input type="range" min={18} max={80} value={filters.ageMin}
-                  onChange={(e) => updateFilter('ageMin', Math.min(Number(e.target.value), filters.ageMax))} />
-                <input type="range" min={18} max={80} value={filters.ageMax}
-                  onChange={(e) => updateFilter('ageMax', Math.max(Number(e.target.value), filters.ageMin))} />
+                <input type="range" min={18} max={80} value={draftFilters.ageMin}
+                  onChange={(e) => updateFilter('ageMin', Math.min(Number(e.target.value), draftFilters.ageMax))} />
+                <input type="range" min={18} max={80} value={draftFilters.ageMax}
+                  onChange={(e) => updateFilter('ageMax', Math.max(Number(e.target.value), draftFilters.ageMin))} />
               </div>
             </label>
           </CollapsibleSection>
@@ -708,35 +631,6 @@ export default function SettingsPanel({
             <WorldsSubsection user={user} onOpenAuth={onOpenAuth} onUpdateUser={onUpdateUser} />
           </CollapsibleSection>
         </CollapsibleSection>
-
-        <CollapsibleSection
-          title="Profilo Incontri"
-          infoText="Città e bio mostrate agli altri nel mazzo del mondo Incontri."
-          open={incontriProfileOpen}
-          onToggle={() => setIncontriProfileOpen((v) => !v)}
-        >
-          <DatingProfileSection user={user} onOpenAuth={onOpenAuth} onUpdateUser={onUpdateUser} />
-        </CollapsibleSection>
-
-        <section className="rb-settings-section">
-          <button type="button" className="rb-settings-nav-btn" onClick={() => setView('advanced')}>
-            <span>
-              <strong>Filtri avanzati</strong>
-              <p>Categorie specifiche di un mondo e altri filtri in arrivo.</p>
-            </span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </section>
-
-        <section className="rb-settings-section">
-          <button type="button" className="rb-settings-nav-btn" onClick={() => setView('privacy')}>
-            <span>
-              <strong>Privacy</strong>
-              <p>Utenti, posizione, sicurezza e accesso.</p>
-            </span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </section>
 
         <p className="rb-settings-footnote">I filtri sono salvati solo su questo dispositivo, per ora. In arrivo: account veri e ricerca in tempo reale.</p>
 

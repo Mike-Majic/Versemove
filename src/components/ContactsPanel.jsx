@@ -13,8 +13,6 @@ import './FriendsModal.css';
 const TABS = [
   { id: 'amici', label: 'Amici' },
   { id: 'cerca', label: 'Cerca' },
-  { id: 'ricevute', label: 'Ricevute' },
-  { id: 'inviate', label: 'Inviate' },
 ];
 
 // Scheda "Contatti" dell'hub DM (vedi DMHub.jsx): cercare persone reali,
@@ -120,7 +118,7 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
             onClick={() => setTab(t.id)}
           >
             {t.label}
-            {t.id === 'ricevute' && received.length > 0 && <span className="rb-friends-tab-badge">{received.length}</span>}
+            {t.id === 'amici' && received.length > 0 && <span className="rb-friends-tab-badge">{received.length}</span>}
           </button>
         ))}
       </div>
@@ -167,57 +165,68 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
             </>
           )}
 
-          {tab === 'ricevute' && (
-            <ul className="rb-friends-list">
-              {received.length === 0 && <p className="rb-friends-empty">Nessuna richiesta in arrivo.</p>}
-              {received.map((r) => (
-                <li key={r.id} className="rb-friends-row">
-                  <img src={r.other.avatar} alt="" />
-                  <strong>{r.other.name}</strong>
-                  <div className="rb-friends-row-actions">
-                    <button type="button" disabled={busyId === r.id} onClick={() => handleRespond(r.id, true)}>
-                      Accetta
-                    </button>
-                    <button type="button" className="rb-friends-decline" disabled={busyId === r.id} onClick={() => handleRespond(r.id, false)}>
-                      Rifiuta
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {tab === 'inviate' && (
-            <ul className="rb-friends-list">
-              {sent.length === 0 && <p className="rb-friends-empty">Nessuna richiesta inviata in sospeso.</p>}
-              {sent.map((r) => (
-                <li key={r.id} className="rb-friends-row">
-                  <img src={r.other.avatar} alt="" />
-                  <strong>{r.other.name}</strong>
-                  <button type="button" disabled={busyId === r.id} onClick={() => handleCancel(r.id)}>
-                    Annulla
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
           {tab === 'amici' && (
-            <ul className="rb-friends-list">
-              {friendsList.length === 0 && <p className="rb-friends-empty">Non hai ancora amici. Cercali nella scheda "Cerca".</p>}
-              {friendsList.map((f) => (
-                <li key={f.id} className="rb-friends-row">
-                  <img src={f.avatar} alt="" />
-                  <strong>{f.name}</strong>
-                  <div className="rb-friends-row-actions">
-                    <button type="button" onClick={() => onOpenChat(f.id)}>Messaggio</button>
-                    <button type="button" className="rb-friends-decline" disabled={busyId === f.id} onClick={() => handleRemoveFriend(f.id)}>
-                      Rimuovi
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              {received.length > 0 && (
+                <>
+                  <p className="rb-friends-section-title">Richieste ricevute</p>
+                  <ul className="rb-friends-list">
+                    {received.map((r) => (
+                      <li key={r.id} className="rb-friends-row">
+                        <img src={r.other.avatar} alt="" />
+                        <strong>{r.other.name}</strong>
+                        <div className="rb-friends-row-actions">
+                          <button type="button" disabled={busyId === r.id} onClick={() => handleRespond(r.id, true)}>
+                            Accetta
+                          </button>
+                          <button type="button" className="rb-friends-decline" disabled={busyId === r.id} onClick={() => handleRespond(r.id, false)}>
+                            Rifiuta
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {sent.length > 0 && (
+                <>
+                  <p className="rb-friends-section-title">Richieste inviate</p>
+                  <ul className="rb-friends-list">
+                    {sent.map((r) => (
+                      <li key={r.id} className="rb-friends-row">
+                        <img src={r.other.avatar} alt="" />
+                        <strong>{r.other.name}</strong>
+                        <button type="button" disabled={busyId === r.id} onClick={() => handleCancel(r.id)}>
+                          Annulla
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {(received.length > 0 || sent.length > 0) && friendsList.length > 0 && (
+                <p className="rb-friends-section-title">Amici</p>
+              )}
+              <ul className="rb-friends-list">
+                {friendsList.length === 0 && received.length === 0 && sent.length === 0 && (
+                  <p className="rb-friends-empty">Non hai ancora amici. Cercali nella scheda "Cerca".</p>
+                )}
+                {friendsList.map((f) => (
+                  <li key={f.id} className="rb-friends-row">
+                    <img src={f.avatar} alt="" />
+                    <strong>{f.name}</strong>
+                    <div className="rb-friends-row-actions">
+                      <button type="button" onClick={() => onOpenChat(f.id)}>Messaggio</button>
+                      <button type="button" className="rb-friends-decline" disabled={busyId === f.id} onClick={() => handleRemoveFriend(f.id)}>
+                        Rimuovi
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       )}

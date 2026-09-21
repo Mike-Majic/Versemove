@@ -927,8 +927,6 @@ export default function App() {
         setFilters={setFilters}
         locationFilters={locationFilters}
         setLocationFilters={setLocationFilters}
-        arteFilter={arteFilter}
-        setArteFilter={setArteFilter}
         visibility={visibility}
         setVisibility={setVisibility}
         onResetFilters={() => {
