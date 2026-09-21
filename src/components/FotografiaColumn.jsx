@@ -220,7 +220,7 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
       <div className="rb-foto-header">
         <div>
           <h3>Fotografia</h3>
-          <p>In stile Pinterest: scatti della community, taggabili a persone e gruppi del mondo Social.</p>
+          <p>Scatti della community, taggabili a persone e gruppi del mondo Social.</p>
         </div>
         <div className="rb-foto-upload-btns">
           <button type="button" className="rb-foto-upload-btn" onClick={() => openPicker(cameraInputRef)}>📸 Scatta</button>
