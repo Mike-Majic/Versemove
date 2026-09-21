@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { rememberDeviceSession } from './accountSwitcher';
 
 // Il bucket "attachments" accetta solo certi tipi di file e una dimensione
 // massima (vedi accept sull'input allegati in AuthModal): un upload respinto
@@ -131,7 +132,9 @@ export function subscribeAuthChanges(callback) {
       callback(null, event);
       return;
     }
-    callback(await fetchOwnProfile(), event);
+    const account = await fetchOwnProfile();
+    if (account) rememberDeviceSession(account, session);
+    callback(account, event);
   });
   return () => sub.subscription.unsubscribe();
 }
@@ -459,4 +462,43 @@ export async function setOwnWorlds(mondi) {
   const { error } = await supabase.rpc('set_own_worlds', { p_mondi: mondi });
   if (error) return { error: error.message };
   return { account: await fetchOwnProfile() };
+}
+
+// Multi-profilo stile Facebook: un account Persona può collegarsi a un
+// account Azienda della stessa persona reale (o viceversa), mai due dello
+// stesso tipo. Supabase Auth impone una mail unica per account, quindi il
+// "secondo profilo" resta un account Supabase a sé — questo collegamento
+// serve solo a impedirne un terzo e a mostrare lo switcher (vedi
+// data/accountSwitcher.js per il cambio rapido di sessione sul dispositivo).
+export async function getMyLinkedAccount() {
+  const { data, error } = await supabase.rpc('get_my_linked_account');
+  if (error || !data?.length) return null;
+  const row = data[0];
+  return {
+    id: row.id,
+    nickname: row.nickname,
+    avatar: row.avatar_url,
+    tipoAccount: row.tipo_account,
+    email: row.email,
+    verificato: row.verificato,
+  };
+}
+
+// p_other_password è quella dell'ALTRO account (quello che si sta
+// collegando), non quella dell'account corrente: la funzione lato server la
+// verifica contro auth.users prima di registrare il collegamento, così
+// chi collega deve avere in mano le credenziali di entrambi.
+export async function linkSecondAccount(otherEmail, otherPassword) {
+  const { error } = await supabase.rpc('link_second_account', {
+    p_other_email: (otherEmail ?? '').trim().toLowerCase(),
+    p_other_password: otherPassword,
+  });
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function unlinkMyAccount() {
+  const { error } = await supabase.rpc('unlink_account');
+  if (error) return { error: error.message };
+  return {};
 }

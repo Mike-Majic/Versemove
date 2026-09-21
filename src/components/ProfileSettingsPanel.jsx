@@ -6,7 +6,12 @@ import {
   nameCooldownRemaining,
   updateAccountDetails,
   uploadAvatar,
+  getMyLinkedAccount,
+  linkSecondAccount,
+  unlinkMyAccount,
+  loginAccount,
 } from '../data/accounts';
+import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
 import { WORLDS } from '../data/worlds';
@@ -516,6 +521,157 @@ function FavoriteCategoriesList({ favoriteCategories }) {
   );
 }
 
+// Multi-profilo stile Facebook: un account Persona può collegarsi a un
+// account Azienda della stessa persona reale (o viceversa), mai due dello
+// stesso tipo — vedi la funzione link_second_account lato server, che
+// verifica davvero le credenziali dell'altro account prima di collegarlo.
+// Chi non ha ancora un secondo account deve prima uscire e registrarne uno
+// nuovo del tipo opposto: qui si collega solo un account già esistente.
+function AccountLinkPanel({ user, onClose }) {
+  const [linked, setLinked] = useState(undefined); // undefined = in caricamento
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [otherEmail, setOtherEmail] = useState('');
+  const [otherPassword, setOtherPassword] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [switchPasswordNeeded, setSwitchPasswordNeeded] = useState(false);
+  const [switchPassword, setSwitchPassword] = useState('');
+  const [switchError, setSwitchError] = useState('');
+
+  useEffect(() => {
+    getMyLinkedAccount().then(setLinked);
+  }, []);
+
+  const doLink = async () => {
+    if (!otherEmail.trim() || !otherPassword) return;
+    setLinking(true);
+    setLinkError('');
+    const { error } = await linkSecondAccount(otherEmail, otherPassword);
+    setLinking(false);
+    if (error) {
+      setLinkError(error);
+      return;
+    }
+    setShowLinkForm(false);
+    setOtherEmail('');
+    setOtherPassword('');
+    setLinked(await getMyLinkedAccount());
+  };
+
+  const doUnlink = async () => {
+    const { error } = await unlinkMyAccount();
+    if (error) return;
+    setLinked(null);
+  };
+
+  const doSwitch = async () => {
+    setSwitching(true);
+    setSwitchError('');
+    const { needsPassword } = await switchToDeviceSession(linked.id);
+    setSwitching(false);
+    if (needsPassword) {
+      setSwitchPasswordNeeded(true);
+      return;
+    }
+    onClose();
+  };
+
+  const confirmSwitchWithPassword = async () => {
+    if (!switchPassword) return;
+    setSwitching(true);
+    setSwitchError('');
+    const { error } = await loginAccount(linked.email, switchPassword);
+    setSwitching(false);
+    if (error) {
+      setSwitchError(error);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Profili collegati</strong></div>
+      <p className="rb-profile-link-hint">
+        {user.tipoAccount === 'azienda'
+          ? 'Puoi collegare un tuo account Persona già esistente: comparirà qui uno switcher per passare dall\'uno all\'altro.'
+          : 'Puoi collegare un tuo account Azienda già esistente: comparirà qui uno switcher per passare dall\'uno all\'altro.'}
+      </p>
+
+      {linked === undefined && <p className="rb-profile-status">Caricamento...</p>}
+
+      {linked === null && !showLinkForm && (
+        <button type="button" className="rb-profile-save-btn" onClick={() => setShowLinkForm(true)}>
+          + Collega un profilo esistente
+        </button>
+      )}
+
+      {linked === null && showLinkForm && (
+        <div className="rb-profile-link-form">
+          <p className="rb-profile-link-hint">
+            Non hai ancora un secondo account? Esci e registrane uno nuovo del tipo opposto, poi torna qui per collegarlo.
+          </p>
+          <input
+            type="email"
+            placeholder="Mail dell'altro account"
+            value={otherEmail}
+            onChange={(e) => setOtherEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password dell'altro account"
+            value={otherPassword}
+            onChange={(e) => setOtherPassword(e.target.value)}
+          />
+          {linkError && <p className="rb-profile-field-error">{linkError}</p>}
+          <div className="rb-profile-confirm-actions">
+            <button type="button" onClick={() => { setShowLinkForm(false); setLinkError(''); }}>Annulla</button>
+            <button type="button" className="rb-profile-confirm-ok" onClick={doLink} disabled={!otherEmail.trim() || !otherPassword || linking}>
+              {linking ? 'Un attimo…' : 'Collega'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {linked && (
+        <div className="rb-profile-linked-card">
+          <img src={linked.avatar} alt={linked.nickname} />
+          <div className="rb-profile-linked-info">
+            <strong>{linked.nickname}</strong>
+            <span>{linked.tipoAccount === 'azienda' ? '🏢 Azienda' : '🙂 Persona'}</span>
+          </div>
+          <div className="rb-profile-linked-actions">
+            <button type="button" className="rb-profile-save-btn" onClick={doSwitch} disabled={switching}>
+              {switching ? 'Un attimo…' : 'Passa a questo profilo'}
+            </button>
+            <button type="button" className="rb-profile-unlink-btn" onClick={doUnlink}>Scollega</button>
+          </div>
+          {switchPasswordNeeded && (
+            <div className="rb-profile-link-form">
+              <p className="rb-profile-link-hint">Prima volta su questo dispositivo: inserisci la password di {linked.nickname}.</p>
+              <input
+                type="password"
+                placeholder="Password"
+                value={switchPassword}
+                onChange={(e) => setSwitchPassword(e.target.value)}
+                autoFocus
+              />
+              {switchError && <p className="rb-profile-field-error">{switchError}</p>}
+              <div className="rb-profile-confirm-actions">
+                <button type="button" onClick={() => { setSwitchPasswordNeeded(false); setSwitchPassword(''); setSwitchError(''); }}>Annulla</button>
+                <button type="button" className="rb-profile-confirm-ok" onClick={confirmSwitchWithPassword} disabled={!switchPassword || switching}>
+                  {switching ? 'Un attimo…' : 'Entra'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Anteprima di come il profilo appare agli altri: gli stessi dati
 // pubblici mostrati in giro per l'app (avatar, nickname, spunta
 // verificato, tipo account) — nome/cognome non compaiono perché non sono
@@ -661,6 +817,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
             </FieldGroup>
 
             <AccountTab user={user} onUpdateUser={onUpdateUser} />
+            <AccountLinkPanel user={user} onClose={onClose} />
           </>
         )}
 
