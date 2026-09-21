@@ -789,6 +789,10 @@ export default function App() {
           onCategoryPositionsReady={setArteCategoryPositions}
           events={world.id === 'social' ? visibleEvents : []}
           onSelectEvent={(eventId) => setEventLikersId(eventId)}
+          onSelectWorld={(worldId) => {
+            const i = WORLDS.findIndex((w) => w.id === worldId);
+            if (i !== -1) setIndex(i);
+          }}
         />
       </Suspense>
 

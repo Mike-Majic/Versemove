@@ -6,8 +6,9 @@ import { loadLandDots } from '../globe/landDots';
 import { loadLandGeo } from '../globe/landGeo';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
+import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
-import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
+import { getGlobeQuality, getMiniGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
 
 // Esperimento: continenti con contorni reali (GeoJSON) al posto dei puntini.
@@ -151,11 +152,15 @@ export default function WorldGlobe({
   onCategoryPositionsReady,
   events = [],
   onSelectEvent,
+  onSelectWorld,
 }) {
   const globeRef = useRef();
   const overlayRef = useRef(null);
   const categoryShellRef = useRef(null);
   const landPointsRef = useRef(null);
+  const satellitesRef = useRef(null);
+  const satPointerRef = useRef(null);
+  const hoverRaycaster = useMemo(() => new THREE.Raycaster(), []);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [landPolygons, setLandPolygons] = useState([]);
   // Qualità grafica (Impostazioni -> Effetti, o "Auto" con downgrade da FPS
@@ -197,8 +202,21 @@ export default function WorldGlobe({
       if (categoryShellRef.current) {
         updateCategoryLabelVisibility(g, categoryShellRef.current);
       }
+      // Nome del globo satellite sotto al puntatore (solo mouse, non touch:
+      // il tocco seleziona subito, non ha un "passaggio sopra" da mostrare):
+      // stesso giro di polling, un raycast in più costa pochissimo ogni 250ms.
+      if (satellitesRef.current) {
+        if (satPointerRef.current) {
+          hoverRaycaster.setFromCamera(satPointerRef.current, g.camera());
+          const hits = hoverRaycaster.intersectObjects(satellitesRef.current.getHitMeshes());
+          satellitesRef.current.setHoveredWorldId(hits[0]?.object.userData.worldId ?? null);
+        } else {
+          satellitesRef.current.setHoveredWorldId(null);
+        }
+      }
     }, 250);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const displayItems = useMemo(() => {
@@ -488,6 +506,115 @@ export default function WorldGlobe({
       canvas.removeEventListener('pointerup', onPointerUp);
     };
   }, [categories, onCategorySelect]);
+
+  // I 5 globi satellite (i mondi non attivi) vivono nella STESSA scena/
+  // renderer del globo grande — mai un secondo <Globe>, che vorrebbe dire un
+  // secondo WebGLRenderer per ognuno e su mobile non reggerebbe (vedi
+  // globe/satelliteGlobes.js). Si ricostruiscono ad ogni cambio di mondo
+  // attivo (quello appena lasciato torna satellite, quello appena raggiunto
+  // sparisce dalla lista).
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g) return undefined;
+    const scene = g.scene();
+    const sats = buildSatelliteGlobes({ worlds: WORLDS, activeWorldId: world.id, quality: getMiniGlobeQuality() });
+    scene.add(sats.group);
+    satellitesRef.current = sats;
+    globeActivity.wake();
+    return () => {
+      scene.remove(sats.group);
+      sats.dispose();
+      satellitesRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id]);
+
+  // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
+  // giro di disegno del globo grande (un wrapper attorno a renderer.render,
+  // non un requestAnimationFrame a parte) così si fermano da soli quando
+  // globeActivity mette in pausa il disegno per inattività — niente CPU
+  // sprecata a far fluttuare globi che nessuno sta guardando.
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g) return undefined;
+    const renderer = g.renderer();
+    const originalRender = renderer.render.bind(renderer);
+    const startedAt = performance.now();
+    let lastElapsed = 0;
+    renderer.render = (scene, camera) => {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      satellitesRef.current?.update(elapsed, elapsed - lastElapsed);
+      lastElapsed = elapsed;
+      originalRender(scene, camera);
+    };
+    return () => {
+      renderer.render = originalRender;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Click su un satellite: per ora passa subito al mondo scelto (il volo
+  // scenografico della Fase 2b arriva dopo, qui si posa solo la base).
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g || !onSelectWorld) return undefined;
+    const canvas = g.renderer().domElement;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let downPos = null;
+
+    const onPointerDown = (e) => {
+      downPos = { x: e.clientX, y: e.clientY };
+    };
+    const onPointerUp = (e) => {
+      if (!downPos || !satellitesRef.current) return;
+      const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+      downPos = null;
+      if (moved > 6) return;
+
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, g.camera());
+      const hits = raycaster.intersectObjects(satellitesRef.current.getHitMeshes());
+      if (hits.length > 0) onSelectWorld(hits[0].object.userData.worldId);
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [onSelectWorld]);
+
+  // Posizione del puntatore per l'hover dei satelliti (letta dal polling a
+  // 250ms sopra, non da un handler che raycasta ad ogni movimento — troppo
+  // costoso per qualcosa che deve solo mostrare un nome). Solo mouse: su
+  // touch non esiste un "passaggio sopra" prima del tocco.
+  useEffect(() => {
+    if (isTouchDevice) return undefined;
+    const g = globeRef.current;
+    if (!g) return undefined;
+    const canvas = g.renderer().domElement;
+    const onMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      satPointerRef.current = {
+        x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        y: -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      };
+    };
+    const onLeave = () => {
+      satPointerRef.current = null;
+    };
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerleave', onLeave);
+    return () => {
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerleave', onLeave);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const g = globeRef.current;

@@ -22,16 +22,17 @@ export const GLOBE_QUALITY = {
   low: { pixelRatioCap: 1, antialias: false, atmosphere: false },
 };
 
-// Budget dei 5 globi satellite della Fase 2 (non ancora costruiti: nessun
-// codice li consuma oggi, ma il tavolo va apparecchiato ora così il chunk
-// Three.js/WorldGlobe non va ripensato da capo quando arriveranno). Molto
-// più leggeri del globo grande per definizione — niente etichette categoria,
-// niente contorni dei continenti in "low", pixelRatio ancora più basso dato
-// che sono piccoli e visti da lontano.
+// Budget dei 5 globi satellite (Fase 2, src/globe/satelliteGlobes.js): vivono
+// nella STESSA scena/renderer del globo grande (un solo WebGLRenderer in
+// tutta la pagina, vedi WorldGlobe.jsx), quindi non hanno un proprio
+// pixelRatio da limitare — la sola leva è quanti nodi ha ciascuna sfera.
+// `detail` è il livello di suddivisione passato a THREE.IcosahedronGeometry
+// (0 = 20 facce, 1 = 80, 2 = 320): "low" resta al minimo, niente contorno a
+// wireframe sopra.
 export const MINI_GLOBE_QUALITY = {
-  high: { pixelRatioCap: 1.25, showContinentOutline: true, showLabels: false },
-  medium: { pixelRatioCap: 1, showContinentOutline: true, showLabels: false },
-  low: { pixelRatioCap: 1, showContinentOutline: false, showLabels: false },
+  high: { detail: 2, showWireframe: true },
+  medium: { detail: 1, showWireframe: true },
+  low: { detail: 0, showWireframe: false },
 };
 
 export function getQualityMode() {
@@ -70,10 +71,14 @@ function notify() {
 
 function detectAutoTier() {
   const cores = navigator.hardwareConcurrency ?? 4;
-  const mem = navigator.deviceMemory ?? 4; // non su tutti i browser: undefined -> si ignora
+  // navigator.deviceMemory non esiste su molti browser (Safari, Firefox, e
+  // parecchi Chrome automatizzati): undefined NON deve contare come "poca
+  // RAM" — altrimenti chiunque lo visiti da un browser che non espone questo
+  // dato finirebbe sempre su "low", a prescindere dall'hardware reale.
+  const mem = navigator.deviceMemory;
   const smallScreen = Math.min(window.innerWidth, window.innerHeight) < 480;
-  if (cores <= 4 || mem <= 4) return 'low';
-  if (cores <= 6 || mem <= 6 || smallScreen) return 'medium';
+  if (cores <= 4 || (mem !== undefined && mem <= 4)) return 'low';
+  if (cores <= 6 || (mem !== undefined && mem <= 6) || smallScreen) return 'medium';
   return 'high';
 }
 
@@ -90,6 +95,10 @@ export function getResolvedTier() {
 
 export function getGlobeQuality(tier = getResolvedTier()) {
   return GLOBE_QUALITY[tier] ?? GLOBE_QUALITY.medium;
+}
+
+export function getMiniGlobeQuality(tier = getResolvedTier()) {
+  return MINI_GLOBE_QUALITY[tier] ?? MINI_GLOBE_QUALITY.medium;
 }
 
 const FPS_SAMPLE_MS = 3000;
