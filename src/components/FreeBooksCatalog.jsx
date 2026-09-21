@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { searchFreeBooks } from '../data/freeBooksApi';
-import ExternalLinkButton from './ExternalLinkButton';
 import './FreeBooksCatalog.css';
 
 // Copertina di scorta per i libri che nel catalogo non ne hanno una (capita
@@ -26,9 +25,10 @@ function BookCoverPlaceholder() {
 }
 
 // Catalogo mondiale dei libri liberi da diritti d'autore, in tempo reale
-// (Open Library/Internet Archive): niente lista incorporata nell'app,
-// perché "tutti i libri gratuiti che esistono nel mondo" sono troppi per
-// starci dentro (vedi commento in data/freeBooksApi.js).
+// (Internet Archive): niente lista incorporata nell'app, perché "tutti i
+// libri gratuiti che esistono nel mondo" sono troppi per starci dentro
+// (vedi commento in data/freeBooksApi.js). La lettura avviene con un
+// lettore incorporato (embedUrl), mai su archive.org direttamente.
 export default function FreeBooksCatalog() {
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState([]);
@@ -36,6 +36,7 @@ export default function FreeBooksCatalog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
+  const [reading, setReading] = useState(null);
   const abortRef = useRef(null);
 
   const search = async () => {
@@ -70,10 +71,29 @@ export default function FreeBooksCatalog() {
     }
   };
 
+  if (reading) {
+    return (
+      <div className="rb-freebooks-reader">
+        <div className="rb-freebooks-reader-bar">
+          <strong>{reading.title}</strong>
+          <button type="button" className="rb-freebooks-reader-close" onClick={() => setReading(null)}>
+            ✕ Chiudi
+          </button>
+        </div>
+        <iframe
+          className="rb-freebooks-reader-frame"
+          src={reading.embedUrl}
+          title={reading.title}
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="rb-freebooks">
       <p className="rb-freebooks-note">
-        🌍 Catalogo mondiale delle opere libere da diritti (Internet Archive), milioni di titoli scansionati — cerca per titolo o autore.
+        🌍 Catalogo mondiale delle opere libere da diritti (Internet Archive), milioni di titoli scansionati — cerca per titolo o autore. Si legge qui dentro, senza uscire da Versemove.
       </p>
 
       <div className="rb-freebooks-search-row">
@@ -114,9 +134,9 @@ export default function FreeBooksCatalog() {
             <div className="rb-freebooks-info">
               <strong>{b.title}</strong>
               <p>{b.authors}</p>
-              <ExternalLinkButton url={b.readUrl} className="rb-freebooks-read-btn">
-                Leggi su Internet Archive
-              </ExternalLinkButton>
+              <button type="button" className="rb-freebooks-read-btn" onClick={() => setReading(b)}>
+                Leggi qui
+              </button>
             </div>
           </li>
         ))}

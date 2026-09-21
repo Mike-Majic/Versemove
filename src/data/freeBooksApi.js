@@ -1,14 +1,14 @@
-// Catalogo mondiale delle opere libere da diritti, in tempo reale: usa la
-// ricerca di Open Library (gestita da Internet Archive) invece di
-// Gutendex/Project Gutenberg. Cambio deciso dopo aver verificato che
-// Gutendex, nella pratica, è inaffidabile — meno del 10% di uptime reale
-// negli ultimi mesi, e dietro una protezione anti-bot che respinge proprio
-// le richieste dirette dal browser come le nostre, da cui i timeout visti
-// in app. Open Library è la stessa infrastruttura che ospita le scansioni
-// dei libri su archive.org: gratuita, senza chiave, pensata per essere
-// interrogata dal browser, con un CDN di copertine proprio e affidabile.
-const SEARCH_BASE = 'https://openlibrary.org/search.json';
-const COVER_BASE = 'https://covers.openlibrary.org/b/id';
+// Catalogo mondiale delle opere libere da diritti, in tempo reale: cerca
+// direttamente su Archive.org (advancedsearch.php) invece che su Open
+// Library. Cambio deciso dopo una prova reale: un libro passato dal filtro
+// di Open Library (public_scan_b/ebook_access) chiedeva comunque la
+// registrazione per essere letto — quei campi non garantiscono davvero
+// "nessun accesso ristretto". Il campo "access-restricted-item" invece è
+// quello che Archive.org stesso usa per decidere se un libro si può
+// leggere subito o va preso in prestito: qui si filtra direttamente lì,
+// alla fonte, non su un dato derivato che può essere impreciso.
+const SEARCH_BASE = 'https://archive.org/advancedsearch.php';
+const COVER_BASE = 'https://archive.org/services/img';
 const RESULTS_LIMIT = 24;
 
 const SEARCH_TIMEOUT_MS = 15000;
@@ -33,8 +33,19 @@ async function fetchJson(url, signal) {
 }
 
 export async function searchFreeBooks(query, { signal } = {}) {
-  const fields = 'key,title,author_name,cover_i,ia,public_scan_b,ebook_access';
-  const url = `${SEARCH_BASE}?q=${encodeURIComponent(query.trim())}&has_fulltext=true&fields=${fields}&limit=${RESULTS_LIMIT}`;
+  // mediatype:texts = libri (non audio/video/software); -access-restricted-item:true
+  // esclude tutto ciò che richiederebbe un account per essere aperto.
+  const q = `${query.trim()} AND mediatype:texts AND -access-restricted-item:true`;
+  const params = [
+    `q=${encodeURIComponent(q)}`,
+    'fl[]=identifier',
+    'fl[]=title',
+    'fl[]=creator',
+    `rows=${RESULTS_LIMIT}`,
+    'output=json',
+  ].join('&');
+  const url = `${SEARCH_BASE}?${params}`;
+
   let data;
   try {
     data = await fetchJson(url, signal);
@@ -43,21 +54,21 @@ export async function searchFreeBooks(query, { signal } = {}) {
     data = await fetchJson(url, signal);
   }
 
-  // Solo opere davvero leggibili subito, non solo "in prestito" (che
-  // sarebbero comunque protette da diritti): serve una scansione su
-  // Internet Archive (ia) marcata pubblica.
-  const freeDocs = (data.docs ?? []).filter(
-    (d) => Array.isArray(d.ia) && d.ia.length > 0 && (d.public_scan_b || d.ebook_access === 'public')
-  );
-
+  const docs = data.response?.docs ?? [];
   return {
-    count: freeDocs.length,
-    books: freeDocs.map((d) => ({
-      id: d.ia[0],
-      title: d.title,
-      authors: (d.author_name ?? []).join(', ') || 'Autore sconosciuto',
-      cover: d.cover_i ? `${COVER_BASE}/${d.cover_i}-M.jpg` : null,
-      readUrl: `https://archive.org/details/${d.ia[0]}`,
-    })),
+    count: docs.length,
+    books: docs
+      .filter((d) => d.identifier)
+      .map((d) => ({
+        id: d.identifier,
+        title: d.title || 'Senza titolo',
+        authors: (Array.isArray(d.creator) ? d.creator.join(', ') : d.creator) || 'Autore sconosciuto',
+        cover: `${COVER_BASE}/${d.identifier}`,
+        readUrl: `https://archive.org/details/${d.identifier}`,
+        // Il lettore incorporato (stesso principio già usato per
+        // musica/video con YouTube): si legge dentro Versemove, senza
+        // aprire il sito esterno né dover registrarsi lì.
+        embedUrl: `https://archive.org/embed/${d.identifier}`,
+      })),
   };
 }
