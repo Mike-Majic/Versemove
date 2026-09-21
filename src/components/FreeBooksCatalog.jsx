@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { searchFreeBooks } from '../data/freeBooksApi';
 import ExternalLinkButton from './ExternalLinkButton';
 import './FreeBooksCatalog.css';
@@ -26,7 +26,7 @@ function BookCoverPlaceholder() {
 }
 
 // Catalogo mondiale dei libri liberi da diritti d'autore, in tempo reale
-// (Project Gutenberg via Gutendex): niente lista incorporata nell'app,
+// (Open Library/Internet Archive): niente lista incorporata nell'app,
 // perché "tutti i libri gratuiti che esistono nel mondo" sono troppi per
 // starci dentro (vedi commento in data/freeBooksApi.js).
 export default function FreeBooksCatalog() {
@@ -36,17 +36,28 @@ export default function FreeBooksCatalog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
+  const abortRef = useRef(null);
 
   const search = async () => {
     if (!query.trim()) return;
+    // Una ricerca precedente ancora in corso (es. lenta) non deve più
+    // contare: si annulla, così la sua risposta in ritardo non sovrascrive
+    // questi risultati nuovi né fa lampeggiare quelli vecchi sullo schermo.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError('');
     setSearched(true);
+    setBooks([]);
+    setCount(null);
     try {
-      const result = await searchFreeBooks(query);
+      const result = await searchFreeBooks(query, { signal: controller.signal });
       setBooks(result.books);
       setCount(result.count);
     } catch (err) {
+      if (err.message === 'cancelled') return;
       setError(
         err.message === 'timeout'
           ? 'Il catalogo ci sta mettendo troppo a rispondere. Controlla la connessione e riprova.'
@@ -55,14 +66,14 @@ export default function FreeBooksCatalog() {
       setBooks([]);
       setCount(null);
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   };
 
   return (
     <div className="rb-freebooks">
       <p className="rb-freebooks-note">
-        🌍 Catalogo mondiale delle opere libere da diritti (Project Gutenberg), oltre 75.000 titoli — cerca per titolo o autore.
+        🌍 Catalogo mondiale delle opere libere da diritti (Internet Archive), milioni di titoli scansionati — cerca per titolo o autore.
       </p>
 
       <div className="rb-freebooks-search-row">
@@ -89,7 +100,7 @@ export default function FreeBooksCatalog() {
         <p className="rb-freebooks-status">Nessun libro trovato con questo titolo o autore.</p>
       )}
       {!loading && !error && count !== null && books.length > 0 && (
-        <p className="rb-freebooks-count">{count} risultati nel catalogo, i primi {books.length} qui sotto</p>
+        <p className="rb-freebooks-count">{count} {count === 1 ? 'risultato leggibile subito' : 'risultati leggibili subito'}</p>
       )}
 
       <ul className="rb-freebooks-list">
@@ -104,7 +115,7 @@ export default function FreeBooksCatalog() {
               <strong>{b.title}</strong>
               <p>{b.authors}</p>
               <ExternalLinkButton url={b.readUrl} className="rb-freebooks-read-btn">
-                Leggi su Project Gutenberg
+                Leggi su Internet Archive
               </ExternalLinkButton>
             </div>
           </li>

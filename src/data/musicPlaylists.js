@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 
 // Playlist personali del mondo Arte & Musica: music_playlists + playlist_tracks
 // (RLS: solo il proprietario le vede/modifica, vedi migrazione music_playlists).
-// I brani sono quelli trovati con la ricerca (data/musicSearch.js, iTunes),
+// I brani sono quelli trovati con la ricerca YouTube (data/youtubeSearch.js),
 // salvati con i dati che servono a riascoltarli senza richiamare l'API.
 export async function listMyPlaylists() {
   try {
