@@ -145,6 +145,85 @@ export function subscribeToOwnMessages(onInsert) {
     .subscribe();
 }
 
+// Tutte le mie conversazioni dirette, con l'altro partecipante, l'anteprima
+// dell'ultimo messaggio e i non letti — per l'hub DM stile WhatsApp
+// (components/DMHub.jsx): niente RPC dedicata, si compone da tabelle già
+// esistenti (poche righe per utente, va bene lato client).
+export async function listMyConversations() {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return [];
+    const myId = auth.user.id;
+
+    const { data: myRows, error } = await supabase
+      .from('chat_participants')
+      .select('conversation_id, archived')
+      .eq('user_id', myId);
+    if (error || !myRows?.length) return [];
+
+    const convIds = myRows.map((r) => r.conversation_id);
+    const archivedMap = new Map(myRows.map((r) => [r.conversation_id, r.archived]));
+
+    const { data: allParticipants } = await supabase
+      .from('chat_participants')
+      .select('conversation_id, user_id')
+      .in('conversation_id', convIds);
+    const otherIdByConv = new Map();
+    for (const row of allParticipants ?? []) {
+      if (row.user_id !== myId) otherIdByConv.set(row.conversation_id, row.user_id);
+    }
+
+    const { data: recentMessages } = await supabase
+      .from('chat_messages')
+      .select('conversation_id, testo, created_at')
+      .in('conversation_id', convIds)
+      .order('created_at', { ascending: false });
+    const lastMsgByConv = new Map();
+    for (const m of recentMessages ?? []) {
+      if (!lastMsgByConv.has(m.conversation_id)) lastMsgByConv.set(m.conversation_id, m);
+    }
+
+    const [unreadCounts, profilesMap] = await Promise.all([
+      getUnreadCounts(),
+      fetchProfilesMap([...otherIdByConv.values()]),
+    ]);
+
+    return convIds
+      .filter((convId) => otherIdByConv.has(convId))
+      .map((convId) => {
+        const otherId = otherIdByConv.get(convId);
+        const lastMsg = lastMsgByConv.get(convId) ?? null;
+        return {
+          conversationId: convId,
+          other: profilesMap.get(otherId) ?? { id: otherId, name: 'Utente', avatar: '' },
+          lastMessage: lastMsg?.testo ?? null,
+          lastMessageAt: lastMsg?.created_at ?? null,
+          unread: unreadCounts.get(convId) ?? 0,
+          archived: archivedMap.get(convId) ?? false,
+        };
+      })
+      .sort((a, b) => new Date(b.lastMessageAt ?? 0) - new Date(a.lastMessageAt ?? 0));
+  } catch {
+    return [];
+  }
+}
+
+export async function setConversationArchived(conversationId, archived) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    const { error } = await supabase
+      .from('chat_participants')
+      .update({ archived })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', auth.user.id);
+    if (error) return { error: error.message };
+    return {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
 // Mappa amico -> conversazione diretta già esistente (non ne crea di nuove:
 // serve solo ad abbinare i conteggi di getUnreadCounts, per conversation_id,
 // alla riga giusta nella lista amici, che è per friendId).

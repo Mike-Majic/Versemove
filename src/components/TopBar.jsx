@@ -11,7 +11,7 @@ export default function TopBar({
   onOpenProfile,
   onOpenFriends,
   onOpenNotifications,
-  pendingFriendRequestsCount = 0,
+  unreadMessagesCount = 0,
   unreadNotifCount = 0,
 }) {
   return (
@@ -25,10 +25,6 @@ export default function TopBar({
       </div>
 
       <div className="rb-topbar-actions">
-        <button className="rb-icon-btn" onClick={onOpenSettings} aria-label="Impostazioni" title="Impostazioni">
-          <GearIcon />
-        </button>
-
         {user ? (
           <div className="rb-user-chip">
             <button className="rb-icon-btn rb-friends-btn" onClick={onOpenNotifications} aria-label="Notifiche" title="Notifiche">
@@ -37,10 +33,10 @@ export default function TopBar({
                 <span className="rb-friends-badge">{unreadNotifCount}</span>
               )}
             </button>
-            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenFriends} aria-label="Amici" title="Amici">
-              👥
-              {pendingFriendRequestsCount > 0 && (
-                <span className="rb-friends-badge">{pendingFriendRequestsCount}</span>
+            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenFriends} aria-label="Messaggi" title="Messaggi">
+              💬
+              {unreadMessagesCount > 0 && (
+                <span className="rb-friends-badge">{unreadMessagesCount}</span>
               )}
             </button>
             {isStaff(user.ruolo) && (
@@ -52,6 +48,9 @@ export default function TopBar({
               <img src={user.avatar} alt={user.name} />
               <span>{user.name}</span>
               {user.verificato && <span className="rb-verified-badge" title="Verificato">✓</span>}
+            </button>
+            <button className="rb-icon-btn" onClick={onOpenSettings} aria-label="Impostazioni" title="Impostazioni">
+              <GearIcon />
             </button>
             <button className="rb-btn-ghost" onClick={onLogout}>Esci</button>
           </div>

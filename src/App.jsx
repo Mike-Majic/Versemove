@@ -35,7 +35,7 @@ import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEvent
 import { isStaff } from './data/roles';
 import EventLikersModal from './components/EventLikersModal';
 import FriendChatModal from './components/FriendChatModal';
-import FriendsModal from './components/FriendsModal';
+import DMHub from './components/DMHub';
 import AdminPanel from './components/AdminPanel';
 import ProfileSettingsPanel from './components/ProfileSettingsPanel';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
@@ -48,7 +48,7 @@ import {
   sendFriendRequest as sendFriendRequestApi,
   removeFriend as removeFriendApi,
 } from './data/friends';
-import { getUnreadCounts, getDirectConversationsMap, subscribeToOwnMessages } from './data/directChat';
+import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
@@ -174,18 +174,17 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [eventActionError, setEventActionError] = useState('');
   // Amicizie e richieste: id soltanto (nomi/avatar li risolve chi li mostra
-  // davvero, vedi FriendsModal) — servono qui solo per i controlli rapidi
+  // davvero, vedi ContactsPanel) — servono qui solo per i controlli rapidi
   // "è già amico?"/"gli ho già scritto?" sparsi nell'app (EventLikersModal,
   // Impostazioni Privacy).
   const [friends, setFriends] = useState([]);
   const [friendRequestsSent, setFriendRequestsSent] = useState([]);
   const [receivedRequestsCount, setReceivedRequestsCount] = useState(0);
-  // Non letti per conversazione diretta (id conversazione -> numero) e
-  // mappa amico -> conversazione, per mostrare il badge sulla riga giusta
-  // nella lista Amici e il totale sull'icona 👥.
+  // Non letti per conversazione diretta (id conversazione -> numero), per il
+  // totale sull'icona 💬 (vedi DMHub, che carica da solo la lista completa).
   const [unreadByConversation, setUnreadByConversation] = useState(new Map());
-  const [friendConversations, setFriendConversations] = useState(new Map());
   const [friendsModalOpen, setFriendsModalOpen] = useState(false);
+  const [dmHubInitialTab, setDmHubInitialTab] = useState('messaggi');
   const [eventLikersId, setEventLikersId] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
   // Notifiche (match/super like): il numero non letto sulla campanella, il
@@ -374,7 +373,7 @@ export default function App() {
   }, []);
 
   // Amicizie/richieste reali (Supabase): ricaricate ad ogni cambio utente
-  // (login/logout), e su richiesta esplicita dopo un'azione da FriendsModal
+  // (login/logout), e su richiesta esplicita dopo un'azione da ContactsPanel
   // (inviata/accettata/rifiutata/rimossa un'amicizia).
   const refreshFriendsState = () => {
     if (!user) {
@@ -441,11 +440,9 @@ export default function App() {
   const refreshUnread = () => {
     if (!user) {
       setUnreadByConversation(new Map());
-      setFriendConversations(new Map());
       return;
     }
     getUnreadCounts().then(setUnreadByConversation);
-    getDirectConversationsMap().then(setFriendConversations);
   };
   useEffect(refreshUnread, [user?.id]);
 
@@ -483,15 +480,6 @@ export default function App() {
     for (const n of unreadByConversation.values()) total += n;
     return total;
   }, [unreadByConversation]);
-
-  const unreadByFriend = useMemo(() => {
-    const map = new Map();
-    for (const [friendId, convId] of friendConversations) {
-      const n = unreadByConversation.get(convId);
-      if (n) map.set(friendId, n);
-    }
-    return map;
-  }, [friendConversations, unreadByConversation]);
 
   // Traccia la posizione reale del dispositivo solo mentre l'utente ha
   // attivato "Condividi la mia posizione in tempo reale" nelle Impostazioni:
@@ -682,6 +670,11 @@ export default function App() {
   const openNotificationTarget = (tipo) => {
     setNotificationsOpen(false);
     setNotifToast(null);
+    if (tipo === 'friend_request') {
+      setDmHubInitialTab('contatti');
+      setFriendsModalOpen(true);
+      return;
+    }
     setIncontriInitialTab(tipo === 'super_like' ? 'likesYou' : 'matches');
     navigateToCategory('incontri', 'match');
   };
@@ -738,10 +731,13 @@ export default function App() {
         }}
         onOpenAdmin={() => setAdminOpen(true)}
         onOpenProfile={() => setProfileSettingsOpen(true)}
-        onOpenFriends={() => setFriendsModalOpen(true)}
+        onOpenFriends={() => {
+          setDmHubInitialTab('messaggi');
+          setFriendsModalOpen(true);
+        }}
         onOpenNotifications={() => setNotificationsOpen(true)}
-        pendingFriendRequestsCount={receivedRequestsCount + totalUnreadMessages}
-        unreadNotifCount={unreadNotifCount}
+        unreadMessagesCount={totalUnreadMessages}
+        unreadNotifCount={unreadNotifCount + receivedRequestsCount}
       />
 
       {justConfirmedEmail && (
@@ -955,14 +951,14 @@ export default function App() {
       />
 
       {friendsModalOpen && (
-        <FriendsModal
+        <DMHub
+          initialTab={dmHubInitialTab}
           onClose={() => setFriendsModalOpen(false)}
           onOpenChat={(friendId) => {
             setFriendsModalOpen(false);
             setActiveFriendChatId(friendId);
           }}
           onFriendsChanged={refreshFriendsState}
-          unreadByFriend={unreadByFriend}
         />
       )}
 
