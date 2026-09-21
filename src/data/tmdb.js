@@ -3,7 +3,7 @@
 // (nessuna restrizione per referrer/dominio come Google — la chiave TMDB è
 // pensata per stare in app pubbliche, ma resta comunque solo di lettura sul
 // catalogo film, niente di sensibile).
-const TMDB_API_KEY = 'INSERISCI_QUI_LA_CHIAVE_TMDB';
+const TMDB_API_KEY = 'c4ad449f7e7c8daf3b3eb7132a4d9385';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMAGE_BASE = 'https://image.tmdb.org/t/p/w342';
 const SEARCH_TIMEOUT_MS = 15000;
