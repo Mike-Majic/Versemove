@@ -7,6 +7,7 @@ import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import EmptyState from './EmptyState';
 import LabelMorphTitle from './LabelMorphTitle';
+import ParticleBurst from './ParticleBurst';
 import './CategoryColumn.css';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
@@ -38,6 +39,7 @@ export default function CategoryColumn({
   user,
   onOpenAuth,
   morphTitleFromCenter = false,
+  isClosing = false,
 }) {
   const [resultsQuery, setResultsQuery] = useState('');
   const [subfamilyFilter, setSubfamilyFilter] = useState(initialSubfamily);
@@ -108,6 +110,7 @@ export default function CategoryColumn({
 
   const resultsContent = (
     <>
+      <ParticleBurst active={isClosing} />
       <div className="rb-arte-panel-header">
         <LabelMorphTitle text={category.label} morphFromCenter={morphTitleFromCenter} as="h3" />
       </div>
@@ -236,6 +239,7 @@ export default function CategoryColumn({
       secondaryLabel="Persone vicine"
       mobileView={mobileView}
       onMobileViewChange={setMobileView}
+      closing={isClosing}
     />
   );
 }

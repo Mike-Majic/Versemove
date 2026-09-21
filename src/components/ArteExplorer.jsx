@@ -31,6 +31,7 @@ export default function ArteExplorer({
   onToggleFavorite,
   onShowReactors,
   morphTitleFromCenter = false,
+  isClosing = false,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
 
@@ -101,6 +102,7 @@ export default function ArteExplorer({
               user={user}
               onOpenAuth={onOpenAuth}
               morphTitleFromCenter={morphTitleFromCenter}
+              isClosing={isClosing}
             />
           )}
         </>

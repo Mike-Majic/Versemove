@@ -28,6 +28,7 @@ export default function TwoColumnSwitcher({
   secondaryLabel = '',
   mobileView: controlledView,
   onMobileViewChange,
+  closing = false,
 }) {
   const isDesktop = useIsDesktopLayout();
   const [internalView, setInternalView] = useState('primary');
@@ -37,14 +38,14 @@ export default function TwoColumnSwitcher({
   if (isDesktop) {
     return (
       <>
-        <aside className="rb-2col-panel rb-2col-left">{primary}</aside>
-        <aside className="rb-2col-panel rb-2col-right">{secondary}</aside>
+        <aside className={`rb-2col-panel rb-2col-left ${closing ? 'closing' : ''}`}>{primary}</aside>
+        <aside className={`rb-2col-panel rb-2col-right ${closing ? 'closing' : ''}`}>{secondary}</aside>
       </>
     );
   }
 
   return (
-    <div className="rb-2col-mobile-stage">
+    <div className={`rb-2col-mobile-stage ${closing ? 'closing' : ''}`}>
       <div className={`rb-2col-mobile-track ${view === 'secondary' ? 'show-secondary' : ''}`}>
         <div className="rb-2col-mobile-slide">{primary}</div>
         <div className="rb-2col-mobile-slide">{secondary}</div>

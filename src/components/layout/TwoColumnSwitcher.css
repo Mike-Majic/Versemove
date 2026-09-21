@@ -58,9 +58,42 @@
   }
 }
 
+/* Chiusura "in particelle" (Fase 2d): il pannello si dissolve invece di
+   sparire di scatto — stessa grammatica visiva dell'apertura olografica,
+   al contrario. App.jsx tiene il pannello montato per CATEGORY_CLOSE_MS
+   (fx/timing.js) prima di smontarlo davvero, il tempo che questa animazione
+   e i frammenti di ParticleBurst.jsx facciano in tempo a finire.
+   overflow:visible sovrascritto qui: durante lo scroll normale i contenuti
+   vanno tagliati al bordo, ma qui i frammenti devono poter volare fuori. */
+.rb-2col-panel.closing,
+.rb-2col-mobile-stage.closing {
+  overflow: visible;
+  pointer-events: none;
+  animation: rb-holo-out 420ms cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+}
+
+@keyframes rb-holo-out {
+  0% {
+    opacity: 1;
+    transform: scaleY(1);
+    filter: brightness(1);
+  }
+  25% {
+    opacity: 0.55;
+    filter: brightness(1.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(0.04);
+    filter: brightness(2.2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rb-2col-panel,
-  .rb-2col-mobile-stage {
+  .rb-2col-mobile-stage,
+  .rb-2col-panel.closing,
+  .rb-2col-mobile-stage.closing {
     animation: none !important;
   }
 }

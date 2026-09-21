@@ -1,0 +1,28 @@
+.rb-particle-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 5;
+}
+
+.rb-particle {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--accent, #8b5cf6);
+  box-shadow: 0 0 6px var(--accent, #8b5cf6);
+  opacity: 0;
+  animation: rb-particle-fly 520ms ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes rb-particle-fly {
+  0% { opacity: 0.95; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.25); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-particle-burst {
+    display: none;
+  }
+}

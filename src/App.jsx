@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORY_FLY_MS } from './fx/timing';
+import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
 import TopBar from './components/TopBar';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
@@ -167,6 +167,12 @@ export default function App() {
   // etichetta->titolo della Fase 2c, che parte dal centro schermo solo in
   // quel caso — senza volo non c'è un'etichetta "appena vista lì" da cui farlo partire.
   const [categoryOpenedViaFly, setCategoryOpenedViaFly] = useState(false);
+  // Id della categoria il cui pannello sta dissolvendosi in particelle
+  // (Fase 2d): resta uguale ad activeArteCategory per tutta la durata della
+  // chiusura, così il pannello resta montato (stessa key) finché
+  // l'animazione non è finita — vedi toggleArteCategory più sotto.
+  const [closingCategoryId, setClosingCategoryId] = useState(null);
+  const closingTimerRef = useRef(null);
   const [arteCategoryPositions, setArteCategoryPositions] = useState({});
   const [arteFilter, setArteFilter] = useState(() => loadStored('rb-arte-filter', DEFAULT_ARTE_FILTER));
   const [arteInitialSubfamily, setArteInitialSubfamily] = useState('');
@@ -632,8 +638,21 @@ export default function App() {
   // scenografia, invece del pannello che scatta subito mentre il globo si
   // muove ancora. Vale ovunque si scelga una categoria: pulsante in basso a
   // sinistra, triangolo sul globo, ricerca, scorciatoia da Impostazioni.
+  // Se una chiusura in particelle (Fase 2d) era ancora in corso per la
+  // categoria precedente, il suo timer va annullato prima di aprirne
+  // un'altra: altrimenti scattando più tardi azzererebbe activeArteCategory
+  // anche dopo che la nuova categoria l'ha già impostato.
+  const cancelCategoryClosing = () => {
+    if (closingTimerRef.current) {
+      clearTimeout(closingTimerRef.current);
+      closingTimerRef.current = null;
+    }
+    setClosingCategoryId(null);
+  };
+
   const flyToCategoryThenOpen = (id, pos) => {
     if (pendingOpenRef.current) clearTimeout(pendingOpenRef.current);
+    cancelCategoryClosing();
     setActiveArteCategory(null);
     setFlyTo({ lat: pos.lat, lng: pos.lng, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
     pendingOpenRef.current = setTimeout(() => {
@@ -657,6 +676,7 @@ export default function App() {
     const pos = arteCategoryPositions[cat.id] ?? cat.anchor;
     if (pos) flyToCategoryThenOpen(cat.id, pos);
     else {
+      cancelCategoryClosing();
       setActiveArteCategory(cat.id);
       setCategoryOpenedViaFly(false);
     }
@@ -687,6 +707,7 @@ export default function App() {
       const pos = (sameWorld ? arteCategoryPositions[cat.id] : null) ?? cat.anchor;
       if (pos) flyToCategoryThenOpen(cat.id, pos);
       else {
+        cancelCategoryClosing();
         setActiveArteCategory(cat.id);
         setCategoryOpenedViaFly(false);
       }
@@ -733,9 +754,19 @@ export default function App() {
       pendingOpenRef.current = null;
     }
     if (id === null || activeArteCategory === id) {
-      setActiveArteCategory(null);
+      if (!activeArteCategory) return;
+      if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
+      // Il pannello resta montato (stessa key) per tutta la dissolvenza:
+      // solo alla fine si azzera davvero activeArteCategory, altrimenti
+      // ArteExplorer lo smonterebbe di scatto a metà animazione.
+      setClosingCategoryId(activeArteCategory);
       setCategoryOpenedViaFly(false);
       setFlyTo({ altitude: 2.4, key: `zoom-out-${Date.now()}` });
+      closingTimerRef.current = setTimeout(() => {
+        setActiveArteCategory(null);
+        setClosingCategoryId(null);
+        closingTimerRef.current = null;
+      }, CATEGORY_CLOSE_MS);
       return;
     }
     setArteInitialSubfamily('');
@@ -743,6 +774,7 @@ export default function App() {
     const pos = arteCategoryPositions[id] ?? cat?.anchor;
     if (pos) flyToCategoryThenOpen(id, pos);
     else {
+      cancelCategoryClosing();
       setActiveArteCategory(id);
       setCategoryOpenedViaFly(false);
     }
@@ -841,6 +873,7 @@ export default function App() {
             onToggleFavorite={toggleFavoriteCategory}
             onShowReactors={setCulturalReactorsView}
             morphTitleFromCenter={categoryOpenedViaFly}
+            isClosing={closingCategoryId !== null}
           />
         </Suspense>
       )}
