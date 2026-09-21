@@ -543,14 +543,28 @@ export default function WorldGlobe({
   // nessuna geometria/materiale nuovo, solo setActiveWorld() sul pool già
   // costruito sopra — l'unica cosa che un warp deve davvero fare a runtime.
   useEffect(() => {
+    const g = globeRef.current;
     const sats = satellitesRef.current;
-    if (!sats) return undefined;
-    sats.setActiveWorld(world.id, { animateSpawn: hasPositionedSatellitesRef.current });
+    if (!g || !sats) return undefined;
+    sats.setActiveWorld(world.id, g.camera(), { animateSpawn: hasPositionedSatellitesRef.current });
     hasPositionedSatellitesRef.current = true;
     globeActivity.wake();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.id]);
+
+  // Se cambia la proporzione dello schermo (resize, rotazione del telefono)
+  // senza un cambio di mondo, i satelliti già visibili vanno riposizionati
+  // sulla nuova camera — altrimenti la disposizione resterebbe tarata sulla
+  // proporzione precedente (bug osservato: su schermi molto stretti in
+  // verticale gli angoli tarati su desktop finiscono quasi tutti fuori
+  // inquadratura, vedi satelliteGlobes.js).
+  useEffect(() => {
+    const g = globeRef.current;
+    const sats = satellitesRef.current;
+    if (!g || !sats) return;
+    sats.repositionForViewport(g.camera());
+  }, [size]);
 
   // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
   // giro di disegno del globo grande (un wrapper attorno a renderer.render,
@@ -667,7 +681,10 @@ export default function WorldGlobe({
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return;
-    g.controls().autoRotateSpeed = 0.35;
+    // OrbitControls.autoRotateSpeed è in "gradi/frame a 60fps": un giro
+    // completo (360°) dura 60/autoRotateSpeed secondi. Tarato per un giro
+    // ogni 7 secondi.
+    g.controls().autoRotateSpeed = 60 / 7;
     g.controls().enableZoom = true;
     g.pointOfView({ altitude: 2.4 }, 0);
     if (isTouchDevice) globeActivity.wake();

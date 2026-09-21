@@ -32,20 +32,28 @@ const SATELLITE_RADIUS = GLOBE_RADIUS * 0.085;
 const SATELLITE_DETAIL = 2;
 
 // Disposizione fissa attorno al globo grande, pensata sullo schizzo
-// dell'utente: due in alto (sinistra/destra), due in basso, uno di lato —
-// tutti ben dentro il campo visivo della camera di partenza, mai a ridosso
-// del bordo dove verrebbero tagliati. az/el in gradi (azimut rispetto al
-// "davanti" della camera, elevazione sopra/sotto l'equatore). L'elevazione
-// dello slot più alto (l'ultimo) resta più bassa degli altri apposta: deve
-// lasciare spazio sopra di sé alla sua etichetta col nome del mondo (vedi
-// buildSatelliteMesh), altrimenti su schermi più bassi verrebbe tagliata
-// dal bordo superiore.
+// dell'utente: due in alto (sinistra/destra), due in basso, uno di lato.
+// azFrac/elFrac sono FRAZIONI (-1..1) di metà campo visivo orizzontale e
+// verticale, non gradi assoluti: il fov della camera (vedi
+// node_modules/three-render-objects) è 50° VERTICALI fissi, ma quello
+// ORIZZONTALE dipende dall'aspect ratio dello schermo (largo su desktop,
+// stretto su telefono in verticale) — con angoli assoluti tarati su un
+// monitor, su un telefono in verticale il campo orizzontale reale si
+// restringe così tanto che quasi tutti i satelliti finiscono fuori
+// inquadratura o accalcati al centro (bug osservato: solo 1 di 5 visibile).
+// Usare una frazione del campo REALE, ricalcolata ad ogni chiamata con la
+// camera attuale (vedi slotAzEl), li tiene sempre dentro inquadratura su
+// qualunque proporzione di schermo. Frazioni derivate dagli angoli assoluti
+// originari (tarati a vista su desktop, aspect ~1.4) divisi per il relativo
+// mezzo-campo di quell'aspect ratio. L'elevazione dello slot più alto
+// (l'ultimo) resta più bassa degli altri apposta: deve lasciare spazio
+// sopra di sé alla sua etichetta col nome del mondo (vedi buildSatelliteMesh).
 const LAYOUT = [
-  { az: -22, el: 13 },
-  { az: 22, el: 12 },
-  { az: -24, el: -14 },
-  { az: 23, el: -13 },
-  { az: 1, el: 15 },
+  { azFrac: -0.656, elFrac: 0.52 },
+  { azFrac: 0.656, elFrac: 0.48 },
+  { azFrac: -0.715, elFrac: -0.56 },
+  { azFrac: 0.685, elFrac: -0.52 },
+  { azFrac: 0.03, elFrac: 0.6 },
 ];
 
 function sphereFromAzEl(az, el, radius) {
@@ -56,6 +64,15 @@ function sphereFromAzEl(az, el, radius) {
     radius * Math.sin(elRad),
     radius * Math.cos(elRad) * Math.cos(azRad)
   );
+}
+
+// Az/el reali (gradi) di uno slot per la camera ATTUALE: la sua metà-fov
+// verticale è camera.fov/2 (fisso), quella orizzontale si ricava
+// dall'aspect ratio corrente (formula standard PerspectiveCamera).
+function slotAzEl(slot, camera) {
+  const halfV = camera.fov / 2;
+  const halfH = THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(halfV)) * camera.aspect));
+  return { az: slot.azFrac * halfH, el: slot.elFrac * halfV };
 }
 
 // Inversa di sphereFromAzEl, in lat/lng invece che az/el: stessa formula di
@@ -144,7 +161,10 @@ function buildSatelliteMesh(world) {
     { mesh: label, baseOpacity: 1 },
   ];
   group.userData.bobPhase = Math.random() * Math.PI * 2;
-  group.userData.bobSpeed = 0.35 + Math.random() * 0.15;
+  // Un ciclo completo su-giù (basso->alto->basso) dura ~10 secondi:
+  // bobSpeed è la pulsazione (2π/periodo), con una piccola variazione
+  // casuale per satellite così non fluttuano tutti in perfetta sincronia.
+  group.userData.bobSpeed = ((2 * Math.PI) / 10) * (0.95 + Math.random() * 0.1);
   group.userData.spinSpeed = 0.06 + Math.random() * 0.05;
   // Impostato per davvero da setActiveWorld() quando il satellite diventa
   // visibile: finché resta -Infinity l'oggetto è comunque invisibile
@@ -200,10 +220,12 @@ export function buildSatelliteGlobes({ worlds }) {
   }
 
   // Mostra come satelliti tutti i mondi tranne quello attivo (al massimo
-  // LAYOUT.length), nella disposizione fissa di sempre. Non tocca mai
-  // geometrie/materiali: solo visibilità, posizione e — se richiesto — un
-  // riavvio dell'animazione di comparsa sui satelliti ora visibili.
-  function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
+  // LAYOUT.length), nella disposizione fissa di sempre — riproporzionata
+  // sulla camera ATTUALE (vedi slotAzEl) così resta dentro inquadratura su
+  // qualunque proporzione di schermo. Non tocca mai geometrie/materiali:
+  // solo visibilità, posizione e — se richiesto — un riavvio
+  // dell'animazione di comparsa sui satelliti ora visibili.
+  function setActiveWorld(activeWorldId, camera, { animateSpawn = true } = {}) {
     const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId).slice(0, LAYOUT.length);
     const visibleIds = new Set(visibleWorlds.map((w) => w.id));
     const nowMs = performance.now();
@@ -215,10 +237,27 @@ export function buildSatelliteGlobes({ worlds }) {
     visibleWorlds.forEach((world, i) => {
       const sat = satellitesById.get(world.id);
       if (!sat) return;
-      const basePos = sphereFromAzEl(LAYOUT[i].az, LAYOUT[i].el, ORBIT_RADIUS);
+      sat.userData.slotIndex = i;
+      const { az, el } = slotAzEl(LAYOUT[i], camera);
+      const basePos = sphereFromAzEl(az, el, ORBIT_RADIUS);
       sat.userData.basePos = basePos;
       sat.position.copy(basePos);
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
+    });
+  }
+
+  // Ricalcola solo la posizione (mai la visibilità) dei satelliti già
+  // visibili, usando la camera attuale: chiamata quando cambia l'aspect
+  // ratio dello schermo (resize, rotazione del telefono) SENZA un cambio di
+  // mondo — altrimenti la disposizione tarata su una proporzione resterebbe
+  // quella anche dopo che lo schermo è cambiato forma.
+  function repositionForViewport(camera) {
+    satellites.forEach((sat) => {
+      if (!sat.visible || sat.userData.slotIndex === undefined) return;
+      const { az, el } = slotAzEl(LAYOUT[sat.userData.slotIndex], camera);
+      const basePos = sphereFromAzEl(az, el, ORBIT_RADIUS);
+      sat.userData.basePos = basePos;
+      sat.position.copy(basePos);
     });
   }
 
@@ -270,5 +309,15 @@ export function buildSatelliteGlobes({ worlds }) {
     });
   }
 
-  return { group, satellites, setActiveWorld, update, getHitMeshes, setWarpTarget, getWorldLatLng, dispose };
+  return {
+    group,
+    satellites,
+    setActiveWorld,
+    repositionForViewport,
+    update,
+    getHitMeshes,
+    setWarpTarget,
+    getWorldLatLng,
+    dispose,
+  };
 }
