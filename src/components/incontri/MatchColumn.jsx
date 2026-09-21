@@ -305,8 +305,8 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {eligible && current && (
         <div className="rb-match-actions">
           <button type="button" className="rb-match-pass-btn" onClick={() => decide('passed')} disabled={!!swiping}>✕ Passa</button>
-          <button type="button" className="rb-match-like-btn" onClick={() => decide('liked')} disabled={!!swiping}>❤️ Mi piace</button>
           <button type="button" className="rb-match-super-btn" onClick={() => decide('super')} disabled={!!swiping}>⭐ Super Like</button>
+          <button type="button" className="rb-match-like-btn" onClick={() => decide('liked')} disabled={!!swiping}>❤️ Mi piace</button>
         </div>
       )}
     </div>

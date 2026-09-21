@@ -24,8 +24,12 @@ export default function FreeBooksCatalog() {
       const result = await searchFreeBooks(query);
       setBooks(result.books);
       setCount(result.count);
-    } catch {
-      setError('Impossibile raggiungere il catalogo ora. Riprova più tardi.');
+    } catch (err) {
+      setError(
+        err.message === 'timeout'
+          ? 'Il catalogo ci sta mettendo troppo a rispondere. Controlla la connessione e riprova.'
+          : 'Impossibile raggiungere il catalogo ora. Riprova più tardi.'
+      );
       setBooks([]);
       setCount(null);
     } finally {
