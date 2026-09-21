@@ -162,6 +162,11 @@ export default function App() {
   const [filters, setFilters] = useState(() => loadStored('rb-filters', DEFAULT_FILTERS));
   const [locationFilters, setLocationFilters] = useState(() => loadStored('rb-location-filters', DEFAULT_LOCATION_FILTERS));
   const [activeArteCategory, setActiveArteCategory] = useState(null);
+  // Vero solo quando il pannello categoria appena aperto arriva da un volo
+  // di camera completo (vedi flyToCategoryThenOpen): governa il morph
+  // etichetta->titolo della Fase 2c, che parte dal centro schermo solo in
+  // quel caso — senza volo non c'è un'etichetta "appena vista lì" da cui farlo partire.
+  const [categoryOpenedViaFly, setCategoryOpenedViaFly] = useState(false);
   const [arteCategoryPositions, setArteCategoryPositions] = useState({});
   const [arteFilter, setArteFilter] = useState(() => loadStored('rb-arte-filter', DEFAULT_ARTE_FILTER));
   const [arteInitialSubfamily, setArteInitialSubfamily] = useState('');
@@ -633,6 +638,12 @@ export default function App() {
     setFlyTo({ lat: pos.lat, lng: pos.lng, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
     pendingOpenRef.current = setTimeout(() => {
       setActiveArteCategory(id);
+      // Il volo finisce sempre con la camera centrata sulla categoria: la
+      // sua etichetta 3D era quindi, un attimo prima, vicina al centro
+      // dello schermo. Il titolo del pannello può "volare" da lì (Fase 2c,
+      // vedi LabelMorphTitle) solo quando l'apertura arriva da un volo vero
+      // e proprio, non dalle aperture istantanee qui sotto (pos assente).
+      setCategoryOpenedViaFly(true);
       pendingOpenRef.current = null;
     }, CATEGORY_FLY_MS);
   };
@@ -645,7 +656,10 @@ export default function App() {
     setArteInitialSubfamily('');
     const pos = arteCategoryPositions[cat.id] ?? cat.anchor;
     if (pos) flyToCategoryThenOpen(cat.id, pos);
-    else setActiveArteCategory(cat.id);
+    else {
+      setActiveArteCategory(cat.id);
+      setCategoryOpenedViaFly(false);
+    }
   };
 
   // Naviga a una categoria di un mondo qualunque (usato dall'hub testuale
@@ -672,7 +686,10 @@ export default function App() {
       // triangoli del nuovo mondo.
       const pos = (sameWorld ? arteCategoryPositions[cat.id] : null) ?? cat.anchor;
       if (pos) flyToCategoryThenOpen(cat.id, pos);
-      else setActiveArteCategory(cat.id);
+      else {
+        setActiveArteCategory(cat.id);
+        setCategoryOpenedViaFly(false);
+      }
     };
 
     if (sameWorld) {
@@ -717,6 +734,7 @@ export default function App() {
     }
     if (id === null || activeArteCategory === id) {
       setActiveArteCategory(null);
+      setCategoryOpenedViaFly(false);
       setFlyTo({ altitude: 2.4, key: `zoom-out-${Date.now()}` });
       return;
     }
@@ -724,7 +742,10 @@ export default function App() {
     const cat = categorySet?.categories.find((c) => c.id === id);
     const pos = arteCategoryPositions[id] ?? cat?.anchor;
     if (pos) flyToCategoryThenOpen(id, pos);
-    else setActiveArteCategory(id);
+    else {
+      setActiveArteCategory(id);
+      setCategoryOpenedViaFly(false);
+    }
   };
 
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
@@ -819,6 +840,7 @@ export default function App() {
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
             onShowReactors={setCulturalReactorsView}
+            morphTitleFromCenter={categoryOpenedViaFly}
           />
         </Suspense>
       )}

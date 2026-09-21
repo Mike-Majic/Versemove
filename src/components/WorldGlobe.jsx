@@ -172,6 +172,12 @@ export default function WorldGlobe({
   const warpFlashRef = useRef(null);
   const warpingRef = useRef(false);
   const hasBuiltSatellitesRef = useRef(false);
+  // Letto dal polling a 250ms sotto (interval con deps [], serve un ref e
+  // non solo la prop per restare aggiornato senza far ripartire l'intervallo).
+  const activeCategoryRef = useRef(activeCategory);
+  useEffect(() => {
+    activeCategoryRef.current = activeCategory;
+  }, [activeCategory]);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [landPolygons, setLandPolygons] = useState([]);
   // Qualità grafica (Impostazioni -> Effetti, o "Auto" con downgrade da FPS
@@ -211,7 +217,7 @@ export default function WorldGlobe({
       // sovrapposte a un altro controllo cliccabile. Stesso giro di
       // polling della vista qui sopra, nessun ciclo nuovo da pagare.
       if (categoryShellRef.current) {
-        updateCategoryLabelVisibility(g, categoryShellRef.current);
+        updateCategoryLabelVisibility(g, categoryShellRef.current, activeCategoryRef.current);
       }
       // Nome del globo satellite sotto al puntatore (solo mouse, non touch:
       // il tocco seleziona subito, non ha un "passaggio sopra" da mostrare):
@@ -846,7 +852,7 @@ const LABEL_EDGE_MARGIN = 16;
 // categorie in basso a sinistra (.rb-world-tagline-list, vedi App.jsx) — lì
 // il nome è già leggibile e cliccabile, l'etichetta 3D sarebbe solo
 // un'etichetta doppia che si accavalla.
-function updateCategoryLabelVisibility(g, shell) {
+function updateCategoryLabelVisibility(g, shell, activeCategoryId) {
   const sprites = shell.labelSprites;
   if (!sprites || sprites.length === 0) return;
   const camera = g.camera();
@@ -878,7 +884,13 @@ function updateCategoryLabelVisibility(g, shell) {
       screenY >= taglineRect.top &&
       screenY <= taglineRect.bottom;
 
-    sprite.visible = !facingAway && !behindCamera && !nearEdge && !overTagline;
+    // La categoria attiva non mostra la propria etichetta sul globo mentre
+    // il suo pannello è aperto (Fase 2c): l'etichetta "è diventata" il
+    // titolo del pannello (vedi LabelMorphTitle), tenerla anche qui sarebbe
+    // un doppione proprio al centro dello schermo, dove il volo l'ha appena
+    // portata.
+    const isActivePanel = sprite.userData.categoryId === activeCategoryId;
+    sprite.visible = !isActivePanel && !facingAway && !behindCamera && !nearEdge && !overTagline;
   });
 }
 

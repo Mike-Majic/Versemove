@@ -6,6 +6,7 @@ import { listContentsForPlacement, toggleContentLike } from '../data/contents';
 import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import EmptyState from './EmptyState';
+import LabelMorphTitle from './LabelMorphTitle';
 import './CategoryColumn.css';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
@@ -36,6 +37,7 @@ export default function CategoryColumn({
   allResults = [],
   user,
   onOpenAuth,
+  morphTitleFromCenter = false,
 }) {
   const [resultsQuery, setResultsQuery] = useState('');
   const [subfamilyFilter, setSubfamilyFilter] = useState(initialSubfamily);
@@ -107,7 +109,7 @@ export default function CategoryColumn({
   const resultsContent = (
     <>
       <div className="rb-arte-panel-header">
-        <h3>{category.label}</h3>
+        <LabelMorphTitle text={category.label} morphFromCenter={morphTitleFromCenter} as="h3" />
       </div>
 
       {featured.length > 0 && (

@@ -11,7 +11,8 @@
   pointer-events: auto;
   color: #f5f5f7;
   box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #8b5cf6) 18%, transparent);
-  animation: rb-2col-slide-in 0.25s ease;
+  transform-origin: center;
+  animation: rb-holo-in 560ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
 .rb-2col-left {
@@ -22,9 +23,46 @@
   right: 70px;
 }
 
-@keyframes rb-2col-slide-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+/* "Apertura olografica" (Fase 2): il pannello si materializza invece di
+   comparire di scatto — parte da una linea sottile luminosa, si espande e
+   sfarfalla un paio di volte prima di stabilizzarsi. Il colore del bagliore
+   segue --accent (già impostato dal mondo/pannello ospitante, come lo
+   scrollbar a tema di shared.css), quindi non serve ripeterlo per ogni
+   mondo. Applicata qui invece che nel CSS di ogni singolo pannello:
+   TwoColumnSwitcher è condiviso da Arte/Nerd, Libreria, Match, Social,
+   Lavoro — un solo posto per tutti. */
+@keyframes rb-holo-in {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.03);
+    filter: brightness(2.2) saturate(1.3);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #8b5cf6) 85%, transparent),
+      0 0 46px color-mix(in srgb, var(--accent, #8b5cf6) 65%, transparent);
+  }
+  16% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  26% { opacity: 0.35; }
+  34% { opacity: 1; }
+  46% { opacity: 0.65; }
+  56% {
+    opacity: 1;
+    filter: brightness(1.25) saturate(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #8b5cf6) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-2col-panel,
+  .rb-2col-mobile-stage {
+    animation: none !important;
+  }
 }
 
 @media (max-width: 980px) {
@@ -46,6 +84,18 @@
   overflow: hidden;
   pointer-events: auto;
   z-index: 1040;
+  transform-origin: top center;
+  animation: rb-holo-in-mobile 560ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes rb-holo-in-mobile {
+  0% { opacity: 0; transform: scaleY(0.03); filter: brightness(2.2); }
+  16% { opacity: 1; transform: scaleY(1); }
+  26% { opacity: 0.35; }
+  34% { opacity: 1; }
+  46% { opacity: 0.65; }
+  56% { opacity: 1; filter: brightness(1.25); }
+  100% { opacity: 1; transform: scaleY(1); filter: brightness(1); }
 }
 
 .rb-2col-mobile-track {
