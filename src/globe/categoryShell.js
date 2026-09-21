@@ -193,6 +193,7 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
   const faceMeshes = [];
   const triangles = [];
   const positions = {};
+  const labelSprites = [];
   const disposables = [geo];
   const usedFaces = new Set();
   const blockedFaces = new Set();
@@ -266,6 +267,7 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     sprite.position.copy(normal).multiplyScalar(radius + 3);
     sprite.userData.categoryId = cat.id;
     group.add(sprite);
+    labelSprites.push(sprite);
     disposables.push(labelMat, texture);
   });
 
@@ -279,5 +281,5 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     disposables.forEach((d) => d.dispose && d.dispose());
   }
 
-  return { group, faceMeshes, triangles, positions, setActive, dispose };
+  return { group, faceMeshes, triangles, positions, labelSprites, setActive, dispose };
 }

@@ -132,3 +132,32 @@
   left: 50%;
   transform: translateX(-50%);
 }
+
+/* Scrollbar sottile e a tema invece di quella grigia di sistema, ovunque
+   nell'app (chip orizzontali, liste, pannelli): --accent è già impostato
+   sul contenitore da ogni pannello/explorer (es. .rb-arte-explorer), quindi
+   basta questa regola sola, qui, perché ogni elemento erediti il colore
+   del proprio mondo — niente da toccare nel CSS dei singoli pannelli.
+   Firefox: scrollbar-width/scrollbar-color. Chrome/Safari: ::-webkit-*. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent, #8b5cf6) 55%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 55%, transparent);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent, #8b5cf6) 75%, transparent);
+}

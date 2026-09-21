@@ -184,6 +184,15 @@ export default function WorldGlobe({
         const posChanged = closeZoom && (Math.abs(prev.lat - pov.lat) > 0.5 || Math.abs(prev.lng - pov.lng) > 0.5);
         return altChanged || posChanged ? { altitude: pov.altitude, lat: pov.lat, lng: pov.lng } : prev;
       });
+      // Etichette delle categorie: nascoste (non tolte, solo sprite.visible)
+      // quando sono sul retro del globo, troppo vicine al bordo dello
+      // schermo o sopra al menu testuale delle categorie in basso a
+      // sinistra (.rb-world-tagline-list) — mai tagliate a metà, mai
+      // sovrapposte a un altro controllo cliccabile. Stesso giro di
+      // polling della vista qui sopra, nessun ciclo nuovo da pagare.
+      if (categoryShellRef.current) {
+        updateCategoryLabelVisibility(g, categoryShellRef.current);
+      }
     }, 250);
     return () => clearInterval(interval);
   }, []);
@@ -598,6 +607,53 @@ function rebuildShellNodes(overlay, excludeTriangles) {
   const newGeometry = buildShellNodeGeometry(overlay.shell.icoGeometry, excludeTriangles);
   overlay.shell.nodes.geometry.dispose();
   overlay.shell.nodes.geometry = newGeometry;
+}
+
+// Margine (px) dal bordo del canvas sotto il quale un'etichetta si nasconde
+// invece di restare a metà tagliata dal bordo della finestra.
+const LABEL_EDGE_MARGIN = 16;
+
+// Nasconde (sprite.visible, mai un remove dalla scena) l'etichetta di una
+// categoria quando: è sul retro del globo rispetto alla camera (prodotto
+// scalare fra la normale del punto e la direzione verso la camera), è
+// troppo vicina al bordo dello schermo, o cade sopra al menu testuale delle
+// categorie in basso a sinistra (.rb-world-tagline-list, vedi App.jsx) — lì
+// il nome è già leggibile e cliccabile, l'etichetta 3D sarebbe solo
+// un'etichetta doppia che si accavalla.
+function updateCategoryLabelVisibility(g, shell) {
+  const sprites = shell.labelSprites;
+  if (!sprites || sprites.length === 0) return;
+  const camera = g.camera();
+  const canvas = g.renderer().domElement;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const taglineEl = document.querySelector('.rb-world-tagline-list');
+  const taglineRect = taglineEl ? taglineEl.getBoundingClientRect() : null;
+
+  sprites.forEach((sprite) => {
+    const worldPos = sprite.position;
+    const outwardNormal = worldPos.clone().normalize();
+    const toCamera = camera.position.clone().sub(worldPos).normalize();
+    const facingAway = outwardNormal.dot(toCamera) < 0.08;
+
+    const ndc = worldPos.clone().project(camera);
+    const behindCamera = ndc.z > 1;
+    const screenX = rect.left + (ndc.x * 0.5 + 0.5) * rect.width;
+    const screenY = rect.top + (-ndc.y * 0.5 + 0.5) * rect.height;
+    const nearEdge =
+      screenX < rect.left + LABEL_EDGE_MARGIN ||
+      screenX > rect.right - LABEL_EDGE_MARGIN ||
+      screenY < rect.top + LABEL_EDGE_MARGIN ||
+      screenY > rect.bottom - LABEL_EDGE_MARGIN;
+    const overTagline =
+      taglineRect &&
+      screenX >= taglineRect.left &&
+      screenX <= taglineRect.right &&
+      screenY >= taglineRect.top &&
+      screenY <= taglineRect.bottom;
+
+    sprite.visible = !facingAway && !behindCamera && !nearEdge && !overTagline;
+  });
 }
 
 export { WORLDS };
