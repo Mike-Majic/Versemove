@@ -7,13 +7,6 @@ import { SATELLITE_SPIN_PERIOD_S, IDLE_SATELLITE_ORBIT_DEG_S } from '../fx/globe
 
 const DEG2RAD = Math.PI / 180;
 
-// Raggio (in unità di scena) del guscio a rete del globo grande — vedi
-// networkOverlay.buildNetworkShell(radius=128) — usato qui solo per il
-// test "il globo mi nasconde il satellite?" (occlusione), non per
-// posizionare niente: i satelliti ora vivono in coordinate ASSOLUTE e
-// FISSE (vedi SLOTS sotto), non più in proporzione a un raggio d'orbita.
-const OCCLUSION_RADIUS = 128;
-
 // Raggio intrinseco della geometria di un satellite (fisso, uguale per
 // tutti: mai ricreata, vedi buildSatelliteGlobes). La dimensione APPARENTE
 // varia invece per slot tramite una scala (vedi SLOTS.radius sotto e
@@ -102,31 +95,20 @@ const SATELLITE_CAMERA_MARGIN = 60;
 const FOG_NEAR = 420;
 const FOG_FAR = 950;
 const FOG_MIN_OPACITY = 0.4;
-// Quanto sbiadisce, IN PIÙ rispetto alla foschia sopra, un satellite che
-// il globo sta bloccando alla vista in questo istante (mai a zero secco:
-// la sua stessa orbita lenta lo scopre di nuovo prima o poi — un'opacità
-// residua bassa invece di zero evita un pop-in/pop-out di scatto quando
-// rientra in vista).
-const OCCLUDED_OPACITY_FACTOR = 0.15;
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-// Il globo (sfera opaca + guscio a rete, raggio OCCLUSION_RADIUS) blocca
-// la vista fra la camera e il satellite? Intersezione raggio/sfera
-// standard, sfera centrata nell'origine (il centro del globo grande).
-const _occDir = new THREE.Vector3();
-function isOccludedByGlobe(pos, camera) {
-  const camPos = camera.position;
-  _occDir.copy(pos).sub(camPos);
-  const distToSat = _occDir.length();
-  _occDir.normalize();
-  const b = camPos.dot(_occDir);
-  const c = camPos.lengthSq() - OCCLUSION_RADIUS * OCCLUSION_RADIUS;
-  const discriminant = b * b - c;
-  if (discriminant <= 0) return false;
-  const t1 = -b - Math.sqrt(discriminant);
-  return t1 > 0 && t1 < distToSat;
-}
+// L'occlusione fra satellite e globo grande NON è più simulata a mano (un
+// test raggio/sfera JS che abbassava l'opacità quando "calcolava" un
+// satellite coperto): sul canale trasparente l'ordine di disegno, non la
+// vera profondità, decide chi si vede sopra chi, e quel calcolo lato JS
+// poteva far scomparire un satellite anche quando era davanti, non dietro
+// (bug segnalato dal vivo). Ora l'occlusione è quella vera della GPU
+// (depth test), gratuita e sempre corretta: basta che il CORPO di ogni
+// satellite sia opaco (depthWrite/depthTest attivi, vedi coreMaterial più
+// sotto) esattamente come il globo grande (vedi globeMaterial in
+// WorldGlobe.jsx, già opaco) — un satellite davanti copre il globo, uno
+// dietro viene coperto, senza calcoli manuali.
 
 // Inversa di un vettore posizione, in lat/lng invece che coordinate XYZ
 // (stessa formula di vectorToPolar in categoryShell.js, coordinate
@@ -160,23 +142,26 @@ function easeOutCubic(t) {
 
 // Un satellite = un piccolo globo "a rete" (bordi + nodi luminosi, stesso
 // linguaggio visivo del guscio del globo grande — vedi networkOverlay.js
-// buildNetworkShell) colorato del mondo che rappresenta, con un nucleo
-// pieno semi-trasparente sotto la rete (come il globo grande, che ha la
-// Terra piena sotto il proprio guscio): senza un corpo pieno la sola rete
-// si legge come uno scheletro spigoloso invece che come una sfera. Il nome
-// del mondo resta sempre visibile sopra (stessa etichetta a pillola scura
-// delle categorie sul globo grande — vedi categoryShell.js makeLabelSprite
-// — ma senza il triangolo colorato dietro, qui non c'è una faccia da
-// riempire).
+// buildNetworkShell) con un nucleo OPACO sotto la rete — non più
+// semi-trasparente: un corpo che non scrive/legge davvero la profondità non
+// può occludere né essere occluso correttamente dal globo grande (era il
+// bug: "davanti" al globo il satellite si vedeva mimetizzato/trasparente
+// invece che pieno). Stesso schema del globo grande (vedi globeMaterial in
+// WorldGlobe.jsx): base scura e opaca (world.globeColor) che fa da vero
+// corpo 3D, colore del mondo affidato solo alla rete/ai nodi sopra, che
+// restano decorazioni trasparenti. Il nome del mondo resta sempre visibile
+// sopra (stessa etichetta a pillola scura delle categorie sul globo grande
+// — vedi categoryShell.js makeLabelSprite — ma senza il triangolo colorato
+// dietro, qui non c'è una faccia da riempire).
 function buildSatelliteMesh(world) {
   const group = new THREE.Group();
 
   const coreGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, SATELLITE_DETAIL);
   const coreMaterial = new THREE.MeshBasicMaterial({
-    color: world.color,
-    transparent: true,
-    opacity: 0.3,
-    depthWrite: false,
+    color: world.globeColor ?? '#050508',
+    transparent: false,
+    depthWrite: true,
+    depthTest: true,
   });
   const core = new THREE.Mesh(coreGeometry, coreMaterial);
   core.userData.worldId = world.id;
@@ -185,13 +170,18 @@ function buildSatelliteMesh(world) {
 
   // Come nel guscio del globo grande (vedi applyOverlayColor in
   // WorldGlobe.jsx): un mondo può avere un world.lineColor separato solo
-  // per le linee, mentre nucleo e puntini restano su world.color.
+  // per le linee, mentre i puntini restano su world.color. Decorazioni
+  // trasparenti sopra al nucleo opaco: renderOrder più alto del reticolo
+  // del globo grande (che resta a 0, il default) così, nei rari casi in cui
+  // due elementi trasparenti sono quasi alla stessa profondità, quelli del
+  // satellite non vengono "velati" dal reticolo del globo grande.
   const netMaterial = new THREE.LineBasicMaterial({
     color: world.lineColor ?? world.color,
     transparent: true,
     opacity: 0.85,
   });
   const net = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeometry), netMaterial);
+  net.renderOrder = 2;
   group.add(net);
 
   const nodeMaterial = new THREE.PointsMaterial({
@@ -204,6 +194,7 @@ function buildSatelliteMesh(world) {
     sizeAttenuation: true,
   });
   const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
+  nodes.renderOrder = 2;
   group.add(nodes);
 
   const { sprite: label } = makeLabelSprite(world.label, SATELLITE_RADIUS * 1.1);
@@ -221,8 +212,11 @@ function buildSatelliteMesh(world) {
   group.userData.worldId = world.id;
   group.userData.hitMesh = core;
   group.userData.continentGroup = continentGroup;
+  // Il nucleo NON è più in questa lista: è opaco, la sua opacity è sempre
+  // 1 e non deve mai sfumare (né per foschia né per occlusione, richiesta
+  // esplicita — "davanti l'opacità resta 1"). Sfumano solo le decorazioni
+  // trasparenti sopra di lui.
   group.userData.opacityMeshes = [
-    { mesh: core, baseOpacity: 0.3 },
     { mesh: net, baseOpacity: 0.85 },
     { mesh: nodes, baseOpacity: 1 },
     { mesh: label, baseOpacity: 1 },
@@ -325,6 +319,7 @@ export function buildSatelliteGlobes({ worlds }) {
       continentGeometries.forEach((geometry) => {
         const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
         const lines = new THREE.LineSegments(geometry, material);
+        lines.renderOrder = 2;
         continentGroup.add(lines);
         sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85 });
       });
@@ -406,12 +401,15 @@ export function buildSatelliteGlobes({ worlds }) {
       sat.position.copy(basePos);
       if (!reduceMotion) sat.rotation.y += ud.spinSpeed * deltaSec;
 
-      let depthFactor = THREE.MathUtils.clamp(
+      // Foschia leggera solo per le decorazioni trasparenti (mai per il
+      // nucleo, opaco e sempre a piena opacità — vedi sopra): puramente in
+      // funzione della distanza dalla camera, non più anche
+      // dell'occlusione dietro al globo, che ora è quella vera della GPU.
+      const depthFactor = THREE.MathUtils.clamp(
         THREE.MathUtils.mapLinear(camPos.distanceTo(basePos), FOG_NEAR, FOG_FAR, 1, FOG_MIN_OPACITY),
         FOG_MIN_OPACITY,
         1
       );
-      if (isOccludedByGlobe(basePos, camera)) depthFactor *= OCCLUDED_OPACITY_FACTOR;
 
       const spawnAge = nowMs - ud.createdAtMs;
       const spawnT = spawnAge >= SPAWN_MS ? 1 : easeOutCubic(Math.max(0, spawnAge) / SPAWN_MS);
