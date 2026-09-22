@@ -41,6 +41,18 @@
   z-index: 1041;
 }
 
+/* Sotto il breakpoint mobile la topbar (vedi TopBar.css) porta le sue
+   icone (campanella, chat, impostazioni, avatar...) allineate a destra
+   abbastanza vicino al centro dello schermo da toccare la X/stellina qui
+   sopra, centrate — su schermi larghi restano ben separate, qui invece
+   vanno spostate SOTTO tutta la riga della topbar (non solo un po' più in
+   basso: la sua altezza reale è padding 14px + icona 40px, con margine). */
+@media (max-width: 760px) {
+  .rb-arte-top-controls {
+    top: 78px;
+  }
+}
+
 .rb-arte-top-controls-row {
   display: flex;
   align-items: center;
