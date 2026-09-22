@@ -16,6 +16,14 @@ export const SOCIAL_CATEGORIES = [
     aliases: ['world', 'mondo', 'feed', 'bacheca', 'social'],
     subfamilies: [],
   },
+  {
+    id: 'tattoo',
+    label: 'Tattoo',
+    icon: '🖋️',
+    anchor: { lat: -15, lng: -25 }, // Oceano Atlantico meridionale
+    aliases: ['tattoo', 'tatuaggio', 'tatuaggi', 'tatuatore'],
+    subfamilies: [],
+  },
 ];
 
 export function resolveCategoryQuery(query) {
