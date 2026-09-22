@@ -74,6 +74,10 @@ const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance
 const DEFAULT_ARTE_FILTER = { category: '', subfamily: '' };
 const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
 
+// Quante categorie mostra al massimo la lista sotto al mondo (rb-world-tagline-list):
+// oltre questo numero compare la freccetta per scorrere le altre.
+const CATEGORY_LIST_PAGE_SIZE = 5;
+
 // Mondi che hanno un proprio set di categorie esplorabili sul globo (triangoli
 // cliccabili + colonne di ricerca/persone vicine, via ArteExplorer/CategoryColumn).
 // Aggiungere un mondo qui basta a fargli usare lo stesso meccanismo, senza copie.
@@ -134,6 +138,15 @@ export default function App() {
   const { index, setIndex, containerRef } = useSwipeWorld(WORLDS.length, DEFAULT_WORLD_INDEX, gameplayActive);
   const world = WORLDS[index];
   const categorySet = CATEGORY_WORLDS[world.id] ?? null;
+  // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
+  // ne mostra al massimo 5 alla volta, la freccetta a sinistra fa scorrere
+  // le successive, tornando in cima dopo l'ultima (scorrimento infinito).
+  // Si azzera ad ogni cambio di mondo, altrimenti si potrebbe entrare in un
+  // mondo con lo scorrimento già a metà lista.
+  const [categoryScrollOffset, setCategoryScrollOffset] = useState(0);
+  useEffect(() => {
+    setCategoryScrollOffset(0);
+  }, [categorySet]);
   // Incontri e Lavoro sono riservati ai maggiorenni: l'età è quella vera
   // dell'account (data di nascita in registrazione), non più una
   // dichiarazione con un pulsante.
@@ -988,18 +1001,39 @@ export default function App() {
           activeArteCategory ? 'rb-world-tagline-behind' : ''
         }`}
       >
-        {categorySet
-          ? categorySet.categories.map((c) => (
+        {categorySet ? (
+          <>
+            {categorySet.categories.length > CATEGORY_LIST_PAGE_SIZE && (
               <button
-                key={c.id}
                 type="button"
-                className={`rb-tagline-cat-btn ${activeArteCategory === c.id ? 'active' : ''}`}
-                onClick={() => toggleArteCategory(c.id)}
+                className="rb-tagline-scroll-btn"
+                aria-label="Altre categorie"
+                onClick={() =>
+                  setCategoryScrollOffset((o) => (o + 1) % categorySet.categories.length)
+                }
               >
-                {c.label}
+                ‹
               </button>
-            ))
-          : translateWorld(t, world).tagline}
+            )}
+            <div className="rb-tagline-cat-list">
+              {Array.from(
+                { length: Math.min(CATEGORY_LIST_PAGE_SIZE, categorySet.categories.length) },
+                (_, i) => categorySet.categories[(categoryScrollOffset + i) % categorySet.categories.length]
+              ).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`rb-tagline-cat-btn ${activeArteCategory === c.id ? 'active' : ''}`}
+                  onClick={() => toggleArteCategory(c.id)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          translateWorld(t, world).tagline
+        )}
       </div>
 
       <nav className="rb-world-dots" aria-label={t('common.changeWorld')}>

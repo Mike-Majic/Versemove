@@ -135,28 +135,52 @@ function buildBriefcaseShape() {
   return shape;
 }
 
-// Sagoma di una "M" stilizzata (mondo Social): blocco con una tacca a V
-// tagliata dall'alto al centro, due punte separate da una valle — presa
-// geometrica semplificata della lettera, non un font vero.
+// Sagoma di una "M" (mondo Social): non un blocco con una tacca (si leggeva
+// male, un unico bozzo scuro invece di una lettera) ma due pilastri
+// verticali più una "V" spessa che li collega, come i tratti di una M
+// scritta a mano — 4 forme separate (THREE.ShapeGeometry accetta anche un
+// array di Shape, si uniscono da sole in una geometria sola), i due tratti
+// diagonali calcolati per vettori (direzione + normale perpendicolare)
+// invece che a punti scelti a mano, per essere sicuri che restino dritti e
+// della stessa larghezza dei pilastri.
 function buildLetterMShape() {
-  const shape = new THREE.Shape();
-  const left = -1;
-  const right = 1;
   const top = 1;
   const bottom = -1;
-  const notchLeft = -0.3;
-  const notchRight = 0.3;
-  const notchDepth = -0.15;
+  const pillarWidth = 0.32;
+  const legWidth = 0.3;
+  const leftOuter = -1;
+  const leftInner = leftOuter + pillarWidth;
+  const rightOuter = 1;
+  const rightInner = rightOuter - pillarWidth;
+  const valley = new THREE.Vector2(0, -0.3);
 
-  shape.moveTo(left, bottom);
-  shape.lineTo(left, top);
-  shape.lineTo(notchLeft, top);
-  shape.lineTo(0, notchDepth);
-  shape.lineTo(notchRight, top);
-  shape.lineTo(right, top);
-  shape.lineTo(right, bottom);
-  shape.closePath();
-  return shape;
+  const rectShape = (x0, x1, y0, y1) => {
+    const s = new THREE.Shape();
+    s.moveTo(x0, y0);
+    s.lineTo(x1, y0);
+    s.lineTo(x1, y1);
+    s.lineTo(x0, y1);
+    s.closePath();
+    return s;
+  };
+  const diagonalBarShape = (from, to, width) => {
+    const dir = to.clone().sub(from).normalize();
+    const perp = new THREE.Vector2(-dir.y, dir.x).multiplyScalar(width / 2);
+    const s = new THREE.Shape();
+    s.moveTo(from.x + perp.x, from.y + perp.y);
+    s.lineTo(to.x + perp.x, to.y + perp.y);
+    s.lineTo(to.x - perp.x, to.y - perp.y);
+    s.lineTo(from.x - perp.x, from.y - perp.y);
+    s.closePath();
+    return s;
+  };
+
+  return [
+    rectShape(leftOuter, leftInner, bottom, top),
+    rectShape(rightInner, rightOuter, bottom, top),
+    diagonalBarShape(new THREE.Vector2(leftInner, top), valley, legWidth),
+    diagonalBarShape(valley, new THREE.Vector2(rightInner, top), legWidth),
+  ];
 }
 
 // Stella a 5 punte (mondo Intrattenimento): poligono standard, raggio
