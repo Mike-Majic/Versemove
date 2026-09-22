@@ -8,7 +8,11 @@ import { SUPPORTED_LANGUAGES, setAppLanguage } from '../i18n';
 import { translateWorld } from '../i18n/worldLabels';
 import ModalOverlay from './ModalOverlay';
 import TermsModal from './TermsModal';
+import CustomSelect from './shared/CustomSelect';
+import InfoBadge from './InfoBadge';
 import './AuthModal.css';
+
+const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: `${l.flag} ${l.nativeLabel}` }));
 
 // Preimpostazioni più comuni per i pronomi (valori stabili, mai tradotti:
 // sono ciò che si manda a registerAccount — solo l'ETICHETTA mostrata
@@ -38,6 +42,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberChecked, setRememberChecked] = useState(true);
+  // Occhiolino mostra/nascondi: tre campi password indipendenti, ognuno
+  // parte nascosto.
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [username, setUsername] = useState('');
   const [nickname, setNickname] = useState('');
   // 'idle' | 'checking' | 'available' | 'taken': il pulsante "Registrati"
@@ -322,14 +331,25 @@ export default function AuthModal({ open, onClose, onLogin }) {
             </label>
             <label className="rb-field">
               <span>{t('auth.fields.password')}</span>
-              <input
-                type="password"
-                name="password"
-                id="login-password"
-                autoComplete="current-password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-              />
+              <div className="rb-auth-password-field">
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  name="password"
+                  id="login-password"
+                  autoComplete="current-password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rb-auth-password-toggle"
+                  onClick={() => setShowLoginPassword((v) => !v)}
+                  aria-label={showLoginPassword ? t('auth.fields.hidePassword') : t('auth.fields.showPassword')}
+                  tabIndex={-1}
+                >
+                  {showLoginPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </label>
             <label className="rb-field rb-auth-checkbox-field">
               <input type="checkbox" checked={rememberChecked} onChange={(e) => setRememberChecked(e.target.checked)} />
@@ -339,7 +359,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
         ) : (
           <>
             <label className="rb-field">
-              <span>{t('auth.fields.username')}</span>
+              <span>{t('auth.fields.username')} *</span>
               <input type="text" autoFocus autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
             </label>
             <label className="rb-field">
@@ -365,30 +385,52 @@ export default function AuthModal({ open, onClose, onLogin }) {
               )}
             </label>
             <label className="rb-field">
-              <span>{t('auth.fields.mail')}</span>
+              <span>{t('auth.fields.mail')} *</span>
               <input type="email" name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>{t('auth.fields.password')}</span>
-              <input
-                type="password"
-                name="new-password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <span>{t('auth.fields.password')} *</span>
+              <div className="rb-auth-password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="new-password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rb-auth-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t('auth.fields.hidePassword') : t('auth.fields.showPassword')}
+                  tabIndex={-1}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </label>
             <label className="rb-field">
-              <span>{t('auth.fields.confirmPassword')}</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
+              <span>{t('auth.fields.confirmPassword')} *</span>
+              <div className="rb-auth-password-field">
+                <input
+                  type={showPasswordConfirm ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rb-auth-password-toggle"
+                  onClick={() => setShowPasswordConfirm((v) => !v)}
+                  aria-label={showPasswordConfirm ? t('auth.fields.hidePassword') : t('auth.fields.showPassword')}
+                  tabIndex={-1}
+                >
+                  {showPasswordConfirm ? '🙈' : '👁️'}
+                </button>
+              </div>
             </label>
             <label className="rb-field">
-              <span>{t('auth.fields.birthDate')}</span>
+              <span>{t('auth.fields.birthDate')} *</span>
               <input
                 type="date"
                 autoComplete="off"
@@ -417,21 +459,19 @@ export default function AuthModal({ open, onClose, onLogin }) {
               )}
             </label>
 
-            <label className="rb-field">
+            <div className="rb-field">
               <span>{t('auth.fields.language')}</span>
-              <select
+              <CustomSelect
                 value={lingua}
-                onChange={(e) => {
-                  setLingua(e.target.value);
-                  setAppLanguage(e.target.value);
+                options={LANGUAGE_OPTIONS}
+                ariaLabel={t('auth.fields.language')}
+                onChange={(code) => {
+                  setLingua(code);
+                  setAppLanguage(code);
                 }}
-              >
-                {SUPPORTED_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>{l.flag} {l.nativeLabel}</option>
-                ))}
-              </select>
+              />
               <span className="rb-auth-field-hint">{t('auth.fields.languageHint')}</span>
-            </label>
+            </div>
 
             <div className="rb-field">
               <span>{t('auth.fields.accountType')}</span>
@@ -504,7 +544,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
             )}
 
             <label className="rb-field">
-              <span>{t('auth.fields.gender')}</span>
+              <span>{t('auth.fields.gender')} *</span>
               <select value={genere} onChange={(e) => setGenere(e.target.value)}>
                 <option value="" disabled>{t('auth.gender.placeholder')}</option>
                 <option value="uomo">{t('auth.gender.male')}</option>
@@ -531,7 +571,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
             </label>
 
             <div className="rb-field">
-              <span>{t('auth.fields.worldsToEnable')}</span>
+              <span>{t('auth.fields.worldsToEnable')} *</span>
               <div className="rb-auth-worlds-box">
                 {WORLDS.map((w) => (
                   <label key={w.id} className="rb-auth-world-row">
@@ -585,7 +625,10 @@ export default function AuthModal({ open, onClose, onLogin }) {
                 checked={consensoMarketing}
                 onChange={(e) => setConsensoMarketing(e.target.checked)}
               />
-              <span>{t('auth.marketing')}</span>
+              <span>
+                {t('auth.marketing')}{' '}
+                <InfoBadge text={t('auth.marketingInfo')} />
+              </span>
             </label>
           </>
         )}
