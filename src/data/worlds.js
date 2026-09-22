@@ -1,5 +1,6 @@
 // Configurazione dei "mondi" del mappamondo interattivo.
-// Ordine dello swipe a due dita: bambini -> social -> lavoro -> arte -> nerd -> incontri -> vetrina -> (torna a bambini).
+// Ordine dello swipe a due dita (e dei pallini dello switcher, stesso
+// array): bambini -> vetrina -> social -> lavoro -> arte -> nerd -> incontri -> (torna a bambini).
 // Il mondo blu (Social) è quello principale: è il primo che si vede all'apertura dell'app.
 export const WORLDS = [
   {
@@ -13,6 +14,16 @@ export const WORLDS = [
     globeColor: '#03130a',
     atmosphereColor: '#22c55e',
     textOnGlobe: '#e9fff2',
+  },
+  {
+    id: 'vetrina',
+    label: 'Vetrina',
+    tagline: 'Novità in mostra',
+    color: '#ec4899',
+    colorSoft: 'rgba(236, 72, 153, 0.18)',
+    globeColor: '#1f0416',
+    atmosphereColor: '#ec4899',
+    textOnGlobe: '#ffeaf7',
   },
   {
     id: 'social',
@@ -58,21 +69,16 @@ export const WORLDS = [
     id: 'incontri',
     label: 'Incontri',
     tagline: 'Conosci persone vicino a te',
-    color: '#ff3860',
-    colorSoft: 'rgba(255, 56, 96, 0.18)',
+    // Rosso fuoco (non più il rosa-magenta di prima): pilota sia l'accento
+    // UI di tutto il mondo (--accent, vedi App.jsx) sia il colore reale
+    // della rete/puntini e dell'atmosfera del globo (vedi applyOverlayColor
+    // e atmosphereColor in WorldGlobe.jsx) — un solo valore da cambiare per
+    // "accentuare il rosso" ovunque, richiesta esplicita dell'utente.
+    color: '#ff2200',
+    colorSoft: 'rgba(255, 34, 0, 0.18)',
     globeColor: '#1f0409',
-    atmosphereColor: '#ff3860',
+    atmosphereColor: '#ff2200',
     textOnGlobe: '#ffeaf0',
-  },
-  {
-    id: 'vetrina',
-    label: 'Vetrina',
-    tagline: 'Novità in mostra',
-    color: '#ec4899',
-    colorSoft: 'rgba(236, 72, 153, 0.18)',
-    globeColor: '#1f0416',
-    atmosphereColor: '#ec4899',
-    textOnGlobe: '#ffeaf7',
   },
 ];
 
