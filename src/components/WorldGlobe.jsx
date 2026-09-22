@@ -8,7 +8,7 @@ import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../glo
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
-import { IDLE_ROTATE_SPEED, IDLE_ROTATE_EASE_MS } from '../fx/globeRotation';
+import { IDLE_ROTATE_SPEED, IDLE_ROTATE_EASE_MS, IDLE_ROTATE_DURATION_MS } from '../fx/globeRotation';
 import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
 
@@ -112,8 +112,6 @@ const DEFAULT_ALTITUDE = 4.2;
 // altrimenti verrebbero tagliati via invece di sbiadire in lontananza.
 const CAMERA_FAR = 5000;
 
-// Quanto dura al massimo la rotazione automatica del globo prima di fermarsi.
-const AUTO_ROTATE_MS = 10000;
 // Dopo quanto tempo senza interazioni il globo smette di essere ridisegnato
 // (serve anche a far finire le transizioni/inerzie della camera).
 const IDLE_MS = 3000;
@@ -256,8 +254,9 @@ export default function WorldGlobe({
   // marker HTML) ad ogni frame, per sempre, anche col globo fermo. Qui il
   // disegno si mette in pausa quando nessuno interagisce e riparte al primo
   // segno di attività (mouse, rotellina, tocco, voli della camera, dati
-  // nuovi). La rotazione automatica dura al massimo AUTO_ROTATE_MS, poi il
-  // globo si ferma e, dopo IDLE_MS, smette del tutto di essere ridisegnato.
+  // nuovi). La rotazione automatica dura al massimo IDLE_ROTATE_DURATION_MS
+  // (fx/globeRotation.js), poi il globo si ferma e, dopo IDLE_MS, smette
+  // del tutto di essere ridisegnato.
   const globeActivity = useMemo(() => {
     let idleTimer = null;
     let rotateTimer = null;
@@ -342,8 +341,8 @@ export default function WorldGlobe({
       g.controls().autoRotate = true;
       rampAutoRotateSpeedTo(IDLE_ROTATE_SPEED);
       clearTimeout(rotateTimer);
-      rotateTimer = setTimeout(stopAutoRotate, AUTO_ROTATE_MS);
-      wake(AUTO_ROTATE_MS);
+      rotateTimer = setTimeout(stopAutoRotate, IDLE_ROTATE_DURATION_MS);
+      wake(IDLE_ROTATE_DURATION_MS);
     };
 
     const dispose = () => {
@@ -752,9 +751,9 @@ export default function WorldGlobe({
   }, [globeActivity, displayItems, landPolygons, world, categories, activeCategory, size]);
 
   // Solo su desktop: passando il mouse sopra il globo, la rotazione automatica
-  // si ferma; togliendolo, riparte (sempre per al massimo AUTO_ROTATE_MS). Su
-  // mobile non c'e' mai auto-rotazione, quindi non serve gestire l'hover (il
-  // touch non "passa sopra", tocca e basta).
+  // si ferma; togliendolo, riparte (sempre per al massimo
+  // IDLE_ROTATE_DURATION_MS). Su mobile non c'e' mai auto-rotazione, quindi
+  // non serve gestire l'hover (il touch non "passa sopra", tocca e basta).
   useEffect(() => {
     if (isTouchDevice) return undefined;
     const g = globeRef.current;
