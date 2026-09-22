@@ -46,7 +46,27 @@ const SLOTS = [
   { pos: [60, 260, -380], radius: 22 }, // dietro in alto, il più lontano
   { pos: [300, -170, 160], radius: 36 }, // destra in basso, davanti
   { pos: [-90, -300, 210], radius: 30 }, // sotto, davanti (sesto slot)
+  // Settimo e ottavo slot: con 9 mondi i satelliti visibili sono 8. Con solo
+  // 6 slot gli ultimi due mondi dell'elenco (di solito Incontri e FAQ) non
+  // comparivano come satelliti, quindi getWorldLatLng non trovava la loro
+  // posizione e il warp saltava direttamente al mondo senza animazione.
+  { pos: [-340, 210, -150], radius: 28 }, // in alto a sinistra, dietro
+  { pos: [230, -40, -330], radius: 30 }, // destra, a metà altezza, dietro
 ];
+
+// Se un giorno i mondi diventano più degli slot scelti a mano, gli slot in
+// più si generano da soli su una spirale di Fibonacci attorno al globo, così
+// nessun mondo resta senza satellite (e senza warp).
+function slotAt(i) {
+  if (i < SLOTS.length) return SLOTS[i];
+  const k = i - SLOTS.length;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - ((k % 12) + 0.5) * (2 / 12);
+  const r = Math.sqrt(1 - y * y);
+  const theta = golden * (k + 3);
+  const dist = 430;
+  return { pos: [Math.cos(theta) * r * dist, y * dist * 0.7, Math.sin(theta) * r * dist - 120], radius: 24 };
+}
 
 // Ampiezza (unità di scena) del galleggiamento sinusoidale verticale: fissa
 // per tutti, non più proporzionale al raggio del satellite (era così
@@ -276,7 +296,9 @@ export function buildSatelliteGlobes({ worlds }) {
 
   function getWorldLatLng(worldId) {
     const sat = satellitesById.get(worldId);
-    if (!sat?.userData.basePos) return null;
+    // Solo satelliti davvero visibili: una posizione rimasta da un giro
+    // precedente farebbe volare la camera verso un punto vuoto.
+    if (!sat?.visible || !sat.userData.basePos) return null;
     return vectorToLatLng(sat.userData.basePos);
   }
 
@@ -336,7 +358,7 @@ export function buildSatelliteGlobes({ worlds }) {
   // visibilità e stato di posizionamento, più — se richiesto — un riavvio
   // dell'animazione di comparsa sui satelliti ora visibili.
   function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
-    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId).slice(0, SLOTS.length);
+    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId);
     const visibleIds = new Set(visibleWorlds.map((w) => w.id));
     const nowMs = performance.now();
 
@@ -347,7 +369,7 @@ export function buildSatelliteGlobes({ worlds }) {
     visibleWorlds.forEach((world, i) => {
       const sat = satellitesById.get(world.id);
       if (!sat) return;
-      const slot = SLOTS[i];
+      const slot = slotAt(i);
       sat.userData.basePosRef = new THREE.Vector3(...slot.pos);
       sat.userData.slotScale = slot.radius / SATELLITE_RADIUS;
       // Riparte da angolo 0 (cioè esattamente la posizione dello slot,
