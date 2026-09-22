@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
-import { resetAccountPassword, setOwnWorlds, deleteOwnAccount } from '../data/accounts';
+import { resetAccountPassword, setOwnWorlds, setOwnLingua, deleteOwnAccount } from '../data/accounts';
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
 import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
@@ -133,11 +133,19 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
 // usato in registrazione (AuthModal), qui per cambiarla in qualsiasi
 // momento. Salva solo sul dispositivo (vedi commento in i18n/index.js) —
 // quando Cowork avrà creato profiles.lingua andrà salvata anche lì.
-function LanguageSubsection() {
+function LanguageSubsection({ user, onUpdateUser }) {
   const { i18n } = useTranslation();
+
+  const change = async (code) => {
+    setAppLanguage(code);
+    if (!user) return;
+    const { account } = await setOwnLingua(code);
+    if (account) onUpdateUser?.(account);
+  };
+
   return (
     <label className="rb-field">
-      <select value={i18n.language} onChange={(e) => setAppLanguage(e.target.value)}>
+      <select value={i18n.language} onChange={(e) => change(e.target.value)}>
         {SUPPORTED_LANGUAGES.map((l) => (
           <option key={l.code} value={l.code}>{l.nativeLabel}</option>
         ))}
@@ -731,7 +739,7 @@ export default function SettingsPanel({
             open={personalizzaSub === 'lingua'}
             onToggle={() => togglePersonalizzaSub('lingua')}
           >
-            <LanguageSubsection />
+            <LanguageSubsection user={user} onUpdateUser={onUpdateUser} />
           </CollapsibleSection>
         </CollapsibleSection>
 

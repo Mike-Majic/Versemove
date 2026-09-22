@@ -47,6 +47,7 @@ function mapProfile(row) {
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
+    lingua: row.lingua ?? 'it',
     ruolo: row.ruolo,
     verificato: row.verificato,
     avatar: row.avatar_url,
@@ -467,6 +468,15 @@ export async function updateAccountDetails(accountId, {
 // singolo toggle), più semplice da tenere sincronizzato con la UI.
 export async function setOwnWorlds(mondi) {
   const { error } = await supabase.rpc('set_own_worlds', { p_mondi: mondi });
+  if (error) return { error: error.message };
+  return { account: await fetchOwnProfile() };
+}
+
+// Salva la lingua scelta anche sull'account (oltre che sul dispositivo via
+// setAppLanguage, vedi src/i18n/index.js), così segue l'utente da un
+// dispositivo all'altro. Nessun limite di cambi, a differenza dei mondi.
+export async function setOwnLingua(lingua) {
+  const { error } = await supabase.rpc('set_own_lingua', { p_lingua: lingua });
   if (error) return { error: error.message };
   return { account: await fetchOwnProfile() };
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
 import { translateWorld } from './i18n/worldLabels';
+import { setAppLanguage } from './i18n';
 import TopBar from './components/TopBar';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
@@ -125,7 +126,7 @@ function loadStored(key, fallback) {
 }
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Mentre un minigioco del mondo Bambini è aperto, lo swipe/le frecce non
   // devono cambiare mondo: alcuni giochi (es. Snake) usano le stesse frecce
   // per i propri controlli.
@@ -144,6 +145,15 @@ export default function App() {
   // sessione (login/logout/refresh token), così lo stato resta sempre
   // coerente anche se scade o cambia altrove.
   const [user, setUser] = useState(null);
+  // La lingua scelta in registrazione (o nelle Impostazioni) segue
+  // l'account da un dispositivo all'altro: appena arriva un profilo con una
+  // lingua diversa da quella già attiva su questo dispositivo, si applica
+  // quella dell'account (vedi anche setOwnLingua in data/accounts.js).
+  useEffect(() => {
+    if (user?.lingua && user.lingua !== i18n.language) {
+      setAppLanguage(user.lingua);
+    }
+  }, [user?.lingua, i18n]);
   // false all'avvio finché non sappiamo davvero se c'è una sessione valida:
   // AccessGate/AuthModal restano nascosti fino ad allora, altrimenti
   // "Accedi per continuare" comparirebbe (e poi sparirebbe da solo) ogni
