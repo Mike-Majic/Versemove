@@ -10,6 +10,8 @@ export default {
     goToWorld: 'Aller au monde {{world}}',
     howItWorks: 'Comment ça marche',
     nextCategoriesPage: 'Autre page de catégories',
+    scrollWorldsUp: 'Faire défiler les mondes vers le haut',
+    scrollWorldsDown: 'Faire défiler les mondes vers le bas',
   },
   topbar: {
     notifications: 'Notifications',

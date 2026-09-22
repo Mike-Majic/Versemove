@@ -61,6 +61,23 @@ function buildUfoShape() {
   return shape;
 }
 
+// Sagoma di una nuvoletta (mondo FAQ): contorno "a gobbe" chiuso da curve di
+// Bézier, stesso principio delle altre sagome ("solo la forma", nessun
+// dettaglio interno — colore/opacità restano quelli della categoria).
+function buildCloudShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.9, -0.15);
+  shape.bezierCurveTo(-1.05, -0.15, -1.05, 0.15, -0.85, 0.2);
+  shape.bezierCurveTo(-0.9, 0.55, -0.5, 0.65, -0.3, 0.45);
+  shape.bezierCurveTo(-0.15, 0.75, 0.35, 0.75, 0.45, 0.45);
+  shape.bezierCurveTo(0.75, 0.55, 0.95, 0.3, 0.8, 0.05);
+  shape.bezierCurveTo(1.05, -0.05, 1.0, -0.35, 0.7, -0.35);
+  shape.bezierCurveTo(0.6, -0.5, -0.6, -0.5, -0.7, -0.35);
+  shape.bezierCurveTo(-0.85, -0.4, -0.95, -0.3, -0.9, -0.15);
+  shape.closePath();
+  return shape;
+}
+
 // Sagoma di un cuore (mondo Incontri): curva parametrica classica
 // (x=16sin³t, y=13cos t − 5cos2t − 2cos3t − cos4t), campionata e poi
 // normalizzata a un riquadro [-1,1] come le altre sagome, così tutte
@@ -260,7 +277,7 @@ const KIDS_PALETTE = ['#ff5252', '#ffab40', '#ffd740', '#40c4ff', '#e040fb', '#6
 // Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
 // all'indice della categoria dentro il proprio mondo — un unico punto da
 // cui WorldGlobe.jsx decide "che forma ha questo mondo", vedi sotto.
-function buildCategoryFaceShape(shapeType, index) {
+function buildCategoryFaceShape(shapeType, index, categoryId) {
   switch (shapeType) {
     case 'ufo':
       return { shape: buildUfoShape(), color: null };
@@ -272,6 +289,11 @@ function buildCategoryFaceShape(shapeType, index) {
       return { shape: buildLetterMShape(), color: null };
     case 'star':
       return { shape: buildStarShape(), color: null };
+    case 'cloud':
+      // La Stanza MOD (solo staff, vedi faqCategories.js) resta una nuvola
+      // ROSSA distinta dalle altre nuvole grigie/bianche del mondo FAQ —
+      // unica eccezione colore in questo mondo, richiesta esplicita.
+      return { shape: buildCloudShape(), color: categoryId === 'mod-room' ? '#ff3b30' : null };
     case 'kids':
       return {
         shape: KIDS_SHAPES[index % KIDS_SHAPES.length](),
@@ -514,7 +536,7 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     });
     positions[cat.id] = vectorToPolar(normal);
 
-    const face = buildCategoryFaceShape(shapeType, index);
+    const face = buildCategoryFaceShape(shapeType, index, cat.id);
     let faceGeo;
     if (face) {
       const shapeCenter = normal.clone().multiplyScalar(radius);

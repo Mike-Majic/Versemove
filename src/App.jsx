@@ -5,6 +5,7 @@ import { translateWorld } from './i18n/worldLabels';
 import { translateCategoryLabel } from './i18n/categoryLabels';
 import { setAppLanguage } from './i18n';
 import TopBar from './components/TopBar';
+import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
@@ -26,6 +27,7 @@ import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQue
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
 import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
+import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import AccessGate from './components/AccessGate';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
@@ -60,6 +62,7 @@ const SocialWorldExplorer = lazy(() => import('./components/social/SocialWorldEx
 const IncontriLiveExplorer = lazy(() => import('./components/incontri/IncontriLiveExplorer'));
 const LavoroWorldExplorer = lazy(() => import('./components/lavoro/LavoroWorldExplorer'));
 const LavoroConsentGate = lazy(() => import('./components/lavoro/LavoroConsentGate'));
+const FaqWorldExplorer = lazy(() => import('./components/faq/FaqWorldExplorer'));
 const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const AuthModal = lazy(() => import('./components/AuthModal'));
@@ -99,6 +102,10 @@ const CATEGORY_WORLDS = {
   // Vetrina: solo "Novità" per ora, nessun contenuto editoriale ancora —
   // CategoryColumn mostra da sé lo stato vuoto con featured/results vuoti.
   vetrina: { categories: VETRINA_CATEGORIES, featured: {}, results: {}, resolveQuery: resolveVetrinaCategoryQuery },
+  // FAQ: categorie variabili col ruolo (Stanza MOD solo staff), sostituite
+  // sotto con getFaqCategories(isStaff(...)) — questa voce resta solo come
+  // fallback per il conteggio "più di CATEGORY_LIST_PAGE_SIZE" iniziale.
+  faq: { categories: getFaqCategories(false), resolveQuery: resolveFaqCategoryQuery },
 };
 
 // Aspetta che l'utente finisca di digitare prima di far "volare" il globo sulla città cercata.
@@ -109,18 +116,6 @@ function useDebouncedValue(value, delayMs) {
     return () => clearTimeout(t);
   }, [value, delayMs]);
   return debounced;
-}
-
-// Piccolo mappamondo (invece di un semplice puntino) per il selettore dei mondi:
-// cerchio esterno + meridiano + equatore, colorato con il colore del mondo.
-function MiniGlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.4">
-      <circle cx="12" cy="12" r="9" />
-      <ellipse cx="12" cy="12" rx="4" ry="9" />
-      <path d="M3 12h18" />
-    </svg>
-  );
 }
 
 function loadStored(key, fallback) {
@@ -140,21 +135,18 @@ export default function App() {
   const [gameplayActive, setGameplayActive] = useState(false);
   const { index, setIndex, containerRef } = useSwipeWorld(WORLDS.length, DEFAULT_WORLD_INDEX, gameplayActive);
   const world = WORLDS[index];
-  const categorySet = CATEGORY_WORLDS[world.id] ?? null;
-  // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
-  // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
-  // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
-  // solo elemento), tornando alla prima pagina dopo l'ultima (paginazione
-  // infinita). Si azzera ad ogni cambio di mondo, altrimenti si potrebbe
-  // entrare in un mondo già a metà lista.
-  const [categoryPage, setCategoryPage] = useState(0);
-  useEffect(() => {
-    setCategoryPage(0);
-  }, [categorySet]);
+  const baseCategorySet = CATEGORY_WORLDS[world.id] ?? null;
   // Incontri e Lavoro sono riservati ai maggiorenni: l'età è quella vera
   // dell'account (data di nascita in registrazione), non più una
   // dichiarazione con un pulsante.
   const isAgeGatedWorld = world.id === 'incontri' || world.id === 'lavoro';
+
+  // L'account loggato vive su Supabase Auth, non più in localStorage: alla
+  // partenza si controlla se il browser ha già una sessione valida
+  // (persistita da supabase-js per conto suo) e ci si iscrive ai cambi di
+  // sessione (login/logout/refresh token), così lo stato resta sempre
+  // coerente anche se scade o cambia altrove.
+  const [user, setUser] = useState(null);
 
   // Consenso al mondo Lavoro (nome/cognome reali visibili solo lì, vedi
   // LavoroConsentGate): null finché non si è ancora controllato (evita di
@@ -175,12 +167,25 @@ export default function App() {
     };
   }, [world.id, user?.id]);
 
-  // L'account loggato vive su Supabase Auth, non più in localStorage: alla
-  // partenza si controlla se il browser ha già una sessione valida
-  // (persistita da supabase-js per conto suo) e ci si iscrive ai cambi di
-  // sessione (login/logout/refresh token), così lo stato resta sempre
-  // coerente anche se scade o cambia altrove.
-  const [user, setUser] = useState(null);
+  // La Stanza MOD (mondo FAQ) esiste solo per owner/moderatori: qui si
+  // ricalcola la lista categorie in base al ruolo, così il triangolo/nuvola
+  // sul globo e la lista sotto al mondo non la mostrano mai a chi non deve
+  // vederla (vedi anche FaqWorldExplorer, che rifà lo stesso filtro per sé).
+  const categorySet = useMemo(() => {
+    if (!baseCategorySet || world.id !== 'faq') return baseCategorySet;
+    return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseCategorySet, world.id, user?.ruolo]);
+  // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
+  // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
+  // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
+  // solo elemento), tornando alla prima pagina dopo l'ultima (paginazione
+  // infinita). Si azzera ad ogni cambio di mondo, altrimenti si potrebbe
+  // entrare in un mondo già a metà lista.
+  const [categoryPage, setCategoryPage] = useState(0);
+  useEffect(() => {
+    setCategoryPage(0);
+  }, [categorySet]);
   // La lingua scelta in registrazione (o nelle Impostazioni) segue
   // l'account da un dispositivo all'altro: appena arriva un profilo con una
   // lingua diversa da quella già attiva su questo dispositivo, si applica
@@ -838,7 +843,10 @@ export default function App() {
   // l'utente ha scelto di disattivare questo mondo dalle Impostazioni.
   const needsAuthForWorld = !user;
   const ageBlockedForWorld = isAgeGatedWorld && !needsAuthForWorld && !isAdult(user?.dataNascita);
-  const worldDisabledByUser = !needsAuthForWorld && !ageBlockedForWorld && !(user.mondiAbilitati ?? []).includes(world.id);
+  // FAQ resta sempre attivo (è il posto dove si chiede aiuto): non lo si
+  // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui.
+  const worldDisabledByUser =
+    world.id !== 'faq' && !needsAuthForWorld && !ageBlockedForWorld && !(user.mondiAbilitati ?? []).includes(world.id);
 
   return (
     <div className="rb-app" style={{ '--accent': world.color }}>
@@ -910,7 +918,7 @@ export default function App() {
         />
       </Suspense>
 
-      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && (
+      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && world.id !== 'faq' && (
         <Suspense fallback={<PageLoading />}>
           <ArteExplorer
             world={world}
@@ -987,6 +995,21 @@ export default function App() {
             world={world}
             onConsented={() => setLavoroConsentState(true)}
             onDecline={() => setIndex(DEFAULT_WORLD_INDEX)}
+          />
+        </Suspense>
+      )}
+
+      {world.id === 'faq' && user && (
+        <Suspense fallback={<PageLoading />}>
+          <FaqWorldExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
           />
         </Suspense>
       )}
@@ -1070,23 +1093,11 @@ export default function App() {
         )}
       </div>
 
-      <nav className="rb-world-dots" aria-label={t('common.changeWorld')}>
-        {WORLDS.map((w, i) => (
-          <button
-            key={w.id}
-            className={`rb-world-dot ${i === index ? 'active' : ''}`}
-            style={{ '--dot-color': w.color }}
-            onClick={() => {
-              if (w.id === world.id) return;
-              setWarpRequest({ worldId: w.id, ts: Date.now() });
-            }}
-            aria-label={t('common.goToWorld', { world: translateWorld(t, w).label })}
-            title={translateWorld(t, w).label}
-          >
-            <MiniGlobeIcon />
-          </button>
-        ))}
-      </nav>
+      <WorldSelectorColumn
+        worlds={WORLDS}
+        activeWorldId={world.id}
+        onSelectWorld={(worldId) => setWarpRequest({ worldId, ts: Date.now() })}
+      />
 
       {settingsOpen && (
         <Suspense fallback={<PageLoading />}>

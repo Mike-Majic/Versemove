@@ -74,6 +74,14 @@ export const ARTE_CATEGORIES = [
     aliases: ['video', 'video breve', 'cortometraggio video', 'clip'],
     subfamilies: [],
   },
+  {
+    id: 'tattoo',
+    label: 'Tattoo',
+    icon: '🖋️',
+    anchor: { lat: -15, lng: -25 }, // Oceano Atlantico meridionale
+    aliases: ['tattoo', 'tatuaggio', 'tatuaggi', 'tatuatore'],
+    subfamilies: [],
+  },
 ];
 
 // Trova la categoria il cui alias combacia (anche parzialmente) con la query digitata.

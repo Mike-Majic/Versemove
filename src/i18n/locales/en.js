@@ -10,6 +10,8 @@ export default {
     goToWorld: 'Go to {{world}} world',
     howItWorks: 'How it works',
     nextCategoriesPage: 'More categories',
+    scrollWorldsUp: 'Scroll worlds up',
+    scrollWorldsDown: 'Scroll worlds down',
   },
   topbar: {
     notifications: 'Notifications',

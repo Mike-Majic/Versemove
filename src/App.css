@@ -206,41 +206,6 @@
   color: #fff;
 }
 
-.rb-world-dots {
-  position: fixed;
-  right: 22px;
-  bottom: 26px;
-  z-index: 1020;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.rb-world-dot {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--dot-color, #fff) 45%, transparent);
-  background: color-mix(in srgb, var(--dot-color, #fff) 8%, transparent);
-  color: var(--dot-color, #fff);
-  opacity: 0.55;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.rb-world-dot:hover {
-  transform: scale(1.12);
-  opacity: 0.85;
-}
-
-.rb-world-dot.active {
-  opacity: 1;
-  border-color: var(--dot-color, #fff);
-  background: color-mix(in srgb, var(--dot-color, #fff) 20%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--dot-color, #fff) 70%, transparent);
-  transform: scale(1.12);
-}
+/* Il vecchio switcher a pallini fissi (.rb-world-dots/.rb-world-dot) è stato
+   sostituito da WorldSelectorColumn.jsx/.css (selettore a scorrimento, max 4
+   mondi visibili — 9 mondi non ci stavano più tutti in verticale). */

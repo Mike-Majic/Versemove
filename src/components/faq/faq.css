@@ -1,0 +1,270 @@
+.rb-faq-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.rb-faq-hint {
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+/* --- Stanza MOD --- */
+
+.rb-modroom-column {
+  gap: 12px;
+}
+
+.rb-faq-pending-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--accent, #8a8a92) 30%, transparent);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.rb-faq-pending-box h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.rb-faq-pending-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rb-faq-pending-item:first-of-type {
+  border-top: none;
+}
+
+.rb-faq-modroom-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rb-faq-modroom-messages {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb-faq-modroom-msg {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.rb-faq-modroom-msg.me {
+  background: color-mix(in srgb, var(--accent, #8a8a92) 20%, transparent);
+}
+
+.rb-faq-modroom-msg p {
+  margin: 4px 0 0;
+}
+
+.rb-faq-modroom-ref {
+  margin-left: 6px;
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-faq-modroom-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rb-faq-modroom-form input {
+  flex: 1;
+}
+
+/* --- Segnalazioni --- */
+
+.rb-faq-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-faq-mine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb-faq-mine-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.rb-faq-stato-badge {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.rb-faq-stato-aperto { background: rgba(255, 138, 31, 0.25); color: #ffb066; }
+.rb-faq-stato-in_lavorazione { background: rgba(59, 130, 246, 0.25); color: #7fb2ff; }
+.rb-faq-stato-chiuso { background: rgba(34, 197, 94, 0.25); color: #6be08a; }
+.rb-faq-stato-in_valutazione { background: rgba(59, 130, 246, 0.25); color: #7fb2ff; }
+.rb-faq-stato-pianificato { background: rgba(139, 92, 246, 0.25); color: #b79aff; }
+.rb-faq-stato-fatto { background: rgba(34, 197, 94, 0.25); color: #6be08a; }
+.rb-faq-stato-scartato { background: rgba(255, 255, 255, 0.12); color: rgba(245, 245, 247, 0.6); }
+
+/* --- Suggerimenti --- */
+
+.rb-faq-suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rb-faq-suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-faq-suggestion-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.rb-faq-suggestion-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rb-faq-suggestion-head > div {
+  flex: 1;
+  font-size: 13px;
+}
+
+.rb-faq-suggestion-world {
+  color: rgba(245, 245, 247, 0.5);
+  font-size: 11px;
+}
+
+.rb-faq-vote-btn {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: none;
+  color: #f5f5f7;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rb-faq-vote-btn.active {
+  background: color-mix(in srgb, var(--accent, #8a8a92) 30%, transparent);
+  border-color: var(--accent, #8a8a92);
+}
+
+.rb-faq-suggestion-testo {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-faq-suggestion-risposta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-faq-suggestion-staff {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.rb-faq-suggestion-staff input {
+  flex: 1;
+}
+
+/* --- Informazioni --- */
+
+.rb-faq-info-header {
+  display: flex;
+  gap: 10px;
+}
+
+.rb-faq-info-search {
+  flex: 1;
+}
+
+.rb-faq-info-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+}
+
+.rb-faq-info-section summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 8px 0;
+}
+
+.rb-faq-info-article {
+  padding: 8px 0 8px 4px;
+  font-size: 12.5px;
+}
+
+.rb-faq-info-article.hidden {
+  opacity: 0.5;
+}
+
+.rb-faq-info-article p {
+  margin: 4px 0 0;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-faq-info-hidden-badge {
+  margin-left: 8px;
+  font-size: 10px;
+  color: #ffb066;
+}
+
+.rb-faq-info-article-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.rb-faq-article-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

@@ -14,6 +14,8 @@ export default {
     goToWorld: 'Vai al mondo {{world}}',
     howItWorks: 'Come funziona',
     nextCategoriesPage: 'Altra pagina di categorie',
+    scrollWorldsUp: 'Scorri su i mondi',
+    scrollWorldsDown: 'Scorri giù i mondi',
   },
   topbar: {
     notifications: 'Notifiche',

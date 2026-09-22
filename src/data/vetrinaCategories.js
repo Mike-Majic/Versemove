@@ -10,12 +10,17 @@
 // Anchor deliberatamente in mezzo all'oceano, stesso motivo delle altre
 // categorie "globali": un triangolo grande e semi-trasparente su
 // terraferma finirebbe sopra ai marker degli utenti di quella zona.
+// Sparpagliati su tutti gli oceani (non solo Pacifico/Atlantico, dove
+// erano ammassati — feedback utente "le vedo troppo appiccicate"),
+// verificati uno per uno contro public/geo/land-110m.geojson.json (stesso
+// controllo già fatto per l'anchor di Incontri) perché nessuno cada su
+// terraferma.
 export const VETRINA_CATEGORIES = [
   {
     id: 'novita',
     label: 'Novità',
     icon: '🛍️',
-    anchor: { lat: 20, lng: -150 }, // Pacifico settentrionale
+    anchor: { lat: 0, lng: -150 }, // Pacifico centrale
     aliases: ['novita', 'novità', 'vetrina', 'in mostra'],
     subfamilies: [],
   },
@@ -23,7 +28,7 @@ export const VETRINA_CATEGORIES = [
     id: 'cani',
     label: 'Cani',
     icon: '🐕',
-    anchor: { lat: -35, lng: -15 }, // Atlantico meridionale
+    anchor: { lat: -40, lng: -170 }, // Pacifico meridionale
     aliases: ['cani', 'cane', 'dog', 'dogs', 'pet friendly', 'aree cani'],
     subfamilies: [],
   },
@@ -31,7 +36,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-casa-arredamento',
     label: 'Casa & Arredamento',
     icon: '🏠',
-    anchor: { lat: 15, lng: -155 }, // Pacifico centrale
+    anchor: { lat: 40, lng: -160 }, // Pacifico settentrionale
     aliases: ['casa', 'arredamento', 'ikea', 'mondo convenienza', 'leroy merlin', 'maisons du monde'],
     subfamilies: [],
   },
@@ -39,7 +44,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-cibo-supermercati',
     label: 'Cibo & Supermercati',
     icon: '🛒',
-    anchor: { lat: -20, lng: -175 }, // Pacifico meridionale
+    anchor: { lat: -10, lng: -100 }, // Pacifico orientale
     aliases: ['cibo', 'supermercati', 'volantini', 'esselunga', 'coop', 'conad', 'lidl', 'eurospin'],
     subfamilies: [],
   },
@@ -47,7 +52,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-abbigliamento',
     label: 'Abbigliamento',
     icon: '👕',
-    anchor: { lat: 35, lng: -35 }, // Atlantico settentrionale
+    anchor: { lat: 30, lng: -40 }, // Atlantico settentrionale
     aliases: ['abbigliamento', 'vestiti', 'moda'],
     subfamilies: [],
   },
@@ -55,7 +60,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-scarpe',
     label: 'Scarpe',
     icon: '👟',
-    anchor: { lat: -40, lng: -30 }, // Atlantico meridionale
+    anchor: { lat: -30, lng: -20 }, // Atlantico meridionale
     aliases: ['scarpe', 'sneaker', 'calzature'],
     subfamilies: [],
   },
@@ -63,7 +68,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-elettronica',
     label: 'Elettronica',
     icon: '💻',
-    anchor: { lat: 5, lng: 65 }, // Oceano Indiano
+    anchor: { lat: 10, lng: 70 }, // Oceano Indiano
     aliases: ['elettronica', 'informatica', 'smartphone', 'elettrodomestici'],
     subfamilies: [],
   },
@@ -71,7 +76,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-bellezza-cura-persona',
     label: 'Bellezza & Cura persona',
     icon: '💄',
-    anchor: { lat: -25, lng: 75 }, // Oceano Indiano meridionale
+    anchor: { lat: -35, lng: 90 }, // Oceano Indiano meridionale
     aliases: ['bellezza', 'cura persona', 'cosmetici', 'profumeria'],
     subfamilies: [],
   },
@@ -79,7 +84,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-sport-outdoor',
     label: 'Sport & Outdoor',
     icon: '⚽',
-    anchor: { lat: 45, lng: -25 }, // Atlantico del nord
+    anchor: { lat: 50, lng: -30 }, // Nord Atlantico
     aliases: ['sport', 'outdoor', 'decathlon'],
     subfamilies: [],
   },
@@ -87,7 +92,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-bambini-giocattoli',
     label: 'Bambini & Giocattoli',
     icon: '🧸',
-    anchor: { lat: 0, lng: -110 }, // Pacifico equatoriale
+    anchor: { lat: -55, lng: -60 }, // Oceano Meridionale, al largo del Sud America
     aliases: ['bambini', 'giocattoli', 'giochi'],
     subfamilies: [],
   },
@@ -95,7 +100,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-viaggi-voli',
     label: 'Viaggi & Voli',
     icon: '✈️',
-    anchor: { lat: 25, lng: 165 }, // Pacifico occidentale
+    anchor: { lat: 20, lng: 160 }, // Pacifico occidentale
     aliases: ['viaggi', 'voli', 'hotel', 'vacanze'],
     subfamilies: [],
   },
@@ -103,7 +108,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-fai-da-te-giardino',
     label: 'Fai da te & Giardino',
     icon: '🔨',
-    anchor: { lat: -50, lng: -90 }, // Pacifico meridionale
+    anchor: { lat: -20, lng: 150 }, // Mar dei Coralli
     aliases: ['fai da te', 'giardino', 'bricolage'],
     subfamilies: [],
   },
@@ -111,7 +116,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-auto-moto',
     label: 'Auto & Moto',
     icon: '🚗',
-    anchor: { lat: 55, lng: -20 }, // Nord Atlantico
+    anchor: { lat: 63, lng: -15 }, // Nord Atlantico, tra Islanda e Fær Øer
     aliases: ['auto', 'moto', 'veicoli'],
     subfamilies: [],
   },
@@ -119,7 +124,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-codici-sconto',
     label: 'Codici sconto',
     icon: '🎟️',
-    anchor: { lat: -60, lng: 140 }, // Oceano Meridionale
+    anchor: { lat: -65, lng: 40 }, // Oceano Meridionale, a sud dell'Africa
     aliases: ['codici sconto', 'coupon', 'sconti'],
     subfamilies: [],
   },

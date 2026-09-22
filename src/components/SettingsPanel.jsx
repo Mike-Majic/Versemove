@@ -99,7 +99,10 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
       setError('Devi lasciare abilitato almeno un mondo.');
       return;
     }
-    const ordered = WORLDS.map((w) => w.id).filter((id) => selected.includes(id));
+    // FAQ resta sempre abilitato: non è tra le caselle spuntabili qui sotto
+    // (è il posto dove si chiede aiuto, non si può disattivare), ma va
+    // comunque incluso nell'elenco salvato.
+    const ordered = WORLDS.map((w) => w.id).filter((id) => id === 'faq' || selected.includes(id));
     setBusy(true);
     const { account, error: err } = await setOwnWorlds(ordered);
     setBusy(false);
@@ -114,13 +117,18 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
   return (
     <>
       <div className="rb-settings-worlds-list">
-        {WORLDS.map((w) => (
+        {WORLDS.filter((w) => w.id !== 'faq').map((w) => (
           <label key={w.id} className="rb-settings-world-row">
             <input type="checkbox" checked={selected.includes(w.id)} onChange={() => toggle(w.id)} />
             <span className="rb-settings-world-dot" style={{ background: w.color }} />
             <span>{translateWorld(t, w).label}</span>
           </label>
         ))}
+        <label className="rb-settings-world-row rb-settings-world-row-fixed">
+          <input type="checkbox" checked disabled />
+          <span className="rb-settings-world-dot" style={{ background: '#8a8a92' }} />
+          <span>FAQ (sempre attivo)</span>
+        </label>
       </div>
       {error && <p className="rb-privacy-error">{error}</p>}
       {success && <p className="rb-privacy-success">{success}</p>}

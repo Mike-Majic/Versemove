@@ -53,6 +53,7 @@ const CATEGORY_SHAPE_BY_WORLD = {
   social: 'letterM',
   arte: 'star',
   bambini: 'kids',
+  faq: 'cloud',
 };
 
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio

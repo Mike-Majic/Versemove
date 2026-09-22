@@ -483,6 +483,10 @@
   font-size: 13px;
 }
 
+.rb-settings-world-row-fixed {
+  opacity: 0.55;
+}
+
 .rb-settings-world-dot {
   width: 10px;
   height: 10px;

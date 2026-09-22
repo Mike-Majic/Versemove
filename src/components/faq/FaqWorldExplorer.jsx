@@ -1,30 +1,38 @@
-import { useState } from 'react';
-import { SOCIAL_CATEGORIES, resolveCategoryQuery } from '../../data/socialCategories';
-import SocialFeed from './SocialFeed';
+import { useMemo, useState } from 'react';
+import { getFaqCategories, resolveCategoryQuery } from '../../data/faqCategories';
+import { isStaff } from '../../data/roles';
+import ModRoomColumn from './ModRoomColumn';
+import SegnalazioniColumn from './SegnalazioniColumn';
+import SuggerimentiColumn from './SuggerimentiColumn';
+import InformazioniColumn from './InformazioniColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import '../shared/categoryExplorerShell.css';
+import './faq.css';
 
-// Guscio di navigazione del mondo Social: stesso pattern di ArteExplorer/
-// IncontriLiveExplorer (X + ricerca in alto, chiuso finché non si sceglie
-// la categoria), qui c'è solo "World" quindi il triangolo/pulsante apre
-// direttamente il feed esistente — prima si vedeva sempre, ora si apre
-// come negli altri mondi.
-export default function SocialWorldExplorer({
+// Guscio di navigazione del mondo FAQ: stesso pattern di IncontriLiveExplorer/
+// LavoroWorldExplorer (X + ricerca in alto, chiuso finché non si sceglie la
+// categoria). Le categorie visibili dipendono dal ruolo (getFaqCategories):
+// la Stanza MOD non esiste proprio per chi non è owner/moderatore, né sul
+// globo né qui né nella ricerca.
+export default function FaqWorldExplorer({
   world,
   activeCategory,
   onToggleCategory,
   onSearchCategory,
+  user,
+  onOpenAuth,
   favorites = [],
   onToggleFavorite,
-  ...feedProps
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const category = SOCIAL_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
+  const staff = isStaff(user?.ruolo);
+  const categories = useMemo(() => getFaqCategories(staff), [staff]);
+  const category = categories.find((c) => c.id === activeCategory) ?? null;
 
   const submitSearch = (e) => {
     e.preventDefault();
-    const found = resolveCategoryQuery(query);
+    const found = resolveCategoryQuery(query, categories);
     if (found) {
       setInvalid(false);
       onSearchCategory(found);
@@ -44,8 +52,8 @@ export default function SocialWorldExplorer({
                 type="button"
                 className="rb-arte-close-all-btn"
                 onClick={() => onToggleCategory(null)}
-                aria-label="Chiudi il feed"
-                title="Chiudi il feed"
+                aria-label="Chiudi le colonne"
+                title="Chiudi le colonne"
               >
                 ✕
               </button>
@@ -55,15 +63,15 @@ export default function SocialWorldExplorer({
                 categoryLabel={category.label}
                 favorites={favorites}
                 onToggle={onToggleFavorite}
-                user={feedProps.user}
-                onOpenAuth={feedProps.onOpenAuth}
+                user={user}
+                onOpenAuth={onOpenAuth}
               />
             </div>
 
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. world)..."
+                placeholder="Cerca (es. suggerimenti)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -74,7 +82,10 @@ export default function SocialWorldExplorer({
             </form>
           </div>
 
-          <SocialFeed world={world} {...feedProps} />
+          {category.id === 'mod-room' && staff && <ModRoomColumn user={user} />}
+          {category.id === 'segnalazioni' && <SegnalazioniColumn user={user} onOpenAuth={onOpenAuth} />}
+          {category.id === 'suggerimenti' && <SuggerimentiColumn user={user} onOpenAuth={onOpenAuth} staff={staff} />}
+          {category.id === 'informazioni' && <InformazioniColumn staff={staff} />}
         </>
       )}
     </div>

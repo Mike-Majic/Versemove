@@ -1,7 +1,8 @@
 // Configurazione dei "mondi" del mappamondo interattivo.
-// Ordine dello swipe a due dita (e dei pallini dello switcher, stesso
-// array): bambini -> vetrina -> social -> lavoro -> arte -> nerd -> incontri -> (torna a bambini).
-// Il mondo blu (Social) è quello principale: è il primo che si vede all'apertura dell'app.
+// Ordine dello swipe a due dita (e del selettore a scorrimento, stesso
+// array): bambini -> vetrina -> social -> annunci -> lavoro -> arte -> nerd
+// -> incontri -> faq -> (torna a bambini). Il mondo blu (Social) è quello
+// principale: è il primo che si vede all'apertura dell'app.
 export const WORLDS = [
   {
     id: 'bambini',
@@ -34,6 +35,16 @@ export const WORLDS = [
     globeColor: '#04101f',
     atmosphereColor: '#1d9bf0',
     textOnGlobe: '#eaf6ff',
+  },
+  {
+    id: 'annunci',
+    label: 'Annunci',
+    tagline: 'Auto, moto, biciclette, barche e case',
+    color: '#ff8a1f',
+    colorSoft: 'rgba(255, 138, 31, 0.18)',
+    globeColor: '#1f1004',
+    atmosphereColor: '#ff8a1f',
+    textOnGlobe: '#fff2e6',
   },
   {
     id: 'lavoro',
@@ -89,6 +100,21 @@ export const WORLDS = [
     // puntini, come sempre).
     lineColor: '#de0000',
     textOnGlobe: '#ffeaf0',
+  },
+  {
+    id: 'faq',
+    label: 'FAQ',
+    tagline: 'Aiuto, segnalazioni e suggerimenti',
+    color: '#8a8a92',
+    colorSoft: 'rgba(138, 138, 146, 0.18)',
+    globeColor: '#0b0b0f',
+    atmosphereColor: '#c9c9d4',
+    // Rete/linee grigio scuro-argento (non nero puro, altrimenti sparirebbe
+    // nel fondo dello sfondo): stesso meccanismo di lineColor già usato da
+    // Incontri per differenziare puntini/linee, qui serve il contrario
+    // (linee più chiare dei puntini per restare leggibili sul nero).
+    lineColor: '#5a5a66',
+    textOnGlobe: '#f2f2f5',
   },
 ];
 
