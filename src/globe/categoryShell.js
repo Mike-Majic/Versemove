@@ -61,6 +61,183 @@ function buildUfoShape() {
   return shape;
 }
 
+// Sagoma di un cuore (mondo Incontri): curva parametrica classica
+// (x=16sin³t, y=13cos t − 5cos2t − 2cos3t − cos4t), campionata e poi
+// normalizzata a un riquadro [-1,1] come le altre sagome, così tutte
+// condividono la stessa logica di scala in placeShapeOnSphere.
+function buildHeartShape() {
+  const points = [];
+  const steps = 48;
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const x = 16 * Math.sin(t) ** 3;
+    const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    points.push([x, y]);
+  }
+  const maxX = Math.max(...points.map((p) => Math.abs(p[0])));
+  const maxY = Math.max(...points.map((p) => Math.abs(p[1])));
+  const scale = 1 / Math.max(maxX, maxY);
+  const shape = new THREE.Shape();
+  points.forEach(([x, y], i) => {
+    const px = x * scale;
+    const py = y * scale;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  });
+  shape.closePath();
+  return shape;
+}
+
+// Sagoma di una valigetta ventiquattrore (mondo Lavoro): corpo rettangolare
+// con angoli smussati e una maniglia ad arco sopra, col "buco" della presa
+// come foro interno (shape.holes) — senza il foro si leggerebbe come due
+// bozzi invece che come una maniglia.
+function buildBriefcaseShape() {
+  const shape = new THREE.Shape();
+  const left = -1;
+  const right = 1;
+  const top = 0.25;
+  const bottom = -0.65;
+  const r = 0.1;
+  const handleLeft = -0.32;
+  const handleRight = 0.32;
+  const handleTop = 0.58;
+
+  shape.moveTo(left + r, bottom);
+  shape.lineTo(right - r, bottom);
+  shape.quadraticCurveTo(right, bottom, right, bottom + r);
+  shape.lineTo(right, top - r);
+  shape.quadraticCurveTo(right, top, right - r, top);
+  shape.lineTo(handleRight, top);
+  shape.lineTo(handleRight, handleTop - 0.06);
+  shape.quadraticCurveTo(handleRight, handleTop, handleRight - 0.07, handleTop);
+  shape.lineTo(handleLeft + 0.07, handleTop);
+  shape.quadraticCurveTo(handleLeft, handleTop, handleLeft, handleTop - 0.06);
+  shape.lineTo(handleLeft, top);
+  shape.lineTo(left + r, top);
+  shape.quadraticCurveTo(left, top, left, top - r);
+  shape.lineTo(left, bottom + r);
+  shape.quadraticCurveTo(left, bottom, left + r, bottom);
+  shape.closePath();
+
+  const hole = new THREE.Path();
+  const holeLeft = handleLeft + 0.11;
+  const holeRight = handleRight - 0.11;
+  const holeBottom = top + 0.05;
+  const holeTop = handleTop - 0.1;
+  hole.moveTo(holeLeft, holeBottom);
+  hole.lineTo(holeRight, holeBottom);
+  hole.lineTo(holeRight, holeTop);
+  hole.lineTo(holeLeft, holeTop);
+  hole.closePath();
+  shape.holes.push(hole);
+
+  return shape;
+}
+
+// Sagoma di una "M" stilizzata (mondo Social): blocco con una tacca a V
+// tagliata dall'alto al centro, due punte separate da una valle — presa
+// geometrica semplificata della lettera, non un font vero.
+function buildLetterMShape() {
+  const shape = new THREE.Shape();
+  const left = -1;
+  const right = 1;
+  const top = 1;
+  const bottom = -1;
+  const notchLeft = -0.3;
+  const notchRight = 0.3;
+  const notchDepth = -0.15;
+
+  shape.moveTo(left, bottom);
+  shape.lineTo(left, top);
+  shape.lineTo(notchLeft, top);
+  shape.lineTo(0, notchDepth);
+  shape.lineTo(notchRight, top);
+  shape.lineTo(right, top);
+  shape.lineTo(right, bottom);
+  shape.closePath();
+  return shape;
+}
+
+// Stella a 5 punte (mondo Intrattenimento): poligono standard, raggio
+// esterno/interno alternati.
+function buildStarShape(spikes = 5, outerRadius = 1, innerRadius = 0.42) {
+  const shape = new THREE.Shape();
+  const step = Math.PI / spikes;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = i * step - Math.PI / 2;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+// Cerchio e poligono regolare (quadrato/triangolo/pentagono/esagono):
+// primitive di base per il mondo Bambini, che usa una forma diversa (e un
+// colore diverso, vedi KIDS_PALETTE) per ogni categoria invece di una sola
+// sagoma fissa per tutto il mondo.
+function buildCircleShape(radius = 1) {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+  return shape;
+}
+function buildRegularPolygonShape(sides, radius = 1) {
+  const shape = new THREE.Shape();
+  const step = (Math.PI * 2) / sides;
+  for (let i = 0; i < sides; i++) {
+    const angle = i * step - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+// Rotazione di forme e colori per il mondo Bambini: ogni categoria prende
+// la forma e il colore al suo indice (a ciclo, se le categorie sono più
+// delle forme), così restano ben distinte l'una dall'altra — richiesta
+// esplicita ("è un mondo per bambini").
+const KIDS_SHAPES = [
+  () => buildCircleShape(),
+  () => buildRegularPolygonShape(4),
+  () => buildRegularPolygonShape(3),
+  () => buildStarShape(),
+  () => buildRegularPolygonShape(5),
+  () => buildRegularPolygonShape(6),
+];
+const KIDS_PALETTE = ['#ff5252', '#ffab40', '#ffd740', '#40c4ff', '#e040fb', '#69f0ae'];
+
+// Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
+// all'indice della categoria dentro il proprio mondo — un unico punto da
+// cui WorldGlobe.jsx decide "che forma ha questo mondo", vedi sotto.
+function buildCategoryFaceShape(shapeType, index) {
+  switch (shapeType) {
+    case 'ufo':
+      return { shape: buildUfoShape(), color: null };
+    case 'heart':
+      return { shape: buildHeartShape(), color: null };
+    case 'briefcase':
+      return { shape: buildBriefcaseShape(), color: null };
+    case 'letterM':
+      return { shape: buildLetterMShape(), color: null };
+    case 'star':
+      return { shape: buildStarShape(), color: null };
+    case 'kids':
+      return {
+        shape: KIDS_SHAPES[index % KIDS_SHAPES.length](),
+        color: KIDS_PALETTE[index % KIDS_PALETTE.length],
+      };
+    default:
+      return null; // triangolo, gestito a parte (non è una THREE.Shape 2D)
+  }
+}
+
 // Trasforma la geometria piatta di una sagoma 2D (x/y locali, z=0) perché
 // stia tangente alla sfera nello stesso punto/della stessa dimensione
 // occupata dal triangolo che sostituisce: centro in shapeCenter (sulla
@@ -263,7 +440,7 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     return bestFace;
   };
 
-  categories.forEach((cat) => {
+  categories.forEach((cat, index) => {
     const targetDir = polarToVector(cat.anchor.lat, cat.anchor.lng, 1);
     // Prima tentiamo con il margine (niente facce adiacenti a categorie già
     // messe); se lo spazio libero finisce, ripieghiamo su una faccia comunque
@@ -293,11 +470,12 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     });
     positions[cat.id] = vectorToPolar(normal);
 
+    const face = buildCategoryFaceShape(shapeType, index);
     let faceGeo;
-    if (shapeType === 'ufo') {
+    if (face) {
       const shapeCenter = normal.clone().multiplyScalar(radius);
       const scale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
-      faceGeo = new THREE.ShapeGeometry(buildUfoShape(), 24);
+      faceGeo = new THREE.ShapeGeometry(face.shape, 24);
       placeShapeOnSphere(faceGeo, normal, shapeCenter, scale);
     } else {
       faceGeo = new THREE.BufferGeometry();
@@ -306,7 +484,7 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     }
 
     const material = new THREE.MeshBasicMaterial({
-      color,
+      color: face?.color ?? color,
       transparent: true,
       opacity: 0.2,
       side: THREE.DoubleSide,

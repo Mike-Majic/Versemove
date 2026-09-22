@@ -43,6 +43,18 @@ function findGlobeRootObject(scene) {
 // intatto, sotto l'else.
 const USE_REALISTIC_CONTINENTS = true;
 
+// Sagoma delle categorie per mondo (vedi categoryShell.js buildCategoryShell
+// shapeType): un mondo non elencato qui resta sul triangolo di sempre
+// (es. Vetrina, non ancora decisa).
+const CATEGORY_SHAPE_BY_WORLD = {
+  nerd: 'ufo',
+  incontri: 'heart',
+  lavoro: 'briefcase',
+  social: 'letterM',
+  arte: 'star',
+  bambini: 'kids',
+};
+
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio
 // marker quando si condivide la posizione in tempo reale (vedi App.jsx,
 // ownPosition/shareLiveLocation): altrimenti resta il colore standard del
@@ -541,15 +553,16 @@ export default function WorldGlobe({
     }
 
     const scene = g.scene();
-    // Prova richiesta dall'utente: al posto del triangolo, la forma di un UFO
-    // (solo la sagoma, presa da un'immagine di riferimento — non colore né
-    // dettagli) per le categorie del mondo Nerd, per vedere l'effetto prima
-    // di decidere se estenderlo. Stesso colore/trasparenza di sempre (vedi
-    // categoryShell.js), cambia solo la sagoma.
+    // Al posto del triangolo, ogni mondo ha la sua sagoma di categoria
+    // (richiesta esplicita, dopo la prova con l'UFO sul mondo Nerd): stesso
+    // colore/trasparenza di sempre (vedi categoryShell.js), cambia solo la
+    // forma — tranne il mondo Bambini, dove ogni categoria ha una forma E
+    // un colore diversi dalle altre (vedi buildCategoryFaceShape 'kids').
+    // Vetrina non ha ancora una sagoma decisa: resta il triangolo.
     const shell = buildCategoryShell(categories, {
       radius: 122,
       color: world.color,
-      shapeType: world.id === 'nerd' ? 'ufo' : 'triangle',
+      shapeType: CATEGORY_SHAPE_BY_WORLD[world.id] ?? 'triangle',
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;
