@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { translateWorld } from '../i18n/worldLabels';
 import {
   updateNickname,
   updateName,
@@ -27,7 +29,7 @@ const CITTA_MAX = 80;
 const BIO_MAX = 300;
 
 const NICKNAME_RULE_TEXT =
-  'Il nickname si può cambiare al massimo una volta a settimana, e non può essere uguale a quello di un altro utente.';
+  'Il nickname si può cambiare al massimo una volta al mese, e non può essere uguale a quello di un altro utente.';
 const NAME_RULE_TEXT =
   'Nome e cognome si possono cambiare al massimo una volta ogni 3 mesi.';
 const PARTITA_IVA_PATTERN = /^\d{11}$/;
@@ -501,6 +503,7 @@ function AccountTab({ user, onUpdateUser }) {
 // con lo sfondo del colore del suo mondo, testo sempre nel colore standard
 // del resto dell'app.
 function FavoriteCategoriesList({ favoriteCategories }) {
+  const { t } = useTranslation();
   const byWorld = WORLDS.map((w) => ({
     world: w,
     items: favoriteCategories.filter((f) => f.worldId === w.id),
@@ -514,7 +517,7 @@ function FavoriteCategoriesList({ favoriteCategories }) {
     <div className="rb-profile-favorites">
       {byWorld.map(({ world, items }) => (
         <div key={world.id} className="rb-profile-favorites-group">
-          <h4>{world.label}</h4>
+          <h4>{translateWorld(t, world).label}</h4>
           <div className="rb-profile-favorites-chips">
             {items.map((f) => (
               <span key={f.categoryId} className="rb-profile-favorites-chip" style={{ backgroundColor: world.color }}>

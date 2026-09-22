@@ -4,7 +4,16 @@ import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
 import { hasLavoroConsent, setLavoroConsent } from '../data/lavoro';
-import { resetAccountPassword, setOwnWorlds, setOwnLingua, deleteOwnAccount } from '../data/accounts';
+import {
+  resetAccountPassword,
+  setOwnWorlds,
+  setOwnLingua,
+  deleteOwnAccount,
+  updateOwnProfileDetails,
+  profileCooldownRemaining,
+  changeOwnEmail,
+} from '../data/accounts';
+import { computeAge } from '../data/age';
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
 import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
@@ -159,7 +168,143 @@ function LanguageSubsection({ value, onChange }) {
 // dal genitore), confermato solo cliccando "Applica" come gli altri filtri.
 // Utenti (blocco contatti) e Sicurezza restano azioni immediate: non sono
 // filtri di visualizzazione, toccano subito il server.
-function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibility, setVisibility, onLavoroConsentRevoked }) {
+function daysLeft(ms) {
+  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+}
+
+// Sotto-voce "Profilo" di Privacy (prima di "Utenti"): tutti i dati raccolti
+// in registrazione che finora non avevano alcun modo di essere modificati —
+// nome utente, data di nascita, cellulare, mail di backup — più il cambio
+// mail. Nickname, nome/cognome, tipo account/fatturazione, genere e
+// pronomi restano dove sono già oggi (pannello "Il mio profilo", aperto dal
+// nome/avatar in alto): niente doppioni dello stesso controllo in due posti.
+function ProfileSubsection({ user, onOpenAuth, onUpdateUser }) {
+  const [username, setUsername] = useState(user?.username ?? '');
+  const [dataNascita, setDataNascita] = useState(user?.dataNascita ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [backupEmail, setBackupEmail] = useState(user?.backupEmail ?? '');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const [newEmail, setNewEmail] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailErr, setEmailErr] = useState('');
+
+  if (!user) {
+    return (
+      <button type="button" className="rb-settings-nav-btn" onClick={onOpenAuth}>
+        <span><strong>Accedi per modificare il tuo profilo</strong></span>
+        <span aria-hidden="true">→</span>
+      </button>
+    );
+  }
+
+  const cooldownMs = profileCooldownRemaining(user);
+
+  const save = async () => {
+    setError('');
+    setSuccess('');
+    if (!username.trim()) {
+      setError('Il nome utente non può essere vuoto.');
+      return;
+    }
+    if (!dataNascita) {
+      setError('La data di nascita non può essere vuota.');
+      return;
+    }
+    const age = computeAge(dataNascita);
+    if (age !== null && age < 14) {
+      setError('Devi avere almeno 14 anni.');
+      return;
+    }
+    setBusy(true);
+    const { account, error: err } = await updateOwnProfileDetails({ username, dataNascita, phone, backupEmail });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSuccess('Dati aggiornati.');
+    onUpdateUser?.(account);
+  };
+
+  const saveEmail = async () => {
+    setEmailErr('');
+    setEmailMsg('');
+    if (!newEmail.trim()) return;
+    setEmailBusy(true);
+    const { error: err } = await changeOwnEmail(newEmail);
+    setEmailBusy(false);
+    if (err) {
+      setEmailErr(err);
+      return;
+    }
+    setEmailMsg('Controlla la nuova mail e conferma il cambio dal link che ti abbiamo mandato.');
+    setNewEmail('');
+  };
+
+  return (
+    <>
+      <label className="rb-field">
+        <span>Nome utente</span>
+        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Data di nascita</span>
+        <input
+          type="date"
+          value={dataNascita ?? ''}
+          min="1900-01-01"
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setDataNascita(e.target.value)}
+        />
+      </label>
+      <label className="rb-field">
+        <span>Cellulare (facoltativo)</span>
+        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Mail di backup (facoltativa)</span>
+        <input type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} />
+      </label>
+
+      {error && <p className="rb-privacy-error">{error}</p>}
+      {success && <p className="rb-settings-hint">{success}</p>}
+
+      {cooldownMs > 0 ? (
+        <p className="rb-settings-hint">Potrai modificare questi dati tra {daysLeft(cooldownMs)} giorni.</p>
+      ) : (
+        <button type="button" className="rb-reset-filters-btn" onClick={save} disabled={busy}>
+          {busy ? 'Un attimo…' : 'Salva'}
+        </button>
+      )}
+
+      <div className="rb-settings-subaccordion-divider" />
+
+      <label className="rb-field">
+        <span className="rb-field-label-row">
+          Mail
+          <InfoBadge text="Ti mandiamo un link di conferma sulla nuova mail: il cambio vale solo dopo averlo aperto. La mail attuale resta valida finché non confermi." />
+        </span>
+        <p className="rb-settings-hint">Attuale: {user.email}</p>
+        <input type="email" placeholder="Nuova mail" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+      </label>
+      {emailErr && <p className="rb-privacy-error">{emailErr}</p>}
+      {emailMsg && <p className="rb-settings-hint">{emailMsg}</p>}
+      <button type="button" className="rb-reset-filters-btn" onClick={saveEmail} disabled={emailBusy || !newEmail.trim()}>
+        {emailBusy ? 'Un attimo…' : 'Cambia mail'}
+      </button>
+
+      <p className="rb-settings-hint">
+        Il cambio password si fa dalla voce "Sicurezza e accesso" qui sotto.
+      </p>
+    </>
+  );
+}
+
+function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibility, setVisibility, onLavoroConsentRevoked, onUpdateUser }) {
   const [sub, setSub] = useState('');
   const [blocked, setBlocked] = useState([]);
   const [profilesMap, setProfilesMap] = useState(new Map());
@@ -260,6 +405,16 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
 
   return (
     <>
+      <CollapsibleSection
+        level="sub"
+        title="Profilo"
+        infoText="Nome utente, data di nascita, cellulare e mail di backup: modificabili una volta ogni 3 mesi. Il nickname si cambia da 'Il mio profilo' (una volta al mese)."
+        open={sub === 'profilo'}
+        onToggle={() => toggleSub('profilo')}
+      >
+        <ProfileSubsection user={user} onOpenAuth={onOpenAuth} onUpdateUser={onUpdateUser} />
+      </CollapsibleSection>
+
       <CollapsibleSection
         level="sub"
         title="Utenti"
@@ -525,7 +680,6 @@ export default function SettingsPanel({
   onLavoroConsentRevoked,
 }) {
   const { t, i18n } = useTranslation();
-  const [luogoOpen, setLuogoOpen] = useState(false);
   const [personalizzaOpen, setPersonalizzaOpen] = useState(false);
   const [personalizzaSub, setPersonalizzaSub] = useState('');
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -696,53 +850,8 @@ export default function SettingsPanel({
             visibility={draftVisibility}
             setVisibility={setDraftVisibility}
             onLavoroConsentRevoked={onLavoroConsentRevoked}
+            onUpdateUser={onUpdateUser}
           />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          title={t('settings.sections.luogo.title')}
-          infoText={t('settings.sections.luogo.hint')}
-          open={luogoOpen}
-          onToggle={() => setLuogoOpen((v) => !v)}
-        >
-          <label className="rb-field">
-            <span>{t('settings.luogo.continent')}</span>
-            <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
-              <option value="">{t('settings.luogo.allContinents')}</option>
-              {CONTINENTS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="rb-field">
-            <span>{t('settings.luogo.region')}</span>
-            <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
-              <option value="">{t('settings.luogo.allRegions')}</option>
-              {REGIONS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="rb-field">
-            <span>{t('settings.luogo.city')}</span>
-            <input
-              type="text"
-              placeholder={t('settings.luogo.cityPlaceholder')}
-              value={draftLocationFilters.city}
-              onChange={(e) => updateLocation('city', e.target.value)}
-            />
-          </label>
-
-          <label className="rb-field">
-            <span className="rb-field-label-row">
-              {t('settings.luogo.distance')}: {distanzaUnlimited ? t('settings.luogo.distanceUnlimited') : `${draftLocationFilters.distance} km`}
-              <InfoBadge text={t('settings.luogo.distanceHint')} />
-            </span>
-            <input type="range" min={1} max={MAX_DISTANCE_KM} value={draftLocationFilters.distance}
-              onChange={(e) => updateLocation('distance', Number(e.target.value))} />
-          </label>
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -751,6 +860,53 @@ export default function SettingsPanel({
           open={personalizzaOpen}
           onToggle={() => setPersonalizzaOpen((v) => !v)}
         >
+          <CollapsibleSection
+            level="sub"
+            title={t('settings.sections.luogo.title')}
+            infoText={t('settings.sections.luogo.hint')}
+            open={personalizzaSub === 'luogo'}
+            onToggle={() => togglePersonalizzaSub('luogo')}
+          >
+            <label className="rb-field">
+              <span>{t('settings.luogo.continent')}</span>
+              <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
+                <option value="">{t('settings.luogo.allContinents')}</option>
+                {CONTINENTS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="rb-field">
+              <span>{t('settings.luogo.region')}</span>
+              <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
+                <option value="">{t('settings.luogo.allRegions')}</option>
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="rb-field">
+              <span>{t('settings.luogo.city')}</span>
+              <input
+                type="text"
+                placeholder={t('settings.luogo.cityPlaceholder')}
+                value={draftLocationFilters.city}
+                onChange={(e) => updateLocation('city', e.target.value)}
+              />
+            </label>
+
+            <label className="rb-field">
+              <span className="rb-field-label-row">
+                {t('settings.luogo.distance')}: {distanzaUnlimited ? t('settings.luogo.distanceUnlimited') : `${draftLocationFilters.distance} km`}
+                <InfoBadge text={t('settings.luogo.distanceHint')} />
+              </span>
+              <input type="range" min={1} max={MAX_DISTANCE_KM} value={draftLocationFilters.distance}
+                onChange={(e) => updateLocation('distance', Number(e.target.value))} />
+            </label>
+          </CollapsibleSection>
+
           <CollapsibleSection
             level="sub"
             title={t('settings.sections.mostrami.title')}

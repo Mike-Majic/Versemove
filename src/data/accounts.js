@@ -14,8 +14,9 @@ function translateUploadError(error) {
   return msg || 'Errore durante il caricamento del file.';
 }
 
-const NICKNAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 settimana
+const NICKNAME_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 1 mese
 const NAME_COOLDOWN_MS = 90 * 24 * 60 * 60 * 1000; // 3 mesi
+const PROFILE_COOLDOWN_MS = 90 * 24 * 60 * 60 * 1000; // 3 mesi
 
 // Converte la riga di public.profiles (snake_case, come arriva da Supabase)
 // nella forma camelCase che il resto dell'app già si aspetta — così i
@@ -54,6 +55,7 @@ function mapProfile(row) {
     createdAt: row.created_at,
     lastNicknameChangeAt: row.last_nickname_change_at,
     lastNameChangeAt: row.last_name_change_at,
+    lastProfileChangeAt: row.last_profile_change_at,
   };
 }
 
@@ -391,6 +393,15 @@ export function nameCooldownRemaining(account) {
   return Math.max(0, NAME_COOLDOWN_MS - elapsed);
 }
 
+// Come sopra, ma per il gruppo "Profilo" di Impostazioni (nome utente,
+// data di nascita, cellulare, mail di backup): un unico salvataggio, un
+// unico cooldown di 3 mesi (vedi update_own_profile_details lato server).
+export function profileCooldownRemaining(account) {
+  if (!account?.lastProfileChangeAt) return 0;
+  const elapsed = Date.now() - new Date(account.lastProfileChangeAt).getTime();
+  return Math.max(0, PROFILE_COOLDOWN_MS - elapsed);
+}
+
 // Foto profilo: carica nel bucket pubblico "content-media" già usato per i
 // contenuti (stesso percorso sotto il proprio uid, come richiedono le sue
 // policy di storage) e salva l'URL con la RPC già pronta lato server —
@@ -438,6 +449,22 @@ export async function isNicknameTaken(nickname) {
   }
 }
 
+// Campo "Profilo" di Impostazioni: nome utente, data di nascita, cellulare
+// e mail di backup insieme in un solo salvataggio (vedi
+// update_own_profile_details, stesso schema di cooldown di updateName).
+// Telefono e mail di backup restano invariati se lasciati vuoti (lo gestisce
+// già la RPC con coalesce/nullif).
+export async function updateOwnProfileDetails({ username, dataNascita, phone, backupEmail }) {
+  const { error } = await supabase.rpc('update_own_profile_details', {
+    p_username: (username ?? '').trim(),
+    p_data_nascita: dataNascita || null,
+    p_phone: phone ?? '',
+    p_backup_email: backupEmail ?? '',
+  });
+  if (error) return { error: error.message };
+  return { account: await fetchOwnProfile() };
+}
+
 export async function updateName(accountId, nome, cognome) {
   const { error } = await supabase.rpc('update_own_name', {
     p_nome: (nome ?? '').trim(),
@@ -455,6 +482,22 @@ export async function resetAccountPassword(email) {
   const { error } = await supabase.auth.resetPasswordForEmail((email ?? '').trim().toLowerCase(), {
     redirectTo: window.location.origin + import.meta.env.BASE_URL,
   });
+  if (error) return { error: error.message };
+  return {};
+}
+
+// Cambio mail: passa dal flusso di conferma nativo di Supabase Auth (manda
+// un link alla nuova mail, il cambio vero avviene solo dopo il click, non
+// subito) — niente cooldown aggiuntivo qui, quella conferma è già il freno.
+// public.profiles.email si aggiorna da solo quando la conferma va a buon
+// fine (vedi il trigger sync_profile_email su auth.users).
+export async function changeOwnEmail(newEmail) {
+  const clean = (newEmail ?? '').trim().toLowerCase();
+  if (!clean) return { error: 'Inserisci una mail valida.' };
+  const { error } = await supabase.auth.updateUser(
+    { email: clean },
+    { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL }
+  );
   if (error) return { error: error.message };
   return {};
 }

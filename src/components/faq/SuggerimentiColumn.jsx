@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   listFaqSuggestions,
   createFaqSuggestion,
@@ -6,6 +7,7 @@ import {
   updateFaqSuggestionStatus,
 } from '../../data/faq';
 import { WORLDS } from '../../data/worlds';
+import { translateWorld } from '../../i18n/worldLabels';
 import CustomSelect from '../shared/CustomSelect';
 import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
@@ -24,8 +26,6 @@ const STATO_OPTIONS = [
   { value: 'scartato', label: 'Scartato' },
 ];
 const STATO_LABEL = Object.fromEntries(STATO_OPTIONS.map((o) => [o.value, o.label]));
-
-const WORLD_OPTIONS = [{ value: '', label: 'Nessuno in particolare' }, ...WORLDS.map((w) => ({ value: w.id, label: w.label }))];
 
 function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
   const [voting, setVoting] = useState(false);
@@ -106,6 +106,7 @@ function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
 // lo impone la RLS lato server, qui il controllo `staff` è solo per
 // mostrare o nascondere i controlli.
 export default function SuggerimentiColumn({ user, onOpenAuth, staff, closing = false }) {
+  const { t } = useTranslation();
   const [suggestions, setSuggestions] = useState(null);
   const [ordinamento, setOrdinamento] = useState('votati');
   const [titolo, setTitolo] = useState('');
@@ -113,6 +114,11 @@ export default function SuggerimentiColumn({ user, onOpenAuth, staff, closing = 
   const [mondo, setMondo] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+
+  const worldOptions = useMemo(
+    () => [{ value: '', label: 'Nessuno in particolare' }, ...WORLDS.map((w) => ({ value: w.id, label: translateWorld(t, w).label }))],
+    [t]
+  );
 
   const refresh = () => listFaqSuggestions({ ordinamento }).then(setSuggestions);
 
@@ -164,7 +170,7 @@ export default function SuggerimentiColumn({ user, onOpenAuth, staff, closing = 
           </label>
           <label className="rb-field">
             <span>Mondo (facoltativo)</span>
-            <CustomSelect value={mondo} options={WORLD_OPTIONS} onChange={setMondo} ariaLabel="Mondo" />
+            <CustomSelect value={mondo} options={worldOptions} onChange={setMondo} ariaLabel="Mondo" />
           </label>
           {error && <p className="rb-privacy-error">{error}</p>}
           <button type="submit" className="rb-btn-primary" disabled={sending}>

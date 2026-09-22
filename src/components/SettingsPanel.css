@@ -247,6 +247,11 @@
   gap: 6px;
 }
 
+.rb-settings-subaccordion-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 14px 0;
+}
+
 .rb-toggle {
   position: relative;
   flex-shrink: 0;
