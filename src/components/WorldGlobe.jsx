@@ -510,6 +510,12 @@ export default function WorldGlobe({
       .then((features) => {
         if (cancelled) return;
         setLandPolygons(features);
+        // Stessi dati, riusati anche sui satelliti (mondi esterni): "solo il
+        // disegno del mondo", niente categorie né altro sopra — vedi
+        // satelliteGlobes.js setContinentMap. Il ref è già pronto: l'effetto
+        // che costruisce i satelliti gira al mount, questa richiesta di rete
+        // arriva sempre dopo.
+        satellitesRef.current?.setContinentMap(features);
       })
       .catch((err) => {
         console.error('Impossibile caricare i contorni dei continenti', err);

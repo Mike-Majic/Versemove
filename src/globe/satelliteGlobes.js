@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import GeoJsonGeometry from 'three-geojson-geometry';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
@@ -21,6 +22,20 @@ const OCCLUSION_RADIUS = 128;
 // del blocco durante il warp misurato in origine, vedi commento più giù).
 const SATELLITE_RADIUS = 30;
 const SATELLITE_DETAIL = 2;
+
+// Contorni reali dei continenti sulla sfera di un satellite (stessa idea del
+// globo grande, vedi WorldGlobe.jsx polygonsData/landGeo.js, ma lì è
+// react-globe.gl a disegnarli con la sua proiezione interna: un satellite è
+// una Mesh THREE "nuda", quindi qui servono direttamente — three-geojson-
+// geometry (già una dipendenza transitiva di three-globe, ora dichiarata
+// anche qui) genera una BufferGeometry a segmenti pronti per THREE.LineSegments
+// da un oggetto GeoJSON, proiettati sulla sfera di un raggio dato. Un filo
+// appena più largo del raggio del satellite (vedi CONTINENT_RADIUS_SCALE
+// sotto) evita z-fighting con la rete/nucleo che stanno esattamente a
+// SATELLITE_RADIUS. Risoluzione in gradi: più bassa = curve più fedeli ma
+// più vertici — 6° basta per la scala a cui si vedono i satelliti.
+const CONTINENT_RADIUS_SCALE = 1.015;
+const CONTINENT_RESOLUTION_DEG = 6;
 
 // Sei posizioni FISSE in coordinate di scena (raggio del globo grande =
 // 100), sparse nelle tre dimensioni attorno a lui — non su un'unica fascia
@@ -195,8 +210,17 @@ function buildSatelliteMesh(world) {
   label.position.set(0, SATELLITE_RADIUS * 1.6, 0);
   group.add(label);
 
+  // Guscio per i contorni reali dei continenti (vedi setContinentMap più
+  // sotto): vuoto e invisibile finché il GeoJSON non è arrivato — lo stesso
+  // dato, già caricato una volta per il globo grande (loadLandGeo() lo
+  // mette in cache), viene riusato qui senza una seconda richiesta di rete.
+  const continentGroup = new THREE.Group();
+  continentGroup.visible = false;
+  group.add(continentGroup);
+
   group.userData.worldId = world.id;
   group.userData.hitMesh = core;
+  group.userData.continentGroup = continentGroup;
   group.userData.opacityMeshes = [
     { mesh: core, baseOpacity: 0.3 },
     { mesh: net, baseOpacity: 0.85 },
@@ -260,6 +284,39 @@ export function buildSatelliteGlobes({ worlds }) {
     const sat = satellitesById.get(worldId);
     if (!sat?.userData.basePos) return null;
     return vectorToLatLng(sat.userData.basePos);
+  }
+
+  // Disegna sulla sfera di OGNI satellite il vero contorno dei continenti
+  // (stessi dati GeoJSON del globo grande, vedi WorldGlobe.jsx/landGeo.js),
+  // niente categorie né altro sopra: solo il disegno del mondo, richiesta
+  // esplicita. Chiamata una sola volta, quando il GeoJSON è pronto (può
+  // arrivare dopo che i satelliti sono già visibili — build asincrona,
+  // vedi WorldGlobe.jsx). La geometria è identica per tutti (stesso pianeta),
+  // quindi si costruisce UNA VOLTA SOLA per feature e si condivide tra i sei
+  // satelliti: solo il materiale (colore) resta per-satellite, come già per
+  // il resto del guscio (vedi world.atmosphereColor sotto, stessa
+  // convenzione di polygonStrokeColor sul globo grande).
+  let continentGeometries = null;
+  function setContinentMap(features) {
+    if (continentGeometries || !features?.length) return;
+    continentGeometries = features.map(
+      (feature) => new GeoJsonGeometry(feature.geometry, SATELLITE_RADIUS * CONTINENT_RADIUS_SCALE, CONTINENT_RESOLUTION_DEG)
+    );
+
+    satellites.forEach((sat) => {
+      const world = worlds.find((w) => w.id === sat.userData.worldId);
+      const color = world?.atmosphereColor ?? world?.color ?? '#ffffff';
+      const continentGroup = sat.userData.continentGroup;
+
+      continentGeometries.forEach((geometry) => {
+        const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55 });
+        const lines = new THREE.LineSegments(geometry, material);
+        continentGroup.add(lines);
+        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.55 });
+      });
+
+      continentGroup.visible = true;
+    });
   }
 
   // Mostra come satelliti tutti i mondi tranne quello attivo (al massimo
@@ -382,6 +439,7 @@ export function buildSatelliteGlobes({ worlds }) {
     getHitMeshes,
     setWarpTarget,
     getWorldLatLng,
+    setContinentMap,
     dispose,
   };
 }
