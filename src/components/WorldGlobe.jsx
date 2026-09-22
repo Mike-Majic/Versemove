@@ -8,6 +8,7 @@ import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../glo
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
+import { IDLE_ROTATE_SPEED, IDLE_ROTATE_EASE_MS } from '../fx/globeRotation';
 import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
 
@@ -261,6 +262,41 @@ export default function WorldGlobe({
     let idleTimer = null;
     let rotateTimer = null;
     let paused = false;
+    // Rampa morbida di autoRotateSpeed (mai uno scatto istantaneo, vedi
+    // fx/globeRotation.js): rampFrame è il requestAnimationFrame in corso,
+    // rampSpeed il valore "vero" della velocità in questo istante (non
+    // quello che sta per diventare), così partire/fermarsi a metà di una
+    // rampa già in corso riparte da dove si trovava invece di scattare.
+    let rampFrame = null;
+    let rampSpeed = 0;
+
+    const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+
+    const cancelRamp = () => {
+      if (rampFrame !== null) cancelAnimationFrame(rampFrame);
+      rampFrame = null;
+    };
+
+    const rampAutoRotateSpeedTo = (target, onDone) => {
+      cancelRamp();
+      const controls = globeRef.current?.controls();
+      if (!controls) return;
+      const from = rampSpeed;
+      const startedAt = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, (now - startedAt) / IDLE_ROTATE_EASE_MS);
+        rampSpeed = from + (target - from) * easeInOutCubic(t);
+        const c = globeRef.current?.controls();
+        if (c) c.autoRotateSpeed = rampSpeed;
+        if (t < 1) {
+          rampFrame = requestAnimationFrame(step);
+        } else {
+          rampFrame = null;
+          onDone?.();
+        }
+      };
+      rampFrame = requestAnimationFrame(step);
+    };
 
     const sleep = () => {
       const g = globeRef.current;
@@ -286,14 +322,25 @@ export default function WorldGlobe({
     const stopAutoRotate = () => {
       clearTimeout(rotateTimer);
       const g = globeRef.current;
-      if (g) g.controls().autoRotate = false;
+      if (g && g.controls().autoRotate) {
+        // Decelera fino a 0 (restando "autoRotate" per tutta la rampa, così
+        // sleep() non mette in pausa il disegno a metà) e solo alla fine
+        // spegne autoRotate per davvero.
+        rampAutoRotateSpeedTo(0, () => {
+          const c = globeRef.current?.controls();
+          if (c) c.autoRotate = false;
+        });
+      }
       wake();
     };
 
     const startAutoRotate = () => {
       const g = globeRef.current;
       if (!g || isTouchDevice) return;
+      // "Riduci animazioni" del sistema: niente rotazione automatica, punto.
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       g.controls().autoRotate = true;
+      rampAutoRotateSpeedTo(IDLE_ROTATE_SPEED);
       clearTimeout(rotateTimer);
       rotateTimer = setTimeout(stopAutoRotate, AUTO_ROTATE_MS);
       wake(AUTO_ROTATE_MS);
@@ -302,6 +349,7 @@ export default function WorldGlobe({
     const dispose = () => {
       clearTimeout(idleTimer);
       clearTimeout(rotateTimer);
+      cancelRamp();
     };
 
     return { wake, startAutoRotate, stopAutoRotate, dispose };
@@ -684,11 +732,10 @@ export default function WorldGlobe({
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return;
-    // OrbitControls.autoRotateSpeed è in "gradi/frame a 60fps": un giro
-    // completo (360°) dura 60/autoRotateSpeed secondi. Tarato per un giro
-    // ogni 14 secondi (dimezzata rispetto a prima: la rotazione automatica,
-    // che riparte anche quando il mouse esce dal globo, girava troppo veloce).
-    g.controls().autoRotateSpeed = 60 / 14;
+    // autoRotateSpeed non si fissa più qui: la rampa morbida in
+    // globeActivity (vedi sopra, rampAutoRotateSpeedTo) la porta da 0 a
+    // IDLE_ROTATE_SPEED (fx/globeRotation.js) quando startAutoRotate parte,
+    // sia al mount sia ogni volta che il mouse esce dal globo.
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
