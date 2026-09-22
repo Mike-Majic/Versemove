@@ -12,6 +12,16 @@ export function openCallChannel(conversationId) {
   });
 }
 
+// Videochiamata di gruppo nella Stanza MOD: stesso meccanismo (canale
+// Realtime privato, autorizzato solo a owner/moderatori da can_join_call
+// lato server), ma un solo topic fisso condiviso da tutto lo staff invece
+// di uno per conversazione, più la presence per sapere chi è già dentro.
+export function openModRoomCallChannel() {
+  return supabase.channel('call:modroom', {
+    config: { broadcast: { self: false }, private: true },
+  });
+}
+
 export const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 export const RING_TIMEOUT_MS = 30000;
 export const CONNECT_TIMEOUT_MS = 20000;

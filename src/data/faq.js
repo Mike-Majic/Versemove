@@ -72,8 +72,10 @@ function mapSuggestion(row, statsByRow, myVotes) {
     rispostaStaff: row.risposta_staff,
     authorId: row.author_id,
     data: row.created_at,
-    voti: stats?.n_voti ?? 0,
-    hoVotato: myVotes?.has(row.id) ?? false,
+    voti: stats?.voti ?? 0,
+    votiSu: stats?.voti_su ?? 0,
+    votiGiu: stats?.voti_giu ?? 0,
+    mioVoto: myVotes?.get(row.id) ?? null, // 'su' | 'giu' | null
   };
 }
 
@@ -101,25 +103,28 @@ export async function listFaqSuggestions({ ordinamento = 'votati', stato } = {})
 async function fetchSuggestionStats(ids) {
   const map = new Map();
   if (!ids.length) return map;
-  const { data, error } = await supabase.from('faq_suggestion_stats').select('suggestion_id, n_voti').in('suggestion_id', ids);
+  const { data, error } = await supabase
+    .from('faq_suggestion_stats')
+    .select('suggestion_id, voti, voti_su, voti_giu')
+    .in('suggestion_id', ids);
   if (error || !data) return map;
-  data.forEach((row) => map.set(row.suggestion_id, { n_voti: row.n_voti }));
+  data.forEach((row) => map.set(row.suggestion_id, { voti: row.voti, voti_su: row.voti_su, voti_giu: row.voti_giu }));
   return map;
 }
 
 async function fetchMySuggestionVotes(ids) {
-  const set = new Set();
-  if (!ids.length) return set;
+  const map = new Map();
+  if (!ids.length) return map;
   const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return set;
+  if (!auth?.user) return map;
   const { data, error } = await supabase
     .from('faq_suggestion_votes')
-    .select('suggestion_id')
+    .select('suggestion_id, voto')
     .eq('user_id', auth.user.id)
     .in('suggestion_id', ids);
-  if (error || !data) return set;
-  data.forEach((row) => set.add(row.suggestion_id));
-  return set;
+  if (error || !data) return map;
+  data.forEach((row) => map.set(row.suggestion_id, row.voto === 1 ? 'su' : 'giu'));
+  return map;
 }
 
 export async function createFaqSuggestion({ titolo, testo, mondo }) {
@@ -135,23 +140,26 @@ export async function createFaqSuggestion({ titolo, testo, mondo }) {
   return { id: data.id };
 }
 
-// Voto 👍 semplice: un secondo click sullo stesso suggerimento lo toglie
-// (come un like), niente voto negativo (richiesta della specifica).
-export async function toggleFaqSuggestionVote(suggestionId, currentlyVoted) {
+// Voto 👍/👎: un solo voto per utente per suggerimento (PK suggestion_id+
+// user_id). Ricliccare lo stesso verso lo toglie (come un like); cliccare
+// il verso opposto lo ribalta (upsert sostituisce la riga).
+export async function toggleFaqSuggestionVote(suggestionId, direzione, mioVotoAttuale) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: 'Devi essere loggato per votare.' };
-  if (currentlyVoted) {
+  if (mioVotoAttuale === direzione) {
     const { error } = await supabase
       .from('faq_suggestion_votes')
       .delete()
       .eq('suggestion_id', suggestionId)
       .eq('user_id', auth.user.id);
     if (error) return { error: error.message };
-    return { voted: false };
+    return { mioVoto: null };
   }
-  const { error } = await supabase.from('faq_suggestion_votes').insert({ suggestion_id: suggestionId, user_id: auth.user.id });
+  const { error } = await supabase
+    .from('faq_suggestion_votes')
+    .upsert({ suggestion_id: suggestionId, user_id: auth.user.id, voto: direzione === 'su' ? 1 : -1 });
   if (error) return { error: error.message };
-  return { voted: true };
+  return { mioVoto: direzione };
 }
 
 // Solo staff: lo impone la RLS, qui non serve controllare il ruolo.

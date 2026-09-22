@@ -10,6 +10,7 @@ import { fetchProfilesMap, displayName } from '../../data/posts';
 import { supabase } from '../../data/supabaseClient';
 import Skeleton from '../Skeleton';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
+import ModRoomGroupCall from './ModRoomGroupCall';
 
 // Stanza MOD: solo owner/moderatori (il montaggio stesso è già condizionato
 // a staff in FaqWorldExplorer, la RLS lo garantisce comunque lato server).
@@ -149,12 +150,15 @@ export default function ModRoomColumn({ user, closing = false }) {
   );
 
   return (
-    <TwoColumnSwitcher
-      primary={chatPanel}
-      secondary={pendingPanel}
-      primaryLabel="Chat dello staff"
-      secondaryLabel="Da gestire"
-      closing={closing}
-    />
+    <div className="rb-modroom-shell">
+      <ModRoomGroupCall user={user} />
+      <TwoColumnSwitcher
+        primary={chatPanel}
+        secondary={pendingPanel}
+        primaryLabel="Chat dello staff"
+        secondaryLabel="Da gestire"
+        closing={closing}
+      />
+    </div>
   );
 }

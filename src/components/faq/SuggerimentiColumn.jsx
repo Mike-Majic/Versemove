@@ -33,13 +33,13 @@ function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
   const [risposta, setRisposta] = useState(s.rispostaStaff ?? '');
   const [saving, setSaving] = useState(false);
 
-  const vote = async () => {
+  const vote = async (direzione) => {
     if (!user) {
       onOpenAuth?.();
       return;
     }
     setVoting(true);
-    await toggleFaqSuggestionVote(s.id, s.hoVotato);
+    await toggleFaqSuggestionVote(s.id, direzione, s.mioVoto);
     setVoting(false);
     onChanged();
   };
@@ -54,9 +54,26 @@ function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
   return (
     <li className="rb-faq-suggestion-card">
       <div className="rb-faq-suggestion-head">
-        <button type="button" className={`rb-faq-vote-btn ${s.hoVotato ? 'active' : ''}`} onClick={vote} disabled={voting}>
-          👍 {s.voti}
-        </button>
+        <div className="rb-faq-vote-group">
+          <button
+            type="button"
+            className={`rb-faq-vote-btn ${s.mioVoto === 'su' ? 'active' : ''}`}
+            onClick={() => vote('su')}
+            disabled={voting}
+            aria-label="Voto positivo"
+          >
+            👍 {s.votiSu}
+          </button>
+          <button
+            type="button"
+            className={`rb-faq-vote-btn rb-faq-vote-down ${s.mioVoto === 'giu' ? 'active' : ''}`}
+            onClick={() => vote('giu')}
+            disabled={voting}
+            aria-label="Voto negativo"
+          >
+            👎 {s.votiGiu}
+          </button>
+        </div>
         <div>
           <strong>{s.titolo}</strong>
           {s.mondo && <span className="rb-faq-suggestion-world"> · {s.mondo}</span>}
