@@ -6,8 +6,10 @@ import './ReportModal.css';
 // Motivi comuni, uguali per qualunque tipo di contenuto segnalato — la
 // scelta fine (post/commento/profilo/gruppo/live/evento) la fa già chi
 // apre questo modale passando targetType. "Altro" richiede un dettaglio
-// scritto, gli altri no.
-const MOTIVI = [
+// scritto, gli altri no. Un chiamante con motivi propri (es. un'offerta
+// scaduta) può passare un elenco diverso via la prop `motivi` — "Altro"
+// resta sempre in fondo, qualunque sia la lista.
+const DEFAULT_MOTIVI = [
   'Contenuto inappropriato',
   'Spam o pubblicità',
   'Molestie o bullismo',
@@ -17,12 +19,13 @@ const MOTIVI = [
 ];
 
 // Modale generico di segnalazione: lo stesso componente serve per post,
-// commenti, profili e (in futuro) gruppi/live/eventi — chi lo apre passa
-// solo targetType/targetId/targetLabel. targetId resta una stringa anche
-// quando il contenuto vive ancora solo in localStorage (non un vero UUID
+// commenti, profili, offerte e (in futuro) gruppi/live/eventi — chi lo apre
+// passa solo targetType/targetId/targetLabel (e, se servono motivi diversi
+// da quelli di default, `motivi`). targetId resta una stringa anche quando
+// il contenuto vive ancora solo in localStorage (non un vero UUID
 // Supabase): la tabella reports è pensata apposta per questo, come già
 // blocked_contacts.
-export default function ReportModal({ targetType, targetId, targetLabel, onClose }) {
+export default function ReportModal({ targetType, targetId, targetLabel, motivi = DEFAULT_MOTIVI, onClose }) {
   const [motivo, setMotivo] = useState('');
   const [dettagli, setDettagli] = useState('');
   const [stato, setStato] = useState('form'); // form | invio | inviata
@@ -70,7 +73,7 @@ export default function ReportModal({ targetType, targetId, targetLabel, onClose
             <p className="rb-report-hint">Cosa non va? La segnalazione arriva a owner e moderatori.</p>
 
             <div className="rb-report-motivi">
-              {MOTIVI.map((m) => (
+              {motivi.map((m) => (
                 <label key={m} className={`rb-report-motivo ${motivo === m ? 'active' : ''}`}>
                   <input type="radio" name="rb-report-motivo" value={m} checked={motivo === m} onChange={() => setMotivo(m)} />
                   {m}
