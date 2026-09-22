@@ -135,51 +135,57 @@ function buildBriefcaseShape() {
   return shape;
 }
 
-// Sagoma di una "M" (mondo Social): non un blocco con una tacca (si leggeva
-// male, un unico bozzo scuro invece di una lettera) ma due pilastri
-// verticali più una "V" spessa che li collega, come i tratti di una M
-// scritta a mano — 4 forme separate (THREE.ShapeGeometry accetta anche un
-// array di Shape, si uniscono da sole in una geometria sola), i due tratti
-// diagonali calcolati per vettori (direzione + normale perpendicolare)
-// invece che a punti scelti a mano, per essere sicuri che restino dritti e
-// della stessa larghezza dei pilastri.
+// Sagoma di una "M" (mondo Social), seconda versione — la prima (blocco con
+// tacca, poi pilastri+V a bordi piatti) era venuta male entrambe le volte:
+// troppo squadrata, si leggeva come un blob invece che come una lettera.
+// Presa la forma (solo la forma, non i dettagli) da un logo di riferimento
+// a punte: due pilastri con la cima a punta (una piccola vela triangolare
+// sopra un tratto dritto, non più un top piatto) collegati da due bracci
+// che si assottigliano fino a un punto solo nella valle centrale — stessa
+// idea "più forme unite in una geometria sola" di prima (THREE.ShapeGeometry
+// accetta un array di Shape), ma ogni pezzo ora è a punta invece che
+// rettangolare.
 function buildLetterMShape() {
-  const top = 1;
-  const bottom = -1;
-  const pillarWidth = 0.32;
-  const legWidth = 0.3;
+  const pillarWidth = 0.34;
+  const legWidth = 0.34;
   const leftOuter = -1;
   const leftInner = leftOuter + pillarWidth;
   const rightOuter = 1;
   const rightInner = rightOuter - pillarWidth;
-  const valley = new THREE.Vector2(0, -0.3);
+  const yBottom = -1;
+  const yShoulder = 0.55; // dove il pilastro smette di essere dritto e inizia la punta
+  const yTip = 1.05; // la punta sale leggermente sopra il resto della lettera
+  const valley = new THREE.Vector2(0, -0.25);
 
-  const rectShape = (x0, x1, y0, y1) => {
+  // Pilastro verticale con una punta triangolare in cima, invece di un top piatto.
+  const pillarWithSpike = (xLeft, xRight) => {
+    const xMid = (xLeft + xRight) / 2;
     const s = new THREE.Shape();
-    s.moveTo(x0, y0);
-    s.lineTo(x1, y0);
-    s.lineTo(x1, y1);
-    s.lineTo(x0, y1);
+    s.moveTo(xLeft, yBottom);
+    s.lineTo(xRight, yBottom);
+    s.lineTo(xRight, yShoulder);
+    s.lineTo(xMid, yTip);
+    s.lineTo(xLeft, yShoulder);
     s.closePath();
     return s;
   };
-  const diagonalBarShape = (from, to, width) => {
-    const dir = to.clone().sub(from).normalize();
-    const perp = new THREE.Vector2(-dir.y, dir.x).multiplyScalar(width / 2);
+  // Braccio diagonale: parte largo quanto il pilastro (stesso bordo interno)
+  // e si assottiglia fino a un punto solo nella valle — un triangolo, non
+  // un parallelogramma: dà l'aspetto "a lama" del riferimento.
+  const taperedLeg = (innerX) => {
     const s = new THREE.Shape();
-    s.moveTo(from.x + perp.x, from.y + perp.y);
-    s.lineTo(to.x + perp.x, to.y + perp.y);
-    s.lineTo(to.x - perp.x, to.y - perp.y);
-    s.lineTo(from.x - perp.x, from.y - perp.y);
+    s.moveTo(innerX - legWidth / 2, yShoulder);
+    s.lineTo(innerX + legWidth / 2, yShoulder);
+    s.lineTo(valley.x, valley.y);
     s.closePath();
     return s;
   };
 
   return [
-    rectShape(leftOuter, leftInner, bottom, top),
-    rectShape(rightInner, rightOuter, bottom, top),
-    diagonalBarShape(new THREE.Vector2(leftInner, top), valley, legWidth),
-    diagonalBarShape(valley, new THREE.Vector2(rightInner, top), legWidth),
+    pillarWithSpike(leftOuter, leftInner),
+    pillarWithSpike(rightInner, rightOuter),
+    taperedLeg(leftInner),
+    taperedLeg(rightInner),
   ];
 }
 

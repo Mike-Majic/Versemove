@@ -139,13 +139,14 @@ export default function App() {
   const world = WORLDS[index];
   const categorySet = CATEGORY_WORLDS[world.id] ?? null;
   // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
-  // ne mostra al massimo 5 alla volta, la freccetta a sinistra fa scorrere
-  // le successive, tornando in cima dopo l'ultima (scorrimento infinito).
-  // Si azzera ad ogni cambio di mondo, altrimenti si potrebbe entrare in un
-  // mondo con lo scorrimento già a metà lista.
-  const [categoryScrollOffset, setCategoryScrollOffset] = useState(0);
+  // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
+  // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
+  // solo elemento), tornando alla prima pagina dopo l'ultima (paginazione
+  // infinita). Si azzera ad ogni cambio di mondo, altrimenti si potrebbe
+  // entrare in un mondo già a metà lista.
+  const [categoryPage, setCategoryPage] = useState(0);
   useEffect(() => {
-    setCategoryScrollOffset(0);
+    setCategoryPage(0);
   }, [categorySet]);
   // Incontri e Lavoro sono riservati ai maggiorenni: l'età è quella vera
   // dell'account (data di nascita in registrazione), non più una
@@ -1007,28 +1008,28 @@ export default function App() {
               <button
                 type="button"
                 className="rb-tagline-scroll-btn"
-                aria-label="Altre categorie"
-                onClick={() =>
-                  setCategoryScrollOffset((o) => (o + 1) % categorySet.categories.length)
-                }
+                aria-label="Altra pagina di categorie"
+                onClick={() => {
+                  const totalPages = Math.ceil(categorySet.categories.length / CATEGORY_LIST_PAGE_SIZE);
+                  setCategoryPage((p) => (p + 1) % totalPages);
+                }}
               >
                 ‹
               </button>
             )}
             <div className="rb-tagline-cat-list">
-              {Array.from(
-                { length: Math.min(CATEGORY_LIST_PAGE_SIZE, categorySet.categories.length) },
-                (_, i) => categorySet.categories[(categoryScrollOffset + i) % categorySet.categories.length]
-              ).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`rb-tagline-cat-btn ${activeArteCategory === c.id ? 'active' : ''}`}
-                  onClick={() => toggleArteCategory(c.id)}
-                >
-                  {c.label}
-                </button>
-              ))}
+              {categorySet.categories
+                .slice(categoryPage * CATEGORY_LIST_PAGE_SIZE, categoryPage * CATEGORY_LIST_PAGE_SIZE + CATEGORY_LIST_PAGE_SIZE)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`rb-tagline-cat-btn ${activeArteCategory === c.id ? 'active' : ''}`}
+                    onClick={() => toggleArteCategory(c.id)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
             </div>
           </>
         ) : (
