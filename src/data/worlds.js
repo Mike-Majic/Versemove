@@ -76,6 +76,9 @@ export const WORLDS = [
     label: 'Nerd',
     tagline: 'Giochi da tavolo, gaming, cosplay, streaming',
     color: '#d4f634',
+    // Contorni dei continenti bianchi anche sul satellite giallo (richiesta di
+    // Mike): il calcolo automatico per luminanza gli darebbe contorni scuri.
+    satelliteContinentColor: '#ffffff',
     colorSoft: 'rgba(212, 246, 52, 0.18)',
     globeColor: '#0c0f02',
     atmosphereColor: '#d4f634',

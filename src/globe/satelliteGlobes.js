@@ -335,7 +335,9 @@ export function buildSatelliteGlobes({ worlds }) {
 
     satellites.forEach((sat) => {
       const world = worlds.find((w) => w.id === sat.userData.worldId);
-      const color = pickContrastColor(world?.color ?? '#888888');
+      // Un mondo può forzare il colore dei contorni (world.satelliteContinentColor):
+      // es. Nerd, giallo chiaro, che col calcolo automatico prenderebbe contorni scuri.
+      const color = world?.satelliteContinentColor ?? pickContrastColor(world?.color ?? '#888888');
       const continentGroup = sat.userData.continentGroup;
 
       continentGeometries.forEach((geometry) => {
