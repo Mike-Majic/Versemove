@@ -54,6 +54,11 @@ export const WORLDS = [
     colorSoft: 'rgba(231, 234, 242, 0.16)',
     globeColor: '#0a0b10',
     atmosphereColor: '#e7eaf2',
+    // Continenti quasi bianchi (richiesta di Mike): con il riempimento di
+    // default al 10% sul globo quasi nero sembravano grigio molto scuro.
+    // Contorni (stroke) più chiari del riempimento per restare visibili.
+    landFillColor: '#f4f6fb',
+    landFillOpacity: 0.78,
     textOnGlobe: '#f5f6fa',
   },
   {

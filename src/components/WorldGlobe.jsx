@@ -899,7 +899,7 @@ export default function WorldGlobe({
         atmosphereColor={world.atmosphereColor}
         atmosphereAltitude={0.3}
         polygonsData={USE_REALISTIC_CONTINENTS ? landPolygons : []}
-        polygonCapColor={() => polygonFillColor(world.atmosphereColor)}
+        polygonCapColor={() => polygonFillColor(world.landFillColor ?? world.atmosphereColor, world.landFillOpacity)}
         polygonSideColor={() => 'rgba(0,0,0,0)'}
         polygonStrokeColor={() => world.atmosphereColor}
         polygonAltitude={0.006}
@@ -922,15 +922,19 @@ export default function WorldGlobe({
   );
 }
 
-// Colore del "riempimento" dei continenti: stesso colore del mondo ma molto
-// trasparente, così i contorni (lo stroke) restano il segno principale.
+// Colore del "riempimento" dei continenti: di default stesso colore del mondo
+// ma molto trasparente (0.1), così i contorni (lo stroke) restano il segno
+// principale. Un mondo può chiedere un riempimento più pieno/diverso con
+// world.landFillOpacity / world.landFillColor (vedi Lavoro in data/worlds.js:
+// col bianco al 10% sul globo quasi nero i continenti sembravano grigio scuro).
 const capColorCache = new Map();
-function polygonFillColor(hexColor) {
-  let cached = capColorCache.get(hexColor);
+function polygonFillColor(hexColor, opacity = 0.1) {
+  const key = `${hexColor}|${opacity}`;
+  let cached = capColorCache.get(key);
   if (!cached) {
     const c = new THREE.Color(hexColor);
-    cached = `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, 0.1)`;
-    capColorCache.set(hexColor, cached);
+    cached = `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${opacity})`;
+    capColorCache.set(key, cached);
   }
   return cached;
 }
