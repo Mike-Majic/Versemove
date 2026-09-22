@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
+import { SATELLITE_SPIN_PERIOD_S } from '../fx/globeRotation';
 
 // Raggio (in unità di scena) del guscio a rete del globo grande — vedi
 // networkOverlay.buildNetworkShell(radius=128) — usato qui solo per il
@@ -191,12 +192,15 @@ function buildSatelliteMesh(world) {
     { mesh: nodes, baseOpacity: 1 },
     { mesh: label, baseOpacity: 1 },
   ];
-  // Fase/velocità del galleggiamento e della rotazione propria: proprietà
-  // del SATELLITE (non dello slot), così restano coerenti anche se lo
-  // stesso satellite cambia slot da un warp all'altro.
+  // Fase/velocità del galleggiamento: proprietà del SATELLITE (non dello
+  // slot), così restano coerenti anche se lo stesso satellite cambia slot
+  // da un warp all'altro. Il galleggiamento resta leggermente casuale per
+  // varietà; la rotazione propria invece no (vedi SATELLITE_SPIN_PERIOD_S
+  // in fx/globeRotation.js): stesso giro pulito per tutti, richiesto
+  // esplicitamente dall'utente al posto del valore casuale di prima.
   group.userData.bobPhase = Math.random() * Math.PI * 2;
   group.userData.bobSpeed = ((2 * Math.PI) / 10) * (0.95 + Math.random() * 0.1);
-  group.userData.spinSpeed = 0.06 + Math.random() * 0.05;
+  group.userData.spinSpeed = (2 * Math.PI) / SATELLITE_SPIN_PERIOD_S;
   // Impostati per davvero da setActiveWorld() quando il satellite diventa
   // visibile: finché createdAtMs resta -Infinity l'oggetto è comunque
   // invisibile (group.visible = false qui sotto), quindi non ha nessun
