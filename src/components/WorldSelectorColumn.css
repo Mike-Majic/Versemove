@@ -1,7 +1,14 @@
 .rb-world-selector {
   --rb-world-item-height: 42px;
+  /* Spazio attorno ai pallini per non tagliare il bagliore del mondo
+     attivo (box-shadow 14px): la lista ha overflow nascosto per lo
+     scorrimento, quindi senza questo margine interno il glow veniva
+     tagliato ai lati e in alto/basso. right/bottom compensano il padding,
+     così i pallini restano esattamente dove erano. */
+  --rb-world-glow-pad-x: 16px;
+  --rb-world-glow-pad-y: 12px;
   position: fixed;
-  right: 22px;
+  right: calc(22px - var(--rb-world-glow-pad-x));
   bottom: 26px;
   z-index: 1020;
   display: flex;
@@ -10,7 +17,14 @@
 }
 
 .rb-world-selector-list {
-  height: calc(var(--rb-world-item-height) * 4);
+  height: calc(var(--rb-world-item-height) * 4 + var(--rb-world-glow-pad-y) * 2);
+  box-sizing: border-box;
+  padding: var(--rb-world-glow-pad-y) var(--rb-world-glow-pad-x);
+  scroll-padding-top: var(--rb-world-glow-pad-y);
+  /* Nel margine sopra/sotto si intravedrebbe il pallino precedente/successivo:
+     la maschera lo sfuma, lasciando solo il bagliore morbido dei 4 visibili. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--rb-world-glow-pad-y), #000 calc(100% - var(--rb-world-glow-pad-y)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--rb-world-glow-pad-y), #000 calc(100% - var(--rb-world-glow-pad-y)), transparent 100%);
   overflow-y: auto;
   overflow-x: hidden;
   scroll-snap-type: y mandatory;
