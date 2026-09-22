@@ -541,7 +541,16 @@ export default function WorldGlobe({
     }
 
     const scene = g.scene();
-    const shell = buildCategoryShell(categories, { radius: 122, color: world.color });
+    // Prova richiesta dall'utente: al posto del triangolo, la forma di un UFO
+    // (solo la sagoma, presa da un'immagine di riferimento — non colore né
+    // dettagli) per le categorie del mondo Nerd, per vedere l'effetto prima
+    // di decidere se estenderlo. Stesso colore/trasparenza di sempre (vedi
+    // categoryShell.js), cambia solo la sagoma.
+    const shell = buildCategoryShell(categories, {
+      radius: 122,
+      color: world.color,
+      shapeType: world.id === 'nerd' ? 'ufo' : 'triangle',
+    });
     scene.add(shell.group);
     categoryShellRef.current = shell;
     shell.setActive(activeCategory);

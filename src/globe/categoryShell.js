@@ -39,6 +39,53 @@ function shrinkVertex(v, rawCentroid, radius) {
   return v.clone().sub(rawCentroid).multiplyScalar(TRIANGLE_SHRINK).add(rawCentroid).normalize().multiplyScalar(radius);
 }
 
+// Sagoma di un UFO (disco + cupola), presa "solo la forma" da un'immagine di
+// riferimento — nessun dettaglio (finestrini, luci) né colore, quella resta
+// sempre quella della categoria (vedi material sotto). Disegnata in un
+// piano locale 2D, x in [-1, 1]: la si scala e orienta poi per farla stare
+// esattamente dove stava il triangolo che sostituisce (vedi placeShape).
+function buildUfoShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-1, -0.05);
+  // Pancia del disco (curva verso il basso) da punta sinistra a punta destra.
+  shape.bezierCurveTo(-0.5, -0.3, 0.5, -0.3, 1, -0.05);
+  // Bordo superiore del disco, punta destra -> base destra della cupola.
+  shape.quadraticCurveTo(0.97, 0.02, 0.85, 0.05);
+  shape.quadraticCurveTo(0.62, 0.08, 0.42, 0.09);
+  // Cupola.
+  shape.bezierCurveTo(0.38, 0.45, -0.38, 0.45, -0.42, 0.09);
+  // Base sinistra della cupola -> punta sinistra.
+  shape.quadraticCurveTo(-0.62, 0.08, -0.85, 0.05);
+  shape.quadraticCurveTo(-0.97, 0.02, -1, -0.05);
+  shape.closePath();
+  return shape;
+}
+
+// Trasforma la geometria piatta di una sagoma 2D (x/y locali, z=0) perché
+// stia tangente alla sfera nello stesso punto/della stessa dimensione
+// occupata dal triangolo che sostituisce: centro in shapeCenter (sulla
+// sfera, come il triangolo), assi locali (right/up) tangenti alla sfera in
+// quel punto, scala = ingombro medio del triangolo originale dal suo
+// centro (così la sagoma non risulta né minuscola né sproporzionata), più
+// un piccolo distacco lungo la normale per non litigare (z-fighting) con
+// guscio/nucleo sotto.
+const SHAPE_SURFACE_OFFSET = 0.6;
+function placeShapeOnSphere(geometry, normal, shapeCenter, scale) {
+  const worldUp = Math.abs(normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+  const up = new THREE.Vector3().crossVectors(normal, right).normalize();
+  const basis = new THREE.Matrix4().makeBasis(right, up, normal);
+  geometry.scale(scale, scale, 1);
+  geometry.applyMatrix4(basis);
+  geometry.translate(
+    shapeCenter.x + normal.x * SHAPE_SURFACE_OFFSET,
+    shapeCenter.y + normal.y * SHAPE_SURFACE_OFFSET,
+    shapeCenter.z + normal.z * SHAPE_SURFACE_OFFSET
+  );
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // Tra tutti i punti in cui si può spezzare il testo in due (a uno spazio),
 // sceglie quello che bilancia meglio le due righe (minimizza la più larga
 // delle due), invece di riempire la prima riga fino al massimo consentito.
@@ -137,7 +184,7 @@ export function makeLabelSprite(text, spriteScale) {
 // almeno una faccia vuota di margine, così restano nettamente staccate, senza
 // dover rimpicciolire ulteriormente i triangoli), così la stessa coordinata
 // può essere riusata per centrare la camera (vedi App.jsx).
-export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6' } = {}) {
+export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6', shapeType = 'triangle' } = {}) {
   const detail = pickDetailLevel(categories.length);
   const geo = new THREE.IcosahedronGeometry(radius, detail);
   const pos = geo.getAttribute('position'); // non indicizzata: 3 vertici propri per faccia
@@ -246,9 +293,17 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
     });
     positions[cat.id] = vectorToPolar(normal);
 
-    const triGeo = new THREE.BufferGeometry();
-    triGeo.setAttribute('position', new THREE.Float32BufferAttribute([sa.x, sa.y, sa.z, sb.x, sb.y, sb.z, sc.x, sc.y, sc.z], 3));
-    triGeo.computeVertexNormals();
+    let faceGeo;
+    if (shapeType === 'ufo') {
+      const shapeCenter = normal.clone().multiplyScalar(radius);
+      const scale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
+      faceGeo = new THREE.ShapeGeometry(buildUfoShape(), 24);
+      placeShapeOnSphere(faceGeo, normal, shapeCenter, scale);
+    } else {
+      faceGeo = new THREE.BufferGeometry();
+      faceGeo.setAttribute('position', new THREE.Float32BufferAttribute([sa.x, sa.y, sa.z, sb.x, sb.y, sb.z, sc.x, sc.y, sc.z], 3));
+      faceGeo.computeVertexNormals();
+    }
 
     const material = new THREE.MeshBasicMaterial({
       color,
@@ -257,11 +312,11 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const mesh = new THREE.Mesh(triGeo, material);
+    const mesh = new THREE.Mesh(faceGeo, material);
     mesh.userData.categoryId = cat.id;
     group.add(mesh);
     faceMeshes.push(mesh);
-    disposables.push(triGeo, material);
+    disposables.push(faceGeo, material);
 
     const { sprite, material: labelMat, texture } = makeLabelSprite(cat.label, labelScale);
     sprite.position.copy(normal).multiplyScalar(radius + 3);
