@@ -34,6 +34,17 @@
   object-fit: cover;
 }
 
+.rb-friend-chat-avatar-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
 .rb-friend-chat-header strong {
   flex: 1;
   font-size: 15px;

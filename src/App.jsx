@@ -1257,6 +1257,7 @@ export default function App() {
           <FriendChatModal
             friendId={activeFriendChatId}
             user={user}
+            world={world}
             onClose={() => setActiveFriendChatId(null)}
             onMessagesRead={refreshUnread}
           />

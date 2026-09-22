@@ -26,6 +26,20 @@
   color: #f5f5f7;
   cursor: pointer;
   text-align: left;
+  transition: border-color 0.15s ease;
+}
+
+.rb-dm-row-avatar-btn {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.rb-dm-row-avatar-btn:hover,
+.rb-dm-row-avatar-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
 }
 
 .rb-dm-row-main img {

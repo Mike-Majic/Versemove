@@ -13,6 +13,7 @@ import {
   CHAT_MAX_FILE_BYTES,
 } from '../data/directChat';
 import ChatAttachment from './chat/ChatAttachment';
+import ContactProfileModal from './chat/ContactProfileModal';
 import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
 import ModalOverlay from './ModalOverlay';
@@ -24,8 +25,11 @@ import './FriendChatModal.css';
 // una copia locale per browser — chi scrive e chi legge vedono davvero lo
 // stesso scambio. In tempo reale via un canale Supabase per la conversazione
 // aperta: se la connessione realtime cade e si ristabilisce, i messaggi
-// vengono ricaricati dal DB per non perderne nel frattempo.
-export default function FriendChatModal({ friendId, user, onClose, onMessagesRead }) {
+// vengono ricaricati dal DB per non perderne nel frattempo. `world` è il
+// mondo da cui si sta scrivendo in questo momento: viaggia con ogni
+// messaggio (vedi sendMessage/sendFile/sendLocation) solo per colorare la
+// card dell'ultimo messaggio nell'hub 💬, non cambia nient'altro.
+export default function FriendChatModal({ friendId, user, world, onClose, onMessagesRead }) {
   const [conversationId, setConversationId] = useState(null);
   const [friend, setFriend] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -47,6 +51,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
   const photoInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,7 +167,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
     const text = draft.trim();
     if (!text || !conversationId || sending) return;
     setSending(true);
-    const { id, createdAt, error: sendError } = await sendMessage(conversationId, text);
+    const { id, createdAt, error: sendError } = await sendMessage(conversationId, text, { mondo: world?.id ?? null });
     setSending(false);
     if (sendError) {
       setError(sendError);
@@ -205,7 +210,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
     }
     const allegato = { path: up.path, nome: up.nome, mime: up.mime, size: up.size };
     const label = tipo === 'foto' ? '📷 Foto' : `📎 ${up.nome}`;
-    const res = await sendMessage(conversationId, label, { tipo, allegato });
+    const res = await sendMessage(conversationId, label, { tipo, allegato, mondo: world?.id ?? null });
     if (res.error) {
       setAttachStatus(`⚠️ ${res.error}`);
       return;
@@ -231,7 +236,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
           lng: Number(pos.coords.longitude.toFixed(6)),
           precisione: Math.round(pos.coords.accuracy || 0),
         };
-        const res = await sendMessage(conversationId, '📍 Posizione', { tipo: 'posizione', allegato });
+        const res = await sendMessage(conversationId, '📍 Posizione', { tipo: 'posizione', allegato, mondo: world?.id ?? null });
         if (res.error) {
           setAttachStatus(`⚠️ ${res.error}`);
           return;
@@ -264,13 +269,21 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
         <div className="rb-friend-chat-header">
           {friend && (
             <>
-              {friend.avatar ? (
-                <img src={friend.avatar} alt="" />
-              ) : (
-                <span className="rb-friend-chat-avatar-empty" aria-hidden="true">
-                  {(friend.name || '?').trim().charAt(0).toUpperCase()}
-                </span>
-              )}
+              <button
+                type="button"
+                className="rb-friend-chat-avatar-btn"
+                onClick={() => setProfilePreviewOpen(true)}
+                aria-label={`Vedi profilo di ${friend.name}`}
+                title="Vedi profilo"
+              >
+                {friend.avatar ? (
+                  <img src={friend.avatar} alt="" />
+                ) : (
+                  <span className="rb-friend-chat-avatar-empty" aria-hidden="true">
+                    {(friend.name || '?').trim().charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </button>
               <strong>{friend.name}</strong>
             </>
           )}
@@ -402,6 +415,10 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
           friend={friend}
           registerStart={(fn) => { startCallRef.current = fn; }}
         />
+      )}
+
+      {profilePreviewOpen && friend && (
+        <ContactProfileModal contact={friend} onClose={() => setProfilePreviewOpen(false)} />
       )}
     </ModalOverlay>
   );

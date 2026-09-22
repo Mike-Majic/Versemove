@@ -47,14 +47,16 @@ export async function fetchMessages(conversationId) {
 // tipo: 'testo' | 'foto' | 'file' | 'posizione'. Per gli allegati `testo`
 // contiene comunque un'etichetta breve ("📷 Foto", "📎 nome.pdf", "📍
 // Posizione") così le anteprime delle conversazioni e le notifiche, che
-// leggono solo il testo, restano leggibili.
-export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null } = {}) {
+// leggono solo il testo, restano leggibili. `mondo` è il mondo attivo al
+// momento dell'invio (non quello in cui è nata la conversazione): serve solo
+// a colorare la card dell'ultimo messaggio nell'hub, vedi listMyConversations.
+export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null, mondo = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato })
+      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato, mondo })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
@@ -181,7 +183,7 @@ export async function listMyConversations() {
 
     const { data: recentMessages } = await supabase
       .from('chat_messages')
-      .select('conversation_id, testo, created_at')
+      .select('conversation_id, testo, created_at, mondo')
       .in('conversation_id', convIds)
       .order('created_at', { ascending: false });
     const lastMsgByConv = new Map();
@@ -204,6 +206,7 @@ export async function listMyConversations() {
           other: profilesMap.get(otherId) ?? { id: otherId, name: 'Utente', avatar: '' },
           lastMessage: lastMsg?.testo ?? null,
           lastMessageAt: lastMsg?.created_at ?? null,
+          lastMessageMondo: lastMsg?.mondo ?? null,
           unread: unreadCounts.get(convId) ?? 0,
           archived: archivedMap.get(convId) ?? false,
         };

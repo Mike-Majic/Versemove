@@ -1,16 +1,49 @@
 import { useEffect, useState } from 'react';
 import ModalOverlay from './ModalOverlay';
 import ContactsPanel from './ContactsPanel';
+import ContactProfileModal from './chat/ContactProfileModal';
 import { formatRelativeDate } from './social/resolveAuthor';
 import { listMyConversations, setConversationArchived } from '../data/directChat';
+import { WORLDS } from '../data/worlds';
 import './FriendsModal.css';
 import './DMHub.css';
 
-function ConversationRow({ conv, onOpen, onArchiveToggle }) {
+// Colore del mondo da cui è arrivato l'ultimo messaggio di una
+// conversazione, per il bordo della card (richiesta di Mike): un solo
+// contatto, una sola chat unificata fra tutti i mondi (vedi
+// start_direct_conversation, che riusa sempre la stessa conversazione),
+// ma il bordo cambia colore in base a dove si è scritto per ultimo.
+const WORLD_COLOR_BY_ID = new Map(WORLDS.map((w) => [w.id, w.color]));
+
+function ConversationRow({ conv, onOpen, onArchiveToggle, onOpenProfile }) {
+  const borderColor = WORLD_COLOR_BY_ID.get(conv.lastMessageMondo) ?? null;
   return (
     <li className="rb-dm-row">
-      <button type="button" className="rb-dm-row-main" onClick={() => onOpen(conv.other.id)}>
-        <img src={conv.other.avatar} alt="" />
+      <button
+        type="button"
+        className="rb-dm-row-main"
+        style={borderColor ? { borderColor } : undefined}
+        onClick={() => onOpen(conv.other.id)}
+      >
+        <span
+          className="rb-dm-row-avatar-btn"
+          role="button"
+          tabIndex={0}
+          aria-label={`Vedi profilo di ${conv.other.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenProfile(conv.other);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenProfile(conv.other);
+            }
+          }}
+        >
+          <img src={conv.other.avatar} alt="" />
+        </span>
         <div className="rb-dm-row-text">
           <strong>{conv.other.name}</strong>
           <p>{conv.lastMessage ?? 'Nessun messaggio ancora'}</p>
@@ -34,6 +67,7 @@ function ConversationRow({ conv, onOpen, onArchiveToggle }) {
 export default function DMHub({ onClose, onOpenChat, onFriendsChanged, initialTab = 'messaggi' }) {
   const [tab, setTab] = useState(initialTab); // 'messaggi' | 'archiviati' | 'contatti'
   const [conversations, setConversations] = useState(null);
+  const [profilePreview, setProfilePreview] = useState(null);
 
   const refresh = () => {
     listMyConversations().then(setConversations);
@@ -77,11 +111,19 @@ export default function DMHub({ onClose, onOpenChat, onFriendsChanged, initialTa
         ) : (
           <ul className="rb-dm-list">
             {visible.map((c) => (
-              <ConversationRow key={c.conversationId} conv={c} onOpen={onOpenChat} onArchiveToggle={toggleArchive} />
+              <ConversationRow
+                key={c.conversationId}
+                conv={c}
+                onOpen={onOpenChat}
+                onArchiveToggle={toggleArchive}
+                onOpenProfile={setProfilePreview}
+              />
             ))}
           </ul>
         )}
       </div>
+
+      {profilePreview && <ContactProfileModal contact={profilePreview} onClose={() => setProfilePreview(null)} />}
     </ModalOverlay>
   );
 }
