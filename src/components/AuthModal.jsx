@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { registerAccount, loginAccount, resendConfirmationEmail } from '../data/accounts';
 import { setRememberMe } from '../data/supabaseClient';
 import { computeAge } from '../data/age';
 import { WORLDS } from '../data/worlds';
+import { SUPPORTED_LANGUAGES, setAppLanguage } from '../i18n';
+import { translateWorld } from '../i18n/worldLabels';
 import ModalOverlay from './ModalOverlay';
 import TermsModal from './TermsModal';
 import './AuthModal.css';
 
-// Preimpostazioni più comuni per i pronomi: coprono la maggior parte dei
-// casi con un click, "Altro" lascia comunque scrivere qualsiasi cosa a chi
-// non si riconosce in queste opzioni.
+// Preimpostazioni più comuni per i pronomi (valori stabili, mai tradotti:
+// sono ciò che si manda a registerAccount — solo l'ETICHETTA mostrata
+// cambia lingua, letta da auth.pronouns.* nei file di traduzione).
 const PRONOMI_PRESETS = [
-  { value: 'non_specificato', label: 'Preferisco non specificare' },
-  { value: 'lui', label: 'Lui (he/him)' },
-  { value: 'lei', label: 'Lei (she/her)' },
-  { value: 'loro', label: 'Loro (they/them)' },
-  { value: 'altro', label: 'Altro (scrivi tu)' },
+  { value: 'non_specificato', key: 'unspecified' },
+  { value: 'lui', key: 'he' },
+  { value: 'lei', key: 'she' },
+  { value: 'loro', key: 'they' },
+  { value: 'altro', key: 'other' },
 ];
 
 const PARTITA_IVA_PATTERN = /^\d{11}$/;
@@ -30,6 +33,7 @@ const SDI_PATTERN = /^([A-Za-z0-9]{7}|0000000)$/;
 // ruolo si assegna da solo in base alla mail (lato server, vedi la funzione
 // di registrazione su Supabase) — qui non si sceglie mai.
 export default function AuthModal({ open, onClose, onLogin }) {
+  const { t, i18n } = useTranslation();
   const [mode, setMode] = useState('login');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -54,6 +58,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
   const [genere, setGenere] = useState('');
   const [pronomiPreset, setPronomiPreset] = useState('non_specificato');
   const [pronomiCustom, setPronomiCustom] = useState('');
+  // Parte dalla lingua già attiva (rilevata dal browser o già scelta in
+  // precedenza su questo dispositivo, vedi i18n/index.js): cambiarla qui
+  // aggiorna subito TUTTO il sito (setAppLanguage), non solo il modulo —
+  // è il punto "diventa della lingua selezionata" della richiesta.
+  const [lingua, setLingua] = useState(i18n.language);
   // Tutti i mondi abilitati di default: chi si registra può deselezionarne
   // alcuni (es. vuole usare solo il mondo Nerd), non deve spuntarli a mano
   // uno per uno per averli tutti.
@@ -149,7 +158,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
     setRememberMe(true);
 
     if (password !== passwordConfirm) {
-      setError('Le due password non coincidono.');
+      setError(t('auth.errors.passwordMismatch'));
       return;
     }
     // Il DB ora rifiuta comunque chi ha meno di 14 anni (o nessuna data di
@@ -159,51 +168,51 @@ export default function AuthModal({ open, onClose, onLogin }) {
     // registerAccount, che dà un messaggio diverso e più completo.
     const age = computeAge(dataNascita);
     if (age !== null && age < 14) {
-      setError('Devi avere almeno 14 anni per registrarti.');
+      setError(t('auth.errors.tooYoung'));
       return;
     }
     if (!genere) {
-      setError('Seleziona il genere.');
+      setError(t('auth.errors.genderRequired'));
       return;
     }
     if (!mondiAbilitati.length) {
-      setError('Scegli almeno un mondo da abilitare.');
+      setError(t('auth.errors.worldsRequired'));
       return;
     }
     if (!termsAccepted) {
-      setError('Devi accettare i Termini di servizio e l\'Informativa Privacy per registrarti.');
+      setError(t('auth.errors.termsRequired'));
       return;
     }
     if (tipoAccount === 'azienda') {
       if (!ragioneSociale.trim()) {
-        setError('Inserisci la ragione sociale.');
+        setError(t('auth.errors.companyNameRequired'));
         return;
       }
       if (!PARTITA_IVA_PATTERN.test(partitaIva.trim())) {
-        setError('La partita IVA deve essere di 11 cifre numeriche.');
+        setError(t('auth.errors.vatInvalid'));
         return;
       }
       if (codiceFiscale.trim() && !CODICE_FISCALE_PATTERN.test(codiceFiscale.trim())) {
-        setError('Il codice fiscale non è in un formato valido.');
+        setError(t('auth.errors.taxCodeInvalid'));
         return;
       }
       if (!pec.trim() && !codiceSdi.trim()) {
-        setError('Per la fatturazione elettronica serve almeno uno tra PEC e Codice SDI.');
+        setError(t('auth.errors.pecOrSdiRequired'));
         return;
       }
       if (pec.trim() && !PEC_PATTERN.test(pec.trim())) {
-        setError('La PEC non è un indirizzo mail valido.');
+        setError(t('auth.errors.pecInvalid'));
         return;
       }
       if (codiceSdi.trim() && !SDI_PATTERN.test(codiceSdi.trim())) {
-        setError('Il Codice SDI deve essere di 7 caratteri alfanumerici (o "0000000" se usi solo la PEC).');
+        setError(t('auth.errors.sdiInvalid'));
         return;
       }
     }
 
     const pronomi = pronomiPreset === 'altro'
       ? pronomiCustom.trim()
-      : PRONOMI_PRESETS.find((p) => p.value === pronomiPreset)?.label ?? '';
+      : t(`auth.pronouns.${PRONOMI_PRESETS.find((p) => p.value === pronomiPreset)?.key}`, '');
 
     setBusy(true);
     const { account, error: err, needsEmailConfirmation, attachmentError } = await registerAccount({
@@ -226,6 +235,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
       termsAcceptedAt: new Date().toISOString(),
       consensoMarketing,
       mondiAbilitati,
+      lingua,
     });
     setBusy(false);
     if (err) {
@@ -233,7 +243,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
       return;
     }
     if (needsEmailConfirmation) {
-      setInfo('Account creato: controlla la tua mail e conferma l\'indirizzo, poi accedi da qui con mail e password.');
+      setInfo(t('auth.info.accountCreated'));
       setPendingConfirmEmail(email);
       setResendOk(false);
       setMode('login');
@@ -249,22 +259,22 @@ export default function AuthModal({ open, onClose, onLogin }) {
         onClick={(e) => e.stopPropagation()}
         onSubmit={mode === 'login' ? submitLogin : submitRegister}
       >
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-        <h2>{mode === 'login' ? 'Accedi a Versemove' : 'Crea un account'}</h2>
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
+        <h2>{mode === 'login' ? t('auth.title.login') : t('auth.title.register')}</h2>
 
         <div className="rb-auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => switchMode('login')}>
-            Accedi
+            {t('auth.tabs.login')}
           </button>
           <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => switchMode('register')}>
-            Registrati
+            {t('auth.tabs.register')}
           </button>
         </div>
 
         {mode === 'login' ? (
           <>
             <label className="rb-field">
-              <span>Mail</span>
+              <span>{t('auth.fields.mail')}</span>
               <input
                 type="email"
                 name="email"
@@ -276,7 +286,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
               />
             </label>
             <label className="rb-field">
-              <span>Password</span>
+              <span>{t('auth.fields.password')}</span>
               <input
                 type="password"
                 name="password"
@@ -288,25 +298,25 @@ export default function AuthModal({ open, onClose, onLogin }) {
             </label>
             <label className="rb-field rb-auth-checkbox-field">
               <input type="checkbox" checked={rememberChecked} onChange={(e) => setRememberChecked(e.target.checked)} />
-              <span>Ricordami su questo dispositivo</span>
+              <span>{t('auth.fields.rememberMe')}</span>
             </label>
           </>
         ) : (
           <>
             <label className="rb-field">
-              <span>Nome utente</span>
+              <span>{t('auth.fields.username')}</span>
               <input type="text" autoFocus autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>Nickname</span>
+              <span>{t('auth.fields.nickname')}</span>
               <input type="text" autoComplete="off" value={nickname} onChange={(e) => setNickname(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>Mail</span>
+              <span>{t('auth.fields.mail')}</span>
               <input type="email" name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>Password</span>
+              <span>{t('auth.fields.password')}</span>
               <input
                 type="password"
                 name="new-password"
@@ -316,7 +326,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
               />
             </label>
             <label className="rb-field">
-              <span>Conferma password</span>
+              <span>{t('auth.fields.confirmPassword')}</span>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -325,7 +335,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
               />
             </label>
             <label className="rb-field">
-              <span>Data di nascita</span>
+              <span>{t('auth.fields.birthDate')}</span>
               <input
                 type="date"
                 autoComplete="off"
@@ -334,40 +344,58 @@ export default function AuthModal({ open, onClose, onLogin }) {
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setDataNascita(e.target.value)}
               />
-              <span className="rb-auth-field-hint">Serve per i mondi riservati ai maggiorenni.</span>
+              <span className="rb-auth-field-hint">{t('auth.fields.birthDateHint')}</span>
             </label>
             <label className="rb-field">
-              <span>Cellulare (facoltativo)</span>
+              <span>{t('auth.fields.phone')}</span>
               <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>Mail di backup (facoltativa)</span>
+              <span>{t('auth.fields.backupEmail')}</span>
               <input type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>Allegati (facoltativi)</span>
+              <span>{t('auth.fields.attachments')}</span>
               <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={onFilesChosen} />
               {attachments.length > 0 && (
-                <span className="rb-auth-attachments-count">{attachments.length} file selezionati</span>
+                <span className="rb-auth-attachments-count">
+                  {t('auth.fields.attachmentsCount', { count: attachments.length })}
+                </span>
               )}
             </label>
 
+            <label className="rb-field">
+              <span>{t('auth.fields.language')}</span>
+              <select
+                value={lingua}
+                onChange={(e) => {
+                  setLingua(e.target.value);
+                  setAppLanguage(e.target.value);
+                }}
+              >
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.nativeLabel}</option>
+                ))}
+              </select>
+              <span className="rb-auth-field-hint">{t('auth.fields.languageHint')}</span>
+            </label>
+
             <div className="rb-field">
-              <span>Tipo di account</span>
+              <span>{t('auth.fields.accountType')}</span>
               <div className="rb-auth-segmented">
                 <button
                   type="button"
                   className={tipoAccount === 'persona' ? 'active' : ''}
                   onClick={() => setTipoAccount('persona')}
                 >
-                  Persona
+                  {t('auth.accountType.person')}
                 </button>
                 <button
                   type="button"
                   className={tipoAccount === 'azienda' ? 'active' : ''}
                   onClick={() => setTipoAccount('azienda')}
                 >
-                  Azienda / P.IVA
+                  {t('auth.accountType.company')}
                 </button>
               </div>
             </div>
@@ -375,7 +403,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
             {tipoAccount === 'azienda' && (
               <>
                 <label className="rb-field">
-                  <span>Ragione sociale</span>
+                  <span>{t('auth.fields.companyName')}</span>
                   <input
                     type="text"
                     autoComplete="organization"
@@ -384,7 +412,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
                   />
                 </label>
                 <label className="rb-field">
-                  <span>Partita IVA</span>
+                  <span>{t('auth.fields.vatNumber')}</span>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -393,10 +421,10 @@ export default function AuthModal({ open, onClose, onLogin }) {
                     value={partitaIva}
                     onChange={(e) => setPartitaIva(e.target.value.replace(/\D/g, ''))}
                   />
-                  <span className="rb-auth-field-hint">11 cifre numeriche, senza spazi né prefisso IT.</span>
+                  <span className="rb-auth-field-hint">{t('auth.fields.vatNumberHint')}</span>
                 </label>
                 <label className="rb-field">
-                  <span>Codice fiscale (facoltativo)</span>
+                  <span>{t('auth.fields.taxCode')}</span>
                   <input
                     type="text"
                     autoComplete="off"
@@ -405,11 +433,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
                   />
                 </label>
                 <label className="rb-field">
-                  <span>PEC</span>
+                  <span>{t('auth.fields.pec')}</span>
                   <input type="email" autoComplete="off" value={pec} onChange={(e) => setPec(e.target.value)} />
                 </label>
                 <label className="rb-field">
-                  <span>Codice SDI</span>
+                  <span>{t('auth.fields.sdiCode')}</span>
                   <input
                     type="text"
                     maxLength={7}
@@ -417,32 +445,32 @@ export default function AuthModal({ open, onClose, onLogin }) {
                     value={codiceSdi}
                     onChange={(e) => setCodiceSdi(e.target.value.toUpperCase())}
                   />
-                  <span className="rb-auth-field-hint">Serve almeno uno tra PEC e Codice SDI, per la fatturazione elettronica.</span>
+                  <span className="rb-auth-field-hint">{t('auth.fields.sdiCodeHint')}</span>
                 </label>
               </>
             )}
 
             <label className="rb-field">
-              <span>Genere</span>
+              <span>{t('auth.fields.gender')}</span>
               <select value={genere} onChange={(e) => setGenere(e.target.value)}>
-                <option value="" disabled>Seleziona...</option>
-                <option value="uomo">Uomo</option>
-                <option value="donna">Donna</option>
+                <option value="" disabled>{t('auth.gender.placeholder')}</option>
+                <option value="uomo">{t('auth.gender.male')}</option>
+                <option value="donna">{t('auth.gender.female')}</option>
               </select>
             </label>
 
             <label className="rb-field">
-              <span>Pronomi</span>
+              <span>{t('auth.fields.pronouns')}</span>
               <select value={pronomiPreset} onChange={(e) => setPronomiPreset(e.target.value)}>
                 {PRONOMI_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                  <option key={p.value} value={p.value}>{t(`auth.pronouns.${p.key}`)}</option>
                 ))}
               </select>
               {pronomiPreset === 'altro' && (
                 <input
                   type="text"
                   className="rb-auth-pronomi-custom"
-                  placeholder="Scrivi i tuoi pronomi"
+                  placeholder={t('auth.pronouns.customPlaceholder')}
                   value={pronomiCustom}
                   onChange={(e) => setPronomiCustom(e.target.value)}
                 />
@@ -450,7 +478,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
             </label>
 
             <div className="rb-field">
-              <span>Mondi da abilitare</span>
+              <span>{t('auth.fields.worldsToEnable')}</span>
               <div className="rb-auth-worlds-box">
                 {WORLDS.map((w) => (
                   <label key={w.id} className="rb-auth-world-row">
@@ -464,13 +492,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
                       }
                     />
                     <span className="rb-auth-world-dot" style={{ background: w.color }} />
-                    <span>{w.label}</span>
+                    <span>{translateWorld(t, w).label}</span>
                   </label>
                 ))}
               </div>
-              <span className="rb-auth-field-hint">
-                Potrai attivarli o disattivarli in qualsiasi momento dalle Impostazioni (fino a 4 volte a settimana).
-              </span>
+              <span className="rb-auth-field-hint">{t('auth.worldsHint')}</span>
             </div>
 
             <label className="rb-field rb-auth-checkbox-field">
@@ -480,7 +506,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
                 onChange={(e) => setTermsAccepted(e.target.checked)}
               />
               <span>
-                Ho letto e accetto i{' '}
+                {t('auth.terms.prefix')}{' '}
                 <button
                   type="button"
                   className="rb-auth-terms-link"
@@ -494,9 +520,9 @@ export default function AuthModal({ open, onClose, onLogin }) {
                     setShowTerms(true);
                   }}
                 >
-                  Termini di servizio e l'Informativa Privacy
+                  {t('auth.terms.link')}
                 </button>
-                {' '}(obbligatorio)
+                {' '}{t('auth.terms.suffix')}
               </span>
             </label>
 
@@ -506,7 +532,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
                 checked={consensoMarketing}
                 onChange={(e) => setConsensoMarketing(e.target.checked)}
               />
-              <span>Voglio ricevere comunicazioni e novità su Versemove (facoltativo)</span>
+              <span>{t('auth.marketing')}</span>
             </label>
           </>
         )}
@@ -516,13 +542,13 @@ export default function AuthModal({ open, onClose, onLogin }) {
 
         {pendingConfirmEmail && !resendOk && (
           <button type="button" className="rb-auth-resend-btn" onClick={resendConfirmation} disabled={busy}>
-            Rinvia mail di conferma a {pendingConfirmEmail}
+            {t('auth.resendButton', { email: pendingConfirmEmail })}
           </button>
         )}
-        {resendOk && <p className="rb-auth-info">Mail inviata di nuovo: controlla la posta (anche spam).</p>}
+        {resendOk && <p className="rb-auth-info">{t('auth.resendSuccess')}</p>}
 
         <button type="submit" className="rb-btn-primary rb-auth-submit" disabled={busy}>
-          {busy ? 'Un attimo…' : mode === 'login' ? 'Entra' : 'Crea account'}
+          {busy ? t('auth.submit.oneMoment') : mode === 'login' ? t('auth.submit.login') : t('auth.submit.register')}
         </button>
       </form>
 

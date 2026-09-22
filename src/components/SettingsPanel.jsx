@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
@@ -7,6 +8,8 @@ import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
 import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
 import { getQualityMode, setQualityMode } from '../fx/quality';
+import { SUPPORTED_LANGUAGES, setAppLanguage } from '../i18n';
+import { translateWorld } from '../i18n/worldLabels';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import './SettingsPanel.css';
@@ -66,6 +69,7 @@ function CollapsibleSection({ title, infoText, open, onToggle, children, level =
 // profilo/marker smette di comparire in quel mondo per gli altri utenti
 // (vedi il filtro su globeUsers in App.jsx).
 function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState(user?.mondiAbilitati?.length ? user.mondiAbilitati : WORLDS.map((w) => w.id));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -112,16 +116,33 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
           <label key={w.id} className="rb-settings-world-row">
             <input type="checkbox" checked={selected.includes(w.id)} onChange={() => toggle(w.id)} />
             <span className="rb-settings-world-dot" style={{ background: w.color }} />
-            <span>{w.label}</span>
+            <span>{translateWorld(t, w).label}</span>
           </label>
         ))}
       </div>
       {error && <p className="rb-privacy-error">{error}</p>}
       {success && <p className="rb-privacy-success">{success}</p>}
       <button type="button" className="rb-reset-filters-btn" onClick={save} disabled={busy}>
-        {busy ? 'Un attimo…' : 'Salva'}
+        {busy ? t('common.oneMoment') : t('common.save')}
       </button>
     </>
+  );
+}
+
+// Sotto-voce "Lingua" di "Personalizza il tuo Versemove": stesso selettore
+// usato in registrazione (AuthModal), qui per cambiarla in qualsiasi
+// momento. Salva solo sul dispositivo (vedi commento in i18n/index.js) —
+// quando Cowork avrà creato profiles.lingua andrà salvata anche lì.
+function LanguageSubsection() {
+  const { i18n } = useTranslation();
+  return (
+    <label className="rb-field">
+      <select value={i18n.language} onChange={(e) => setAppLanguage(e.target.value)}>
+        {SUPPORTED_LANGUAGES.map((l) => (
+          <option key={l.code} value={l.code}>{l.nativeLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -452,6 +473,7 @@ export default function SettingsPanel({
   onUnfriend,
   onAccountDeleted,
 }) {
+  const { t } = useTranslation();
   const [luogoOpen, setLuogoOpen] = useState(false);
   const [personalizzaOpen, setPersonalizzaOpen] = useState(false);
   const [personalizzaSub, setPersonalizzaSub] = useState('');
@@ -700,6 +722,16 @@ export default function SettingsPanel({
             onToggle={() => togglePersonalizzaSub('mondi')}
           >
             <WorldsSubsection user={user} onOpenAuth={onOpenAuth} onUpdateUser={onUpdateUser} />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            level="sub"
+            title={t('settings.language.title')}
+            infoText={t('settings.language.hint')}
+            open={personalizzaSub === 'lingua'}
+            onToggle={() => togglePersonalizzaSub('lingua')}
+          >
+            <LanguageSubsection />
           </CollapsibleSection>
         </CollapsibleSection>
 

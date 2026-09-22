@@ -175,6 +175,7 @@ export async function registerAccount({
   termsAcceptedAt,
   consensoMarketing,
   mondiAbilitati,
+  lingua,
 }) {
   const cleanEmail = (email ?? '').trim().toLowerCase();
   if (!username?.trim() || !nickname?.trim() || !cleanEmail || !password || !dataNascita) {
@@ -220,6 +221,12 @@ export async function registerAccount({
         termsAcceptedAt,
         consensoMarketing: Boolean(consensoMarketing),
         mondiAbilitati,
+        // Letta da chi si registra dal selettore lingua (vedi AuthModal):
+        // finché Cowork non crea profiles.lingua e non aggiorna il trigger
+        // handle_new_user() per leggerla da qui, resta salvata solo in
+        // questi metadati Auth (mai persa: basta aggiornare il trigger per
+        // farla arrivare anche sul profilo, senza toccare il client).
+        lingua: lingua || 'it',
       },
     },
   });

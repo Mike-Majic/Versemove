@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
+import { translateWorld } from './i18n/worldLabels';
 import TopBar from './components/TopBar';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
@@ -123,6 +125,7 @@ function loadStored(key, fallback) {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   // Mentre un minigioco del mondo Bambini è aperto, lo swipe/le frecce non
   // devono cambiare mondo: alcuni giochi (es. Snake) usano le stesse frecce
   // per i propri controlli.
@@ -986,10 +989,10 @@ export default function App() {
                 {c.label}
               </button>
             ))
-          : world.tagline}
+          : translateWorld(t, world).tagline}
       </div>
 
-      <nav className="rb-world-dots" aria-label="Cambia mondo">
+      <nav className="rb-world-dots" aria-label={t('common.changeWorld')}>
         {WORLDS.map((w, i) => (
           <button
             key={w.id}
@@ -999,8 +1002,8 @@ export default function App() {
               if (w.id === world.id) return;
               setWarpRequest({ worldId: w.id, ts: Date.now() });
             }}
-            aria-label={`Vai al mondo ${w.label}`}
-            title={w.label}
+            aria-label={t('common.goToWorld', { world: translateWorld(t, w).label })}
+            title={translateWorld(t, w).label}
           >
             <MiniGlobeIcon />
           </button>

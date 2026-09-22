@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { isStaff } from '../data/roles';
+import { translateWorld } from '../i18n/worldLabels';
 import './TopBar.css';
 
 export default function TopBar({
@@ -14,6 +16,7 @@ export default function TopBar({
   unreadMessagesCount = 0,
   unreadNotifCount = 0,
 }) {
+  const { t } = useTranslation();
   return (
     <header className="rb-topbar" style={{ '--accent': world.color }}>
       <div className="rb-topbar-brand">
@@ -21,41 +24,41 @@ export default function TopBar({
           <img className="rb-logo-icon" src={`${import.meta.env.BASE_URL}icons/logo-160.png`} alt="" />
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
-        <span className="rb-world-pill">{world.label}</span>
+        <span className="rb-world-pill">{translateWorld(t, world).label}</span>
       </div>
 
       <div className="rb-topbar-actions">
         {user ? (
           <div className="rb-user-chip">
-            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenNotifications} aria-label="Notifiche" title="Notifiche">
+            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenNotifications} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
               🔔
               {unreadNotifCount > 0 && (
                 <span className="rb-friends-badge">{unreadNotifCount}</span>
               )}
             </button>
-            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenFriends} aria-label="Messaggi" title="Messaggi">
+            <button className="rb-icon-btn rb-friends-btn" onClick={onOpenFriends} aria-label={t('topbar.messages')} title={t('topbar.messages')}>
               💬
               {unreadMessagesCount > 0 && (
                 <span className="rb-friends-badge">{unreadMessagesCount}</span>
               )}
             </button>
             {isStaff(user.ruolo) && (
-              <button className="rb-icon-btn" onClick={onOpenAdmin} aria-label="Backend" title="Backend">
+              <button className="rb-icon-btn" onClick={onOpenAdmin} aria-label={t('topbar.backend')} title={t('topbar.backend')}>
                 🛠️
               </button>
             )}
-            <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title="Il mio profilo">
+            <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title={t('topbar.myProfile')}>
               <img src={user.avatar} alt={user.name} />
               <span>{user.name}</span>
-              {user.verificato && <span className="rb-verified-badge" title="Verificato">✓</span>}
+              {user.verificato && <span className="rb-verified-badge" title={t('topbar.verified')}>✓</span>}
             </button>
-            <button className="rb-icon-btn" onClick={onOpenSettings} aria-label="Impostazioni" title="Impostazioni">
+            <button className="rb-icon-btn" onClick={onOpenSettings} aria-label={t('topbar.settings')} title={t('topbar.settings')}>
               <GearIcon />
             </button>
-            <button className="rb-btn-ghost" onClick={onLogout}>Esci</button>
+            <button className="rb-btn-ghost" onClick={onLogout}>{t('topbar.logout')}</button>
           </div>
         ) : (
-          <button className="rb-btn-primary" onClick={onOpenAuth}>Accedi</button>
+          <button className="rb-btn-primary" onClick={onOpenAuth}>{t('topbar.login')}</button>
         )}
       </div>
     </header>
