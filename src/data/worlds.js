@@ -69,15 +69,17 @@ export const WORLDS = [
     id: 'incontri',
     label: 'Incontri',
     tagline: 'Conosci persone vicino a te',
-    // Rosso fuoco (non più il rosa-magenta di prima): pilota sia l'accento
-    // UI di tutto il mondo (--accent, vedi App.jsx) sia il colore reale
-    // della rete/puntini e dell'atmosfera del globo (vedi applyOverlayColor
-    // e atmosphereColor in WorldGlobe.jsx) — un solo valore da cambiare per
-    // "accentuare il rosso" ovunque, richiesta esplicita dell'utente.
-    color: '#ff2200',
-    colorSoft: 'rgba(255, 34, 0, 0.18)',
+    // Rosso elettrico: zero verde (il precedente #ff2200 aveva un 34/255 di
+    // verde che a schermo si leggeva come arancione, segnalato dall'utente),
+    // un filo di blu per la resa "elettrica"/al neon senza scivolare verso
+    // il rosa-magenta del colore originale. Pilota sia l'accento UI di
+    // tutto il mondo (--accent, vedi App.jsx) sia il colore reale della
+    // rete/puntini e dell'atmosfera del globo (vedi applyOverlayColor e
+    // atmosphereColor in WorldGlobe.jsx) — un solo valore per tutto.
+    color: '#ff0033',
+    colorSoft: 'rgba(255, 0, 51, 0.18)',
     globeColor: '#1f0409',
-    atmosphereColor: '#ff2200',
+    atmosphereColor: '#ff0033',
     textOnGlobe: '#ffeaf0',
   },
 ];
