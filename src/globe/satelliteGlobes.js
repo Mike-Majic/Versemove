@@ -156,8 +156,11 @@ function buildSatelliteMesh(world) {
   core.userData.isSatellite = true;
   group.add(core);
 
+  // Come nel guscio del globo grande (vedi applyOverlayColor in
+  // WorldGlobe.jsx): un mondo può avere un world.lineColor separato solo
+  // per le linee, mentre nucleo e puntini restano su world.color.
   const netMaterial = new THREE.LineBasicMaterial({
-    color: world.color,
+    color: world.lineColor ?? world.color,
     transparent: true,
     opacity: 0.85,
   });
