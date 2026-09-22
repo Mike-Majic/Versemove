@@ -47,7 +47,7 @@ export const WORLDS = [
   },
   {
     id: 'arte',
-    label: 'Arte & Musica',
+    label: 'Intrattenimento',
     tagline: 'Musica, cinema, teatro, arte',
     color: '#8b5cf6',
     colorSoft: 'rgba(139, 92, 246, 0.18)',

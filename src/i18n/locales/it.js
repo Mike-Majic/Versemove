@@ -27,7 +27,7 @@ export default {
     bambini: { label: 'Bambini', tagline: 'Minigiochi per i più piccoli' },
     social: { label: 'Social', tagline: 'Mondo Social' },
     lavoro: { label: 'Lavoro', tagline: 'Curriculum e opportunità' },
-    arte: { label: 'Arte & Musica', tagline: 'Musica, cinema, teatro, arte' },
+    arte: { label: 'Intrattenimento', tagline: 'Musica, cinema, teatro, arte' },
     nerd: { label: 'Nerd', tagline: 'Giochi da tavolo, gaming, cosplay, streaming' },
     incontri: { label: 'Incontri', tagline: 'Conosci persone vicino a te' },
     vetrina: { label: 'Vetrina', tagline: 'Novità in mostra' },

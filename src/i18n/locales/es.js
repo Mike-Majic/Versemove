@@ -23,7 +23,7 @@ export default {
     bambini: { label: 'Niños', tagline: 'Minijuegos para los más pequeños' },
     social: { label: 'Social', tagline: 'El mundo Social' },
     lavoro: { label: 'Empleo', tagline: 'Currículums y oportunidades' },
-    arte: { label: 'Arte y Música', tagline: 'Música, cine, teatro, arte' },
+    arte: { label: 'Entretenimiento', tagline: 'Música, cine, teatro, arte' },
     nerd: { label: 'Nerd', tagline: 'Juegos de mesa, videojuegos, cosplay, streaming' },
     incontri: { label: 'Citas', tagline: 'Conoce a gente cerca de ti' },
     vetrina: { label: 'Escaparate', tagline: 'Novedades en exposición' },
