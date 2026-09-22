@@ -34,6 +34,8 @@ export async function fetchMessages(conversationId) {
       senderId: row.sender_id,
       author: profilesMap.get(row.sender_id) ?? { id: row.sender_id, name: 'Utente', avatar: '' },
       testo: row.testo,
+      tipo: row.tipo ?? 'testo',
+      allegato: row.allegato ?? null,
       data: row.created_at,
     }));
     return { messages };
@@ -42,13 +44,17 @@ export async function fetchMessages(conversationId) {
   }
 }
 
-export async function sendMessage(conversationId, testo) {
+// tipo: 'testo' | 'foto' | 'file' | 'posizione'. Per gli allegati `testo`
+// contiene comunque un'etichetta breve ("📷 Foto", "📎 nome.pdf", "📍
+// Posizione") così le anteprime delle conversazioni e le notifiche, che
+// leggono solo il testo, restano leggibili.
+export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo })
+      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
@@ -242,5 +248,50 @@ export async function getDirectConversationsMap() {
     return map;
   } catch {
     return new Map();
+  }
+}
+
+
+// --- Allegati (bucket privato chat-media) -------------------------------
+// Percorso: <conversation_id>/<uid mittente>/<timestamp>-<nome>. La RLS di
+// storage lascia caricare solo nella propria cartella di una conversazione
+// di cui si fa parte, e leggere solo ai partecipanti: i file non sono mai
+// pubblici, si aprono con URL firmati a scadenza.
+export const CHAT_MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+export async function uploadChatAttachment(conversationId, file) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    if (file.size > CHAT_MAX_FILE_BYTES) return { error: 'Il file supera i 20 MB.' };
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80) || 'file';
+    const path = `${conversationId}/${auth.user.id}/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from('chat-media')
+      .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (error) {
+      if (/mime|type/i.test(error.message)) return { error: 'Tipo di file non supportato.' };
+      return { error: error.message };
+    }
+    return { path, nome: file.name, mime: file.type || '', size: file.size };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+const signedUrlCache = new Map();
+export async function getChatAttachmentUrl(path, { download = false } = {}) {
+  const key = `${path}|${download}`;
+  const cached = signedUrlCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.url;
+  try {
+    const { data, error } = await supabase.storage
+      .from('chat-media')
+      .createSignedUrl(path, 3600, download ? { download: true } : undefined);
+    if (error || !data?.signedUrl) return null;
+    signedUrlCache.set(key, { url: data.signedUrl, expires: Date.now() + 55 * 60 * 1000 });
+    return data.signedUrl;
+  } catch {
+    return null;
   }
 }

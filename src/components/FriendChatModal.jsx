@@ -9,7 +9,10 @@ import {
   subscribeToConversationMessages,
   getOtherParticipantLastRead,
   subscribeToParticipantUpdates,
+  uploadChatAttachment,
+  CHAT_MAX_FILE_BYTES,
 } from '../data/directChat';
+import ChatAttachment from './chat/ChatAttachment';
 import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
 import ModalOverlay from './ModalOverlay';
@@ -37,6 +40,13 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
   // stessa condizione richiesta dalla RLS del canale della chiamata.
   const [canCall, setCanCall] = useState(false);
   const startCallRef = useRef(null);
+  // Menu "+" accanto a Invia: foto, file, posizione GPS.
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [attachStatus, setAttachStatus] = useState('');
+  const [confirmLocation, setConfirmLocation] = useState(false);
+  const photoInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +113,19 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
           const author = isMine
             ? { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' }
             : friendRef.current ?? { id: row.sender_id, name: 'Utente', avatar: '' };
-          return [...prev, { id: row.id, conversationId: row.conversation_id, senderId: row.sender_id, author, testo: row.testo, data: row.created_at }];
+          return [
+            ...prev,
+            {
+              id: row.id,
+              conversationId: row.conversation_id,
+              senderId: row.sender_id,
+              author,
+              testo: row.testo,
+              tipo: row.tipo ?? 'testo',
+              allegato: row.allegato ?? null,
+              data: row.created_at,
+            },
+          ];
         });
         markConversationRead(conversationId);
         onMessagesRead?.();
@@ -146,19 +168,90 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
       setError(sendError);
       return;
     }
-    setMessages((prev) => [
-      ...prev,
-      {
-        id,
-        conversationId,
-        senderId: user.id,
-        author: { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' },
-        testo: text,
-        data: createdAt,
-      },
-    ]);
+    appendMine({ id, testo: text, tipo: 'testo', allegato: null, data: createdAt });
     setDraft('');
   };
+
+  const appendMine = (msg) => {
+    setMessages((prev) =>
+      prev.some((m) => m.id === msg.id)
+        ? prev
+        : [
+            ...prev,
+            {
+              conversationId,
+              senderId: user.id,
+              author: { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' },
+              ...msg,
+            },
+          ]
+    );
+  };
+
+  // Carica il file nel bucket privato della conversazione e manda il
+  // messaggio che lo contiene.
+  const sendFile = async (file, tipo) => {
+    if (!file || !conversationId) return;
+    if (file.size > CHAT_MAX_FILE_BYTES) {
+      setAttachStatus('⚠️ Il file supera i 20 MB.');
+      return;
+    }
+    setAttachMenuOpen(false);
+    setAttachStatus(tipo === 'foto' ? 'Invio foto…' : 'Invio file…');
+    const up = await uploadChatAttachment(conversationId, file);
+    if (up.error) {
+      setAttachStatus(`⚠️ ${up.error}`);
+      return;
+    }
+    const allegato = { path: up.path, nome: up.nome, mime: up.mime, size: up.size };
+    const label = tipo === 'foto' ? '📷 Foto' : `📎 ${up.nome}`;
+    const res = await sendMessage(conversationId, label, { tipo, allegato });
+    if (res.error) {
+      setAttachStatus(`⚠️ ${res.error}`);
+      return;
+    }
+    setAttachStatus('');
+    appendMine({ id: res.id, testo: label, tipo, allegato, data: res.createdAt });
+  };
+
+  // La posizione si manda SOLO dopo una conferma esplicita e solo quella
+  // attuale (nessun tracciamento continuo, niente salvato sul profilo).
+  const sendLocation = () => {
+    setConfirmLocation(false);
+    setAttachMenuOpen(false);
+    if (!navigator.geolocation) {
+      setAttachStatus('⚠️ Il tuo dispositivo non permette di leggere la posizione.');
+      return;
+    }
+    setAttachStatus('Rilevo la posizione…');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const allegato = {
+          lat: Number(pos.coords.latitude.toFixed(6)),
+          lng: Number(pos.coords.longitude.toFixed(6)),
+          precisione: Math.round(pos.coords.accuracy || 0),
+        };
+        const res = await sendMessage(conversationId, '📍 Posizione', { tipo: 'posizione', allegato });
+        if (res.error) {
+          setAttachStatus(`⚠️ ${res.error}`);
+          return;
+        }
+        setAttachStatus('');
+        appendMine({ id: res.id, testo: '📍 Posizione', tipo: 'posizione', allegato, data: res.createdAt });
+      },
+      (err) => {
+        setAttachStatus(
+          err.code === 1 ? '⚠️ Permesso alla posizione negato dal browser.' : '⚠️ Posizione non disponibile, riprova.'
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  };
+
+  // Porta in vista l'ultimo messaggio quando ne arriva o se ne manda uno.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages.length, loading]);
 
   // Solo l'ULTIMO messaggio mio ha lo stato "Inviato"/"Visualizzato" sotto
   // (non ogni messaggio: sarebbe ridondante, come in qualunque chat).
@@ -171,7 +264,13 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
         <div className="rb-friend-chat-header">
           {friend && (
             <>
-              <img src={friend.avatar} alt="" />
+              {friend.avatar ? (
+                <img src={friend.avatar} alt="" />
+              ) : (
+                <span className="rb-friend-chat-avatar-empty" aria-hidden="true">
+                  {(friend.name || '?').trim().charAt(0).toUpperCase()}
+                </span>
+              )}
               <strong>{friend.name}</strong>
             </>
           )}
@@ -196,7 +295,13 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
             {messages.length === 0 && <p className="rb-friend-chat-empty">Nessun messaggio ancora, scrivi il primo!</p>}
             {messages.map((m) => (
               <li key={m.id} className={`rb-friend-chat-msg ${m.senderId === user.id ? 'me' : ''}`}>
-                <span>{m.testo}</span>
+                {m.tipo && m.tipo !== 'testo' && m.allegato ? (
+                  <div className="rb-friend-chat-bubble-att">
+                    <ChatAttachment tipo={m.tipo} allegato={m.allegato} />
+                  </div>
+                ) : (
+                  <span className="rb-friend-chat-bubble">{m.testo}</span>
+                )}
                 <span className="rb-friend-chat-date">{formatRelativeDate(m.data)}</span>
                 {m.id === lastMineId && (
                   <span className="rb-friend-chat-receipt">
@@ -205,10 +310,80 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
                 )}
               </li>
             ))}
+            <li ref={messagesEndRef} aria-hidden="true" className="rb-friend-chat-end" />
           </ul>
         )}
 
+        {attachStatus && <p className="rb-friend-chat-att-status">{attachStatus}</p>}
+
+        {confirmLocation && (
+          <div className="rb-friend-chat-confirm">
+            <p>
+              Vuoi inviare a <strong>{friend?.name ?? 'questa persona'}</strong> la tua posizione attuale? Verrà mostrata solo in
+              questa chat.
+            </p>
+            <div>
+              <button type="button" onClick={() => setConfirmLocation(false)}>Annulla</button>
+              <button type="button" className="primary" onClick={sendLocation}>Invia posizione</button>
+            </div>
+          </div>
+        )}
+
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            sendFile(e.target.files?.[0], 'foto');
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            sendFile(f, f?.type?.startsWith('image/') ? 'foto' : 'file');
+            e.target.value = '';
+          }}
+        />
+
         <form className="rb-friend-chat-form" onSubmit={send}>
+          <div className="rb-friend-chat-attach">
+            <button
+              type="button"
+              className={`rb-friend-chat-plus ${attachMenuOpen ? 'open' : ''}`}
+              onClick={() => setAttachMenuOpen((v) => !v)}
+              disabled={loading || Boolean(error) || !conversationId}
+              aria-label="Allega foto, file o posizione"
+              aria-expanded={attachMenuOpen}
+              title="Allega"
+            >
+              <span className="rb-friend-chat-plus-glyph">+</span>
+            </button>
+            {attachMenuOpen && (
+              <div className="rb-friend-chat-attach-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => photoInputRef.current?.click()}>
+                  <span>📷</span> Foto
+                </button>
+                <button type="button" role="menuitem" onClick={() => fileInputRef.current?.click()}>
+                  <span>📎</span> File
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenuOpen(false);
+                    setConfirmLocation(true);
+                  }}
+                >
+                  <span>📍</span> Posizione
+                </button>
+              </div>
+            )}
+          </div>
           <input
             type="text"
             placeholder="Scrivi un messaggio..."
