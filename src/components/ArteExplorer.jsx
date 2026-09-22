@@ -6,6 +6,7 @@ import MusicaApp from './musica/MusicaApp';
 import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
+import DogWorldMap from './dogworld/DogWorldMap';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import './shared/categoryExplorerShell.css';
 
@@ -81,6 +82,8 @@ export default function ArteExplorer({
             <PodcastColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'cinema' ? (
             <CinemaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} />
+          ) : category.id === 'cani' ? (
+            <DogWorldMap key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}

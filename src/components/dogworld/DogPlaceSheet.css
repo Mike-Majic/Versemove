@@ -1,0 +1,281 @@
+/* Foglio in basso, non un modale centrato: pensato per il pollice, si apre
+   sempre dal fondo dello schermo (stesso principio delle richieste mobile
+   first del resto dell'app). */
+.rb-dogsheet-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.rb-dogsheet {
+  position: relative;
+  width: 100%;
+  max-height: 82%;
+  background: #131318;
+  border-top: 1px solid color-mix(in srgb, var(--accent, #ec4899) 45%, transparent);
+  border-radius: 20px 20px 0 0;
+  color: #f5f5f7;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  animation: rb-dogsheet-up 0.22s ease;
+}
+
+@keyframes rb-dogsheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.rb-dogsheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+
+.rb-dogsheet-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rb-dogsheet-scroll {
+  overflow-y: auto;
+  padding: 8px 18px 24px;
+}
+
+.rb-dogsheet-header h3 {
+  margin: 6px 0 4px;
+  font-size: 19px;
+}
+
+.rb-dogsheet-type-badge {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #06060a;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.rb-dogsheet-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.75);
+  margin-bottom: 4px;
+}
+
+.rb-dogsheet-stars {
+  color: #f5c518;
+  letter-spacing: 1px;
+}
+
+.rb-dogsheet-desc {
+  font-size: 13.5px;
+  color: rgba(245, 245, 247, 0.85);
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+.rb-dogsheet-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.rb-dogsheet-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+.rb-dogsheet-location {
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+  margin: 0 0 10px;
+}
+
+.rb-dogsheet-photos {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.rb-dogsheet-photos img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.rb-dogsheet-photos-sm img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+
+.rb-dogsheet-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.rb-dogsheet-report-link {
+  background: none;
+  border: none;
+  color: rgba(245, 245, 247, 0.5);
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.rb-dogsheet-review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.rb-dogsheet-star-picker {
+  display: flex;
+  gap: 4px;
+}
+
+.rb-dogsheet-star-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: rgba(245, 245, 247, 0.25);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.rb-dogsheet-star-btn.active {
+  color: #f5c518;
+}
+
+.rb-dogsheet-condizione-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rb-dogsheet-condizione-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f5f5f7;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rb-dogsheet-condizione-chip.active {
+  color: #06060a;
+}
+
+.rb-dogsheet-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.rb-dogsheet-photo-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.rb-dogsheet-reviews-title {
+  font-size: 14px;
+  margin: 4px 0 10px;
+}
+
+.rb-dogsheet-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rb-dogsheet-review {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.rb-dogsheet-review-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.rb-dogsheet-review-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rb-dogsheet-review-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+}
+
+.rb-dogsheet-review-meta {
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-dogsheet-condizione-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.rb-dogsheet-review p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 4px 0 8px;
+  color: rgba(245, 245, 247, 0.9);
+}

@@ -1,0 +1,183 @@
+.rb-dogmap {
+  position: absolute;
+  top: 76px;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, 94vw);
+  background: rgba(10, 4, 8, 0.92);
+  border: 1px solid color-mix(in srgb, var(--accent, #ec4899) 45%, transparent);
+  border-radius: 18px;
+  overflow: hidden;
+  pointer-events: auto;
+  color: #f5f5f7;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #ec4899) 18%, transparent);
+}
+
+@media (max-width: 480px) {
+  .rb-dogmap {
+    top: 168px;
+    bottom: 26px;
+    width: calc(100vw - 28px);
+  }
+}
+
+.rb-dogmap-filters {
+  display: flex;
+  gap: 6px;
+  padding: 56px 10px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+
+.rb-dogmap-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.rb-dogmap-filter-chip {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f5f5f7;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Il colore per-tipo arriva da uno stile inline (vedi DogWorldMap.jsx);
+   questo è solo il fallback per chip senza colore proprio, come "Solo
+   recintate". */
+.rb-dogmap-filter-chip.active {
+  background: var(--accent, #ec4899);
+  border-color: var(--accent, #ec4899);
+  color: #06060a;
+}
+
+.rb-dogmap-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.rb-dogmap-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.rb-dogmap-loading {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* Il pin custom (vedi typeIconHtml in DogWorldMap.jsx): un cerchio colorato
+   con l'emoji del tipo, molto più leggibile col pollice del pin a goccia di
+   serie di Leaflet — e ci evita il problema noto dei percorsi delle
+   immagini di default che si rompono sotto un bundler. */
+.rb-dogmap-pin-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+
+.rb-dogmap-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 17px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Cluster di leaflet.markercluster: ricolorati sul tema scuro dell'app
+   invece del giallo/verde/arancio di serie. */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background: color-mix(in srgb, var(--accent, #ec4899) 30%, transparent);
+}
+
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  background: var(--accent, #ec4899);
+  color: #06060a;
+  font-weight: 700;
+}
+
+.rb-dogmap-locate-btn,
+.rb-dogmap-add-btn {
+  position: absolute;
+  z-index: 500;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* Pensati per il pollice: grandi, negli angoli bassi raggiungibili con una
+   mano, mai piccoli controlli in alto dove serve allungare le dita. */
+.rb-dogmap-locate-btn {
+  right: 12px;
+  bottom: 70px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #1c1c24;
+  color: #f5f5f7;
+  font-size: 19px;
+}
+
+.rb-dogmap-add-btn {
+  left: 12px;
+  bottom: 16px;
+  padding: 13px 18px;
+  border-radius: 999px;
+  background: var(--accent, #ec4899);
+  color: #06060a;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.rb-dogmap-loading-badge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f5f5f7;
+  font-size: 11.5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.rb-dogmap-empty-hint {
+  position: absolute;
+  bottom: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  max-width: 80%;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.75);
+  color: rgba(245, 245, 247, 0.85);
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 12px;
+}
+
+/* Attribuzione OpenStreetMap (obbligatoria, mai rimossa): leggibile ma
+   discreta sul tema scuro. */
+.rb-dogmap .leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.6) !important;
+  color: rgba(245, 245, 247, 0.7) !important;
+}
