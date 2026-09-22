@@ -19,6 +19,7 @@ export default function AnnunciWorldExplorer({
   onOpenChat,
   favorites = [],
   onToggleFavorite,
+  isClosing = false,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -76,7 +77,7 @@ export default function AnnunciWorldExplorer({
             </form>
           </div>
 
-          <AnnunciColumn category={category} user={user} onOpenAuth={onOpenAuth} onOpenChat={onOpenChat} />
+          <AnnunciColumn category={category} user={user} onOpenAuth={onOpenAuth} onOpenChat={onOpenChat} closing={isClosing} />
         </>
       )}
     </div>

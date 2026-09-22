@@ -6,6 +6,8 @@ import DealCard from './DealCard';
 import SubmitDealModal from './SubmitDealModal';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
+import { useIsDesktopLayout } from '../../hooks/useIsDesktopLayout';
 import CustomSelect from '../shared/CustomSelect';
 import './vetrinaOfferte.css';
 
@@ -35,7 +37,9 @@ const ONLINE_OPTIONS = [
 // Stesso componente per tutte e 12 le sotto-categorie (vedi
 // VETRINA_OFFERTE_CATEGORY_IDS in data/vetrinaCategories.js), parametrizzato
 // da `category`.
-export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locationFilters }) {
+export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locationFilters, closing = false }) {
+  const isDesktop = useIsDesktopLayout();
+  const [mobileView, setMobileView] = useState('primary');
   const { t } = useTranslation();
   const [deals, setDeals] = useState(null);
   const [error, setError] = useState('');
@@ -75,8 +79,8 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
   // un'offerta arrivata giusto mentre scadeva.
   const visibleDeals = useMemo(() => (deals ?? []).filter((d) => !d.scaduta), [deals]);
 
-  return (
-    <div className="rb-deal-column" style={{ '--accent': '#ec4899' }}>
+  const dealsPanel = (
+    <div className="rb-deal-column">
       <div className="rb-deal-header">
         <div>
           <h3>
@@ -89,22 +93,11 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
         </button>
       </div>
 
-      <div className="rb-deal-filters">
-        <input
-          type="text"
-          className="rb-deal-filter-input"
-          placeholder="Negozio"
-          value={negozio}
-          onChange={(e) => setNegozio(e.target.value)}
-        />
-        <CustomSelect value={scontoMin} options={SCONTO_OPTIONS} onChange={setScontoMin} ariaLabel="Sconto minimo" />
-        <CustomSelect value={onlineFiltro} options={ONLINE_OPTIONS} onChange={setOnlineFiltro} ariaLabel="Online o in negozio" />
-        <label className="rb-deal-filter-chip">
-          <input type="checkbox" checked={vicinoAMe} onChange={(e) => setVicinoAMe(e.target.checked)} disabled={onlineFiltro === 'online'} />
-          Vicino a me
-        </label>
-        <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
-      </div>
+      {!isDesktop && (
+        <button type="button" className="rb-reset-filters-btn rb-deal-filters-open" onClick={() => setMobileView('secondary')}>
+          Filtri e ordinamento
+        </button>
+      )}
 
       {error && <p className="rb-deal-status rb-deal-error">{error}</p>}
 
@@ -132,6 +125,48 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
         </ul>
       )}
 
+    </div>
+  );
+
+  const filtersPanel = (
+    <div className="rb-deal-column">
+      <h3 className="rb-deal-panel-title">Filtri e ordinamento</h3>
+      <div className="rb-deal-filters rb-deal-filters-stack">
+        <input
+          type="text"
+          className="rb-deal-filter-input"
+          placeholder="Negozio"
+          value={negozio}
+          onChange={(e) => setNegozio(e.target.value)}
+        />
+        <CustomSelect value={scontoMin} options={SCONTO_OPTIONS} onChange={setScontoMin} ariaLabel="Sconto minimo" />
+        <CustomSelect value={onlineFiltro} options={ONLINE_OPTIONS} onChange={setOnlineFiltro} ariaLabel="Online o in negozio" />
+        <label className="rb-deal-filter-chip">
+          <input type="checkbox" checked={vicinoAMe} onChange={(e) => setVicinoAMe(e.target.checked)} disabled={onlineFiltro === 'online'} />
+          Vicino a me
+        </label>
+        <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
+      </div>
+
+      {!isDesktop && (
+        <button type="button" className="rb-btn-primary rb-deal-show-results" onClick={() => setMobileView('primary')}>
+          Mostra offerte
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ '--accent': '#ec4899', display: 'contents' }}>
+      <TwoColumnSwitcher
+        primary={dealsPanel}
+        secondary={filtersPanel}
+        primaryLabel="Offerte"
+        secondaryLabel="Filtri"
+        mobileView={mobileView}
+        onMobileViewChange={setMobileView}
+        closing={closing}
+      />
       {submitOpen && (
         <SubmitDealModal
           categoria={category.id}

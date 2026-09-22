@@ -8,6 +8,8 @@ import AnnuncioDetailModal from './AnnuncioDetailModal';
 import PublishAnnuncioWizard from './PublishAnnuncioWizard';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
+import { useIsDesktopLayout } from '../../hooks/useIsDesktopLayout';
 import './annunci.css';
 // Riusa lo stile di rb-faq-hint/rb-faq-stato-badge (stato pubblicazione,
 // stesso linguaggio visivo di Segnalazioni/Suggerimenti) invece di
@@ -20,12 +22,14 @@ const DEFAULT_FILTERS = { prezzoMin: null, prezzoMax: null, citta: '', soloConFo
 // vista Lista/Griglia/Mappa, filtri professionali (generati dallo stesso
 // schema del form di pubblicazione), + una scheda "I miei annunci" per
 // gestire i propri (rinnova/riservato/venduto/elimina).
-export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat }) {
+export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, closing = false }) {
   const [tipo, setTipo] = useState('vendita');
   const [view, setView] = useState('list'); // list | grid | map
   const [tab, setTab] = useState('annunci'); // annunci | mie
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Vista mobile del TwoColumnSwitcher: 'primary' = annunci, 'secondary' = filtri.
+  const [mobileView, setMobileView] = useState('primary');
+  const isDesktop = useIsDesktopLayout();
   const [listings, setListings] = useState(null);
   const [myListings, setMyListings] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -56,7 +60,7 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat }
     setSelected((prev) => (prev && prev.id === id ? { ...prev, isFavorite: fav } : prev));
   };
 
-  return (
+  const resultsPanel = (
     <div className="rb-annunci-column">
       <div className="rb-annunci-header">
         <div>
@@ -105,16 +109,18 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat }
                 </button>
               ))}
             </div>
-            <button type="button" className="rb-reset-filters-btn rb-annunci-filters-toggle" onClick={() => setFiltersOpen((v) => !v)}>
-              Filtri
-            </button>
+            {!isDesktop && (
+              <button
+                type="button"
+                className="rb-reset-filters-btn rb-annunci-filters-toggle"
+                onClick={() => setMobileView('secondary')}
+              >
+                Filtri
+              </button>
+            )}
           </div>
 
           <div className="rb-annunci-body">
-            {filtersOpen && (
-              <AnnunciFilters categoria={category.id} tipo={tipo} filters={filters} setFilters={setFilters} />
-            )}
-
             {view === 'map' ? (
               <AnnunciMapView categoria={category.id} tipo={tipo} onOpen={setSelected} />
             ) : listings === null ? (
@@ -182,6 +188,34 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat }
             ))}
         </ul>
       )}
+    </div>
+  );
+
+  // Pannello destro (su mobile la seconda schermata): Vendita/Affitto e
+  // filtri professionali sempre visibili, come nei portali di annunci.
+  const filtersPanel = (
+    <div className="rb-annunci-column">
+      <h3 className="rb-annunci-panel-title">Filtri</h3>
+      <AnnunciFilters categoria={category.id} tipo={tipo} filters={filters} setFilters={setFilters} />
+      {!isDesktop && (
+        <button type="button" className="rb-btn-primary rb-annunci-show-results" onClick={() => setMobileView('primary')}>
+          Mostra annunci
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <TwoColumnSwitcher
+        primary={resultsPanel}
+        secondary={filtersPanel}
+        primaryLabel="Annunci"
+        secondaryLabel="Filtri"
+        mobileView={mobileView}
+        onMobileViewChange={setMobileView}
+        closing={closing}
+      />
 
       {selected && (
         <AnnuncioDetailModal
@@ -205,6 +239,6 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat }
           }}
         />
       )}
-    </div>
+    </>
   );
 }

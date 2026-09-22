@@ -90,7 +90,7 @@ export default function ArteExplorer({
           ) : category.id === 'tattoo' ? (
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
-            <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} />
+            <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}
