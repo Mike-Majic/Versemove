@@ -1,0 +1,25 @@
+.rb-translate-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rb-translate-btn {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.rb-translate-text {
+  margin: 0;
+  font-size: 13.5px;
+  color: rgba(245, 245, 247, 0.85);
+  font-style: italic;
+}
+
+.rb-translate-error {
+  margin: 0;
+  font-size: 12px;
+  color: #ff6b6b;
+}
