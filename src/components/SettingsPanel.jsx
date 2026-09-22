@@ -131,40 +131,16 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
 }
 
 // Sotto-voce "Lingua" di "Personalizza il tuo Versemove": stesso selettore
-// usato in registrazione (AuthModal). Come "Mondi" sopra, è immediata (non
-// passa da "Applica"): la scelta cambia subito la lingua di tutto il sito
-// (vedi setAppLanguage) e, se loggati, viene salvata anche sull'account
-// (RPC set_own_lingua). Il messaggio sotto è l'unico riscontro visibile qui
-// dentro il pannello — quasi nient'altro in Impostazioni è già tradotto in
-// questa fase, quindi senza un avviso esplicito sembra non succedere nulla.
-const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.nativeLabel }));
+// usato in registrazione (AuthModal), con bandiera prima del nome. A
+// differenza di "Mondi" sopra, qui la scelta resta una bozza (draftLingua,
+// gestita dal genitore) finché non si preme "Applica": cambiare lingua a
+// metà pannello mentre il resto di Impostazioni resta nella lingua vecchia
+// era confuso, quindi ora si vede il cambio solo dopo un ricaricamento
+// completo della pagina (vedi handleApply), che traduce davvero tutto.
+const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: `${l.flag} ${l.nativeLabel}` }));
 
-function LanguageSubsection({ user, onUpdateUser }) {
-  const { t, i18n } = useTranslation();
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const change = async (code) => {
-    setError('');
-    setSuccess('');
-    setAppLanguage(code);
-    if (!user) return;
-    const { account, error: err } = await setOwnLingua(code);
-    if (err) {
-      setError(err);
-      return;
-    }
-    if (account) onUpdateUser?.(account);
-    setSuccess(t('settings.language.saved'));
-  };
-
-  return (
-    <>
-      <CustomSelect value={i18n.language} options={LANGUAGE_OPTIONS} onChange={change} />
-      {error && <p className="rb-privacy-error">{error}</p>}
-      {success && <p className="rb-privacy-success">{success}</p>}
-    </>
-  );
+function LanguageSubsection({ value, onChange }) {
+  return <CustomSelect value={value} options={LANGUAGE_OPTIONS} onChange={onChange} />;
 }
 
 // Sezione "Privacy": tre sotto-voci (Utenti, Posizione, Sicurezza e
@@ -468,15 +444,18 @@ function DeleteAccountSection({ user, onAccountDeleted }) {
   );
 }
 
-// Tutti i filtri di visualizzazione (Suono, Luogo, Mostrami/età, Posizione)
-// vivono qui come una "bozza": partono allineati a quanto è già attivo
-// (filters/locationFilters/visibility, gli stessi che filtrano davvero il
-// globo in App.jsx) ogni volta che il pannello si apre, e toccano lo stato
+// Tutti i filtri di visualizzazione (Suono, Luogo, Mostrami/età, Posizione,
+// Lingua) vivono qui come una "bozza": partono allineati a quanto è già
+// attivo (filters/locationFilters/visibility/lingua, gli stessi che
+// contano davvero) ogni volta che il pannello si apre, e toccano lo stato
 // vero solo quando si clicca "Applica" — prima, muovere uno slider o
-// spuntare una casella cambia solo l'anteprima qui dentro. "Mondi" (dentro
-// Personalizza) e le azioni di Privacy → Utenti/Sicurezza restano invece
-// immediate: sono mutazioni vere sull'account (RPC), non filtri client, e
-// hanno già un loro pulsante "Salva"/azione dedicato.
+// cambiare lingua cambia solo l'anteprima qui dentro. Per Lingua, "Applica"
+// ricarica anche la pagina (vedi handleApply): è l'unico modo per essere
+// certi che TUTTO il sito, non solo Impostazioni, si veda davvero tradotto,
+// dato quanto poco del resto dell'app è già collegato a i18next in questa
+// fase. "Mondi" (dentro Personalizza) e le azioni di Privacy →
+// Utenti/Sicurezza restano invece immediate: sono mutazioni vere
+// sull'account (RPC) con già un loro pulsante "Salva"/azione dedicato.
 export default function SettingsPanel({
   open,
   onClose,
@@ -494,7 +473,7 @@ export default function SettingsPanel({
   onUnfriend,
   onAccountDeleted,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [luogoOpen, setLuogoOpen] = useState(false);
   const [personalizzaOpen, setPersonalizzaOpen] = useState(false);
   const [personalizzaSub, setPersonalizzaSub] = useState('');
@@ -507,7 +486,9 @@ export default function SettingsPanel({
   const [soundBaseline, setSoundBaseline] = useState(true);
   const [draftQuality, setDraftQuality] = useState('auto');
   const [qualityBaseline, setQualityBaseline] = useState('auto');
+  const [draftLingua, setDraftLingua] = useState(i18n.language);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -520,6 +501,7 @@ export default function SettingsPanel({
     const quality = getQualityMode();
     setDraftQuality(quality);
     setQualityBaseline(quality);
+    setDraftLingua(i18n.language);
     setCloseConfirmOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -540,7 +522,8 @@ export default function SettingsPanel({
     JSON.stringify(draftLocationFilters) !== JSON.stringify(locationFilters) ||
     JSON.stringify(draftVisibility) !== JSON.stringify(visibility) ||
     draftSound !== soundBaseline ||
-    draftQuality !== qualityBaseline;
+    draftQuality !== qualityBaseline ||
+    draftLingua !== i18n.language;
 
   const handleReset = () => {
     setDraftFilters(DEFAULT_FILTERS);
@@ -548,12 +531,24 @@ export default function SettingsPanel({
     setDraftVisibility(DEFAULT_VISIBILITY);
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     setFilters(draftFilters);
     setLocationFilters(draftLocationFilters);
     setVisibility(draftVisibility);
     setSoundEnabled(draftSound);
     setQualityMode(draftQuality);
+    if (draftLingua !== i18n.language) {
+      // Ricarica tutta la pagina nella nuova lingua invece di affidarsi al
+      // solo re-render reattivo di i18next: gran parte del sito non è
+      // ancora tradotta (vedi commento sopra), quindi un reload è l'unico
+      // modo per non lasciare l'utente in un limbo mezzo italiano/mezzo
+      // nella lingua scelta.
+      setApplying(true);
+      setAppLanguage(draftLingua);
+      if (user) await setOwnLingua(draftLingua);
+      window.location.reload();
+      return;
+    }
     (onApply ?? onClose)();
   };
 
@@ -577,19 +572,21 @@ export default function SettingsPanel({
           <div className="rb-settings-close-confirm">
             <p>Hai modifiche non applicate. Chiudere comunque?</p>
             <div className="rb-settings-close-confirm-actions">
-              <button type="button" onClick={() => setCloseConfirmOpen(false)}>Annulla</button>
-              <button type="button" onClick={onClose}>Scarta e chiudi</button>
-              <button type="button" className="rb-apply-filters-btn" onClick={handleApply}>Applica e chiudi</button>
+              <button type="button" onClick={() => setCloseConfirmOpen(false)} disabled={applying}>Annulla</button>
+              <button type="button" onClick={onClose} disabled={applying}>Scarta e chiudi</button>
+              <button type="button" className="rb-apply-filters-btn" onClick={handleApply} disabled={applying}>
+                {applying ? 'Un attimo…' : 'Applica e chiudi'}
+              </button>
             </div>
           </div>
         )}
 
         <div className="rb-filter-actions">
-          <button type="button" className="rb-reset-filters-btn" onClick={handleReset}>
+          <button type="button" className="rb-reset-filters-btn" onClick={handleReset} disabled={applying}>
             Azzera tutti i filtri
           </button>
-          <button type="button" className="rb-apply-filters-btn" onClick={handleApply}>
-            Applica
+          <button type="button" className="rb-apply-filters-btn" onClick={handleApply} disabled={applying}>
+            {applying ? 'Un attimo…' : 'Applica'}
           </button>
         </div>
         <p className="rb-settings-hint">
@@ -752,7 +749,7 @@ export default function SettingsPanel({
             open={personalizzaSub === 'lingua'}
             onToggle={() => togglePersonalizzaSub('lingua')}
           >
-            <LanguageSubsection user={user} onUpdateUser={onUpdateUser} />
+            <LanguageSubsection value={draftLingua} onChange={setDraftLingua} />
           </CollapsibleSection>
         </CollapsibleSection>
 

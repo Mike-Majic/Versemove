@@ -13,11 +13,11 @@ import de from './locales/de';
 // SUA STESSA lingua (mai tradotta: chi non legge ancora l'italiano deve
 // comunque riconoscere la propria voce nel menu).
 export const SUPPORTED_LANGUAGES = [
-  { code: 'it', nativeLabel: 'Italiano' },
-  { code: 'en', nativeLabel: 'English' },
-  { code: 'es', nativeLabel: 'Español' },
-  { code: 'fr', nativeLabel: 'Français' },
-  { code: 'de', nativeLabel: 'Deutsch' },
+  { code: 'it', nativeLabel: 'Italiano', flag: '🇮🇹' },
+  { code: 'en', nativeLabel: 'English', flag: '🇬🇧' },
+  { code: 'es', nativeLabel: 'Español', flag: '🇪🇸' },
+  { code: 'fr', nativeLabel: 'Français', flag: '🇫🇷' },
+  { code: 'de', nativeLabel: 'Deutsch', flag: '🇩🇪' },
 ];
 
 // Chiave localStorage per la preferenza scelta esplicitamente (non quella

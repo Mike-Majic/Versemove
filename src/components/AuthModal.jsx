@@ -374,7 +374,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
                 }}
               >
                 {SUPPORTED_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>{l.nativeLabel}</option>
+                  <option key={l.code} value={l.code}>{l.flag} {l.nativeLabel}</option>
                 ))}
               </select>
               <span className="rb-auth-field-hint">{t('auth.fields.languageHint')}</span>
