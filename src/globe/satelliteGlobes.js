@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
-import { SATELLITE_SPIN_PERIOD_S } from '../fx/globeRotation';
+import { SATELLITE_SPIN_PERIOD_S, IDLE_SATELLITE_ORBIT_DEG_S } from '../fx/globeRotation';
+
+const DEG2RAD = Math.PI / 180;
 
 // Raggio (in unità di scena) del guscio a rete del globo grande — vedi
 // networkOverlay.buildNetworkShell(radius=128) — usato qui solo per il
@@ -45,22 +47,23 @@ const SLOTS = [
 const BOB_AMPLITUDE = 8;
 
 // Orbita propria lenta attorno all'asse verticale del globo (radianti al
-// secondo): un giro completo dura 2-5 minuti, quasi impercettibile
-// istante per istante ma quel tanto che basta a non restare mai
-// perfettamente fermi. Il segno (orario/antiorario) è casuale per
-// satellite. Nota sul "mai nascosto": la camera gira da sola su questo
-// stesso asse ogni 7 secondi (vedi WorldGlobe.jsx autoRotateSpeed) — molto
-// più veloce di questa deriva lenta — quindi qualunque punto attorno al
-// globo, satelliti compresi, torna comunque inquadrato più volte al
-// minuto SENZA bisogno di inseguire attivamente la camera: un primo
-// tentativo che lo faceva (ruotava il satellite verso la direzione della
-// camera ogni volta che usciva dai bordi) è stato scartato perché portava
-// il satellite a passare vicinissimo alla camera stessa, facendolo
-// esplodere di dimensione in prospettiva (bug visto in uno screenshot di
-// verifica). Resta solo la difesa sotto (MIN_CAMERA_DISTANCE), che quel
-// bug specifico lo previene senza inseguire nessuno.
-const ORBIT_SPEED_MIN = 0.02;
-const ORBIT_SPEED_MAX = 0.05;
+// secondo), attiva solo quando il mouse è fuori dal canvas (vedi
+// idleFactor in update() sotto, pilotato da WorldGlobe.jsx): un giro
+// completo dura 360/IDLE_SATELLITE_ORBIT_DEG_S secondi. Il segno
+// (orario/antiorario) resta casuale per satellite, solo per varietà — la
+// MAGNITUDINE è fissa e uguale per tutti (prima era un valore casuale,
+// 0.02-0.05 rad/s, ~1.1-2.9°/s). Nota sul "mai nascosto": la CAMERA non
+// orbita più da sola attorno alla scena (lo faceva, ogni 40 secondi circa,
+// prima che questo file venisse riscritto: disorientava, i satelliti
+// sembravano sfrecciare sullo schermo) — resta solo questa deriva lenta,
+// indipendente. Un primo tentativo di "inseguire" attivamente la camera
+// (ruotare il satellite verso di lei quando usciva dai bordi) è stato
+// scartato perché lo portava a passarle troppo vicino, esplodendo di
+// dimensione in prospettiva (bug visto in uno screenshot di verifica).
+// Resta solo la difesa sotto (MIN_CAMERA_DISTANCE + il margine dinamico
+// sulla distanza vera della camera dal centro), che quel bug lo previene
+// senza inseguire nessuno.
+const ORBIT_SPEED_RAD_S = IDLE_SATELLITE_ORBIT_DEG_S * DEG2RAD;
 
 // Distanza minima dalla camera: se l'orbita porta un satellite più vicino
 // di così, viene respinto lungo la stessa direzione fino a questa
@@ -68,7 +71,15 @@ const ORBIT_SPEED_MAX = 0.05;
 // stessa, solo la prospettiva non lo fa più esplodere di dimensione). A
 // questa distanza anche il satellite più grande (raggio 42, vedi SLOTS)
 // ha una dimensione angolare paragonabile al globo grande, mai dominante.
+// È solo un PAVIMENTO: la vera soglia usata in update() è sempre almeno
+// questa, ma cresce con la distanza reale camera-centro (vedi
+// SATELLITE_CAMERA_MARGIN) così un satellite non è MAI più vicino alla
+// camera del globo centrale stesso, a qualunque livello di zoom.
 const MIN_CAMERA_DISTANCE = 280;
+// Quanto un satellite deve restare più lontano dalla camera rispetto al
+// centro del globo (che è sempre nell'origine, quindi camPos.length() è
+// esattamente "distanza globo centrale-camera").
+const SATELLITE_CAMERA_MARGIN = 60;
 
 // Distanza dalla camera oltre la quale un satellite comincia a sbiadire
 // (profondità atmosferica, come una foschia leggera) e a cui arriva alla
@@ -78,9 +89,9 @@ const FOG_FAR = 950;
 const FOG_MIN_OPACITY = 0.4;
 // Quanto sbiadisce, IN PIÙ rispetto alla foschia sopra, un satellite che
 // il globo sta bloccando alla vista in questo istante (mai a zero secco:
-// la camera che gira da sola lo scopre di nuovo in meno di un secondo,
-// vedi nota sopra — un'opacità residua bassa invece di zero evita un
-// pop-in/pop-out di scatto quando rientra).
+// la sua stessa orbita lenta lo scopre di nuovo prima o poi — un'opacità
+// residua bassa invece di zero evita un pop-in/pop-out di scatto quando
+// rientra in vista).
 const OCCLUDED_OPACITY_FACTOR = 0.15;
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -277,45 +288,52 @@ export function buildSatelliteGlobes({ worlds }) {
       // quella scelta a mano) ad ogni cambio di mondo attivo: l'orbita
       // lenta e l'eventuale correzione (vedi update()) accumulano da lì.
       sat.userData.orbitAngle = 0;
-      sat.userData.baseOrbitSpeed =
-        (ORBIT_SPEED_MIN + Math.random() * (ORBIT_SPEED_MAX - ORBIT_SPEED_MIN)) * (Math.random() < 0.5 ? -1 : 1);
+      sat.userData.baseOrbitSpeed = ORBIT_SPEED_RAD_S * (Math.random() < 0.5 ? -1 : 1);
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
   }
 
-  // Galleggiamento + rotazione propria + orbita lenta indipendente attorno
-  // al globo, più le due animazioni temporanee (materializzazione e
-  // crescita durante il warp) sopra. Una sola difesa attiva per fotogramma:
-  // se l'orbita porterebbe il satellite più vicino di MIN_CAMERA_DISTANCE
-  // alla camera, lo si respinge (stessa direzione, solo distanza minima
+  // Galleggiamento (sempre attivo) + rotazione propria e orbita lenta
+  // attorno al globo (entrambe SOLO quando il mouse è fuori dal canvas,
+  // scalate da idleFactor 0..1 — 0 = camera/mouse dentro, ferme; 1 = mouse
+  // fuori, velocità piena — pilotato da WorldGlobe.jsx in sincrono con la
+  // stessa rampa morbida del globo centrale), più le due animazioni
+  // temporanee (materializzazione e crescita durante il warp) sopra.
+  // "Riduci animazioni" (reduceMotion): niente rotazioni proprio, resta
+  // solo il galleggiamento. Una sola difesa attiva per fotogramma: se
+  // l'orbita porterebbe il satellite più vicino della soglia (sempre
+  // almeno MIN_CAMERA_DISTANCE, ma cresce con la distanza vera camera-
+  // centro così non è mai più vicino della camera al globo centrale
+  // stesso), lo si respinge (stessa direzione, solo distanza minima
   // garantita) — evita che l'oggetto esploda di dimensione in prospettiva
   // senza mai bloccare o deviare l'orbita stessa. elapsedSec/deltaSec
   // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
   // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
   const _toCam = new THREE.Vector3();
-  function update(elapsedSec, deltaSec, camera) {
+  function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
     const camPos = camera.position;
+    const minAllowedDist = Math.max(MIN_CAMERA_DISTANCE, camPos.length() + SATELLITE_CAMERA_MARGIN);
 
     for (const sat of satellites) {
       if (!sat.visible) continue;
       const ud = sat.userData;
       if (!ud.basePosRef) continue;
 
-      ud.orbitAngle += ud.baseOrbitSpeed * deltaSec;
+      if (!reduceMotion) ud.orbitAngle += ud.baseOrbitSpeed * deltaSec * idleFactor;
       const basePos = ud.basePosRef.clone().applyAxisAngle(Y_AXIS, ud.orbitAngle);
       basePos.y += Math.sin(elapsedSec * ud.bobSpeed + ud.bobPhase) * BOB_AMPLITUDE;
 
       _toCam.copy(basePos).sub(camPos);
       const distToCam = _toCam.length();
-      if (distToCam < MIN_CAMERA_DISTANCE) {
-        _toCam.setLength(MIN_CAMERA_DISTANCE);
+      if (distToCam < minAllowedDist) {
+        _toCam.setLength(minAllowedDist);
         basePos.copy(camPos).add(_toCam);
       }
 
       ud.basePos = basePos;
       sat.position.copy(basePos);
-      sat.rotation.y += ud.spinSpeed * deltaSec;
+      if (!reduceMotion) sat.rotation.y += ud.spinSpeed * deltaSec;
 
       let depthFactor = THREE.MathUtils.clamp(
         THREE.MathUtils.mapLinear(camPos.distanceTo(basePos), FOG_NEAR, FOG_FAR, 1, FOG_MIN_OPACITY),

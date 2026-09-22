@@ -8,9 +8,34 @@ import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../glo
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
-import { IDLE_ROTATE_SPEED, IDLE_ROTATE_EASE_MS, IDLE_ROTATE_DURATION_MS } from '../fx/globeRotation';
+import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
 import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
 import './WorldGlobe.css';
+
+const DEG2RAD = Math.PI / 180;
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+// Trova l'oggetto Three.js che react-globe.gl aggiunge alla scena per il
+// globo vero e proprio (superficie + continenti + marker HTML + atmosfera,
+// tutti nidificati dentro): quello, e SOLO quello, va ruotato per far
+// girare "il globo su se stesso" restando fermi con la camera — ruotare i
+// singoli layer sarebbe sbagliato (alcuni, come i nostri overlay
+// custom sotto, non sono nidificati lì dentro). three-globe marca il
+// layer della superficie con __globeObjType='globe' da qualche parte
+// dentro l'albero: risalendo i parent da lì si arriva all'oggetto
+// aggiunto direttamente alla scena (vedi globe.gl: .objects([globe])).
+function findGlobeRootObject(scene) {
+  let tagged = null;
+  scene.traverse((obj) => {
+    if (!tagged && obj.__globeObjType === 'globe') tagged = obj;
+  });
+  if (!tagged) return null;
+  let node = tagged;
+  while (node.parent && node.parent !== scene) node = node.parent;
+  return node.parent === scene ? node : null;
+}
 
 // Esperimento: continenti con contorni reali (GeoJSON) al posto dei puntini.
 // Per tornare al vecchio sistema basta rimettere questa a false, il codice
@@ -182,6 +207,32 @@ export default function WorldGlobe({
   const warpFlashRef = useRef(null);
   const warpingRef = useRef(false);
   const hasPositionedSatellitesRef = useRef(false);
+  // Stato del movimento "salvaschermo" (vedi globeActivity più sotto):
+  // globeRootRef è l'oggetto trovato da findGlobeRootObject (cache, la
+  // ricerca si fa una sola volta); globeSpinAngleRef l'angolo accumulato
+  // (radianti) applicato ogni fotogramma a lui + overlayRef.current.group +
+  // categoryShellRef.current.group, sempre in sincrono, così non si
+  // "staccano" mai visivamente l'uno dall'altro. idleTargetRef/
+  // idleRampFromRef/idleRampStartRef/idleRampDurationMsRef sono la rampa
+  // (0..1) che porta il movimento da fermo a velocità piena in
+  // IDLE_EASE_IN_S secondi quando il mouse esce, e viceversa in
+  // IDLE_EASE_OUT_S quando rientra — calcolata "al volo" ad ogni
+  // fotogramma (vedi computeIdleFactor), mai con un rAF a parte.
+  const globeRootRef = useRef(null);
+  const globeSpinAngleRef = useRef(0);
+  const idleTargetRef = useRef(0);
+  const idleRampFromRef = useRef(0);
+  const idleRampStartRef = useRef(0);
+  const idleRampDurationMsRef = useRef(0);
+  const reduceMotionActiveRef = useRef(false);
+
+  const computeIdleFactor = (now) => {
+    const dur = idleRampDurationMsRef.current;
+    if (dur <= 0) return idleTargetRef.current;
+    const t = Math.min(1, (now - idleRampStartRef.current) / dur);
+    return idleRampFromRef.current + (idleTargetRef.current - idleRampFromRef.current) * easeInOutCubic(t);
+  };
+
   // Letto dal polling a 250ms sotto (interval con deps [], serve un ref e
   // non solo la prop per restare aggiornato senza far ripartire l'intervallo).
   const activeCategoryRef = useRef(activeCategory);
@@ -254,55 +305,28 @@ export default function WorldGlobe({
   // marker HTML) ad ogni frame, per sempre, anche col globo fermo. Qui il
   // disegno si mette in pausa quando nessuno interagisce e riparte al primo
   // segno di attività (mouse, rotellina, tocco, voli della camera, dati
-  // nuovi). La rotazione automatica dura al massimo IDLE_ROTATE_DURATION_MS
-  // (fx/globeRotation.js), poi il globo si ferma e, dopo IDLE_MS, smette
-  // del tutto di essere ridisegnato.
+  // nuovi) — oppure resta sveglio finché il mouse è fuori dal canvas,
+  // perché lì il globo/i satelliti continuano a muoversi da soli (vedi
+  // "keep-alive" in startAutoRotate sotto).
+  //
+  // I nomi startAutoRotate/stopAutoRotate sono rimasti (li chiamano molti
+  // punti sotto: mount, hover, warp, fly-to) ma NON toccano più
+  // OrbitControls.autoRotate — la CAMERA non orbita più da sola, punto
+  // (richiesta esplicita, il vecchio comportamento disorientava). "Start"
+  // ora vuol dire "il mouse è fuori, fai partire il movimento idle"
+  // (rotazione del globo + orbita dei satelliti, vedi il wrapper di
+  // renderer.render più giù), "stop" vuol dire il contrario: la rampa
+  // (idleTargetRef 0..1, calcolata al volo da computeIdleFactor) porta la
+  // velocità da 0 a piena in IDLE_EASE_IN_S secondi, e viceversa in
+  // IDLE_EASE_OUT_S.
   const globeActivity = useMemo(() => {
     let idleTimer = null;
-    let rotateTimer = null;
+    let keepAliveTimer = null;
     let paused = false;
-    // Rampa morbida di autoRotateSpeed (mai uno scatto istantaneo, vedi
-    // fx/globeRotation.js): rampFrame è il requestAnimationFrame in corso,
-    // rampSpeed il valore "vero" della velocità in questo istante (non
-    // quello che sta per diventare), così partire/fermarsi a metà di una
-    // rampa già in corso riparte da dove si trovava invece di scattare.
-    let rampFrame = null;
-    let rampSpeed = 0;
-
-    const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
-
-    const cancelRamp = () => {
-      if (rampFrame !== null) cancelAnimationFrame(rampFrame);
-      rampFrame = null;
-    };
-
-    const rampAutoRotateSpeedTo = (target, onDone) => {
-      cancelRamp();
-      const controls = globeRef.current?.controls();
-      if (!controls) return;
-      const from = rampSpeed;
-      const startedAt = performance.now();
-      const step = (now) => {
-        const t = Math.min(1, (now - startedAt) / IDLE_ROTATE_EASE_MS);
-        rampSpeed = from + (target - from) * easeInOutCubic(t);
-        const c = globeRef.current?.controls();
-        if (c) c.autoRotateSpeed = rampSpeed;
-        if (t < 1) {
-          rampFrame = requestAnimationFrame(step);
-        } else {
-          rampFrame = null;
-          onDone?.();
-        }
-      };
-      rampFrame = requestAnimationFrame(step);
-    };
 
     const sleep = () => {
       const g = globeRef.current;
       if (!g || paused) return;
-      // Mentre ruota da solo deve continuare a disegnare: sarà la fine della
-      // rotazione (vedi stopAutoRotate) a rimandare qui.
-      if (g.controls().autoRotate) return;
       g.pauseAnimation();
       paused = true;
     };
@@ -318,37 +342,44 @@ export default function WorldGlobe({
       idleTimer = setTimeout(sleep, ms);
     };
 
+    const setIdleTarget = (target, durationMs) => {
+      const now = performance.now();
+      idleRampFromRef.current = computeIdleFactor(now);
+      idleTargetRef.current = target;
+      idleRampStartRef.current = now;
+      idleRampDurationMsRef.current = durationMs;
+    };
+
     const stopAutoRotate = () => {
-      clearTimeout(rotateTimer);
-      const g = globeRef.current;
-      if (g && g.controls().autoRotate) {
-        // Decelera fino a 0 (restando "autoRotate" per tutta la rampa, così
-        // sleep() non mette in pausa il disegno a metà) e solo alla fine
-        // spegne autoRotate per davvero.
-        rampAutoRotateSpeedTo(0, () => {
-          const c = globeRef.current?.controls();
-          if (c) c.autoRotate = false;
-        });
-      }
-      wake();
+      clearInterval(keepAliveTimer);
+      keepAliveTimer = null;
+      setIdleTarget(0, IDLE_EASE_OUT_S * 1000);
+      // Resta sveglio solo il tempo di finire la decelerazione, poi il
+      // solito timeout di inattività (IDLE_MS) rimette in pausa da solo.
+      wake(IDLE_EASE_OUT_S * 1000 + 400);
     };
 
     const startAutoRotate = () => {
       const g = globeRef.current;
       if (!g || isTouchDevice) return;
-      // "Riduci animazioni" del sistema: niente rotazione automatica, punto.
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      g.controls().autoRotate = true;
-      rampAutoRotateSpeedTo(IDLE_ROTATE_SPEED);
-      clearTimeout(rotateTimer);
-      rotateTimer = setTimeout(stopAutoRotate, IDLE_ROTATE_DURATION_MS);
-      wake(IDLE_ROTATE_DURATION_MS);
+      // "Riduci animazioni" del sistema: niente rotazioni, solo il
+      // galleggiamento dei satelliti (già indipendente da questo stato).
+      reduceMotionActiveRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setIdleTarget(1, IDLE_EASE_IN_S * 1000);
+      wake(2000);
+      clearInterval(keepAliveTimer);
+      // Il mouse può restare fuori per minuti (è un salvaschermo, non ha
+      // una durata massima): senza questo, dopo IDLE_MS di inattività
+      // "apparente" (nessun evento pointer, il mouse è semplicemente
+      // altrove) il disegno si metterebbe in pausa e il movimento si
+      // fermerebbe di scatto invece di continuare finché il mouse non
+      // rientra davvero.
+      keepAliveTimer = setInterval(() => wake(2000), 1000);
     };
 
     const dispose = () => {
       clearTimeout(idleTimer);
-      clearTimeout(rotateTimer);
-      cancelRamp();
+      clearInterval(keepAliveTimer);
     };
 
     return { wake, startAutoRotate, stopAutoRotate, dispose };
@@ -428,6 +459,10 @@ export default function WorldGlobe({
     scene.add(group);
     overlayRef.current = { group, shell, landDots: null };
     applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
+    // Cache dell'oggetto "globo vero e proprio" di react-globe.gl (vedi
+    // findGlobeRootObject sopra): serve al giro di rendering più giù per
+    // farlo ruotare in sincrono con questo stesso overlay.
+    globeRootRef.current = findGlobeRootObject(scene);
 
     return () => {
       scene.remove(group);
@@ -437,6 +472,7 @@ export default function WorldGlobe({
       shell.lineMaterial.dispose();
       shell.nodeMaterial.dispose();
       overlayRef.current = null;
+      globeRootRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -616,11 +652,20 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.id]);
 
-  // Galleggiamento/rotazione propria dei satelliti: agganciati allo stesso
-  // giro di disegno del globo grande (un wrapper attorno a renderer.render,
-  // non un requestAnimationFrame a parte) così si fermano da soli quando
-  // globeActivity mette in pausa il disegno per inattività — niente CPU
-  // sprecata a far fluttuare globi che nessuno sta guardando.
+  // Galleggiamento/rotazione dei satelliti + rotazione del globo centrale su
+  // se stesso: tutti agganciati allo stesso giro di disegno del globo grande
+  // (un wrapper attorno a renderer.render, non un requestAnimationFrame a
+  // parte) così si fermano da soli quando globeActivity mette in pausa il
+  // disegno per inattività — niente CPU sprecata a far muovere globi che
+  // nessuno sta guardando. idleFactor (0..1, calcolato al volo da
+  // computeIdleFactor — la rampa morbida di IDLE_EASE_IN_S/IDLE_EASE_OUT_S
+  // secondi impostata da globeActivity.startAutoRotate/stopAutoRotate) è la
+  // "velocità" di entrambi i movimenti: a 0 tutto è fermo (mouse dentro), a
+  // 1 velocità piena (mouse fuori da IDLE_EASE_IN_S secondi). Il globo
+  // centrale, il guscio a rete (overlayRef) e i triangoli delle categorie
+  // (categoryShellRef) condividono lo STESSO angolo accumulato
+  // (globeSpinAngleRef): mai calcolato tre volte separatamente, altrimenti
+  // andrebbero fuori sincrono fra loro nel tempo.
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return undefined;
@@ -630,8 +675,19 @@ export default function WorldGlobe({
     let lastElapsed = 0;
     renderer.render = (scene, camera) => {
       const elapsed = (performance.now() - startedAt) / 1000;
-      satellitesRef.current?.update(elapsed, elapsed - lastElapsed, camera);
+      const deltaSec = elapsed - lastElapsed;
       lastElapsed = elapsed;
+
+      const idleFactor = computeIdleFactor(performance.now());
+      const reduceMotion = reduceMotionActiveRef.current;
+      if (!reduceMotion) {
+        globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
+        const angle = globeSpinAngleRef.current;
+        if (globeRootRef.current) globeRootRef.current.rotation.y = angle;
+        if (overlayRef.current) overlayRef.current.group.rotation.y = angle;
+        if (categoryShellRef.current) categoryShellRef.current.group.rotation.y = angle;
+      }
+      satellitesRef.current?.update(elapsed, deltaSec, camera, reduceMotion ? 0 : idleFactor, reduceMotion);
       originalRender(scene, camera);
     };
     return () => {
@@ -731,10 +787,9 @@ export default function WorldGlobe({
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return;
-    // autoRotateSpeed non si fissa più qui: la rampa morbida in
-    // globeActivity (vedi sopra, rampAutoRotateSpeedTo) la porta da 0 a
-    // IDLE_ROTATE_SPEED (fx/globeRotation.js) quando startAutoRotate parte,
-    // sia al mount sia ogni volta che il mouse esce dal globo.
+    // OrbitControls.autoRotate resta sempre false: la camera non orbita
+    // mai da sola (vedi globeActivity sopra e il wrapper di
+    // renderer.render più giù per il movimento vero, sul globo/satelliti).
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
@@ -750,10 +805,12 @@ export default function WorldGlobe({
     globeActivity.wake();
   }, [globeActivity, displayItems, landPolygons, world, categories, activeCategory, size]);
 
-  // Solo su desktop: passando il mouse sopra il globo, la rotazione automatica
-  // si ferma; togliendolo, riparte (sempre per al massimo
-  // IDLE_ROTATE_DURATION_MS). Su mobile non c'e' mai auto-rotazione, quindi
-  // non serve gestire l'hover (il touch non "passa sopra", tocca e basta).
+  // Solo su desktop: passando il mouse sopra il globo, il movimento idle si
+  // ferma (rampa di IDLE_EASE_OUT_S secondi); togliendolo, riparte (rampa di
+  // IDLE_EASE_IN_S secondi) e resta attivo finché il mouse non rientra, senza
+  // un tetto massimo (è un salvaschermo). Su mobile non c'e' mai
+  // auto-rotazione, quindi non serve gestire l'hover (il touch non "passa
+  // sopra", tocca e basta).
   useEffect(() => {
     if (isTouchDevice) return undefined;
     const g = globeRef.current;
@@ -904,7 +961,11 @@ function updateCategoryLabelVisibility(g, shell, activeCategoryId) {
   const taglineRect = taglineEl ? taglineEl.getBoundingClientRect() : null;
 
   sprites.forEach((sprite) => {
-    const worldPos = sprite.position;
+    // Posizione VERA in scena, non quella locale (sprite.position): il
+    // gruppo delle categorie ora ruota assieme al globo (vedi
+    // globeSpinAngleRef in WorldGlobe.jsx), quindi la posizione locale da
+    // sola non basta più a sapere dove lo sprite si trova davvero.
+    const worldPos = sprite.getWorldPosition(new THREE.Vector3());
     const outwardNormal = worldPos.clone().normalize();
     const toCamera = camera.position.clone().sub(worldPos).normalize();
     const facingAway = outwardNormal.dot(toCamera) < 0.08;

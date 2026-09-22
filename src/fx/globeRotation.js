@@ -1,30 +1,40 @@
-// Rotazione automatica del globo quando nessuno interagisce (il mouse è
-// uscito dal canvas su desktop, o appena montato prima del primo tocco):
-// un posto a parte, fuori da components/WorldGlobe.jsx, solo per poterla
-// ritoccare senza andare a cercarla in mezzo al resto della logica del
-// globo (stessa idea di fx/timing.js).
+// Movimento "salvaschermo spaziale" quando il mouse è fuori dal canvas del
+// globo: niente più orbita della CAMERA attorno alla scena (era la causa
+// del disorientamento segnalato — la camera che girava in fretta faceva
+// "sfrecciare" i satelliti sullo schermo, alcuni passando enormi vicino
+// all'obiettivo). Ora la camera resta sempre ferma: al suo posto il globo
+// centrale ruota lentamente su se stesso e i satelliti continuano la loro
+// orbita indipendente attorno a lui (esiste già, vedi
+// globe/satelliteGlobes.js — qui si fissa solo la velocità). Tutto basato
+// sul tempo reale trascorso (deltaSeconds), mai sui fotogrammi: identico a
+// 60, 144 o 240Hz.
 
-// OrbitControls.autoRotateSpeed è in "gradi/frame a 60fps": un giro
-// completo (360°) dura 60/IDLE_ROTATE_SPEED secondi.
-// Storico: 60/7 (un giro ogni 7s, troppo veloce) -> 60/14 (un giro ogni
-// 14s) -> 60/30 (un giro ogni 30s) -> 60/40 (un giro ogni 40s, "un
-// pochino" più lenta ancora, richiesta esplicita dell'utente).
-export const IDLE_ROTATE_SPEED = 60 / 40;
+// Gradi al secondo di rotazione su se stesso del globo centrale, quando il
+// mouse è fuori. Richiesta esplicita dell'utente/Cowork dopo aver misurato
+// dal vivo il vecchio comportamento (camera in orbita a 15-25°/s).
+export const IDLE_GLOBE_SPIN_DEG_S = 3;
 
-// Quanto ci mette la rotazione a passare da ferma a IDLE_ROTATE_SPEED (e
-// viceversa, quando il mouse rientra): mai uno scatto istantaneo.
-export const IDLE_ROTATE_EASE_MS = 1500;
+// Gradi al secondo dell'orbita dei satelliti attorno al globo centrale,
+// quando il mouse è fuori. L'orbita esiste già sempre (vedi
+// globe/satelliteGlobes.js, ud.orbitAngle) — prima aveva una velocità
+// casuale per satellite (0.02-0.05 rad/s, ~1.1-2.9°/s): qui diventa un
+// valore fisso e pulito, il segno (orario/antiorario) resta casuale per
+// varietà.
+export const IDLE_SATELLITE_ORBIT_DEG_S = 1.5;
 
-// Quanto dura al massimo la rotazione automatica (da quando il mouse esce
-// dal canvas) prima di fermarsi da sola, se nel frattempo il mouse non è
-// rientrato — se rientra prima, si ferma subito (vedi onEnter in
-// WorldGlobe.jsx). Era 10s, ora 30s: richiesta esplicita dell'utente,
-// "gira per 30 secondi, poi se torno con il mouse si ferma".
-export const IDLE_ROTATE_DURATION_MS = 30000;
+// Quanto ci mette il movimento (rotazione del globo + orbita dei
+// satelliti) a raggiungere la velocità piena quando il mouse esce dal
+// canvas (ease-in) e a tornare a 0 quando rientra (ease-out) — di
+// proposito NON simmetrico: la partenza è più lenta e morbida di quanto
+// sia rapido l'arresto, richiesta esplicita.
+export const IDLE_EASE_IN_S = 2;
+export const IDLE_EASE_OUT_S = 1;
 
 // Rotazione propria dei satelliti (Fase 2a, un mondo = una sfera "a rete"
 // che orbita attorno al globo grande, vedi globe/satelliteGlobes.js): un
 // giro completo su se stessi ogni SATELLITE_SPIN_PERIOD_S secondi, uguale
 // per tutti (prima era un valore casuale per satellite, 0.06-0.11 rad/s,
 // cioè un giro ogni ~57-105s — qui diventa un unico valore pulito).
+// Indipendente dal movimento idle sopra: continua sempre (a meno di
+// "riduci animazioni", vedi satelliteGlobes.js).
 export const SATELLITE_SPIN_PERIOD_S = 60;
