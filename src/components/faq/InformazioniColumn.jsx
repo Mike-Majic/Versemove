@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listFaqArticles, createFaqArticle, updateFaqArticle, setFaqArticleVisibility } from '../../data/faq';
 import EmptyState from '../EmptyState';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import Skeleton from '../Skeleton';
 
 function ArticleEditForm({ initial, onCancel, onSave }) {
@@ -41,7 +42,7 @@ function ArticleEditForm({ initial, onCancel, onSave }) {
 // Guida dell'app: fisarmonica per sezione, ricerca testuale in alto, CRUD
 // (Nuovo/Modifica/Nascondi) visibile solo allo staff — la RLS impone
 // comunque che solo owner/moderatori possano scrivere.
-export default function InformazioniColumn({ staff }) {
+export default function InformazioniColumn({ staff, closing = false, onOpenCategory }) {
   const [articles, setArticles] = useState(null);
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
@@ -63,8 +64,9 @@ export default function InformazioniColumn({ staff }) {
     return map;
   }, [articles, search]);
 
-  return (
+  const guidePanel = (
     <div className="rb-faq-column">
+      <h3 className="rb-faq-title">Informazioni</h3>
       <div className="rb-faq-info-header">
         <input
           type="text"
@@ -135,5 +137,36 @@ export default function InformazioniColumn({ staff }) {
         ))
       )}
     </div>
+  );
+
+  const helpPanel = (
+    <div className="rb-faq-column">
+      <h3 className="rb-faq-title">Non trovi la risposta?</h3>
+      <p className="rb-faq-hint">Scrivi allo staff o proponi un miglioramento: rispondiamo dalla Stanza MOD.</p>
+      <button type="button" className="rb-faq-help-card" onClick={() => onOpenCategory?.('segnalazioni')}>
+        <span className="rb-faq-help-icon">🚩</span>
+        <span>
+          <strong>Segnala un problema</strong>
+          <small>Bug, contenuti offensivi, problemi con l'account</small>
+        </span>
+      </button>
+      <button type="button" className="rb-faq-help-card" onClick={() => onOpenCategory?.('suggerimenti')}>
+        <span className="rb-faq-help-icon">💡</span>
+        <span>
+          <strong>Proponi un'idea</strong>
+          <small>Vota e suggerisci nuove funzioni</small>
+        </span>
+      </button>
+    </div>
+  );
+
+  return (
+    <TwoColumnSwitcher
+      primary={guidePanel}
+      secondary={helpPanel}
+      primaryLabel="Guida"
+      secondaryLabel="Aiuto"
+      closing={closing}
+    />
   );
 }

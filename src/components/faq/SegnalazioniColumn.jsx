@@ -4,6 +4,7 @@ import { supabase } from '../../data/supabaseClient';
 import CustomSelect from '../shared/CustomSelect';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 
 const CATEGORIE = [
   { value: 'Bug', label: 'Bug' },
@@ -19,7 +20,7 @@ const STATO_LABEL = { aperto: 'Aperto', in_lavorazione: 'In lavorazione', chiuso
 // data/reports.js e ReportModal.jsx) più lo storico delle proprie
 // segnalazioni, con lo stato che lo staff gli assegna dalla Stanza MOD/
 // dal pannello Backend.
-export default function SegnalazioniColumn({ user, onOpenAuth }) {
+export default function SegnalazioniColumn({ user, onOpenAuth, closing = false }) {
   const [categoria, setCategoria] = useState('Bug');
   const [descrizione, setDescrizione] = useState('');
   const [screenshot, setScreenshot] = useState(null);
@@ -71,10 +72,11 @@ export default function SegnalazioniColumn({ user, onOpenAuth }) {
     refreshMine();
   };
 
-  return (
+  const formPanel = (
     <div className="rb-faq-column">
       <form className="rb-faq-form" onSubmit={submit}>
-        <h3>Segnala un problema</h3>
+        <h3 className="rb-faq-title">Segnala un problema</h3>
+        <p className="rb-faq-hint">Hai trovato un errore o qualcosa che non va? Raccontacelo: lo staff lo vede subito.</p>
         {!user ? (
           <button type="button" className="rb-btn-primary" onClick={onOpenAuth}>Accedi per segnalare</button>
         ) : (
@@ -85,12 +87,21 @@ export default function SegnalazioniColumn({ user, onOpenAuth }) {
             </label>
             <label className="rb-field">
               <span>Descrizione</span>
-              <textarea rows={4} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} />
+              <textarea
+                rows={5}
+                value={descrizione}
+                placeholder="Cosa è successo? In quale mondo? Cosa ti aspettavi?"
+                onChange={(e) => setDescrizione(e.target.value)}
+              />
             </label>
-            <label className="rb-field">
+            <div className="rb-field">
               <span>Screenshot (facoltativo)</span>
-              <input type="file" accept="image/*" onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)} />
-            </label>
+              <label className="rb-faq-file">
+                <input type="file" accept="image/*" onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)} />
+                <span className="rb-faq-file-btn">📎 Scegli immagine</span>
+                <span className="rb-faq-file-name">{screenshot ? screenshot.name : 'Nessun file selezionato'}</span>
+              </label>
+            </div>
             {error && <p className="rb-privacy-error">{error}</p>}
             {sent && <p className="rb-faq-hint">Segnalazione inviata, grazie.</p>}
             <button type="submit" className="rb-btn-primary" disabled={sending}>
@@ -99,9 +110,13 @@ export default function SegnalazioniColumn({ user, onOpenAuth }) {
           </>
         )}
       </form>
+    </div>
+  );
 
+  const minePanel = (
+    <div className="rb-faq-column">
       <div className="rb-faq-mine">
-        <h3>Le mie segnalazioni</h3>
+        <h3 className="rb-faq-title">Le mie segnalazioni</h3>
         {mine === null ? (
           <Skeleton lines={3} />
         ) : mine.length === 0 ? (
@@ -120,5 +135,15 @@ export default function SegnalazioniColumn({ user, onOpenAuth }) {
         )}
       </div>
     </div>
+  );
+
+  return (
+    <TwoColumnSwitcher
+      primary={formPanel}
+      secondary={minePanel}
+      primaryLabel="Segnala un problema"
+      secondaryLabel="Le mie segnalazioni"
+      closing={closing}
+    />
   );
 }

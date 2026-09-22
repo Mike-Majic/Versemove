@@ -8,6 +8,7 @@ import {
 import { WORLDS } from '../../data/worlds';
 import CustomSelect from '../shared/CustomSelect';
 import EmptyState from '../EmptyState';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import Skeleton from '../Skeleton';
 
 const ORDER_OPTIONS = [
@@ -87,10 +88,9 @@ function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
 // lo staff (owner/moderatori) può cambiare stato e lasciare una risposta,
 // lo impone la RLS lato server, qui il controllo `staff` è solo per
 // mostrare o nascondere i controlli.
-export default function SuggerimentiColumn({ user, onOpenAuth, staff }) {
+export default function SuggerimentiColumn({ user, onOpenAuth, staff, closing = false }) {
   const [suggestions, setSuggestions] = useState(null);
   const [ordinamento, setOrdinamento] = useState('votati');
-  const [formOpen, setFormOpen] = useState(false);
   const [titolo, setTitolo] = useState('');
   const [testo, setTesto] = useState('');
   const [mondo, setMondo] = useState('');
@@ -126,20 +126,16 @@ export default function SuggerimentiColumn({ user, onOpenAuth, staff }) {
     setTitolo('');
     setTesto('');
     setMondo('');
-    setFormOpen(false);
     refresh();
   };
 
-  return (
+  const formPanel = (
     <div className="rb-faq-column">
-      <div className="rb-faq-suggestions-header">
-        <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
-        <button type="button" className="rb-btn-primary" onClick={() => (user ? setFormOpen((v) => !v) : onOpenAuth?.())}>
-          + Nuovo suggerimento
-        </button>
-      </div>
-
-      {formOpen && (
+      <h3 className="rb-faq-title">Nuovo suggerimento</h3>
+      <p className="rb-faq-hint">Hai un'idea per migliorare Versemove? Scrivila qui: la community la vota e lo staff risponde.</p>
+      {!user ? (
+        <button type="button" className="rb-btn-primary" onClick={onOpenAuth}>Accedi per proporre un'idea</button>
+      ) : (
         <form className="rb-faq-form" onSubmit={submit}>
           <label className="rb-field">
             <span>Titolo</span>
@@ -159,6 +155,15 @@ export default function SuggerimentiColumn({ user, onOpenAuth, staff }) {
           </button>
         </form>
       )}
+    </div>
+  );
+
+  const listPanel = (
+    <div className="rb-faq-column">
+      <div className="rb-faq-suggestions-header">
+        <h3 className="rb-faq-title">Suggerimenti</h3>
+        <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
+      </div>
 
       {suggestions === null ? (
         <Skeleton lines={4} />
@@ -172,5 +177,15 @@ export default function SuggerimentiColumn({ user, onOpenAuth, staff }) {
         </ul>
       )}
     </div>
+  );
+
+  return (
+    <TwoColumnSwitcher
+      primary={listPanel}
+      secondary={formPanel}
+      primaryLabel="Suggerimenti"
+      secondaryLabel="Nuovo suggerimento"
+      closing={closing}
+    />
   );
 }

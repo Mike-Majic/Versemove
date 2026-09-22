@@ -1006,6 +1006,7 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <FaqWorldExplorer
             world={world}
+            isClosing={closingCategoryId !== null}
             activeCategory={activeArteCategory}
             onToggleCategory={toggleArteCategory}
             onSearchCategory={flyToArteCategory}

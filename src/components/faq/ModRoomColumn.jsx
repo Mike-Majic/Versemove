@@ -9,12 +9,13 @@ import {
 import { fetchProfilesMap, displayName } from '../../data/posts';
 import { supabase } from '../../data/supabaseClient';
 import Skeleton from '../Skeleton';
+import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 
 // Stanza MOD: solo owner/moderatori (il montaggio stesso è già condizionato
 // a staff in FaqWorldExplorer, la RLS lo garantisce comunque lato server).
 // In cima il riquadro "Da gestire" (segnalazioni aperte + casella postale
 // non letta), sotto la chat interna dello staff.
-export default function ModRoomColumn({ user }) {
+export default function ModRoomColumn({ user, closing = false }) {
   const [openReports, setOpenReports] = useState(null);
   const [unreadMail, setUnreadMail] = useState(null);
   const [messages, setMessages] = useState(null);
@@ -77,8 +78,9 @@ export default function ModRoomColumn({ user }) {
     setDraft('');
   };
 
-  return (
+  const pendingPanel = (
     <div className="rb-faq-column rb-modroom-column">
+      <h3 className="rb-faq-title rb-modroom-title">🛡️ Stanza MOD</h3>
       <div className="rb-faq-pending-box">
         <h3>Da gestire</h3>
         {openReports === null || unreadMail === null ? (
@@ -111,7 +113,12 @@ export default function ModRoomColumn({ user }) {
           </>
         )}
       </div>
+    </div>
+  );
 
+  const chatPanel = (
+    <div className="rb-faq-column rb-modroom-column">
+      <h3 className="rb-faq-title rb-modroom-title">Chat dello staff</h3>
       <div className="rb-faq-modroom-chat">
         {messages === null ? (
           <Skeleton lines={5} />
@@ -139,5 +146,15 @@ export default function ModRoomColumn({ user }) {
         </form>
       </div>
     </div>
+  );
+
+  return (
+    <TwoColumnSwitcher
+      primary={chatPanel}
+      secondary={pendingPanel}
+      primaryLabel="Chat dello staff"
+      secondaryLabel="Da gestire"
+      closing={closing}
+    />
   );
 }

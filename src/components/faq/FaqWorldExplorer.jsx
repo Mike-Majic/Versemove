@@ -23,6 +23,7 @@ export default function FaqWorldExplorer({
   onOpenAuth,
   favorites = [],
   onToggleFavorite,
+  isClosing = false,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -43,7 +44,9 @@ export default function FaqWorldExplorer({
   };
 
   return (
-    <div className="rb-arte-explorer" style={{ '--accent': world.color }}>
+    // La Stanza MOD ha l'accento rosso (come la sua nuvola sul globo), le
+    // altre categorie il grigio-argento del mondo FAQ.
+    <div className="rb-arte-explorer" style={{ '--accent': category?.id === 'mod-room' ? '#ff3b3b' : world.color }}>
       {category && (
         <>
           <div className="rb-arte-top-controls">
@@ -82,10 +85,20 @@ export default function FaqWorldExplorer({
             </form>
           </div>
 
-          {category.id === 'mod-room' && staff && <ModRoomColumn user={user} />}
-          {category.id === 'segnalazioni' && <SegnalazioniColumn user={user} onOpenAuth={onOpenAuth} />}
-          {category.id === 'suggerimenti' && <SuggerimentiColumn user={user} onOpenAuth={onOpenAuth} staff={staff} />}
-          {category.id === 'informazioni' && <InformazioniColumn staff={staff} />}
+          {/* Ogni categoria usa lo stesso layout a due pannelli degli altri
+              mondi (TwoColumnSwitcher: pannello scuro con bordo del colore
+              del mondo, apertura olografica, chiusura in particelle) —
+              prima i contenuti erano disegnati "nudi" sopra al globo. */}
+          {category.id === 'mod-room' && staff && <ModRoomColumn user={user} closing={isClosing} />}
+          {category.id === 'segnalazioni' && (
+            <SegnalazioniColumn user={user} onOpenAuth={onOpenAuth} closing={isClosing} />
+          )}
+          {category.id === 'suggerimenti' && (
+            <SuggerimentiColumn user={user} onOpenAuth={onOpenAuth} staff={staff} closing={isClosing} />
+          )}
+          {category.id === 'informazioni' && (
+            <InformazioniColumn staff={staff} closing={isClosing} onOpenCategory={onToggleCategory} />
+          )}
         </>
       )}
     </div>

@@ -1,13 +1,165 @@
 .rb-faq-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  overflow-y: auto;
-  height: 100%;
+  gap: 14px;
+  min-height: 100%;
+  color: #f5f5f7;
+}
+
+/* Il contenitore scuro, il bordo del colore del mondo e lo scroll li dà già
+   il pannello di TwoColumnSwitcher (.rb-2col-panel): qui solo i contenuti. */
+
+.rb-faq-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.rb-modroom-title {
+  color: #ff6b6b;
+}
+
+/* --- Campi dei form FAQ (stesso look degli altri pannelli) --- */
+
+.rb-faq-column .rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rb-faq-column .rb-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rb-faq-column input[type='text'],
+.rb-faq-column textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rb-faq-column textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.rb-faq-column input[type='text']::placeholder,
+.rb-faq-column textarea::placeholder {
+  color: rgba(245, 245, 247, 0.35);
+}
+
+.rb-faq-column input[type='text']:focus,
+.rb-faq-column textarea:focus {
+  border-color: var(--accent, #8a8a92);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #8a8a92) 22%, transparent);
+}
+
+.rb-faq-file {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.rb-faq-file input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rb-faq-file-btn {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rb-faq-file-name {
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-faq-column .rb-btn-primary {
+  align-self: stretch;
+  border: 1px solid color-mix(in srgb, var(--accent, #8a8a92) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #8a8a92) 28%, rgba(255, 255, 255, 0.04));
+  color: #f5f5f7;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.rb-faq-column .rb-btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #8a8a92) 45%, rgba(255, 255, 255, 0.04));
+}
+
+.rb-faq-column .rb-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- Aiuto (pannello destro di Informazioni) --- */
+
+.rb-faq-help-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #f5f5f7;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.rb-faq-help-card:hover {
+  border-color: var(--accent, #8a8a92);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.rb-faq-help-card strong {
+  display: block;
+  font-size: 13.5px;
+}
+
+.rb-faq-help-card small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-faq-help-icon {
+  font-size: 22px;
 }
 
 .rb-faq-hint {
+  margin: 0;
   font-size: 12.5px;
   color: rgba(245, 245, 247, 0.55);
 }
@@ -46,6 +198,7 @@
 
 .rb-faq-modroom-chat {
   flex: 1;
+  min-height: 320px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -91,6 +244,22 @@
 
 .rb-faq-modroom-form input {
   flex: 1;
+}
+
+.rb-faq-modroom-form button {
+  border: 1px solid color-mix(in srgb, var(--accent, #ff3b3b) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #ff3b3b) 30%, transparent);
+  color: #f5f5f7;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rb-faq-modroom-form button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* --- Segnalazioni --- */
@@ -142,6 +311,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .rb-faq-suggestions-list {
