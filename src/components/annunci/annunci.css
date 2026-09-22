@@ -1,0 +1,618 @@
+.rb-annunci-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.rb-annunci-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rb-annunci-header h3 {
+  margin: 0;
+}
+
+.rb-annunci-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-annunci-tabs button {
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(245, 245, 247, 0.7);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.rb-annunci-tabs button.active {
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 30%, transparent);
+  color: #fff;
+}
+
+.rb-annunci-online-toggle {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.rb-annunci-online-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.rb-annunci-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rb-annunci-view-switch {
+  display: flex;
+  gap: 6px;
+}
+
+.rb-annunci-view-switch button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: none;
+  color: rgba(245, 245, 247, 0.7);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.rb-annunci-view-switch button.active {
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 25%, transparent);
+  border-color: var(--accent, #ff8a1f);
+  color: #fff;
+}
+
+.rb-annunci-body {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.rb-annunci-filters {
+  flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+}
+
+.rb-annunci-filters.compact {
+  width: 100%;
+  border-right: none;
+}
+
+.rb-annunci-range-row {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-annunci-filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.rb-annunci-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-annunci-list.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* --- AnnuncioCard --- */
+
+.rb-annuncio-card {
+  display: flex;
+  gap: 10px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.rb-annuncio-card.grid {
+  flex-direction: column;
+}
+
+.rb-annuncio-card-media {
+  position: relative;
+  flex-shrink: 0;
+  width: 100px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rb-annuncio-card.grid .rb-annuncio-card-media {
+  width: 100%;
+  height: 110px;
+}
+
+.rb-annuncio-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rb-annuncio-card-media-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 24px;
+}
+
+.rb-annuncio-card-tipo {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.rb-annuncio-fav-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.rb-annuncio-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rb-annuncio-card-price {
+  font-size: 14px;
+  color: var(--accent, #ff8a1f);
+}
+
+.rb-annuncio-card-title {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-annuncio-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-annuncio-card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.5);
+  margin-top: 2px;
+}
+
+.rb-annuncio-card-trattabile {
+  color: #6be08a;
+}
+
+.rb-annuncio-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- Mappa --- */
+
+.rb-annunci-map-viewport {
+  position: relative;
+  flex: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.rb-annunci-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.rb-annunci-map-empty-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  z-index: 500;
+}
+
+.rb-annuncio-pin-wrap {
+  background: none;
+  border: none;
+}
+
+.rb-annuncio-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0d0c12;
+  border: 2px solid var(--accent, #ff8a1f);
+  font-size: 16px;
+}
+
+.rb-annuncio-pin img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- I miei annunci --- */
+
+.rb-annunci-mie-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb-annunci-mie-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.rb-annunci-mie-item img {
+  width: 56px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.rb-annunci-mie-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.rb-annunci-mie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rb-annunci-mie-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: none;
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.rb-annunci-stato-attivo { background: rgba(34, 197, 94, 0.25); color: #6be08a; }
+.rb-annunci-stato-riservato { background: rgba(255, 138, 31, 0.25); color: #ffb066; }
+.rb-annunci-stato-venduto { background: rgba(139, 92, 246, 0.25); color: #b79aff; }
+.rb-annunci-stato-rimosso { background: rgba(255, 255, 255, 0.12); color: rgba(245, 245, 247, 0.6); }
+
+/* --- Dettaglio annuncio --- */
+
+.rb-annuncio-detail-card {
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0d0c12;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent, #ff8a1f) 35%, transparent);
+}
+
+.rb-annuncio-detail-gallery {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rb-annuncio-detail-gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rb-annuncio-detail-gallery-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+
+.rb-annuncio-detail-gallery-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.rb-annuncio-detail-gallery-dots button {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 0;
+  cursor: pointer;
+}
+
+.rb-annuncio-detail-gallery-dots button.active {
+  background: #fff;
+}
+
+.rb-annuncio-detail-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-annuncio-detail-price {
+  font-size: 22px;
+  color: var(--accent, #ff8a1f);
+}
+
+.rb-annuncio-detail-body h3 {
+  margin: 0;
+}
+
+.rb-annuncio-detail-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+  flex-wrap: wrap;
+}
+
+.rb-annuncio-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.rb-annuncio-detail-table td {
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rb-annuncio-detail-table td:first-child {
+  color: rgba(245, 245, 247, 0.55);
+  width: 45%;
+}
+
+.rb-annuncio-detail-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(245, 245, 247, 0.8);
+}
+
+.rb-annuncio-detail-seller {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+}
+
+.rb-annuncio-detail-seller img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.rb-annuncio-detail-seller div {
+  display: flex;
+  flex-direction: column;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-annuncio-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rb-annuncio-detail-actions .rb-reset-filters-btn.active {
+  border-color: #ff5a7a;
+  color: #ff5a7a;
+}
+
+/* --- Wizard di pubblicazione --- */
+
+.rb-annunci-wizard-card {
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0d0c12;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent, #ff8a1f) 35%, transparent);
+  padding: 24px;
+}
+
+.rb-annunci-wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.rb-annunci-wizard-step {
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-annunci-wizard-step.active {
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 30%, transparent);
+  color: #fff;
+}
+
+.rb-annunci-wizard-step.done {
+  color: #6be08a;
+}
+
+.rb-annunci-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rb-annunci-photo-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.rb-annunci-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rb-annunci-photo-cover {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  font-size: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.rb-annunci-photo-thumb button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.rb-annunci-location-map {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rb-annunci-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.rb-annunci-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .rb-annunci-filters {
+    width: 100%;
+    border-right: none;
+    order: 2;
+  }
+  .rb-annunci-body {
+    flex-direction: column;
+  }
+}

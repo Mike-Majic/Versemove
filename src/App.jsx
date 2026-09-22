@@ -28,6 +28,7 @@ import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery }
 import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
+import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
 import AccessGate from './components/AccessGate';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
@@ -63,6 +64,7 @@ const IncontriLiveExplorer = lazy(() => import('./components/incontri/IncontriLi
 const LavoroWorldExplorer = lazy(() => import('./components/lavoro/LavoroWorldExplorer'));
 const LavoroConsentGate = lazy(() => import('./components/lavoro/LavoroConsentGate'));
 const FaqWorldExplorer = lazy(() => import('./components/faq/FaqWorldExplorer'));
+const AnnunciWorldExplorer = lazy(() => import('./components/annunci/AnnunciWorldExplorer'));
 const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const AuthModal = lazy(() => import('./components/AuthModal'));
@@ -106,6 +108,7 @@ const CATEGORY_WORLDS = {
   // sotto con getFaqCategories(isStaff(...)) — questa voce resta solo come
   // fallback per il conteggio "più di CATEGORY_LIST_PAGE_SIZE" iniziale.
   faq: { categories: getFaqCategories(false), resolveQuery: resolveFaqCategoryQuery },
+  annunci: { categories: ANNUNCI_CATEGORIES, resolveQuery: resolveAnnunciCategoryQuery },
 };
 
 // Aspetta che l'utente finisca di digitare prima di far "volare" il globo sulla città cercata.
@@ -918,7 +921,7 @@ export default function App() {
         />
       </Suspense>
 
-      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && world.id !== 'faq' && (
+      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && world.id !== 'faq' && world.id !== 'annunci' && (
         <Suspense fallback={<PageLoading />}>
           <ArteExplorer
             world={world}
@@ -1008,6 +1011,22 @@ export default function App() {
             onSearchCategory={flyToArteCategory}
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
+      )}
+
+      {world.id === 'annunci' && (
+        <Suspense fallback={<PageLoading />}>
+          <AnnunciWorldExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
           />
