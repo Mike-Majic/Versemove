@@ -179,8 +179,15 @@ export async function registerAccount({
   lingua,
 }) {
   const cleanEmail = (email ?? '').trim().toLowerCase();
-  if (!username?.trim() || !nickname?.trim() || !cleanEmail || !password || !dataNascita) {
+  const cleanNickname = (nickname ?? '').trim();
+  if (!username?.trim() || !cleanNickname || !cleanEmail || !password || !dataNascita) {
     return { error: 'Nome utente, nickname, mail, password e data di nascita sono obbligatori.' };
+  }
+  // Stesso vincolo del database (profiles.nickname, 2-30 caratteri): si
+  // intercetta qui per non far arrivare chi sbaglia fino al generico errore
+  // di Supabase alla creazione dell'account.
+  if (cleanNickname.length < 2 || cleanNickname.length > 30) {
+    return { error: 'Il nickname deve avere tra 2 e 30 caratteri.' };
   }
   if (!genere) {
     return { error: 'Seleziona il genere.' };
@@ -412,6 +419,23 @@ export async function updateNickname(accountId, newNickname) {
   const { error } = await supabase.rpc('update_own_nickname', { p_nickname: (newNickname ?? '').trim() });
   if (error) return { error: error.message };
   return { account: await fetchOwnProfile() };
+}
+
+// true se il nickname è già usato da un altro account (RPC pubblica, non
+// richiede login: serve alla validazione in tempo reale del form di
+// registrazione, prima ancora di creare l'account). In caso di errore di
+// rete si preferisce non bloccare la UI: il controllo definitivo resta
+// comunque lato server alla creazione dell'account.
+export async function isNicknameTaken(nickname) {
+  const clean = (nickname ?? '').trim();
+  if (!clean) return false;
+  try {
+    const { data, error } = await supabase.rpc('is_nickname_taken', { p_nickname: clean });
+    if (error) return false;
+    return Boolean(data);
+  } catch {
+    return false;
+  }
 }
 
 export async function updateName(accountId, nome, cognome) {

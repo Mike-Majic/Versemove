@@ -1,8 +1,8 @@
 // Italiano: lingua di partenza dell'app, testo sorgente per le altre
 // traduzioni (vedi src/i18n/index.js). Ogni chiave qui DEVE esistere
 // identica (stessa struttura, stesso nesting) in en.js/es.js/fr.js/de.js:
-// se manca in una lingua, i18next mostra questa versione italiana come
-// ripiego invece di una chiave grezza a schermo.
+// se manca in una lingua diversa dall'italiano, i18next mostra l'inglese
+// come ripiego (fallbackLng: 'en'), mai questa versione italiana.
 export default {
   common: {
     close: 'Chiudi',
@@ -12,6 +12,8 @@ export default {
     report: 'Segnala',
     changeWorld: 'Cambia mondo',
     goToWorld: 'Vai al mondo {{world}}',
+    howItWorks: 'Come funziona',
+    nextCategoriesPage: 'Altra pagina di categorie',
   },
   topbar: {
     notifications: 'Notifiche',
@@ -22,6 +24,24 @@ export default {
     settings: 'Impostazioni',
     logout: 'Esci',
     login: 'Accedi',
+  },
+  categories: {
+    vetrina: {
+      novita: 'Novità',
+      cani: 'Cani',
+      'offerte-casa-arredamento': 'Casa & Arredamento',
+      'offerte-cibo-supermercati': 'Cibo & Supermercati',
+      'offerte-abbigliamento': 'Abbigliamento',
+      'offerte-scarpe': 'Scarpe',
+      'offerte-elettronica': 'Elettronica',
+      'offerte-bellezza-cura-persona': 'Bellezza & Cura persona',
+      'offerte-sport-outdoor': 'Sport & Outdoor',
+      'offerte-bambini-giocattoli': 'Bambini & Giocattoli',
+      'offerte-viaggi-voli': 'Viaggi & Voli',
+      'offerte-fai-da-te-giardino': 'Fai da te & Giardino',
+      'offerte-auto-moto': 'Auto & Moto',
+      'offerte-codici-sconto': 'Codici sconto',
+    },
   },
   worlds: {
     bambini: { label: 'Bambini', tagline: 'Minigiochi per i più piccoli' },
@@ -41,6 +61,8 @@ export default {
       rememberMe: 'Ricordami su questo dispositivo',
       username: 'Nome utente',
       nickname: 'Nickname',
+      nicknameChecking: 'Controllo disponibilità…',
+      nicknameAvailable: 'Disponibile.',
       confirmPassword: 'Conferma password',
       birthDate: 'Data di nascita',
       birthDateHint: 'Serve per i mondi riservati ai maggiorenni.',
@@ -83,6 +105,9 @@ export default {
     resendSuccess: 'Mail inviata di nuovo: controlla la posta (anche spam).',
     submit: { oneMoment: 'Un attimo…', login: 'Entra', register: 'Crea account' },
     errors: {
+      nicknameLength: 'Il nickname deve avere tra 2 e 30 caratteri.',
+      nicknameTaken: 'Questo nickname è già in uso, provane un altro.',
+      nicknameInvalid: 'Scegli un nickname valido e disponibile.',
       passwordMismatch: 'Le due password non coincidono.',
       tooYoung: 'Devi avere almeno 14 anni per registrarti.',
       genderRequired: 'Seleziona il genere.',
@@ -100,10 +125,73 @@ export default {
     },
   },
   settings: {
+    title: 'Impostazioni',
+    apply: 'Applica',
+    applyAndClose: 'Applica e chiudi',
+    resetAll: 'Azzera tutti i filtri',
+    unappliedChanges: 'Modifiche non applicate',
+    applyHint: 'Le modifiche qui sotto valgono solo dopo aver premuto "Applica".',
+    closeConfirm: {
+      message: 'Hai modifiche non applicate. Chiudere comunque?',
+      cancel: 'Annulla',
+      discard: 'Scarta e chiudi',
+    },
+    sound: {
+      title: 'Suono',
+      hint: "Attiva o disattiva gli effetti sonori dell'app (es. i suoni del globo).",
+    },
+    effects: {
+      title: 'Effetti',
+      hint: "Quanto sono ricchi gli effetti grafici del globo (nitidezza, atmosfera). 'Auto' sceglie da solo in base al dispositivo e si adatta se il telefono/PC fatica.",
+      ariaLabel: 'Livello effetti grafici',
+    },
+    sections: {
+      privacy: { title: 'Privacy', hint: 'Utenti, posizione, sicurezza e accesso.' },
+      luogo: { title: 'Luogo', hint: 'Continente, regione e città: valido per tutti i mondi.' },
+      personalizza: { title: 'Personalizza il tuo Versemove', hint: 'Chi vuoi vedere e quali mondi usare, valido per tutti i mondi.' },
+      mostrami: { title: 'Mostrami ed età', hint: 'Genere ed età di chi vuoi vedere.' },
+      mondi: {
+        title: 'Mondi',
+        hint: 'Dove togli la spunta, il mondo sparisce per te e il tuo profilo non comparirà più agli altri in quel mondo. Puoi cambiare idea quando vuoi, fino a 4 volte a settimana.',
+      },
+    },
+    luogo: {
+      continent: 'Continente',
+      allContinents: 'Tutti i continenti',
+      region: 'Regione',
+      allRegions: 'Tutte le regioni',
+      city: 'Città',
+      cityPlaceholder: 'Es. Roma',
+      distance: 'Distanza',
+      distanceUnlimited: 'tutto il mondo',
+      distanceHint: 'Trascina la barra tutta a destra per non avere nessun limite di distanza: verranno considerate le persone di tutto il mondo, non solo quelle entro un certo raggio dalla città impostata sopra.',
+    },
+    mostrami: {
+      label: 'Mostrami',
+      all: 'Tutti',
+      male: 'Uomo',
+      female: 'Donna',
+      age: 'Età',
+    },
     language: {
       title: 'Lingua',
       hint: "Cambia la lingua dell'interfaccia in qualsiasi momento.",
       saved: 'Lingua cambiata e salvata sul tuo account.',
     },
+  },
+  accessGate: {
+    worldDisabled: {
+      title: 'Mondo disattivato',
+      message: 'Hai scelto di non abilitare il mondo {{world}} per il tuo account. Puoi riattivarlo in qualsiasi momento dalle Impostazioni (fino a 4 volte a settimana).',
+      back: 'Torna indietro',
+      goToSettings: 'Vai alle Impostazioni',
+    },
+    adultTitle: 'Contenuti per un pubblico adulto',
+    loginTitle: 'Accedi per continuare',
+    adultNeedsAuth: 'Il mondo {{world}} è riservato ai maggiorenni. Accedi o registrati (con la tua data di nascita) per continuare.',
+    needsAuth: 'Devi accedere o registrarti per esplorare il mondo {{world}}.',
+    adultBlocked: 'Il mondo {{world}} è riservato ai maggiorenni. In base alla data di nascita del tuo account non puoi ancora entrare.',
+    back: 'Torna indietro',
+    loginOrRegister: 'Accedi o registrati',
   },
 };

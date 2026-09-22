@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Icona "i" cerchiata: al click mostra/nasconde una vignetta col testo.
 // Condivisa da ProfileSettingsPanel (dove serve anche onSeen, per non
@@ -6,6 +7,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 // SettingsPanel (dove tutte le spiegazioni prima sempre visibili sono
 // state spostate qui dentro, per occupare meno spazio in colonna).
 export default function InfoBadge({ text, onSeen }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [align, setAlign] = useState('left');
   const wrapRef = useRef(null);
@@ -46,7 +48,7 @@ export default function InfoBadge({ text, onSeen }) {
           setOpen((v) => !v);
           onSeen?.();
         }}
-        aria-label="Come funziona"
+        aria-label={t('common.howItWorks')}
       >
         i
       </button>

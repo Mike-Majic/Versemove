@@ -88,6 +88,11 @@
   color: rgba(245, 245, 247, 0.5);
 }
 
+.rb-live-directory-nickname {
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+
 .rb-golive-form {
   display: flex;
   flex-direction: column;

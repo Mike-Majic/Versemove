@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { translateInteractionError } from './errors';
+import { displayName } from './posts';
 
 // Segui/smetti di seguire un utente reale (tabella follows) — sostituisce
 // il vecchio array locale "following" di SocialFeed.jsx.
@@ -48,7 +49,7 @@ export async function listFollowingProfiles() {
     if (ids.length === 0) return [];
     const { data, error } = await supabase.from('public_profiles').select('id, nickname, username, avatar_url').in('id', ids);
     if (error || !data) return [];
-    return data.map((p) => ({ id: p.id, name: p.nickname || p.username || 'Utente', avatar: p.avatar_url || '' }));
+    return data.map((p) => ({ id: p.id, name: displayName(p), avatar: p.avatar_url || '' }));
   } catch {
     return [];
   }
@@ -69,7 +70,7 @@ export async function listSuggestedProfiles(excludeIds = [], limit = 4) {
     return data
       .filter((p) => !exclude.has(p.id))
       .slice(0, limit)
-      .map((p) => ({ id: p.id, name: p.nickname || p.username || 'Utente', avatar: p.avatar_url || '' }));
+      .map((p) => ({ id: p.id, name: displayName(p), avatar: p.avatar_url || '' }));
   } catch {
     return [];
   }

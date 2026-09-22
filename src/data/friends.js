@@ -1,9 +1,9 @@
 import { supabase } from './supabaseClient';
-import { fetchProfilesMap } from './posts';
+import { fetchProfilesMap, displayName } from './posts';
 import { translateInteractionError } from './errors';
 
 function mapProfileRow(row) {
-  return { id: row.id, name: row.nickname || row.username || 'Utente', avatar: row.avatar_url || '' };
+  return { id: row.id, name: displayName(row), avatar: row.avatar_url || '' };
 }
 
 // Cerca persone reali per nickname o nome utente (vista public_profiles,

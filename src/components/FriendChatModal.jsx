@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatRelativeDate } from './social/resolveAuthor';
-import { fetchProfilesMap } from '../data/posts';
+import { fetchProfilesMap, displayName } from '../data/posts';
 import {
   startDirectConversation,
   fetchMessages,
@@ -101,7 +101,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
           if (prev.some((m) => m.id === row.id)) return prev;
           const isMine = row.sender_id === user.id;
           const author = isMine
-            ? { id: user.id, name: user.nickname || user.username || 'Tu', avatar: user.avatar || '' }
+            ? { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' }
             : friendRef.current ?? { id: row.sender_id, name: 'Utente', avatar: '' };
           return [...prev, { id: row.id, conversationId: row.conversation_id, senderId: row.sender_id, author, testo: row.testo, data: row.created_at }];
         });
@@ -152,7 +152,7 @@ export default function FriendChatModal({ friendId, user, onClose, onMessagesRea
         id,
         conversationId,
         senderId: user.id,
-        author: { id: user.id, name: user.nickname || user.username || 'Tu', avatar: user.avatar || '' },
+        author: { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' },
         testo: text,
         data: createdAt,
       },

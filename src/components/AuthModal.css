@@ -71,6 +71,14 @@
   margin-top: 3px;
 }
 
+.rb-auth-field-warning {
+  color: #ff6b6b;
+}
+
+.rb-auth-field-ok {
+  color: #4ade80;
+}
+
 .rb-auth-attachments-count {
   display: block;
   font-size: 11px;

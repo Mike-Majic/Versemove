@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
 import { translateWorld } from './i18n/worldLabels';
+import { translateCategoryLabel } from './i18n/categoryLabels';
 import { setAppLanguage } from './i18n';
 import TopBar from './components/TopBar';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
@@ -26,6 +27,7 @@ import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery }
 import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import AccessGate from './components/AccessGate';
+import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
@@ -57,6 +59,7 @@ const BambiniGameExplorer = lazy(() => import('./components/BambiniGameExplorer'
 const SocialWorldExplorer = lazy(() => import('./components/social/SocialWorldExplorer'));
 const IncontriLiveExplorer = lazy(() => import('./components/incontri/IncontriLiveExplorer'));
 const LavoroWorldExplorer = lazy(() => import('./components/lavoro/LavoroWorldExplorer'));
+const LavoroConsentGate = lazy(() => import('./components/lavoro/LavoroConsentGate'));
 const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const AuthModal = lazy(() => import('./components/AuthModal'));
@@ -152,6 +155,25 @@ export default function App() {
   // dell'account (data di nascita in registrazione), non più una
   // dichiarazione con un pulsante.
   const isAgeGatedWorld = world.id === 'incontri' || world.id === 'lavoro';
+
+  // Consenso al mondo Lavoro (nome/cognome reali visibili solo lì, vedi
+  // LavoroConsentGate): null finché non si è ancora controllato (evita di
+  // mostrare per un attimo il gate a chi ha già consentito), poi true/false
+  // dalla RPC has_lavoro_consent. Si ricontrolla ad ogni cambio di account e
+  // ogni volta che si rientra nel mondo Lavoro (potrebbe essere stato
+  // revocato dalle Impostazioni mentre si era altrove).
+  const [lavoroConsent, setLavoroConsentState] = useState(null);
+  useEffect(() => {
+    if (world.id !== 'lavoro' || !user || !isAdult(user?.dataNascita)) return undefined;
+    let cancelled = false;
+    setLavoroConsentState(null);
+    hasLavoroConsent().then((consented) => {
+      if (!cancelled) setLavoroConsentState(consented);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [world.id, user?.id]);
 
   // L'account loggato vive su Supabase Auth, non più in localStorage: alla
   // partenza si controlla se il browser ha già una sessione valida
@@ -939,11 +961,12 @@ export default function App() {
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            matchFilters={{ citta: locationFilters.city, etaMin: filters.ageMin, etaMax: filters.ageMax }}
           />
         </Suspense>
       )}
 
-      {world.id === 'lavoro' && isAdult(user?.dataNascita) && (
+      {world.id === 'lavoro' && isAdult(user?.dataNascita) && lavoroConsent === true && (
         <Suspense fallback={<PageLoading />}>
           <LavoroWorldExplorer
             world={world}
@@ -954,6 +977,16 @@ export default function App() {
             onOpenAuth={() => setAuthOpen(true)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
+      )}
+
+      {world.id === 'lavoro' && !authOpen && isAdult(user?.dataNascita) && lavoroConsent === false && (
+        <Suspense fallback={<PageLoading />}>
+          <LavoroConsentGate
+            world={world}
+            onConsented={() => setLavoroConsentState(true)}
+            onDecline={() => setIndex(DEFAULT_WORLD_INDEX)}
           />
         </Suspense>
       )}
@@ -1008,7 +1041,7 @@ export default function App() {
               <button
                 type="button"
                 className="rb-tagline-scroll-btn"
-                aria-label="Altra pagina di categorie"
+                aria-label={t('common.nextCategoriesPage')}
                 onClick={() => {
                   const totalPages = Math.ceil(categorySet.categories.length / CATEGORY_LIST_PAGE_SIZE);
                   setCategoryPage((p) => (p + 1) % totalPages);
@@ -1027,7 +1060,7 @@ export default function App() {
                     className={`rb-tagline-cat-btn ${activeArteCategory === c.id ? 'active' : ''}`}
                     onClick={() => toggleArteCategory(c.id)}
                   >
-                    {c.label}
+                    {translateCategoryLabel(t, world.id, c)}
                   </button>
                 ))}
             </div>
@@ -1095,6 +1128,10 @@ export default function App() {
               setEventLikersId(null);
               setSelectedUser(null);
               setAccountDeletedNotice(true);
+            }}
+            onLavoroConsentRevoked={() => {
+              setLavoroConsentState(false);
+              if (world.id === 'lavoro') setIndex(DEFAULT_WORLD_INDEX);
             }}
           />
         </Suspense>

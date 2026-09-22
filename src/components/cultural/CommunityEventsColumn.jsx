@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listCommunityEvents, createCommunityEvent, deleteCommunityEvent } from '../../data/communityEvents';
 import { getCommunityReactionsSummary, toggleCommunityReaction } from '../../data/culturalReactions';
+import { displayName } from '../../data/posts';
 import ReactionButtons from './ReactionButtons';
 import './cultural.css';
 
@@ -78,7 +79,7 @@ export default function CommunityEventsColumn({ categoryId, label, user, onOpenA
     setReactions((prev) => {
       const next = new Map(prev);
       const entry = { vuole: [...summary.vuole], piaciuto: [...summary.piaciuto], myReactions: new Set(summary.myReactions) };
-      const me = { id: user.id, name: user.nickname || user.username || 'Tu', avatar: user.avatar || '' };
+      const me = { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' };
       if (active) {
         entry[reazione] = entry[reazione].filter((p) => p.id !== user.id);
         entry.myReactions.delete(reazione);

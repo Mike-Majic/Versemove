@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
+import { hasLavoroConsent, setLavoroConsent } from '../data/lavoro';
 import { resetAccountPassword, setOwnWorlds, setOwnLingua, deleteOwnAccount } from '../data/accounts';
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
@@ -150,7 +151,7 @@ function LanguageSubsection({ value, onChange }) {
 // dal genitore), confermato solo cliccando "Applica" come gli altri filtri.
 // Utenti (blocco contatti) e Sicurezza restano azioni immediate: non sono
 // filtri di visualizzazione, toccano subito il server.
-function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibility, setVisibility }) {
+function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibility, setVisibility, onLavoroConsentRevoked }) {
   const [sub, setSub] = useState('');
   const [blocked, setBlocked] = useState([]);
   const [profilesMap, setProfilesMap] = useState(new Map());
@@ -158,6 +159,8 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
   const [error, setError] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
   const [pwSent, setPwSent] = useState(false);
+  const [lavoroConsent, setLavoroConsentValue] = useState(false);
+  const [lavoroBusy, setLavoroBusy] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -171,10 +174,29 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
         setLoading(false);
       }
     });
+    hasLavoroConsent().then((consented) => {
+      if (!cancelled) setLavoroConsentValue(consented);
+    });
     return () => {
       cancelled = true;
     };
   }, [user]);
+
+  // Revocare (mai concedere: quello si fa solo dalla schermata di consenso
+  // entrando in Lavoro, con il testo completo davanti) fa uscire subito dal
+  // mondo Lavoro se ci si è dentro — il nome reale smette di essere
+  // visibile agli altri anche mentre la pagina è ancora aperta.
+  const revokeLavoroConsent = async () => {
+    setLavoroBusy(true);
+    const { error: err } = await setLavoroConsent(false);
+    setLavoroBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setLavoroConsentValue(false);
+    onLavoroConsentRevoked?.();
+  };
 
   // Nomi da public_profiles (non più da MOCK_USERS): unione di chi ho
   // bloccato e degli amici ancora bloccabili, così i nomi non "saltano"
@@ -348,6 +370,26 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
         )}
       </CollapsibleSection>
 
+      {user && lavoroConsent && (
+        <CollapsibleSection
+          level="sub"
+          title="Lavoro"
+          infoText="Nel mondo Lavoro il tuo nome e cognome reali sono visibili agli altri utenti di Lavoro. Puoi revocare il consenso in qualsiasi momento: uscirai subito dal mondo Lavoro."
+          open={sub === 'lavoro'}
+          onToggle={() => toggleSub('lavoro')}
+        >
+          <label className="rb-toggle-row">
+            <span className="rb-toggle-text-row">
+              <strong>Nome e cognome reali visibili nel mondo Lavoro</strong>
+            </span>
+            <span className="rb-toggle">
+              <input type="checkbox" checked={lavoroConsent} disabled={lavoroBusy} onChange={revokeLavoroConsent} />
+              <span className="rb-toggle-slider" />
+            </span>
+          </label>
+        </CollapsibleSection>
+      )}
+
       <p className="rb-settings-footnote">Altre impostazioni privacy arriveranno qui.</p>
     </>
   );
@@ -472,6 +514,7 @@ export default function SettingsPanel({
   friends,
   onUnfriend,
   onAccountDeleted,
+  onLavoroConsentRevoked,
 }) {
   const { t, i18n } = useTranslation();
   const [luogoOpen, setLuogoOpen] = useState(false);
@@ -564,18 +607,18 @@ export default function SettingsPanel({
     <ModalOverlay onClose={onClose} className="rb-settings-overlay">
       <aside className="rb-settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rb-settings-header">
-          <h2>Impostazioni</h2>
-          <button className="rb-close-btn" onClick={requestClose} aria-label="Chiudi">✕</button>
+          <h2>{t('settings.title')}</h2>
+          <button className="rb-close-btn" onClick={requestClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         {closeConfirmOpen && (
           <div className="rb-settings-close-confirm">
-            <p>Hai modifiche non applicate. Chiudere comunque?</p>
+            <p>{t('settings.closeConfirm.message')}</p>
             <div className="rb-settings-close-confirm-actions">
-              <button type="button" onClick={() => setCloseConfirmOpen(false)} disabled={applying}>Annulla</button>
-              <button type="button" onClick={onClose} disabled={applying}>Scarta e chiudi</button>
+              <button type="button" onClick={() => setCloseConfirmOpen(false)} disabled={applying}>{t('settings.closeConfirm.cancel')}</button>
+              <button type="button" onClick={onClose} disabled={applying}>{t('settings.closeConfirm.discard')}</button>
               <button type="button" className="rb-apply-filters-btn" onClick={handleApply} disabled={applying}>
-                {applying ? 'Un attimo…' : 'Applica e chiudi'}
+                {applying ? t('common.oneMoment') : t('settings.applyAndClose')}
               </button>
             </div>
           </div>
@@ -583,21 +626,21 @@ export default function SettingsPanel({
 
         <div className="rb-filter-actions">
           <button type="button" className="rb-reset-filters-btn" onClick={handleReset} disabled={applying}>
-            Azzera tutti i filtri
+            {t('settings.resetAll')}
           </button>
           <button type="button" className="rb-apply-filters-btn" onClick={handleApply} disabled={applying}>
-            {applying ? 'Un attimo…' : 'Applica'}
+            {applying ? t('common.oneMoment') : t('settings.apply')}
           </button>
         </div>
         <p className="rb-settings-hint">
-          {isDirty ? <span className="rb-settings-dirty-badge">● Modifiche non applicate</span> : 'Le modifiche qui sotto valgono solo dopo aver premuto "Applica".'}
+          {isDirty ? <span className="rb-settings-dirty-badge">● {t('settings.unappliedChanges')}</span> : t('settings.applyHint')}
         </p>
 
         <section className="rb-settings-section rb-settings-section-first">
           <label className="rb-toggle-row">
             <span className="rb-toggle-text-row">
-              <strong>Suono</strong>
-              <InfoBadge text="Attiva o disattiva gli effetti sonori dell'app (es. i suoni del globo)." />
+              <strong>{t('settings.sound.title')}</strong>
+              <InfoBadge text={t('settings.sound.hint')} />
             </span>
             <span className="rb-toggle">
               <input
@@ -611,10 +654,10 @@ export default function SettingsPanel({
 
           <div className="rb-field rb-settings-quality-field">
             <span className="rb-toggle-text-row">
-              <strong>Effetti</strong>
-              <InfoBadge text="Quanto sono ricchi gli effetti grafici del globo (nitidezza, atmosfera). 'Auto' sceglie da solo in base al dispositivo e si adatta se il telefono/PC fatica." />
+              <strong>{t('settings.effects.title')}</strong>
+              <InfoBadge text={t('settings.effects.hint')} />
             </span>
-            <div className="rb-settings-quality-options" role="radiogroup" aria-label="Livello effetti grafici">
+            <div className="rb-settings-quality-options" role="radiogroup" aria-label={t('settings.effects.ariaLabel')}>
               {QUALITY_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -632,8 +675,8 @@ export default function SettingsPanel({
         </section>
 
         <CollapsibleSection
-          title="Privacy"
-          infoText="Utenti, posizione, sicurezza e accesso."
+          title={t('settings.sections.privacy.title')}
+          infoText={t('settings.sections.privacy.hint')}
           open={privacyOpen}
           onToggle={() => setPrivacyOpen((v) => !v)}
         >
@@ -644,19 +687,20 @@ export default function SettingsPanel({
             onUnfriend={onUnfriend}
             visibility={draftVisibility}
             setVisibility={setDraftVisibility}
+            onLavoroConsentRevoked={onLavoroConsentRevoked}
           />
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="Luogo"
-          infoText="Continente, regione e città: valido per tutti i mondi."
+          title={t('settings.sections.luogo.title')}
+          infoText={t('settings.sections.luogo.hint')}
           open={luogoOpen}
           onToggle={() => setLuogoOpen((v) => !v)}
         >
           <label className="rb-field">
-            <span>Continente</span>
+            <span>{t('settings.luogo.continent')}</span>
             <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
-              <option value="">Tutti i continenti</option>
+              <option value="">{t('settings.luogo.allContinents')}</option>
               {CONTINENTS.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -664,9 +708,9 @@ export default function SettingsPanel({
           </label>
 
           <label className="rb-field">
-            <span>Regione</span>
+            <span>{t('settings.luogo.region')}</span>
             <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
-              <option value="">Tutte le regioni</option>
+              <option value="">{t('settings.luogo.allRegions')}</option>
               {REGIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
@@ -674,10 +718,10 @@ export default function SettingsPanel({
           </label>
 
           <label className="rb-field">
-            <span>Città</span>
+            <span>{t('settings.luogo.city')}</span>
             <input
               type="text"
-              placeholder="Es. Roma"
+              placeholder={t('settings.luogo.cityPlaceholder')}
               value={draftLocationFilters.city}
               onChange={(e) => updateLocation('city', e.target.value)}
             />
@@ -685,8 +729,8 @@ export default function SettingsPanel({
 
           <label className="rb-field">
             <span className="rb-field-label-row">
-              Distanza: {distanzaUnlimited ? 'tutto il mondo' : `${draftLocationFilters.distance} km`}
-              <InfoBadge text="Trascina la barra tutta a destra per non avere nessun limite di distanza: verranno considerate le persone di tutto il mondo, non solo quelle entro un certo raggio dalla città impostata sopra." />
+              {t('settings.luogo.distance')}: {distanzaUnlimited ? t('settings.luogo.distanceUnlimited') : `${draftLocationFilters.distance} km`}
+              <InfoBadge text={t('settings.luogo.distanceHint')} />
             </span>
             <input type="range" min={1} max={MAX_DISTANCE_KM} value={draftLocationFilters.distance}
               onChange={(e) => updateLocation('distance', Number(e.target.value))} />
@@ -694,35 +738,39 @@ export default function SettingsPanel({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="Personalizza il tuo Versemove"
-          infoText="Chi vuoi vedere e quali mondi usare, valido per tutti i mondi."
+          title={t('settings.sections.personalizza.title')}
+          infoText={t('settings.sections.personalizza.hint')}
           open={personalizzaOpen}
           onToggle={() => setPersonalizzaOpen((v) => !v)}
         >
           <CollapsibleSection
             level="sub"
-            title="Mostrami ed età"
-            infoText="Genere ed età di chi vuoi vedere."
+            title={t('settings.sections.mostrami.title')}
+            infoText={t('settings.sections.mostrami.hint')}
             open={personalizzaSub === 'mostrami'}
             onToggle={() => togglePersonalizzaSub('mostrami')}
           >
             <label className="rb-field">
-              <span>Mostrami</span>
+              <span>{t('settings.mostrami.label')}</span>
               <div className="rb-chip-group">
-                {['Tutti', 'Uomo', 'Donna'].map((opt) => (
+                {[
+                  { value: 'Tutti', label: t('settings.mostrami.all') },
+                  { value: 'Uomo', label: t('settings.mostrami.male') },
+                  { value: 'Donna', label: t('settings.mostrami.female') },
+                ].map((opt) => (
                   <button
-                    key={opt}
-                    className={`rb-chip ${draftFilters.gender === opt ? 'active' : ''}`}
-                    onClick={() => updateFilter('gender', opt)}
+                    key={opt.value}
+                    className={`rb-chip ${draftFilters.gender === opt.value ? 'active' : ''}`}
+                    onClick={() => updateFilter('gender', opt.value)}
                   >
-                    {opt}
+                    {opt.label}
                   </button>
                 ))}
               </div>
             </label>
 
             <label className="rb-field">
-              <span>Età: {draftFilters.ageMin}–{draftFilters.ageMax}</span>
+              <span>{t('settings.mostrami.age')}: {draftFilters.ageMin}–{draftFilters.ageMax}</span>
               <div className="rb-range-row">
                 <input type="range" min={18} max={80} value={draftFilters.ageMin}
                   onChange={(e) => updateFilter('ageMin', Math.min(Number(e.target.value), draftFilters.ageMax))} />
@@ -734,8 +782,8 @@ export default function SettingsPanel({
 
           <CollapsibleSection
             level="sub"
-            title="Mondi"
-            infoText="Dove togli la spunta, il mondo sparisce per te e il tuo profilo non comparirà più agli altri in quel mondo. Puoi cambiare idea quando vuoi, fino a 4 volte a settimana."
+            title={t('settings.sections.mondi.title')}
+            infoText={t('settings.sections.mondi.hint')}
             open={personalizzaSub === 'mondi'}
             onToggle={() => togglePersonalizzaSub('mondi')}
           >
@@ -752,8 +800,6 @@ export default function SettingsPanel({
             <LanguageSubsection value={draftLingua} onChange={setDraftLingua} />
           </CollapsibleSection>
         </CollapsibleSection>
-
-        <p className="rb-settings-footnote">I filtri sono salvati solo su questo dispositivo, per ora. In arrivo: account veri e ricerca in tempo reale.</p>
 
         <DeleteAccountSection user={user} onAccountDeleted={onAccountDeleted} />
       </aside>

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { translateWorld } from '../i18n/worldLabels';
 import './AccessGate.css';
 
 // Generalizzazione del vecchio AgeGate: oggi TUTTI i mondi richiedono un
@@ -8,23 +10,22 @@ import './AccessGate.css';
 // due: un account loggato e (se serve) maggiorenne, ma che ha scelto di non
 // abilitare questo mondo in registrazione/impostazioni.
 export default function AccessGate({ world, user, requireAdult, disabledByUser, onOpenAuth, onDecline, onOpenSettings }) {
+  const { t } = useTranslation();
   const needsAuth = !user;
+  const worldLabel = translateWorld(t, world).label;
 
   if (!needsAuth && disabledByUser) {
     return (
       <div className="rb-adult-gate-overlay" style={{ '--accent': world.color }}>
         <div className="rb-adult-gate-card">
-          <h2>Mondo disattivato</h2>
-          <p>
-            Hai scelto di non abilitare il mondo {world.label} per il tuo account. Puoi riattivarlo in
-            qualsiasi momento dalle Impostazioni (fino a 4 volte a settimana).
-          </p>
+          <h2>{t('accessGate.worldDisabled.title')}</h2>
+          <p>{t('accessGate.worldDisabled.message', { world: worldLabel })}</p>
           <div className="rb-adult-gate-actions">
             <button type="button" className="rb-adult-gate-decline" onClick={onDecline}>
-              Torna indietro
+              {t('accessGate.worldDisabled.back')}
             </button>
             <button type="button" className="rb-adult-gate-confirm" onClick={onOpenSettings}>
-              Vai alle Impostazioni
+              {t('accessGate.worldDisabled.goToSettings')}
             </button>
           </div>
         </div>
@@ -35,32 +36,29 @@ export default function AccessGate({ world, user, requireAdult, disabledByUser, 
   return (
     <div className="rb-adult-gate-overlay" style={{ '--accent': world.color }}>
       <div className="rb-adult-gate-card">
-        <h2>{requireAdult ? 'Contenuti per un pubblico adulto' : 'Accedi per continuare'}</h2>
+        <h2>{requireAdult ? t('accessGate.adultTitle') : t('accessGate.loginTitle')}</h2>
         {needsAuth ? (
           <>
             <p>
               {requireAdult
-                ? `Il mondo ${world.label} è riservato ai maggiorenni. Accedi o registrati (con la tua data di nascita) per continuare.`
-                : `Devi accedere o registrarti per esplorare il mondo ${world.label}.`}
+                ? t('accessGate.adultNeedsAuth', { world: worldLabel })
+                : t('accessGate.needsAuth', { world: worldLabel })}
             </p>
             <div className="rb-adult-gate-actions">
               <button type="button" className="rb-adult-gate-decline" onClick={onDecline}>
-                Torna indietro
+                {t('accessGate.back')}
               </button>
               <button type="button" className="rb-adult-gate-confirm" onClick={onOpenAuth}>
-                Accedi o registrati
+                {t('accessGate.loginOrRegister')}
               </button>
             </div>
           </>
         ) : (
           <>
-            <p>
-              Il mondo {world.label} è riservato ai maggiorenni. In base alla data di nascita del tuo
-              account non puoi ancora entrare.
-            </p>
+            <p>{t('accessGate.adultBlocked', { world: worldLabel })}</p>
             <div className="rb-adult-gate-actions">
               <button type="button" className="rb-adult-gate-decline" onClick={onDecline}>
-                Torna indietro
+                {t('accessGate.back')}
               </button>
             </div>
           </>

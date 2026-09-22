@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getNowPlayingMovies, getUpcomingMovies, getMovieTrailerKey } from '../../data/tmdb';
 import { getTmdbReactionsSummary, toggleTmdbReaction } from '../../data/culturalReactions';
 import { youtubeEmbedUrl } from '../../data/youtubeSearch';
+import { displayName } from '../../data/posts';
 import ReactionButtons from './ReactionButtons';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
@@ -118,7 +119,7 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
     setReactions((prev) => {
       const next = new Map(prev);
       const entry = { vuole: [...summary.vuole], piaciuto: [...summary.piaciuto], myReactions: new Set(summary.myReactions) };
-      const me = { id: user.id, name: user.nickname || user.username || 'Tu', avatar: user.avatar || '' };
+      const me = { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' };
       if (active) {
         entry[reazione] = entry[reazione].filter((p) => p.id !== user.id);
         entry.myReactions.delete(reazione);

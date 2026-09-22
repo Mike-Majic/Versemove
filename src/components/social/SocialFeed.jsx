@@ -23,6 +23,7 @@ import {
   toggleSavedPost as toggleSavedPostApi,
   addComment as addCommentApi,
   deleteComment as deleteCommentApi,
+  displayName,
 } from '../../data/posts';
 import { listGroups, getMyGroupIds, createGroup as createGroupApi, joinGroup, leaveGroup } from '../../data/groups';
 import { followUser, unfollowUser, getFollowing, listSuggestedProfiles } from '../../data/follows';
@@ -206,7 +207,7 @@ export default function SocialFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const authorFromUser = () => ({ id: user.id, name: user.nickname || user.username || 'Tu', avatar: user.avatar || '' });
+  const authorFromUser = () => ({ id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' });
 
   const createPost = async ({ testo, gif, link_esterno, gruppo_id, contentId, mediaUrl, mediaType, tags }) => {
     if (!user) {

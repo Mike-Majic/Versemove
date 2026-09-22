@@ -38,7 +38,11 @@ i18n
       fr: { translation: fr },
       de: { translation: de },
     },
-    fallbackLng: 'it',
+    // Dove manca una chiave in una lingua, l'inglese (non l'italiano: una
+    // persona che ha scelto spagnolo o francese leggerebbe comunque
+    // italiano a caso, l'inglese è la scelta meno spiazzante quando la
+    // traduzione non è ancora arrivata — richiesta esplicita).
+    fallbackLng: 'en',
     supportedLngs: SUPPORTED_LANGUAGES.map((l) => l.code),
     nonExplicitSupportedLngs: true,
     detection: {
@@ -53,11 +57,20 @@ i18n
     interpolation: { escapeValue: false },
   });
 
+// <html lang> segue sempre la lingua attiva: serve a lettori di schermo,
+// traduttori automatici e SEO, e prima non veniva mai toccato (restava
+// sempre "it" anche cambiando lingua dalle Impostazioni).
+function syncHtmlLang(lng) {
+  if (lng) document.documentElement.lang = lng;
+}
+syncHtmlLang(i18n.language);
+i18n.on('languageChanged', syncHtmlLang);
+
 // Cambia lingua e la ricorda su questo dispositivo. Chiamata sia dal
-// selettore in registrazione sia da quello nelle Impostazioni — quando
-// Cowork avrà creato profiles.lingua, andrà anche salvata lì (RPC dedicata,
-// stesso schema di set_own_worlds) così la preferenza segue l'account e
-// non resta legata al singolo dispositivo/browser.
+// selettore in registrazione sia da quello nelle Impostazioni — la
+// preferenza viene salvata anche su profiles.lingua (setOwnLingua, vedi
+// data/accounts.js) così segue l'account e non resta legata al singolo
+// dispositivo/browser.
 export function setAppLanguage(code) {
   i18n.changeLanguage(code);
 }

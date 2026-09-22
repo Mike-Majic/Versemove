@@ -12,6 +12,7 @@ import {
   platformLabel,
 } from '../../data/liveStreams';
 import { formatRelativeDate } from '../social/resolveAuthor';
+import { getLavoroProfiles } from '../../data/lavoro';
 import { supabase } from '../../data/supabaseClient';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import './LiveWorldPanel.css';
@@ -145,6 +146,11 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth }) {
   const [selectedId, setSelectedId] = useState(null);
   const [showGoLive, setShowGoLive] = useState(false);
   const [goLiveError, setGoLiveError] = useState('');
+  // Solo nel mondo Lavoro: nome e cognome reali (se chi guarda e l'host
+  // hanno entrambi dato il consenso, vedi data/lavoro.js) al posto del solo
+  // nickname — la RPC stessa filtra chi non ha consentito, qui si mostra
+  // solo quello che torna.
+  const [lavoroProfiles, setLavoroProfiles] = useState(new Map());
 
   const mySession = sessions.find((s) => s.hostId === user?.id) ?? null;
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
@@ -161,6 +167,33 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mondo]);
+
+  useEffect(() => {
+    if (mondo !== 'lavoro' || sessions.length === 0) {
+      setLavoroProfiles(new Map());
+      return undefined;
+    }
+    let cancelled = false;
+    getLavoroProfiles(sessions.map((s) => s.hostId)).then((map) => {
+      if (!cancelled) setLavoroProfiles(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mondo, sessions]);
+
+  // Nome mostrato per un host: "Nome Cognome" (nickname più piccolo sotto,
+  // vedi CSS) se il consenso Lavoro c'è per entrambi, altrimenti il solo
+  // nickname come in ogni altro mondo.
+  const hostDisplayName = (host) => {
+    const lp = lavoroProfiles.get(host.id);
+    if (lp?.nome && lp?.cognome) return `${lp.nome} ${lp.cognome}`;
+    return host.name;
+  };
+  const hostShowsNickname = (host) => {
+    const lp = lavoroProfiles.get(host.id);
+    return Boolean(lp?.nome && lp?.cognome);
+  };
 
   const handleGoLive = async ({ piattaforma, canale, titolo }) => {
     if (!user) {
@@ -193,7 +226,7 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth }) {
       <div className="rb-live-panel">
         <div className="rb-live-panel-topbar">
           <button type="button" className="rb-live-back-btn" onClick={() => setSelectedId(null)}>← Elenco dirette</button>
-          <span className="rb-live-panel-title">{selected.titolo || `${selected.host.name} è in diretta`}</span>
+          <span className="rb-live-panel-title">{selected.titolo || `${hostDisplayName(selected.host)} è in diretta`}</span>
           {selected.hostId === user?.id && (
             <button type="button" className="rb-live-end-btn" onClick={handleEndLive}>⏹ Termina</button>
           )}
@@ -242,8 +275,12 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth }) {
             <button type="button" className="rb-live-directory-item" onClick={() => setSelectedId(s.id)}>
               <img src={s.host.avatar} alt="" />
               <span className="rb-live-directory-info">
-                <strong>{s.titolo || `${s.host.name} è in diretta`}</strong>
-                <span className="rb-live-directory-sub">{s.host.name} · {platformLabel(s.piattaforma)}</span>
+                <strong>{s.titolo || `${hostDisplayName(s.host)} è in diretta`}</strong>
+                <span className="rb-live-directory-sub">
+                  {hostDisplayName(s.host)}
+                  {hostShowsNickname(s.host) && <span className="rb-live-directory-nickname"> ({s.host.name})</span>}
+                  {' · '}{platformLabel(s.piattaforma)}
+                </span>
               </span>
             </button>
           </li>

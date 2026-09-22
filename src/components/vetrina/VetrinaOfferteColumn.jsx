@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { listDeals } from '../../data/vetrinaDeals';
+import { translateCategoryLabel } from '../../i18n/categoryLabels';
 import DealCard from './DealCard';
 import SubmitDealModal from './SubmitDealModal';
 import EmptyState from '../EmptyState';
@@ -34,6 +36,7 @@ const ONLINE_OPTIONS = [
 // VETRINA_OFFERTE_CATEGORY_IDS in data/vetrinaCategories.js), parametrizzato
 // da `category`.
 export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locationFilters }) {
+  const { t } = useTranslation();
   const [deals, setDeals] = useState(null);
   const [error, setError] = useState('');
   const [negozio, setNegozio] = useState('');
@@ -77,7 +80,7 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
       <div className="rb-deal-header">
         <div>
           <h3>
-            {category.icon} {category.label}
+            {category.icon} {translateCategoryLabel(t, 'vetrina', category)}
           </h3>
           <p>Offerte segnalate dalla community e raccolte automaticamente — vota le più calde, segui quelle che scadono presto.</p>
         </div>

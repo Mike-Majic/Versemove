@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { registerAccount, loginAccount, resendConfirmationEmail } from '../data/accounts';
+import { registerAccount, loginAccount, resendConfirmationEmail, isNicknameTaken } from '../data/accounts';
 import { setRememberMe } from '../data/supabaseClient';
 import { computeAge } from '../data/age';
 import { WORLDS } from '../data/worlds';
@@ -40,6 +40,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
   const [rememberChecked, setRememberChecked] = useState(true);
   const [username, setUsername] = useState('');
   const [nickname, setNickname] = useState('');
+  // 'idle' | 'checking' | 'available' | 'taken': il pulsante "Registrati"
+  // resta disattivato finché non è 'available' (vedi nicknameValid sotto —
+  // il database ora rifiuta comunque un nickname fuori da 2-30 caratteri o
+  // già preso, ma qui si blocca prima di mandare la richiesta).
+  const [nicknameStatus, setNicknameStatus] = useState('idle');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -96,6 +101,32 @@ export default function AuthModal({ open, onClose, onLogin }) {
       setConsensoMarketing(false);
     }
   }, [open]);
+
+  // Validazione in tempo reale del nickname (2-30 caratteri, poi controllo
+  // "già preso" via RPC, con un piccolo debounce per non interrogare il
+  // server ad ogni tasto premuto).
+  useEffect(() => {
+    if (mode !== 'register') return undefined;
+    const clean = nickname.trim();
+    if (clean.length < 2 || clean.length > 30) {
+      setNicknameStatus('idle');
+      return undefined;
+    }
+    setNicknameStatus('checking');
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const taken = await isNicknameTaken(clean);
+      if (!cancelled) setNicknameStatus(taken ? 'taken' : 'available');
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mode, nickname]);
+
+  const nicknameLength = nickname.trim().length;
+  const nicknameLengthValid = nicknameLength >= 2 && nicknameLength <= 30;
+  const nicknameValid = nicknameLengthValid && nicknameStatus === 'available';
 
   if (!open) return null;
 
@@ -157,6 +188,10 @@ export default function AuthModal({ open, onClose, onLogin }) {
     // da un login precedente su questo stesso browser.
     setRememberMe(true);
 
+    if (!nicknameValid) {
+      setError(t('auth.errors.nicknameInvalid'));
+      return;
+    }
     if (password !== passwordConfirm) {
       setError(t('auth.errors.passwordMismatch'));
       return;
@@ -308,8 +343,26 @@ export default function AuthModal({ open, onClose, onLogin }) {
               <input type="text" autoFocus autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
             </label>
             <label className="rb-field">
-              <span>{t('auth.fields.nickname')}</span>
-              <input type="text" autoComplete="off" value={nickname} onChange={(e) => setNickname(e.target.value)} />
+              <span>{t('auth.fields.nickname')} *</span>
+              <input
+                type="text"
+                autoComplete="off"
+                maxLength={30}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+              {nickname.trim() && !nicknameLengthValid && (
+                <span className="rb-auth-field-hint rb-auth-field-warning">{t('auth.errors.nicknameLength')}</span>
+              )}
+              {nicknameLengthValid && nicknameStatus === 'checking' && (
+                <span className="rb-auth-field-hint">{t('auth.fields.nicknameChecking')}</span>
+              )}
+              {nicknameLengthValid && nicknameStatus === 'taken' && (
+                <span className="rb-auth-field-hint rb-auth-field-warning">{t('auth.errors.nicknameTaken')}</span>
+              )}
+              {nicknameLengthValid && nicknameStatus === 'available' && (
+                <span className="rb-auth-field-hint rb-auth-field-ok">{t('auth.fields.nicknameAvailable')}</span>
+              )}
             </label>
             <label className="rb-field">
               <span>{t('auth.fields.mail')}</span>
@@ -547,7 +600,11 @@ export default function AuthModal({ open, onClose, onLogin }) {
         )}
         {resendOk && <p className="rb-auth-info">{t('auth.resendSuccess')}</p>}
 
-        <button type="submit" className="rb-btn-primary rb-auth-submit" disabled={busy}>
+        <button
+          type="submit"
+          className="rb-btn-primary rb-auth-submit"
+          disabled={busy || (mode === 'register' && !nicknameValid)}
+        >
           {busy ? t('auth.submit.oneMoment') : mode === 'login' ? t('auth.submit.login') : t('auth.submit.register')}
         </button>
       </form>

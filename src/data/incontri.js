@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { translateInteractionError } from './errors';
+import { displayName } from './posts';
 
 // Backend reale del mondo Incontri (RPC dedicate, vedi le funzioni SQL
 // corrispondenti — is_incontri_eligible richiede mondo "incontri" abilitato
@@ -9,12 +10,13 @@ import { translateInteractionError } from './errors';
 function mapProfileRow(row) {
   return {
     id: row.id,
-    name: row.nickname || 'Utente',
+    name: displayName(row),
     avatar: row.avatar_url || `https://i.pravatar.cc/150?u=${row.id}`,
     age: row.eta ?? null,
     city: row.citta || '',
     bio: row.bio || '',
     attivita: row.attivita ?? null,
+    giaVisto: Boolean(row.gia_visto),
   };
 }
 
@@ -32,9 +34,20 @@ export async function touchLastSeen() {
   }
 }
 
-export async function getMatchCandidates(limit = 20) {
+// I filtri passati sono quelli attivi dell'utente (Impostazioni -> Luogo e
+// Mostrami: città ed età), passati come parametri RPC così il database
+// filtra anche il secondo giro (i profili "passo" recuperati quando i mai
+// visti finiscono) e non solo i primi p_limit mai visti — se restassero
+// lato client, il limite di 20 righe potrebbe tagliare fuori risultati
+// validi della zona scelta.
+export async function getMatchCandidates(limit = 20, { citta, etaMin, etaMax } = {}) {
   try {
-    const { data, error } = await supabase.rpc('get_match_candidates', { p_limit: limit });
+    const { data, error } = await supabase.rpc('get_match_candidates', {
+      p_limit: limit,
+      p_citta: citta || null,
+      p_eta_min: etaMin ?? null,
+      p_eta_max: etaMax ?? null,
+    });
     if (error) return { error: error.message };
     return { candidates: (data ?? []).map(mapProfileRow) };
   } catch (err) {

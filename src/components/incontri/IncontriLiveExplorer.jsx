@@ -20,6 +20,7 @@ export default function IncontriLiveExplorer({
   onConsumeInitialMatchTab,
   favorites = [],
   onToggleFavorite,
+  matchFilters,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -83,6 +84,7 @@ export default function IncontriLiveExplorer({
             onOpenChat={onOpenChat}
             initialTab={initialMatchTab}
             onConsumeInitialTab={onConsumeInitialMatchTab}
+            matchFilters={matchFilters}
           />
         </>
       )}

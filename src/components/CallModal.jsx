@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { openCallChannel, ICE_SERVERS, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
+import { displayName } from '../data/posts';
 import './CallModal.css';
 
 // Breve suoneria sintetizzata (stessa tecnica delle melodie del mondo
@@ -161,7 +162,7 @@ export default function CallModal({ conversationId, user, friend, registerStart 
     if (phaseRef.current !== 'idle') return;
     roleRef.current = 'caller';
     setPhase('calling');
-    send('ring', { fromName: user.nickname || user.username || 'Utente', fromAvatar: user.avatar || '' });
+    send('ring', { fromName: displayName(user), fromAvatar: user.avatar || '' });
     ringTimeoutRef.current = setTimeout(() => {
       if (phaseRef.current === 'calling') {
         send('hangup');

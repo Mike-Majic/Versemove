@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import ModalOverlay from '../ModalOverlay';
+import EmptyState from '../EmptyState';
 import { isAdult } from '../../data/age';
 import { fetchProfilesMap } from '../../data/posts';
 import { supabase } from '../../data/supabaseClient';
@@ -45,7 +46,7 @@ function ActivityBadge({ attivita }) {
 // subito come nella vecchia demo locale). "Messaggi" apre la chat diretta
 // reale già usata per gli amici (FriendChatModal, via onOpenChat), non ha
 // una sua chat: un match è comunque solo una conversazione come le altre.
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, onConsumeInitialTab }) {
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, onConsumeInitialTab, matchFilters }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -62,6 +63,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
   const [matchToast, setMatchToast] = useState(null);
   const [pendingUnmatch, setPendingUnmatch] = useState(null);
   const [actionError, setActionError] = useState('');
+  // Il giro ricomincia (get_match_candidates, vedi data/incontri.js): quando
+  // arriva il primo profilo già visto (gia_visto=true, un "passo" di prima
+  // ripresentato), si mostra un avviso una sola volta per apertura, non ad
+  // ogni profilo del genere — "shown" resta true anche dopo la chiusura,
+  // così non ricompare da solo; "visible" è solo se mostrarlo adesso.
+  const [giaVistoBannerShown, setGiaVistoBannerShown] = useState(false);
+  const [giaVistoBannerVisible, setGiaVistoBannerVisible] = useState(false);
   const [mobileView, setMobileView] = useState(initialTab ? 'secondary' : 'primary');
   const [rightTab, setRightTab] = useState(initialTab ?? 'matches');
 
@@ -120,7 +128,9 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     setLikesYouLoading(true);
     setMatchesLoading(true);
     setFavoritesLoading(true);
-    Promise.all([getMatchCandidates(20), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
+    setGiaVistoBannerShown(false);
+    setGiaVistoBannerVisible(false);
+    Promise.all([getMatchCandidates(20, matchFilters), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
       ([deckRes, likesRes, matchesRes, favRes]) => {
         if (cancelled) return;
         setDeck(deckRes.candidates ?? []);
@@ -145,7 +155,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
   useEffect(() => {
     if (!eligible || deckLoading || deck.length >= 3) return;
     let cancelled = false;
-    getMatchCandidates(20).then(({ candidates }) => {
+    getMatchCandidates(20, matchFilters).then(({ candidates }) => {
       if (cancelled || !candidates) return;
       setDeck((prev) => {
         const known = new Set(prev.map((p) => p.id));
@@ -155,7 +165,18 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eligible, deckLoading, deck.length]);
+
+  // Primo profilo "già visto" nel mazzo: il giro è ricominciato dai
+  // "passo" di prima, si avvisa una volta sola.
+  useEffect(() => {
+    if (giaVistoBannerShown) return;
+    if (deck.some((p) => p.giaVisto)) {
+      setGiaVistoBannerShown(true);
+      setGiaVistoBannerVisible(true);
+    }
+  }, [deck, giaVistoBannerShown]);
 
   // Canale realtime sui propri match (RLS limita già alle righe dove sono
   // user_a o user_b): copre il caso in cui è l'ALTRA persona a completare
@@ -276,6 +297,12 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     <div className="rb-match-deck">
       <p className="rb-match-hint">Profili reali del mondo Incontri: un &quot;mi piace&quot; diventa un match solo se è reciproco.</p>
       {actionError && <p className="rb-privacy-error">{actionError}</p>}
+      {giaVistoBannerVisible && (
+        <div className="rb-match-gia-visto-banner">
+          <span>Hai visto tutti i profili nuovi nella tua zona: ecco di nuovo quelli che avevi saltato, magari hai cambiato idea 😉</span>
+          <button type="button" onClick={() => setGiaVistoBannerVisible(false)} aria-label="Chiudi avviso">✕</button>
+        </div>
+      )}
       {!eligible ? (
         <p className="rb-match-empty">{eligibilityMessage ?? 'Accedi per scoprire nuovi profili.'}</p>
       ) : deckLoading ? (
@@ -300,7 +327,11 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
           </div>
         </div>
       ) : (
-        <p className="rb-match-empty">Nessun altro profilo al momento, torna più tardi 👋</p>
+        <EmptyState
+          icon="💔"
+          title="Nessun profilo in questa zona"
+          subtitle="Prova ad allargare la ricerca dalle Impostazioni → Luogo e Mostrami."
+        />
       )}
       {eligible && current && (
         <div className="rb-match-actions">

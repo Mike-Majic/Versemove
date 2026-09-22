@@ -30,6 +30,15 @@ function fieldsFromMedia(media) {
   };
 }
 
+// Nome mostrato ovunque tranne "Il mio profilo"/Impostazioni e il pannello
+// Admin: SEMPRE il nickname, mai nome+cognome reali (vedi migrazione
+// nickname_required_lavoro_consent_match_recycle — nickname è ora
+// obbligatorio, quindi non dovrebbe più mancare, ma restano i fallback per
+// righe vecchie/incomplete).
+export function displayName(profile, fallback = 'Utente') {
+  return profile?.nickname || profile?.username || profile?.name || fallback;
+}
+
 // profiles ha la SELECT ristretta alla propria riga (protegge dati
 // personali): per il nome pubblico/avatar di autori diversi da sé si passa
 // sempre dalla vista public_profiles (vedi migrazione), mai da profiles.
@@ -39,7 +48,7 @@ export async function fetchProfilesMap(ids) {
   const { data, error } = await supabase.from('public_profiles').select('id, nickname, username, avatar_url').in('id', unique);
   if (error || !data) return new Map();
   const map = new Map();
-  for (const p of data) map.set(p.id, { id: p.id, name: p.nickname || p.username || 'Utente', avatar: p.avatar_url || '' });
+  for (const p of data) map.set(p.id, { id: p.id, name: displayName(p), avatar: p.avatar_url || '' });
   return map;
 }
 
