@@ -224,18 +224,78 @@
   align-items: flex-start;
 }
 
-.rb-cinema-card img,
+.rb-cinema-poster-wrap,
 .rb-cinema-poster-empty {
+  position: relative;
   width: 70px;
   height: 100px;
   border-radius: 8px;
-  object-fit: cover;
   flex-shrink: 0;
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
+}
+
+.rb-cinema-poster-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rb-cinema-trailer-btn,
+.rb-cinema-trailer-none {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: 9.5px;
+  padding: 4px 2px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.rb-cinema-trailer-btn {
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-cinema-trailer-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rb-cinema-trailer-none {
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-cinema-trailer {
+  flex-basis: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.rb-cinema-trailer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.rb-cultural-sort {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  color: rgba(245, 245, 247, 0.55);
+  flex-shrink: 0;
 }
 
 .rb-cinema-card .rb-cultural-card-info {

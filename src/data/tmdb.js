@@ -36,6 +36,7 @@ function mapMovie(m) {
     overview: m.overview,
     posterUrl: m.poster_path ? `${IMAGE_BASE}${m.poster_path}` : null,
     releaseDate: m.release_date || null,
+    popularity: m.popularity ?? 0,
   };
 }
 
@@ -47,4 +48,20 @@ export async function getNowPlayingMovies() {
 export async function getUpcomingMovies() {
   const data = await fetchJson('/movie/upcoming');
   return (data.results ?? []).map(mapMovie);
+}
+
+// Trailer da YouTube per un film, presi dai video collegati su TMDB (non
+// c'è da cercarli a mano): non consuma la quota giornaliera della YouTube
+// Data API (vedi data/youtubeSearch.js), condivisa con Musica/Video.
+// Chiamata solo quando l'utente apre davvero un trailer (vedi CinemaColumn),
+// mai per tutti i film di una lista in una volta.
+export async function getMovieTrailerKey(movieId) {
+  const data = await fetchJson(`/movie/${movieId}/videos`);
+  const youtube = (data.results ?? []).filter((v) => v.site === 'YouTube');
+  const trailer =
+    youtube.find((v) => v.type === 'Trailer' && v.official) ||
+    youtube.find((v) => v.type === 'Trailer') ||
+    youtube.find((v) => v.type === 'Teaser') ||
+    youtube[0];
+  return trailer?.key ?? null;
 }

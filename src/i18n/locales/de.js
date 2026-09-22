@@ -99,6 +99,7 @@ export default {
     language: {
       title: 'Sprache',
       hint: 'Ändere die Sprache der Oberfläche jederzeit.',
+      saved: 'Sprache geändert und im Konto gespeichert.',
     },
   },
 };

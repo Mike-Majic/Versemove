@@ -12,6 +12,7 @@ import { SUPPORTED_LANGUAGES, setAppLanguage } from '../i18n';
 import { translateWorld } from '../i18n/worldLabels';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
+import CustomSelect from './shared/CustomSelect';
 import './SettingsPanel.css';
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
@@ -130,27 +131,39 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
 }
 
 // Sotto-voce "Lingua" di "Personalizza il tuo Versemove": stesso selettore
-// usato in registrazione (AuthModal), qui per cambiarla in qualsiasi
-// momento. Salva solo sul dispositivo (vedi commento in i18n/index.js) —
-// quando Cowork avrà creato profiles.lingua andrà salvata anche lì.
+// usato in registrazione (AuthModal). Come "Mondi" sopra, è immediata (non
+// passa da "Applica"): la scelta cambia subito la lingua di tutto il sito
+// (vedi setAppLanguage) e, se loggati, viene salvata anche sull'account
+// (RPC set_own_lingua). Il messaggio sotto è l'unico riscontro visibile qui
+// dentro il pannello — quasi nient'altro in Impostazioni è già tradotto in
+// questa fase, quindi senza un avviso esplicito sembra non succedere nulla.
+const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.nativeLabel }));
+
 function LanguageSubsection({ user, onUpdateUser }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const change = async (code) => {
+    setError('');
+    setSuccess('');
     setAppLanguage(code);
     if (!user) return;
-    const { account } = await setOwnLingua(code);
+    const { account, error: err } = await setOwnLingua(code);
+    if (err) {
+      setError(err);
+      return;
+    }
     if (account) onUpdateUser?.(account);
+    setSuccess(t('settings.language.saved'));
   };
 
   return (
-    <label className="rb-field">
-      <select value={i18n.language} onChange={(e) => change(e.target.value)}>
-        {SUPPORTED_LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>{l.nativeLabel}</option>
-        ))}
-      </select>
-    </label>
+    <>
+      <CustomSelect value={i18n.language} options={LANGUAGE_OPTIONS} onChange={change} />
+      {error && <p className="rb-privacy-error">{error}</p>}
+      {success && <p className="rb-privacy-success">{success}</p>}
+    </>
   );
 }
 

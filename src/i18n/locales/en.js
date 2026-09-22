@@ -99,6 +99,7 @@ export default {
     language: {
       title: 'Language',
       hint: 'Change the interface language anytime.',
+      saved: 'Language changed and saved to your account.',
     },
   },
 };

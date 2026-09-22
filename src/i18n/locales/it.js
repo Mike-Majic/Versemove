@@ -103,6 +103,7 @@ export default {
     language: {
       title: 'Lingua',
       hint: "Cambia la lingua dell'interfaccia in qualsiasi momento.",
+      saved: 'Lingua cambiata e salvata sul tuo account.',
     },
   },
 };
