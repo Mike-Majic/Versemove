@@ -380,7 +380,7 @@ export default function WorldGlobe({
     group.add(shell.lines, shell.nodes);
     scene.add(group);
     overlayRef.current = { group, shell, landDots: null };
-    applyOverlayColor(overlayRef.current, world.atmosphereColor);
+    applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
 
     return () => {
       scene.remove(group);
@@ -438,8 +438,8 @@ export default function WorldGlobe({
   }, []);
 
   useEffect(() => {
-    if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor);
-  }, [world.atmosphereColor]);
+    if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
+  }, [world.atmosphereColor, world.lineColor]);
 
   // Categorie "incastonate" nel guscio (solo dove servono, es. mondo Arte & Musica):
   // ogni categoria riempie il triangolo più vicino alla sua posizione lat/lng, con
@@ -803,10 +803,14 @@ function polygonFillColor(hexColor) {
   return cached;
 }
 
-function applyOverlayColor(overlay, color) {
-  if (overlay.landDots) overlay.landDots.material.color.set(color);
-  overlay.shell.lineMaterial.color.set(color);
-  overlay.shell.nodeMaterial.color.set(color);
+// Di solito un solo colore vale per tutto (linee + puntini), ma un mondo può
+// avere un world.lineColor separato per le sole linee del guscio (vedi
+// Incontri in data/worlds.js): puntini/continenti restano sul colore
+// principale, dotColor.
+function applyOverlayColor(overlay, dotColor, lineColor = dotColor) {
+  if (overlay.landDots) overlay.landDots.material.color.set(dotColor);
+  overlay.shell.lineMaterial.color.set(lineColor);
+  overlay.shell.nodeMaterial.color.set(dotColor);
 }
 
 // Ricostruisce i puntini dei continenti, escludendo (o meno) quelli dentro ai

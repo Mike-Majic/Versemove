@@ -75,14 +75,19 @@ export const WORLDS = [
     // additivo a piena luminosità, vedi buildNetworkShell in
     // globe/networkOverlay.js) si leggeva chiaramente rosa: qualunque
     // sfumatura di blu diventa più evidente quando il colore è sovraesposto
-    // dal blending additivo. Pilota sia l'accento UI di tutto il mondo
-    // (--accent, vedi App.jsx) sia il colore reale della rete/puntini e
-    // dell'atmosfera del globo (vedi applyOverlayColor e atmosphereColor in
-    // WorldGlobe.jsx) — un solo valore per tutto.
+    // dal blending additivo. Pilota l'accento UI di tutto il mondo (--accent,
+    // vedi App.jsx), l'atmosfera del globo e i puntini della rete/continenti
+    // (vedi applyOverlayColor in WorldGlobe.jsx).
     color: '#ff0000',
     colorSoft: 'rgba(255, 0, 0, 0.18)',
     globeColor: '#1f0409',
     atmosphereColor: '#ff0000',
+    // Solo le LINEE del guscio a rete: richiesta esplicita di un rosso
+    // diverso (#DE0000) da quello dei puntini, che restano su color/
+    // atmosphereColor sopra (vedi lineColor in applyOverlayColor,
+    // WorldGlobe.jsx — se un mondo non lo imposta usa lo stesso colore dei
+    // puntini, come sempre).
+    lineColor: '#de0000',
     textOnGlobe: '#ffeaf0',
   },
 ];
