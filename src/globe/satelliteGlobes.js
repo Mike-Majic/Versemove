@@ -286,6 +286,22 @@ export function buildSatelliteGlobes({ worlds }) {
     return vectorToLatLng(sat.userData.basePos);
   }
 
+  // Sceglie bianco o quasi-nero per i contorni dei continenti in base alla
+  // luminanza del colore del mondo (stessa idea di un "testo leggibile su
+  // qualunque sfondo"): sul globo grande i continenti si distinguono dal
+  // reticolo perché hanno anche un riempimento tenue oltre al contorno
+  // (polygonCapColor); qui, senza riempimento, usare lo stesso colore della
+  // rete (world.atmosphereColor, il tentativo iniziale) li mimetizzava
+  // completamente — invisibili a colpo d'occhio anche se tecnicamente
+  // disegnati. Un mondo chiaro (es. Lavoro, quasi bianco) prende contorni
+  // scuri; uno scuro o saturo prende contorni bianchi.
+  const _luminanceColor = new THREE.Color();
+  function pickContrastColor(hex) {
+    _luminanceColor.set(hex);
+    const luminance = 0.2126 * _luminanceColor.r + 0.7152 * _luminanceColor.g + 0.0722 * _luminanceColor.b;
+    return luminance > 0.6 ? '#0a0a12' : '#ffffff';
+  }
+
   // Disegna sulla sfera di OGNI satellite il vero contorno dei continenti
   // (stessi dati GeoJSON del globo grande, vedi WorldGlobe.jsx/landGeo.js),
   // niente categorie né altro sopra: solo il disegno del mondo, richiesta
@@ -293,9 +309,7 @@ export function buildSatelliteGlobes({ worlds }) {
   // arrivare dopo che i satelliti sono già visibili — build asincrona,
   // vedi WorldGlobe.jsx). La geometria è identica per tutti (stesso pianeta),
   // quindi si costruisce UNA VOLTA SOLA per feature e si condivide tra i sei
-  // satelliti: solo il materiale (colore) resta per-satellite, come già per
-  // il resto del guscio (vedi world.atmosphereColor sotto, stessa
-  // convenzione di polygonStrokeColor sul globo grande).
+  // satelliti: solo il colore (vedi pickContrastColor sopra) resta per-satellite.
   let continentGeometries = null;
   function setContinentMap(features) {
     if (continentGeometries || !features?.length) return;
@@ -305,14 +319,14 @@ export function buildSatelliteGlobes({ worlds }) {
 
     satellites.forEach((sat) => {
       const world = worlds.find((w) => w.id === sat.userData.worldId);
-      const color = world?.atmosphereColor ?? world?.color ?? '#ffffff';
+      const color = pickContrastColor(world?.color ?? '#888888');
       const continentGroup = sat.userData.continentGroup;
 
       continentGeometries.forEach((geometry) => {
-        const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55 });
+        const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
         const lines = new THREE.LineSegments(geometry, material);
         continentGroup.add(lines);
-        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.55 });
+        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85 });
       });
 
       continentGroup.visible = true;
