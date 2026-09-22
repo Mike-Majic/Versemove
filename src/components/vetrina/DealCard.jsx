@@ -163,7 +163,7 @@ export default function DealCard({ deal, user, onOpenAuth }) {
 
       {reportOpen && (
         <ReportModal
-          targetType="vetrina_deal"
+          targetType="vetrina_offerta"
           targetId={deal.id}
           targetLabel={`l'offerta "${deal.titolo}"`}
           motivi={REPORT_MOTIVI}

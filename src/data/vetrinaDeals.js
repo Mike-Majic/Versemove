@@ -35,6 +35,11 @@ function mapDeal(row, statsByDeal, myVotesByDeal) {
     caldo: stats?.caldo ?? 0,
     freddo: stats?.freddo ?? 0,
     nCommenti: stats?.n_commenti ?? 0,
+    // "scaduta" arriva già calcolata dalla vista vetrina_deal_stats
+    // (autorevole, calcolata lì con lo stesso now() del resto delle
+    // query) — se la vista non risponde ancora si ricade sul controllo
+    // locale su scadeIl, mai un'offerta scaduta che sembra ancora attiva.
+    scaduta: stats?.scaduta ?? (row.scade_il ? new Date(row.scade_il).getTime() <= Date.now() : false),
     mioVoto: myVotesByDeal?.get(row.id) ?? null,
   };
 }
@@ -55,7 +60,16 @@ const ORDER_COLUMNS = {
 // creare lato Cowork — stesso principio di dog_place_stats già in uso per
 // Cani) invece di ricalcolarli qui ad ogni feed.
 export async function listDeals({ categoria, negozio, scontoMin, online, citta, ordinamento = 'caldo' } = {}) {
-  let query = supabase.from('vetrina_deals').select('*').eq('categoria', categoria).eq('stato', 'attiva');
+  // Condizione di "attiva" esatta indicata da Cowork: stato='attiva' E
+  // (scade_il è vuoto O nel futuro) — lato query, non filtrata dopo
+  // (mai scaricare offerte scadute solo per poi nasconderle a mano).
+  const nowIso = new Date().toISOString();
+  let query = supabase
+    .from('vetrina_deals')
+    .select('*')
+    .eq('categoria', categoria)
+    .eq('stato', 'attiva')
+    .or(`scade_il.is.null,scade_il.gt.${nowIso}`);
   if (negozio) query = query.eq('negozio', negozio);
   if (scontoMin) query = query.gte('sconto_pct', scontoMin);
   if (online === true) query = query.eq('online', true);
@@ -146,6 +160,7 @@ export async function listComments(dealId) {
     .from('vetrina_deal_comments')
     .select('id, deal_id, author_id, testo, created_at')
     .eq('deal_id', dealId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: true });
   if (error || !data) return [];
   const profilesMap = await fetchProfilesMap(data.map((r) => r.author_id));
@@ -181,10 +196,10 @@ export async function findRecentDuplicate(url) {
 }
 
 // Pubblica un'offerta segnalata da un utente (fonte sempre 'utente', mai
-// 'automatica': quelle le scrive solo il backend). sconto_pct si calcola
-// qui se prezzo e prezzo_originale sono entrambi presenti, altrimenti lo
-// lascia vuoto (un'offerta senza prezzo originale, es. un codice sconto,
-// non ha una percentuale).
+// 'automatica': quelle le scrive solo il backend). sconto_pct NON si invia:
+// lo calcola il database da prezzo/prezzo_originale (indicato da Cowork),
+// mandarlo qui lo sovrascriverebbe con un valore che potrebbe disallinearsi
+// dalla logica server. fonte_ref resta implicito (null): lo impone la RLS.
 export async function submitDeal({
   categoria,
   negozio,
@@ -205,11 +220,6 @@ export async function submitDeal({
   if (!titolo?.trim()) return { error: 'Manca il titolo.' };
   if (!url?.trim()) return { error: 'Manca il link.' };
 
-  const scontoPct =
-    prezzo != null && prezzoOriginale != null && prezzoOriginale > 0
-      ? Math.round((1 - prezzo / prezzoOriginale) * 100)
-      : null;
-
   const { data, error } = await supabase
     .from('vetrina_deals')
     .insert({
@@ -221,7 +231,6 @@ export async function submitDeal({
       immagine: immagine || null,
       prezzo: prezzo ?? null,
       prezzo_originale: prezzoOriginale ?? null,
-      sconto_pct: scontoPct,
       valuta,
       online: !!online,
       citta: online ? null : citta?.trim() || null,
@@ -236,17 +245,33 @@ export async function submitDeal({
   return { id: data.id };
 }
 
-// Anteprima del link (titolo/immagine dai meta tag Open Graph) per
-// precompilare il form: un fetch diretto da browser di un URL esterno
-// qualunque fallisce quasi sempre per CORS, quindi passa da una funzione
-// server-side (Edge Function "link-preview", da creare lato Cowork — non
-// esiste ancora). Se non risponde o non esiste, il form resta compilabile
-// a mano: mai bloccante.
+// Un titolo dai meta tag Open Graph può arrivare con entità HTML non
+// decodificate (es. "&egrave;" invece di "è", segnalato da Cowork dopo
+// aver testato la funzione dal vivo) — si decodificano passandole per un
+// DOMParser, mai messe così com'è nel form.
+function decodeHtmlEntities(text) {
+  if (!text) return text;
+  return new DOMParser().parseFromString(text, 'text/html').documentElement.textContent;
+}
+
+// Anteprima del link (titolo/immagine/eventualmente prezzo dai meta tag
+// Open Graph) per precompilare il form: un fetch diretto da browser di un
+// URL esterno qualunque fallisce quasi sempre per CORS, quindi passa da
+// una funzione server-side (Edge Function "link-preview", ora attiva —
+// richiede un utente loggato, risponde 401 altrimenti, per questo il
+// pulsante di pubblicazione è già dietro login). Se non risponde (sito
+// irraggiungibile, non è una pagina web, host non consentito — errore
+// 422), il form resta compilabile a mano: mai bloccante.
 export async function fetchLinkPreview(url) {
   try {
     const { data, error } = await supabase.functions.invoke('link-preview', { body: { url } });
     if (error || !data) return null;
-    return { titolo: data.title ?? null, immagine: data.image ?? null };
+    return {
+      titolo: decodeHtmlEntities(data.title) ?? null,
+      immagine: data.image ?? null,
+      prezzo: data.price != null ? Number(data.price) : null,
+      valuta: data.currency ?? null,
+    };
   } catch {
     return null;
   }

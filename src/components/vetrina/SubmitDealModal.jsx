@@ -25,6 +25,7 @@ export default function SubmitDealModal({ categoria: categoriaIniziale, onClose,
   const [negozio, setNegozio] = useState('');
   const [prezzo, setPrezzo] = useState('');
   const [prezzoOriginale, setPrezzoOriginale] = useState('');
+  const [valuta, setValuta] = useState('EUR');
   const [online, setOnline] = useState(true);
   const [citta, setCitta] = useState('');
   const [scadeIl, setScadeIl] = useState('');
@@ -40,6 +41,10 @@ export default function SubmitDealModal({ categoria: categoriaIniziale, onClose,
     setPreviewLoading(false);
     if (preview?.titolo) setTitolo(preview.titolo);
     if (preview?.immagine) setImmagine(preview.immagine);
+    // Alcuni siti espongono il prezzo nei meta tag: se c'è, si precompila
+    // anche quello (l'utente lo può sempre correggere a mano).
+    if (preview?.prezzo != null) setPrezzo(String(preview.prezzo));
+    if (preview?.valuta) setValuta(preview.valuta);
   };
 
   const doSubmit = async () => {
@@ -53,6 +58,7 @@ export default function SubmitDealModal({ categoria: categoriaIniziale, onClose,
       immagine: immagine || null,
       prezzo: prezzo ? Number(prezzo) : null,
       prezzoOriginale: prezzoOriginale ? Number(prezzoOriginale) : null,
+      valuta,
       online,
       citta,
       scadeIl: scadeIl || null,

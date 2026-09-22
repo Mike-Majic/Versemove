@@ -27,13 +27,6 @@ const ONLINE_OPTIONS = [
   { value: 'negozio', label: 'Solo in negozio' },
 ];
 
-// Un'offerta scaduta non deve restare nel feed anche se il backend non ha
-// ancora avuto modo di aggiornarne lo stato: doppio controllo lato client,
-// oltre al filtro stato='attiva' già fatto lato query in listDeals.
-function isExpired(deal) {
-  return deal.scadeIl && new Date(deal.scadeIl).getTime() <= Date.now();
-}
-
 // Categoria "Offerte" del mondo Vetrina: una sola colonna (feed), non le
 // due dell'esploratore standard (CategoryColumn) — un'offerta non ha
 // bisogno di una colonna di ricerca a fianco, il filtro in alto basta.
@@ -73,7 +66,11 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category.id, negozio, scontoMin, online, citta, ordinamento]);
 
-  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => !isExpired(d)), [deals]);
+  // listDeals filtra già lato query su stato='attiva' e scadenza (vedi
+  // vetrinaDeals.js, condizione esatta indicata da Cowork); "scaduta" dalla
+  // vista vetrina_deal_stats resta solo come ultima rete di sicurezza, per
+  // un'offerta arrivata giusto mentre scadeva.
+  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => !d.scaduta), [deals]);
 
   return (
     <div className="rb-deal-column" style={{ '--accent': '#ec4899' }}>
