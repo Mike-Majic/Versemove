@@ -686,8 +686,9 @@ export default function WorldGlobe({
     if (!g) return;
     // OrbitControls.autoRotateSpeed è in "gradi/frame a 60fps": un giro
     // completo (360°) dura 60/autoRotateSpeed secondi. Tarato per un giro
-    // ogni 7 secondi.
-    g.controls().autoRotateSpeed = 60 / 7;
+    // ogni 14 secondi (dimezzata rispetto a prima: la rotazione automatica,
+    // che riparte anche quando il mouse esce dal globo, girava troppo veloce).
+    g.controls().autoRotateSpeed = 60 / 14;
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
