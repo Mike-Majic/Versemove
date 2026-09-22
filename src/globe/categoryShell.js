@@ -135,58 +135,72 @@ function buildBriefcaseShape() {
   return shape;
 }
 
-// Sagoma di una "M" (mondo Social), seconda versione — la prima (blocco con
-// tacca, poi pilastri+V a bordi piatti) era venuta male entrambe le volte:
-// troppo squadrata, si leggeva come un blob invece che come una lettera.
-// Presa la forma (solo la forma, non i dettagli) da un logo di riferimento
-// a punte: due pilastri con la cima a punta (una piccola vela triangolare
-// sopra un tratto dritto, non più un top piatto) collegati da due bracci
-// che si assottigliano fino a un punto solo nella valle centrale — stessa
-// idea "più forme unite in una geometria sola" di prima (THREE.ShapeGeometry
-// accetta un array di Shape), ma ogni pezzo ora è a punta invece che
-// rettangolare.
+// Ispessisce una spezzata aperta (array di THREE.Vector2) di "width" unità,
+// un lato alla volta (side = 1 o -1): normale perpendicolare al segmento a
+// ogni estremo, media delle due normali (giunto a becco d'anatra) nei punti
+// interni — la lunghezza del becco viene limitata (clamp) perché due
+// segmenti quasi opposti (angolo molto acuto) non lo mandino all'infinito.
+// Le due estremità aperte restano tagliate dritte (perpendicolari
+// all'ultimo segmento), non arrotondate: va benissimo per i tratti di una
+// lettera, che terminano dritti sulla riga di base.
+function offsetPolyline(points, width, side, miterClamp = 0.6) {
+  const n = points.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let normal;
+    if (i === 0) {
+      const dir = points[1].clone().sub(points[0]).normalize();
+      normal = new THREE.Vector2(-dir.y, dir.x);
+    } else if (i === n - 1) {
+      const dir = points[n - 1].clone().sub(points[n - 2]).normalize();
+      normal = new THREE.Vector2(-dir.y, dir.x);
+    } else {
+      const dir1 = points[i].clone().sub(points[i - 1]).normalize();
+      const dir2 = points[i + 1].clone().sub(points[i]).normalize();
+      const n1 = new THREE.Vector2(-dir1.y, dir1.x);
+      const n2 = new THREE.Vector2(-dir2.y, dir2.x);
+      normal = n1.clone().add(n2).normalize();
+      normal.multiplyScalar(1 / Math.max(normal.dot(n1), miterClamp));
+    }
+    out.push(points[i].clone().addScaledVector(normal, (width / 2) * side));
+  }
+  return out;
+}
+
+// Un "nastro" (contorno cavo, non pieno) lungo una spezzata: il bordo
+// esterno andata + il bordo interno ritorno, chiuso — esattamente il
+// linguaggio del logo di riferimento (tratti doppi, si vede "attraverso"
+// la lettera), non un blocco pieno come i primi due tentativi.
+function ribbonShape(points, width) {
+  const outer = offsetPolyline(points, width, 1);
+  const inner = offsetPolyline(points, width, -1);
+  const s = new THREE.Shape();
+  s.moveTo(outer[0].x, outer[0].y);
+  for (let i = 1; i < outer.length; i++) s.lineTo(outer[i].x, outer[i].y);
+  for (let i = inner.length - 1; i >= 0; i--) s.lineTo(inner[i].x, inner[i].y);
+  s.closePath();
+  return s;
+}
+
+// Sagoma di una "M" (mondo Social), terza versione — le prime due (blocco
+// con tacca, poi pilastri+V pieni) erano venute male entrambe: il problema
+// non era la forma ma il RIEMPIMENTO. Il logo di riferimento mandato
+// dall'utente è un contorno CAVO (un nastro), non un blocco pieno — da qui
+// il nastro sopra, seguito da un'unica spezzata a zig-zag (basso-sinistra,
+// punta sinistra, valle, punta destra, basso-destra): i giunti interni
+// (le due punte in alto e la valle) diventano da soli degli angoli netti
+// col metodo del "becco d'anatra" sopra, senza doverli disegnare a mano
+// pezzo per pezzo. Più piccola e più spessa della versione precedente,
+// richiesta esplicita ("ridimensionalo un po, fallo più spesso").
 function buildLetterMShape() {
-  const pillarWidth = 0.34;
-  const legWidth = 0.34;
-  const leftOuter = -1;
-  const leftInner = leftOuter + pillarWidth;
-  const rightOuter = 1;
-  const rightInner = rightOuter - pillarWidth;
-  const yBottom = -1;
-  const yShoulder = 0.55; // dove il pilastro smette di essere dritto e inizia la punta
-  const yTip = 1.05; // la punta sale leggermente sopra il resto della lettera
-  const valley = new THREE.Vector2(0, -0.25);
-
-  // Pilastro verticale con una punta triangolare in cima, invece di un top piatto.
-  const pillarWithSpike = (xLeft, xRight) => {
-    const xMid = (xLeft + xRight) / 2;
-    const s = new THREE.Shape();
-    s.moveTo(xLeft, yBottom);
-    s.lineTo(xRight, yBottom);
-    s.lineTo(xRight, yShoulder);
-    s.lineTo(xMid, yTip);
-    s.lineTo(xLeft, yShoulder);
-    s.closePath();
-    return s;
-  };
-  // Braccio diagonale: parte largo quanto il pilastro (stesso bordo interno)
-  // e si assottiglia fino a un punto solo nella valle — un triangolo, non
-  // un parallelogramma: dà l'aspetto "a lama" del riferimento.
-  const taperedLeg = (innerX) => {
-    const s = new THREE.Shape();
-    s.moveTo(innerX - legWidth / 2, yShoulder);
-    s.lineTo(innerX + legWidth / 2, yShoulder);
-    s.lineTo(valley.x, valley.y);
-    s.closePath();
-    return s;
-  };
-
-  return [
-    pillarWithSpike(leftOuter, leftInner),
-    pillarWithSpike(rightInner, rightOuter),
-    taperedLeg(leftInner),
-    taperedLeg(rightInner),
+  const points = [
+    new THREE.Vector2(-0.62, -0.7), // base sinistra
+    new THREE.Vector2(-0.67, 0.62), // punta sinistra
+    new THREE.Vector2(0, -0.13), // valle centrale
+    new THREE.Vector2(0.67, 0.62), // punta destra
+    new THREE.Vector2(0.62, -0.7), // base destra
   ];
+  return ribbonShape(points, 0.44);
 }
 
 // Stella a 5 punte (mondo Intrattenimento): poligono standard, raggio
