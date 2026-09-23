@@ -4,6 +4,7 @@ import LinkPreview from './LinkPreview';
 import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
+import { isStaff } from '../../data/roles';
 import './PostCard.css';
 
 const REACTION_EMOJIS = ['❤️', '😂', '👍'];
@@ -22,6 +23,7 @@ function MediaImage({ src, alt, errorText, className }) {
 function Comment({ comment, user, onReact, onReport, onDelete }) {
   const author = comment.author ?? { name: 'Utente', avatar: '' };
   const isOwn = user && comment.autoreId === user.id;
+  const canModerate = !isOwn && isStaff(user?.ruolo);
   return (
     <li className="rb-comment">
       <img className="rb-comment-avatar" src={author.avatar} alt={author.name} />
@@ -46,6 +48,11 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
           {isOwn && onDelete && (
             <button type="button" className="rb-comment-react-btn" title="Elimina commento" onClick={() => onDelete(comment.id)}>
               🗑️
+            </button>
+          )}
+          {canModerate && onDelete && (
+            <button type="button" className="rb-comment-react-btn" title="Rimuovi commento (moderazione)" onClick={() => onDelete(comment.id)}>
+              🛡️
             </button>
           )}
           {onReport && (
@@ -94,6 +101,7 @@ export default function PostCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const author = post.author ?? { name: 'Utente', avatar: '' };
   const isOwn = Boolean(user) && post.autoreId === user.id;
+  const canModeratePost = !isOwn && isStaff(user?.ruolo);
   // I post con foto/video autotaggato hanno un contentId condiviso con le
   // altre posizioni dello stesso contenuto (Arte, Nerd, ecc): il like passa
   // dal conteggio comune (content_likes), non dall'array locale mi_piace.
@@ -244,14 +252,19 @@ export default function PostCard({
             ✏️
           </button>
         )}
-        {isOwn && onDeletePost && !confirmDelete && (
-          <button type="button" className="rb-post-action-btn" title="Elimina post" onClick={() => setConfirmDelete(true)}>
-            🗑️
+        {(isOwn || canModeratePost) && onDeletePost && !confirmDelete && (
+          <button
+            type="button"
+            className="rb-post-action-btn"
+            title={isOwn ? 'Elimina post' : 'Rimuovi post (moderazione)'}
+            onClick={() => setConfirmDelete(true)}
+          >
+            {isOwn ? '🗑️' : '🛡️'}
           </button>
         )}
-        {isOwn && onDeletePost && confirmDelete && (
+        {(isOwn || canModeratePost) && onDeletePost && confirmDelete && (
           <span className="rb-post-delete-confirm">
-            Eliminare?
+            {isOwn ? 'Eliminare?' : 'Rimuovere questo post?'}
             <button type="button" className="rb-post-delete-confirm-yes" onClick={confirmDeletePost}>Sì</button>
             <button type="button" className="rb-post-delete-confirm-no" onClick={() => setConfirmDelete(false)}>No</button>
           </span>

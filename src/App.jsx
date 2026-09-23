@@ -38,7 +38,7 @@ import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
-import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile } from './data/accounts';
+import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice } from './data/accounts';
 import {
   getFriends,
   getSentRequests,
@@ -223,6 +223,7 @@ export default function App() {
   // PASSWORD_RECOVERY di Supabase Auth (link "Password dimenticata?"
   // cliccato dalla mail) — mai su richiesta diretta dell'utente.
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
+  const [banNotice, setBanNotice] = useState(null); // { motivo, finoAl } | null
   const [authOpen, setAuthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -402,6 +403,10 @@ export default function App() {
     getCurrentAccount().then((account) => {
       if (cancelled) return;
       setUser(account);
+      if (!account) {
+        const notice = consumeBanNotice();
+        if (notice) setBanNotice(notice);
+      }
       markReady();
     });
 
@@ -412,6 +417,13 @@ export default function App() {
     const unsubscribe = subscribeAuthChanges((account, event) => {
       if (cancelled) return;
       setUser(account);
+      // Chi era già loggato e viene bannato mentre naviga: getCurrentAccount/
+      // fetchOwnProfile lo disconnettono da soli al prossimo evento di auth
+      // (es. il refresh automatico del token) e lasciano qui il motivo.
+      if (!account) {
+        const notice = consumeBanNotice();
+        if (notice) setBanNotice(notice);
+      }
       markReady();
       if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryOpen(true);
     });
@@ -1335,6 +1347,24 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <PasswordRecoveryModal open={passwordRecoveryOpen} onClose={() => setPasswordRecoveryOpen(false)} />
         </Suspense>
+      )}
+
+      {banNotice && (
+        <div className="rb-adult-gate-overlay">
+          <div className="rb-adult-gate-card">
+            <h2>Account sospeso</h2>
+            <p>
+              Un moderatore ha sospeso il tuo account
+              {banNotice.finoAl ? ` fino al ${new Date(banNotice.finoAl).toLocaleString('it-IT')}` : ' senza una data di fine'}.
+              {banNotice.motivo && <> Motivo: {banNotice.motivo}.</>}
+            </p>
+            <div className="rb-adult-gate-actions">
+              <button type="button" className="rb-adult-gate-confirm" onClick={() => setBanNotice(null)}>
+                Ho capito
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <CookieConsentBanner user={user} onOpenPrivacyInfo={() => navigateToCategory('faq', 'informazioni')} />

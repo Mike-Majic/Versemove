@@ -27,6 +27,8 @@ import {
   displayName,
 } from '../../data/posts';
 import { listGroups, getMyGroupIds, createGroup as createGroupApi, joinGroup, leaveGroup } from '../../data/groups';
+import { isStaff } from '../../data/roles';
+import { logAdminAction } from '../../data/adminAuditLog';
 import { followUser, unfollowUser, getFollowing, listSuggestedProfiles } from '../../data/follows';
 import {
   listContentsForPlacement,
@@ -324,10 +326,18 @@ export default function SocialFeed({
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, testo: newTesto } : p)));
   };
 
+  // Autore o staff (owner/moderatore) possono cancellare: la RLS lato
+  // server già lo permette a entrambi (vedi commento su softDeletePost in
+  // data/posts.js), qui si registra anche nel log di moderazione quando è
+  // lo staff a togliere il post di qualcun altro — mai per una propria
+  // cancellazione, quella non è un'azione di moderazione da tracciare.
   const deletePost = async (postId) => {
     const target = posts.find((p) => p.id === postId);
-    if (!target || target.autoreId !== user?.id) return;
-    if (target.contentId) {
+    if (!target) return;
+    const isOwn = target.autoreId === user?.id;
+    const staffRemoval = !isOwn && isStaff(user?.ruolo);
+    if (!isOwn && !staffRemoval) return;
+    if (isOwn && target.contentId) {
       const { error } = await deleteContent(target.contentId, target.mediaUrl);
       if (error) {
         setFeedError(error);
@@ -341,6 +351,7 @@ export default function SocialFeed({
         return;
       }
     }
+    if (staffRemoval) await logAdminAction('rimozione_post', target.autoreId, { postId });
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     setComments((prev) => prev.filter((c) => c.post_id !== postId));
   };
@@ -370,12 +381,16 @@ export default function SocialFeed({
 
   const removeComment = async (commentId) => {
     const target = comments.find((c) => c.id === commentId);
-    if (!target || target.autoreId !== user?.id) return;
+    if (!target) return;
+    const isOwn = target.autoreId === user?.id;
+    const staffRemoval = !isOwn && isStaff(user?.ruolo);
+    if (!isOwn && !staffRemoval) return;
     const { error } = await deleteCommentApi(commentId);
     if (error) {
       setFeedError(error);
       return;
     }
+    if (staffRemoval) await logAdminAction('rimozione_commento', target.autoreId, { commentId });
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   };
 

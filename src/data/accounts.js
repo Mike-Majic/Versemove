@@ -51,6 +51,9 @@ function mapProfile(row) {
     lingua: row.lingua ?? 'it',
     ruolo: row.ruolo,
     verificato: row.verificato,
+    bannato: row.bannato ?? false,
+    banMotivo: row.ban_motivo,
+    banFinoAl: row.ban_fino_al,
     avatar: row.avatar_url,
     createdAt: row.created_at,
     lastNicknameChangeAt: row.last_nickname_change_at,
@@ -102,6 +105,49 @@ export function clearCachedProfile() {
   }
 }
 
+// true se il ban è ancora attivo adesso (bannato=true e, se c'è una
+// scadenza, non è ancora passata — un ban con ban_fino_al nel passato
+// "scade da solo", senza bisogno di un job che lo tolga esplicitamente).
+function isCurrentlyBanned(account) {
+  if (!account?.bannato) return false;
+  return !account.banFinoAl || new Date(account.banFinoAl) > new Date();
+}
+
+const BAN_NOTICE_KEY = 'rb-ban-notice';
+
+// Consumato una sola volta da App.jsx per mostrare il motivo del ban
+// dopo che l'account è già stato disconnesso (getCurrentAccount/
+// subscribeAuthChanges restituiscono solo null, mai l'account bannato).
+export function consumeBanNotice() {
+  try {
+    const raw = localStorage.getItem(BAN_NOTICE_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(BAN_NOTICE_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Disconnette subito un account bannato (lasciando un avviso da mostrare)
+// invece di restituirlo come se fosse normale: unico punto controllato,
+// così vale sia al login sia a chi era già dentro e viene bannato mentre
+// naviga (il prossimo evento di auth, es. il refresh automatico del
+// token, lo intercetta qui). Non è istantaneo come un canale realtime
+// dedicato, ma arriva comunque entro la sessione in corso senza doverne
+// aggiungere uno solo per questo.
+async function enforceBanIfNeeded(account) {
+  if (!isCurrentlyBanned(account)) return false;
+  try {
+    localStorage.setItem(BAN_NOTICE_KEY, JSON.stringify({ motivo: account.banMotivo, finoAl: account.banFinoAl }));
+  } catch {
+    // storage piena/privato: l'avviso si perde, il ban resta comunque efficace.
+  }
+  await supabase.auth.signOut();
+  clearCachedProfile();
+  return true;
+}
+
 async function fetchOwnProfile() {
   // getSession() legge la sessione già salvata dal browser (e la rinnova da
   // sola se serve), senza dover per forza contattare il server come fa
@@ -116,6 +162,7 @@ async function fetchOwnProfile() {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
   if (error) return null;
   const account = mapProfile(data);
+  if (await enforceBanIfNeeded(account)) return null;
   cacheProfile(account);
   return account;
 }
@@ -291,9 +338,19 @@ export async function loginAccount(email, password) {
   }
   const account = await fetchOwnProfile();
   if (!account) {
+    const notice = consumeBanNotice();
+    if (notice) return { error: formatBanMessage(notice) };
     return { error: 'Account non trovato.' };
   }
   return { account };
+}
+
+function formatBanMessage({ motivo, finoAl }) {
+  const quando = finoAl
+    ? `fino al ${new Date(finoAl).toLocaleString('it-IT')}`
+    : 'senza una data di fine';
+  const dettaglio = motivo ? ` Motivo: ${motivo}.` : '';
+  return `Account sospeso da un moderatore, ${quando}.${dettaglio}`;
 }
 
 export async function logoutAccount() {
@@ -376,6 +433,27 @@ export async function updateAccountRole(accountId, newRole) {
 
 export async function setAccountVerified(accountId, verificato) {
   const { error } = await supabase.rpc('set_account_verified', { p_id: accountId, p_verificato: Boolean(verificato) });
+  if (error) return { error: error.message };
+  return {};
+}
+
+// Come updateAccountRole: la funzione lato server verifica da sola chi può
+// bannare chi (owner o moderatore, mai l'owner stesso, solo l'owner può
+// bannare un moderatore) — qui nessun controllo di ruolo, solo la chiamata.
+// finoAl null = ban permanente.
+export async function banAccount(accountId, motivo, finoAl = null) {
+  const { error } = await supabase.rpc('set_account_banned', {
+    p_id: accountId,
+    p_bannato: true,
+    p_motivo: motivo?.trim() || null,
+    p_fino_al: finoAl,
+  });
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function unbanAccount(accountId) {
+  const { error } = await supabase.rpc('set_account_banned', { p_id: accountId, p_bannato: false });
   if (error) return { error: error.message };
   return {};
 }

@@ -47,4 +47,8 @@ export const AUDIT_LABELS = {
   verifica_documento: 'Verifica documento',
   reset_password: 'Reset password',
   gestione_segnalazione: 'Gestione segnalazione',
+  ban_account: 'Ban account',
+  unban_account: 'Rimozione ban',
+  rimozione_post: 'Rimozione post (moderazione)',
+  rimozione_commento: 'Rimozione commento (moderazione)',
 };

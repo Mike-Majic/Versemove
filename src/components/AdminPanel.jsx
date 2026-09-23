@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAccounts, updateAccountRole, setAccountVerified, resetAccountPassword } from '../data/accounts';
+import { getAccounts, updateAccountRole, setAccountVerified, resetAccountPassword, banAccount, unbanAccount } from '../data/accounts';
 import { getMailboxMessages, markMessageRead } from '../data/modMailbox';
 import { getReports, updateReportStatus } from '../data/reports';
 import { getAuditLog, logAdminAction, AUDIT_LABELS } from '../data/adminAuditLog';
@@ -293,6 +293,69 @@ function SponsorshipsPane({ sponsorships, onCreate, onUpdate }) {
   );
 }
 
+// Cella "Ban" della tabella Utenti: badge di stato se già bannato (con
+// pulsante per togliere il ban), altrimenti un piccolo form inline
+// (motivo facoltativo, scadenza facoltativa = permanente) per bannarlo —
+// stesso schema "apri form inline nella riga" del resto del pannello
+// (SponsorshipsPane). canBan arriva già calcolato dal chiamante: protegge
+// la riga dell'owner (mai bannabile) e quella di un moderatore (solo
+// l'owner può bannare un altro moderatore), rispecchiando lato client la
+// stessa gerarchia che la funzione set_account_banned impone lato server.
+function BanCell({ account, canBan, onBan, onUnban }) {
+  const [open, setOpen] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [finoAl, setFinoAl] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  if (account.bannato) {
+    return (
+      <div className="rb-admin-ban-cell">
+        <span className="rb-admin-role-badge rb-admin-banned-badge">
+          Bannato{account.banFinoAl ? ` fino al ${new Date(account.banFinoAl).toLocaleDateString('it-IT')}` : ''}
+        </span>
+        {canBan && (
+          <button type="button" className="rb-admin-reset-btn" onClick={() => onUnban(account)}>
+            Rimuovi ban
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (!canBan) return <span className="rb-admin-empty">—</span>;
+
+  if (!open) {
+    return (
+      <button type="button" className="rb-admin-reset-btn" onClick={() => setOpen(true)}>
+        Banna
+      </button>
+    );
+  }
+
+  const submit = async () => {
+    setSaving(true);
+    await onBan(account, motivo, finoAl ? fromDatetimeLocal(finoAl) : null);
+    setSaving(false);
+    setOpen(false);
+    setMotivo('');
+    setFinoAl('');
+  };
+
+  return (
+    <div className="rb-admin-ban-form">
+      <textarea placeholder="Motivo (facoltativo)" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} />
+      <label>
+        Fino al (vuoto = permanente)
+        <input type="datetime-local" value={finoAl} onChange={(e) => setFinoAl(e.target.value)} />
+      </label>
+      <div className="rb-admin-ban-form-actions">
+        <button type="button" className="rb-reset-filters-btn" onClick={() => setOpen(false)} disabled={saving}>Annulla</button>
+        <button type="button" className="rb-btn-primary" onClick={submit} disabled={saving}>{saving ? 'Salvo…' : 'Conferma'}</button>
+      </div>
+    </div>
+  );
+}
+
 // Apre un allegato in una nuova scheda: il bucket "attachments" è privato,
 // quindi serve un URL firmato temporaneo (valido 60 secondi) invece di un
 // link diretto — è così che owner/moderatori guardano il documento caricato
@@ -484,6 +547,24 @@ export default function AdminPanel({ user, onClose }) {
     }
   };
 
+  const banUser = async (account, motivo, finoAl) => {
+    const { error } = await banAccount(account.id, motivo, finoAl);
+    if (!error) {
+      refreshAccounts();
+      await logAdminAction('ban_account', account.id, { motivo: motivo || null, finoAl });
+      refreshAuditLog();
+    }
+  };
+
+  const unbanUser = async (account) => {
+    const { error } = await unbanAccount(account.id);
+    if (!error) {
+      refreshAccounts();
+      await logAdminAction('unban_account', account.id, {});
+      refreshAuditLog();
+    }
+  };
+
   const markRead = async (messageId) => {
     await markMessageRead(messageId);
     refreshMessages();
@@ -539,6 +620,7 @@ export default function AdminPanel({ user, onClose }) {
                     <th>Verifica</th>
                     <th>Ruolo</th>
                     <th>Password</th>
+                    <th>Ban</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -598,12 +680,20 @@ export default function AdminPanel({ user, onClose }) {
                             Reset
                           </button>
                         </td>
+                        <td>
+                          <BanCell
+                            account={a}
+                            canBan={!isOwnerRow && (a.ruolo !== ROLES.MODERATOR || isOwner)}
+                            onBan={banUser}
+                            onUnban={unbanUser}
+                          />
+                        </td>
                       </tr>
                     );
                   })}
                   {accounts.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="rb-admin-empty">Nessuno si è ancora registrato.</td>
+                      <td colSpan={12} className="rb-admin-empty">Nessuno si è ancora registrato.</td>
                     </tr>
                   )}
                 </tbody>
