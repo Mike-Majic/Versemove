@@ -20,6 +20,13 @@ const LOCALES = {
   es: (await import('../src/i18n/locales/es.js')).default,
   fr: (await import('../src/i18n/locales/fr.js')).default,
   de: (await import('../src/i18n/locales/de.js')).default,
+  zh: (await import('../src/i18n/locales/zh.js')).default,
+  ja: (await import('../src/i18n/locales/ja.js')).default,
+  ko: (await import('../src/i18n/locales/ko.js')).default,
+  pt: (await import('../src/i18n/locales/pt.js')).default,
+  ru: (await import('../src/i18n/locales/ru.js')).default,
+  ar: (await import('../src/i18n/locales/ar.js')).default,
+  hi: (await import('../src/i18n/locales/hi.js')).default,
 };
 
 function flatten(obj, prefix = '') {

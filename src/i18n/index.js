@@ -6,6 +6,13 @@ import en from './locales/en';
 import es from './locales/es';
 import fr from './locales/fr';
 import de from './locales/de';
+import zh from './locales/zh';
+import ja from './locales/ja';
+import ko from './locales/ko';
+import pt from './locales/pt';
+import ru from './locales/ru';
+import ar from './locales/ar';
+import hi from './locales/hi';
 
 // Lingue supportate: id ISO 639-1 usato ovunque nell'app (select di
 // registrazione/Impostazioni, colonna profiles.lingua quando Cowork la
@@ -13,22 +20,28 @@ import de from './locales/de';
 // SUA STESSA lingua (mai tradotta: chi non legge ancora l'italiano deve
 // comunque riconoscere la propria voce nel menu).
 //
-// Solo le prime 5 (it/en/es/fr/de) hanno anche l'interfaccia del sito
-// tradotta (file in ./locales): sono le "lingue di interfaccia". Le altre
-// ~75 servono SOLO a due cose — scegliere in quale lingua tradurre i
-// post/DM al volo (TranslateHint) ed etichettare correttamente la lingua
-// in cui un utente scrive (posts.lingua/chat_messages.lingua) — non hanno
-// un file di traduzione dedicato: se selezionate, l'interfaccia del sito
-// resta in inglese (fallbackLng qui sotto), come da richiesta esplicita di
-// Mike (niente traduzione manuale dell'interfaccia in 80 lingue, solo
-// traduzione dei messaggi).
+// Solo le prime 12 (it/en/es/fr/de/zh/ja/ko/pt/ru/ar/hi) hanno anche
+// l'interfaccia del sito tradotta (file in ./locales): sono le "lingue di
+// interfaccia". Le altre ~68 servono SOLO a due cose — scegliere in quale
+// lingua tradurre i post/DM al volo (TranslateHint) ed etichettare
+// correttamente la lingua in cui un utente scrive (posts.lingua/
+// chat_messages.lingua) — non hanno un file di traduzione dedicato: se
+// selezionate, l'interfaccia del sito resta in inglese (fallbackLng qui
+// sotto), come da richiesta esplicita di Mike (niente traduzione manuale
+// dell'interfaccia in 80 lingue, solo di un sottoinsieme più le
+// traduzioni dei messaggi per tutte le altre).
+//
+// Nota sull'arabo (unica lingua RTL qui): il layout della pagina resta
+// LTR (nessun document.dir = 'rtl'), solo il testo è tradotto — il
+// browser mostra comunque l'arabo nel verso giusto grazie all'algoritmo
+// bidi, ma menu/allineamenti non sono a specchio. Un vero supporto RTL
+// del layout è un lavoro separato, non incluso qui.
 export const SUPPORTED_LANGUAGES = [
   { code: 'it', nativeLabel: 'Italiano', flag: '🇮🇹' },
   { code: 'en', nativeLabel: 'English', flag: '🇬🇧' },
   { code: 'es', nativeLabel: 'Español', flag: '🇪🇸' },
   { code: 'fr', nativeLabel: 'Français', flag: '🇫🇷' },
   { code: 'de', nativeLabel: 'Deutsch', flag: '🇩🇪' },
-  // --- solo traduzione messaggi, interfaccia in inglese di fallback ---
   { code: 'zh', nativeLabel: '中文', flag: '🇨🇳' },
   { code: 'ja', nativeLabel: '日本語', flag: '🇯🇵' },
   { code: 'ko', nativeLabel: '한국어', flag: '🇰🇷' },
@@ -36,6 +49,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ru', nativeLabel: 'Русский', flag: '🇷🇺' },
   { code: 'ar', nativeLabel: 'العربية', flag: '🇸🇦' },
   { code: 'hi', nativeLabel: 'हिन्दी', flag: '🇮🇳' },
+  // --- solo traduzione messaggi, interfaccia in inglese di fallback ---
   { code: 'nl', nativeLabel: 'Nederlands', flag: '🇳🇱' },
   { code: 'sv', nativeLabel: 'Svenska', flag: '🇸🇪' },
   { code: 'no', nativeLabel: 'Norsk', flag: '🇳🇴' },
@@ -123,6 +137,13 @@ i18n
       es: { translation: es },
       fr: { translation: fr },
       de: { translation: de },
+      zh: { translation: zh },
+      ja: { translation: ja },
+      ko: { translation: ko },
+      pt: { translation: pt },
+      ru: { translation: ru },
+      ar: { translation: ar },
+      hi: { translation: hi },
     },
     // Dove manca una chiave in una lingua, l'inglese (non l'italiano: una
     // persona che ha scelto spagnolo o francese leggerebbe comunque
