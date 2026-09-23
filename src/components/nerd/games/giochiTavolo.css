@@ -1,6 +1,33 @@
+/* Stesso guscio a pannello fisso e centrato di ogni altra categoria a un
+   solo riquadro (vedi DogWorldMap.css/.rb-dogmap, stesso schema): senza
+   position/background/pointer-events qui, il contenuto galleggiava
+   trasparente sopra al globo e i bottoni non erano nemmeno cliccabili
+   (l'antenato .rb-arte-explorer ha pointer-events:none apposta, tocca ad
+   ogni pannello riattivarli). Più largo del solito (820px) per fare stare
+   comodamente il ventaglio di carte in mano senza andare a capo. */
 .rb-giochi-tavolo {
-  padding: 4px 2px 20px;
+  position: absolute;
+  top: 76px;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(820px, 94vw);
+  background: rgba(10, 8, 4, 0.92);
+  border: 1px solid color-mix(in srgb, var(--accent, #d4f634) 45%, transparent);
+  border-radius: 18px;
+  padding: 20px 20px 24px;
+  overflow-y: auto;
+  pointer-events: auto;
   color: #f5f5f7;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #d4f634) 18%, transparent);
+}
+
+@media (max-width: 480px) {
+  .rb-giochi-tavolo {
+    top: 168px;
+    bottom: 26px;
+    width: calc(100vw - 28px);
+  }
 }
 
 .rb-giochi-header h3 {
