@@ -1,26 +1,27 @@
 import { useState } from 'react';
-import { SOCIAL_CATEGORIES, resolveCategoryQuery } from '../../data/socialCategories';
-import SocialFeed from './SocialFeed';
+import { ANIMALI_CATEGORIES, resolveCategoryQuery } from '../../data/animaliCategories';
+import DogWorldMap from '../dogworld/DogWorldMap';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import '../shared/categoryExplorerShell.css';
 
-// Guscio di navigazione del mondo Social: stesso pattern di ArteExplorer/
-// IncontriLiveExplorer (X + ricerca in alto, chiuso finché non si sceglie
-// la categoria), qui c'è solo "World" quindi il triangolo/pulsante apre
-// direttamente il feed esistente — prima si vedeva sempre, ora si apre
-// come negli altri mondi.
-export default function SocialWorldExplorer({
+// Guscio di navigazione del mondo Animali: stesso pattern di
+// LavoroWorldExplorer/IncontriLiveExplorer (X + ricerca in alto, chiuso
+// finché non si sceglie la categoria). Per ora solo "Cani" (mappa reale di
+// luoghi pet-friendly + recensioni, DogWorldMap) — spostata qui dal mondo
+// Vetrina, su richiesta esplicita di un mondo dedicato.
+export default function AnimaliWorldExplorer({
   world,
   activeCategory,
   onToggleCategory,
   onSearchCategory,
+  user,
+  onOpenAuth,
   favorites = [],
   onToggleFavorite,
-  ...feedProps
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const category = SOCIAL_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
+  const category = ANIMALI_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
 
   const submitSearch = (e) => {
     e.preventDefault();
@@ -44,8 +45,8 @@ export default function SocialWorldExplorer({
                 type="button"
                 className="rb-arte-close-all-btn"
                 onClick={() => onToggleCategory(null)}
-                aria-label="Chiudi il feed"
-                title="Chiudi il feed"
+                aria-label="Chiudi le colonne"
+                title="Chiudi le colonne"
               >
                 ✕
               </button>
@@ -55,15 +56,15 @@ export default function SocialWorldExplorer({
                 categoryLabel={category.label}
                 favorites={favorites}
                 onToggle={onToggleFavorite}
-                user={feedProps.user}
-                onOpenAuth={feedProps.onOpenAuth}
+                user={user}
+                onOpenAuth={onOpenAuth}
               />
             </div>
 
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. world)..."
+                placeholder="Cerca (es. cani)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -74,7 +75,7 @@ export default function SocialWorldExplorer({
             </form>
           </div>
 
-          <SocialFeed world={world} {...feedProps} />
+          <DogWorldMap user={user} onOpenAuth={onOpenAuth} />
         </>
       )}
     </div>

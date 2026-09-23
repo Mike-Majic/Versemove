@@ -1,8 +1,9 @@
 // Configurazione dei "mondi" del mappamondo interattivo.
 // Ordine dello swipe a due dita (e del selettore a scorrimento, stesso
-// array): bambini -> vetrina -> social -> annunci -> lavoro -> arte -> nerd
-// -> incontri -> faq -> (torna a bambini). Il mondo blu (Social) è quello
-// principale: è il primo che si vede all'apertura dell'app.
+// array): bambini -> vetrina -> animali -> social -> annunci -> lavoro ->
+// arte -> nerd -> incontri -> faq -> (torna a bambini). Il mondo blu
+// (Social) è quello principale: è il primo che si vede all'apertura
+// dell'app.
 export const WORLDS = [
   {
     id: 'bambini',
@@ -25,6 +26,34 @@ export const WORLDS = [
     globeColor: '#1f0416',
     atmosphereColor: '#ec4899',
     textOnGlobe: '#ffeaf7',
+  },
+  {
+    id: 'animali',
+    label: 'Animali',
+    tagline: 'Luoghi pet-friendly vicino a te',
+    // Richiesta esplicita: puntini marrone chiaro, linee verde scuro,
+    // lineamenti dei continenti bianchi. Stessa "grandezza" (una sola
+    // categoria) del mondo Lavoro: qui c'è solo "Cani" (la mappa reale di
+    // luoghi pet-friendly + recensioni, DogWorldMap), spostata qui dal
+    // mondo Vetrina.
+    // Un marrone troppo desaturato (vicino al beige) si "lava" quasi bianco
+    // sui puntini della rete, che usano blending additivo — vedi il
+    // commento su Incontri più sotto, stesso fenomeno: qui serve un
+    // marrone più saturo (canale verde/blu più bassi rispetto al rosso)
+    // perché resti leggibile come marrone anche dopo l'additivo.
+    color: '#b8794a',
+    colorSoft: 'rgba(184, 121, 74, 0.18)',
+    globeColor: '#140f08',
+    atmosphereColor: '#b8794a',
+    lineColor: '#1a4d2e',
+    landFillColor: '#ffffff',
+    landFillOpacity: 0.78,
+    // Sui satelliti il contorno dei continenti si calcola di default per
+    // contrasto rispetto a "color": con questo marrone chiaro sceglierebbe
+    // da solo un contorno scuro, quindi va forzato bianco (stesso
+    // meccanismo già usato da Nerd, vedi satelliteContinentColor sotto).
+    satelliteContinentColor: '#ffffff',
+    textOnGlobe: '#fdf6ec',
   },
   {
     id: 'social',

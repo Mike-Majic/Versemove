@@ -30,6 +30,7 @@ import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery }
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
+import { ANIMALI_CATEGORIES, resolveCategoryQuery as resolveAnimaliCategoryQuery } from './data/animaliCategories';
 import AccessGate from './components/AccessGate';
 import CookieConsentBanner from './components/CookieConsentBanner';
 import { hasLavoroConsent } from './data/lavoro';
@@ -67,6 +68,7 @@ const LavoroWorldExplorer = lazyWithRetry(() => import('./components/lavoro/Lavo
 const LavoroConsentGate = lazyWithRetry(() => import('./components/lavoro/LavoroConsentGate'));
 const FaqWorldExplorer = lazyWithRetry(() => import('./components/faq/FaqWorldExplorer'));
 const AnnunciWorldExplorer = lazyWithRetry(() => import('./components/annunci/AnnunciWorldExplorer'));
+const AnimaliWorldExplorer = lazyWithRetry(() => import('./components/animali/AnimaliWorldExplorer'));
 const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel'));
 const ProfileModal = lazyWithRetry(() => import('./components/ProfileModal'));
 const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
@@ -111,6 +113,8 @@ const CATEGORY_WORLDS = {
   // fallback per il conteggio "più di CATEGORY_LIST_PAGE_SIZE" iniziale.
   faq: { categories: getFaqCategories(false), resolveQuery: resolveFaqCategoryQuery },
   annunci: { categories: ANNUNCI_CATEGORIES, resolveQuery: resolveAnnunciCategoryQuery },
+  // Animali: solo "Cani" per ora, apre la mappa DogWorldMap invece di CategoryColumn.
+  animali: { categories: ANIMALI_CATEGORIES, resolveQuery: resolveAnimaliCategoryQuery },
 };
 
 // Aspetta che l'utente finisca di digitare prima di far "volare" il globo sulla città cercata.
@@ -923,7 +927,7 @@ export default function App() {
         />
       </Suspense>
 
-      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && world.id !== 'faq' && world.id !== 'annunci' && (
+      {categorySet && world.id !== 'bambini' && world.id !== 'incontri' && world.id !== 'social' && world.id !== 'lavoro' && world.id !== 'faq' && world.id !== 'annunci' && world.id !== 'animali' && (
         <Suspense fallback={<PageLoading />}>
           <ArteExplorer
             world={world}
@@ -1031,6 +1035,21 @@ export default function App() {
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
+            favorites={favoriteCategories}
+            onToggleFavorite={toggleFavoriteCategory}
+          />
+        </Suspense>
+      )}
+
+      {world.id === 'animali' && (
+        <Suspense fallback={<PageLoading />}>
+          <AnimaliWorldExplorer
+            world={world}
+            activeCategory={activeArteCategory}
+            onToggleCategory={toggleArteCategory}
+            onSearchCategory={flyToArteCategory}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
           />
