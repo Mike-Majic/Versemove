@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { listOpenRooms, createRoom, joinRoom, leaveRoom, setRoomReady, fetchRoom, subscribeToGameEvents, unsubscribe } from '../../../data/gameRooms';
 import { startScopaHand } from '../../../data/scopa';
 import { startBurracoHand } from '../../../data/burraco';
+import { startTrentunoHand } from '../../../data/trentuno';
 import ScopaTable from './ScopaTable';
 import BurracoTable from './BurracoTable';
+import TrentunoTable from './TrentunoTable';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import './giochiTavolo.css';
@@ -11,12 +13,13 @@ import './giochiTavolo.css';
 const GAMES = [
   { id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane' },
   { id: 'burraco', label: 'Burraco', icon: '🎴', tagline: '2 giocatori, mazzo doppio da 108 carte' },
+  { id: 'trentuno', label: '31', icon: '🂡', tagline: '2 giocatori, chi fa 31 o ha la mano migliore vince' },
 ];
 
 // Ogni gioco ha la sua funzione per far partire la mano e il suo tavolo:
 // aggiungerne uno nuovo vuol dire aggiungerlo qui e alla lista GAMES sopra.
-const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand };
-const TABLES = { scopa: ScopaTable, burraco: BurracoTable };
+const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand, trentuno: startTrentunoHand };
+const TABLES = { scopa: ScopaTable, burraco: BurracoTable, trentuno: TrentunoTable };
 
 // Guscio "Giochi da tavolo & carte" del mondo Nerd: lobby (partite aperte a
 // cui unirsi + crea nuova, per qualunque gioco del catalogo GAMES), sala

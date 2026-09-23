@@ -1,0 +1,23 @@
+.rb-trentuno-bussa-banner {
+  background: color-mix(in srgb, var(--accent, #d4f634) 20%, transparent);
+  border: 1px solid var(--accent, #d4f634);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-align: center;
+  max-width: 90%;
+}
+
+.rb-trentuno-lives {
+  display: inline-flex;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.rb-trentuno-life {
+  color: rgba(245, 245, 247, 0.25);
+}
+
+.rb-trentuno-life.persa {
+  color: #ff6b6b;
+}
