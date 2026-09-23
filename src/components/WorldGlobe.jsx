@@ -263,7 +263,10 @@ export default function WorldGlobe({
   useEffect(() => {
     activeCategoryRef.current = activeCategory;
   }, [activeCategory]);
-  const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [size, setSize] = useState({
+    width: window.visualViewport?.width ?? window.innerWidth,
+    height: window.visualViewport?.height ?? window.innerHeight,
+  });
   const [landPolygons, setLandPolygons] = useState([]);
   // Qualità grafica (Impostazioni -> Effetti, o "Auto" con downgrade da FPS
   // reali, vedi fx/quality.js): pixelRatio e atmosfera restano reattivi a
@@ -433,10 +436,26 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [globeActivity]);
 
+  // Su iOS (Safari e Chrome, entrambi su WebKit) l'evento "resize" della
+  // finestra non scatta in modo affidabile quando la barra degli indirizzi
+  // si espande/collassa a scorrimento: il canvas restava quindi bloccato
+  // sulla dimensione iniziale (più bassa) mentre lo spazio visibile reale
+  // cresceva, lasciando il globo/anello compresso in alto con spazio nero
+  // sotto — bug segnalato dal vivo. window.visualViewport riflette invece
+  // sempre l'area visibile reale ed emette i suoi eventi propri.
   useEffect(() => {
-    const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    const onResize = () => setSize({
+      width: window.visualViewport?.width ?? window.innerWidth,
+      height: window.visualViewport?.height ?? window.innerHeight,
+    });
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('scroll', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('scroll', onResize);
+    };
   }, []);
 
   // Segue i cambi di qualità (scelta esplicita in Impostazioni, o downgrade

@@ -163,6 +163,15 @@
   cursor: pointer;
 }
 
+.rb-user-chip-identity img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
 .rb-friends-btn {
   position: relative;
 }

@@ -49,7 +49,7 @@ export default function TopBar({
               </button>
             )}
             <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title={t('topbar.myProfile')}>
-              <img src={user.avatar} alt={user.name} />
+              <img src={user.avatar} alt={user.name} onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
               <span>{user.name}</span>
               {user.verificato && <span className="rb-verified-badge" title={t('topbar.verified')}>✓</span>}
             </button>
