@@ -88,30 +88,41 @@ const BOB_AMPLITUDE = 8;
 // (ruotare il satellite verso di lei quando usciva dai bordi) è stato
 // scartato perché lo portava a passarle troppo vicino, esplodendo di
 // dimensione in prospettiva (bug visto in uno screenshot di verifica).
-// Resta solo la difesa sotto (MIN_CAMERA_DISTANCE + il margine dinamico
-// sulla distanza vera della camera dal centro), che quel bug lo previene
-// senza inseguire nessuno.
+// Resta solo la difesa sotto (il pavimento fisso MIN_CAMERA_DISTANCE), che
+// quel bug lo previene senza inseguire nessuno e senza impedire a un
+// satellite di passare davanti al globo quando l'orbita lo porta lì.
 const ORBIT_SPEED_RAD_S = IDLE_SATELLITE_ORBIT_DEG_S * DEG2RAD;
 
-// Distanza minima dalla camera: se l'orbita porta un satellite più vicino
-// di così, viene respinto lungo la stessa direzione fino a questa
-// distanza (la direzione — quindi "da che parte si vede" — resta la
-// stessa, solo la prospettiva non lo fa più esplodere di dimensione). A
-// questa distanza anche il satellite più grande (raggio 42, vedi SLOTS)
-// ha una dimensione angolare paragonabile al globo grande, mai dominante.
-// È solo un PAVIMENTO: la vera soglia usata in update() è sempre almeno
-// questa, ma cresce con la distanza reale camera-centro (vedi
-// SATELLITE_CAMERA_MARGIN) così un satellite non è MAI più vicino alla
-// camera del globo centrale stesso, a qualunque livello di zoom.
-const MIN_CAMERA_DISTANCE = 280;
-// Quanto un satellite deve restare più lontano dalla camera rispetto al
-// centro del globo (che è sempre nell'origine, quindi camPos.length() è
-// esattamente "distanza globo centrale-camera").
-const SATELLITE_CAMERA_MARGIN = 60;
+// Distanza minima ASSOLUTA dalla camera: se l'orbita porta un satellite
+// più vicino di così, viene respinto lungo la stessa direzione fino a
+// questa distanza (la direzione — quindi "da che parte si vede" — resta
+// la stessa, solo la prospettiva non lo fa più esplodere di dimensione).
+// Nessun legame con la distanza camera-globo centrale: un satellite PUÒ
+// stare più vicino alla camera del globo stesso e passargli davanti,
+// occludendolo — comportamento realistico richiesto esplicitamente (prima
+// un margine dinamico lo respingeva sempre dietro anche quando sarebbe
+// dovuto passare davanti, bug segnalato dal vivo). Resta solo un
+// pavimento fisso per non avere un satellite gigante in faccia in
+// prospettiva a distanza quasi zero.
+const MIN_CAMERA_DISTANCE = 220;
+
+// Zona di rimpicciolimento morbido quando un satellite è molto vicino
+// alla camera: la scala scende con continuità (mai a scatti) man mano che
+// la distanza NATURALE (prima dell'eventuale respinta sopra) scende da
+// PROXIMITY_SCALE_FAR_DISTANCE fino al pavimento MIN_CAMERA_DISTANCE, fino
+// a un massimo di PROXIMITY_SCALE_MIN (-30%). Puramente estetico — non
+// c'entra con l'occlusione, che resta solo del depth buffer (vedi sotto).
+const PROXIMITY_SCALE_FAR_DISTANCE = MIN_CAMERA_DISTANCE * 2;
+const PROXIMITY_SCALE_MIN = 0.7;
 
 // Distanza dalla camera oltre la quale un satellite comincia a sbiadire
 // (profondità atmosferica, come una foschia leggera) e a cui arriva alla
-// sua opacità minima.
+// sua opacità minima. Si applica SOLO ai satelliti più lontani dalla
+// camera del globo centrale stesso (cioè dietro di lui): un satellite che
+// sta passando DAVANTI al globo resta sempre a piena opacità, mai in
+// dissolvenza (richiesta esplicita) — l'occlusione vera e propria la
+// decide comunque solo il depth buffer, questa è solo una foschia in più
+// sui satelliti lontani.
 const FOG_NEAR = 420;
 const FOG_FAR = 950;
 const FOG_MIN_OPACITY = 0.4;
@@ -391,19 +402,24 @@ export function buildSatelliteGlobes({ worlds }) {
   // temporanee (materializzazione e crescita durante il warp) sopra.
   // "Riduci animazioni" (reduceMotion): niente rotazioni proprio, resta
   // solo il galleggiamento. Una sola difesa attiva per fotogramma: se
-  // l'orbita porterebbe il satellite più vicino della soglia (sempre
-  // almeno MIN_CAMERA_DISTANCE, ma cresce con la distanza vera camera-
-  // centro così non è mai più vicino della camera al globo centrale
-  // stesso), lo si respinge (stessa direzione, solo distanza minima
-  // garantita) — evita che l'oggetto esploda di dimensione in prospettiva
-  // senza mai bloccare o deviare l'orbita stessa. elapsedSec/deltaSec
-  // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
-  // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
+  // l'orbita porterebbe il satellite più vicino della soglia ASSOLUTA
+  // MIN_CAMERA_DISTANCE (nessun legame con la distanza camera-globo: un
+  // satellite può stare più vicino del globo centrale e passargli
+  // davanti, occludendolo — voluto), lo si respinge (stessa direzione,
+  // solo distanza minima garantita) — evita solo che l'oggetto esploda di
+  // dimensione in prospettiva a distanza quasi zero, senza mai bloccare o
+  // deviare l'orbita stessa. In più la scala scende con continuità (mai a
+  // scatti, fino a -30%) quando un satellite è vicino alla camera, solo
+  // per non farlo sembrare sproporzionato — l'occlusione vera resta
+  // sempre quella del depth buffer (vedi sopra), non dipende da questo.
+  // elapsedSec/deltaSec vengono da WorldGlobe.jsx, agganciati allo stesso
+  // giro di rendering del globo grande (si fermano quando lui si ferma
+  // per risparmiare CPU).
   const _toCam = new THREE.Vector3();
   function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
     const camPos = camera.position;
-    const minAllowedDist = Math.max(MIN_CAMERA_DISTANCE, camPos.length() + SATELLITE_CAMERA_MARGIN);
+    const globeDistToCam = camPos.length();
 
     for (const sat of satellites) {
       if (!sat.visible) continue;
@@ -415,9 +431,9 @@ export function buildSatelliteGlobes({ worlds }) {
       basePos.y += Math.sin(elapsedSec * ud.bobSpeed + ud.bobPhase) * BOB_AMPLITUDE;
 
       _toCam.copy(basePos).sub(camPos);
-      const distToCam = _toCam.length();
-      if (distToCam < minAllowedDist) {
-        _toCam.setLength(minAllowedDist);
+      const naturalDistToCam = _toCam.length();
+      if (naturalDistToCam < MIN_CAMERA_DISTANCE) {
+        _toCam.setLength(MIN_CAMERA_DISTANCE);
         basePos.copy(camPos).add(_toCam);
       }
 
@@ -426,14 +442,15 @@ export function buildSatelliteGlobes({ worlds }) {
       if (!reduceMotion) sat.rotation.y += ud.spinSpeed * deltaSec;
 
       // Foschia leggera solo per le decorazioni trasparenti (mai per il
-      // nucleo, opaco e sempre a piena opacità — vedi sopra): puramente in
-      // funzione della distanza dalla camera, non più anche
-      // dell'occlusione dietro al globo, che ora è quella vera della GPU.
-      const depthFactor = THREE.MathUtils.clamp(
-        THREE.MathUtils.mapLinear(camPos.distanceTo(basePos), FOG_NEAR, FOG_FAR, 1, FOG_MIN_OPACITY),
-        FOG_MIN_OPACITY,
-        1
-      );
+      // nucleo, opaco e sempre a piena opacità — vedi sopra), e solo se il
+      // satellite è più lontano dalla camera del globo centrale stesso
+      // (quindi dietro di lui): davanti resta sempre piena opacità, senza
+      // nessuna dissolvenza, a prescindere dalla distanza.
+      const satDistToCam = camPos.distanceTo(basePos);
+      const depthFactor =
+        satDistToCam > globeDistToCam
+          ? THREE.MathUtils.clamp(THREE.MathUtils.mapLinear(satDistToCam, FOG_NEAR, FOG_FAR, 1, FOG_MIN_OPACITY), FOG_MIN_OPACITY, 1)
+          : 1;
 
       const spawnAge = nowMs - ud.createdAtMs;
       const spawnT = spawnAge >= SPAWN_MS ? 1 : easeOutCubic(Math.max(0, spawnAge) / SPAWN_MS);
@@ -444,7 +461,17 @@ export function buildSatelliteGlobes({ worlds }) {
         warpScale = 1 + (WARP_GROW_SCALE - 1) * easeOutCubic(wt);
       }
 
-      sat.scale.setScalar(ud.slotScale * spawnT * warpScale);
+      // Rimpicciolimento morbido in prossimità della camera, sulla
+      // distanza NATURALE (prima dell'eventuale respinta sopra) così resta
+      // continuo anche quando il satellite è già al pavimento.
+      const proximityT = THREE.MathUtils.clamp(
+        THREE.MathUtils.mapLinear(naturalDistToCam, MIN_CAMERA_DISTANCE, PROXIMITY_SCALE_FAR_DISTANCE, 0, 1),
+        0,
+        1
+      );
+      const proximityScale = PROXIMITY_SCALE_MIN + (1 - PROXIMITY_SCALE_MIN) * proximityT;
+
+      sat.scale.setScalar(ud.slotScale * spawnT * warpScale * proximityScale);
       ud.opacityMeshes.forEach(({ mesh, baseOpacity }) => {
         mesh.material.opacity = baseOpacity * spawnT * depthFactor;
       });
