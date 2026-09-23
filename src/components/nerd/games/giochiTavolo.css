@@ -83,6 +83,15 @@
   color: rgba(245, 245, 247, 0.55);
 }
 
+.rb-giochi-player-count {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f5f5f7;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .rb-giochi-lobby-header {
   display: flex;
   justify-content: space-between;

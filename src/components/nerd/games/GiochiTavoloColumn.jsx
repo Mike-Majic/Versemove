@@ -3,9 +3,11 @@ import { listOpenRooms, createRoom, joinRoom, leaveRoom, setRoomReady, fetchRoom
 import { startScopaHand } from '../../../data/scopa';
 import { startBurracoHand } from '../../../data/burraco';
 import { startTrentunoHand } from '../../../data/trentuno';
+import { startCosmopoliGame } from '../../../data/cosmopoli';
 import ScopaTable from './ScopaTable';
 import BurracoTable from './BurracoTable';
 import TrentunoTable from './TrentunoTable';
+import CosmopoliTable from './CosmopoliTable';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import './giochiTavolo.css';
@@ -14,12 +16,13 @@ const GAMES = [
   { id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane' },
   { id: 'burraco', label: 'Burraco', icon: '🎴', tagline: '2 giocatori, mazzo doppio da 108 carte' },
   { id: 'trentuno', label: '31', icon: '🂡', tagline: '2 giocatori, chi fa 31 o ha la mano migliore vince' },
+  { id: 'cosmopoli', label: 'Cosmopoli', icon: '🏙️', tagline: '2-4 giocatori, compra e costruisci nei mondi di Versemove', variablePlayers: true },
 ];
 
 // Ogni gioco ha la sua funzione per far partire la mano e il suo tavolo:
 // aggiungerne uno nuovo vuol dire aggiungerlo qui e alla lista GAMES sopra.
-const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand, trentuno: startTrentunoHand };
-const TABLES = { scopa: ScopaTable, burraco: BurracoTable, trentuno: TrentunoTable };
+const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand, trentuno: startTrentunoHand, cosmopoli: startCosmopoliGame };
+const TABLES = { scopa: ScopaTable, burraco: BurracoTable, trentuno: TrentunoTable, cosmopoli: CosmopoliTable };
 
 // Guscio "Giochi da tavolo & carte" del mondo Nerd: lobby (partite aperte a
 // cui unirsi + crea nuova, per qualunque gioco del catalogo GAMES), sala
@@ -40,6 +43,7 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
   const [rooms, setRooms] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [cosmoCount, setCosmoCount] = useState(4);
 
   const refresh = () => {
     setRooms(null);
@@ -49,11 +53,11 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
   };
   useEffect(refresh, []);
 
-  const handleCreate = async (gioco) => {
+  const handleCreate = async (gioco, maxGiocatori = 2) => {
     if (!user) return onOpenAuth?.();
     setBusy(true);
     setError('');
-    const { id, error: err } = await createRoom(gioco, 2);
+    const { id, error: err } = await createRoom(gioco, maxGiocatori);
     setBusy(false);
     if (err) return setError(err);
     onEnterRoom(id);
@@ -84,7 +88,17 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
               <strong>{g.label}</strong>
               <p>{g.tagline}</p>
             </div>
-            <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id)} disabled={busy}>
+            {g.variablePlayers && (
+              <select
+                className="rb-giochi-player-count"
+                value={cosmoCount}
+                onChange={(e) => setCosmoCount(Number(e.target.value))}
+                disabled={busy}
+              >
+                {[2, 3, 4].map((n) => <option key={n} value={n}>{n} giocatori</option>)}
+              </select>
+            )}
+            <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id, g.variablePlayers ? cosmoCount : 2)} disabled={busy}>
               + Nuova partita
             </button>
           </div>
@@ -141,11 +155,13 @@ function RoomView({ roomId, user, onExit }) {
   }, [roomId]);
 
   const me = room?.giocatori.find((g) => g.userId === user?.id);
-  const bothReady = room?.giocatori.length === 2 && room.giocatori.every((g) => g.pronto);
+  const isFull = room?.giocatori.length === (room?.maxGiocatori ?? 2);
+  const bothReady = isFull && room.giocatori.every((g) => g.pronto);
 
-  // Quando entrambi sono pronti, solo chi occupa la posizione 0 fa partire
-  // la mano (l'RPC è comunque al sicuro da doppie chiamate: la seconda
-  // fallirebbe con "mano già in corso", qui semplicemente ignorata).
+  // Quando la stanza è piena e tutti sono pronti, solo chi occupa la
+  // posizione 0 fa partire la mano (l'RPC è comunque al sicuro da doppie
+  // chiamate: la seconda fallirebbe con "mano già in corso", qui
+  // semplicemente ignorata).
   useEffect(() => {
     if (room?.stato === 'in_attesa' && bothReady && me?.posizione === 0 && !startAttemptedRef.current) {
       startAttemptedRef.current = true;
@@ -187,14 +203,14 @@ function RoomView({ roomId, user, onExit }) {
     return <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />;
   }
 
-  const opponent = room.giocatori.find((g) => g.userId !== user?.id);
   const gameLabel = GAMES.find((g) => g.id === room.gioco)?.label ?? 'Partita';
+  const emptySeats = Math.max((room.maxGiocatori ?? 2) - room.giocatori.length, 0);
 
   return (
     <div className="rb-giochi-tavolo">
       <div className="rb-giochi-header">
         <h3>{gameLabel} · Sala d'attesa</h3>
-        <p className="rb-giochi-hint">Quando siete entrambi pronti la partita comincia da sola.</p>
+        <p className="rb-giochi-hint">Quando la stanza è piena e siete tutti pronti la partita comincia da sola.</p>
       </div>
 
       {error && <p className="rb-giochi-error">{error}</p>}
@@ -207,17 +223,17 @@ function RoomView({ roomId, user, onExit }) {
             <span>{g.pronto ? 'Pronto' : 'In attesa'}</span>
           </div>
         ))}
-        {!opponent && (
-          <div className="rb-giochi-waiting-player rb-giochi-waiting-empty">
+        {Array.from({ length: emptySeats }).map((_, i) => (
+          <div key={`empty-${i}`} className="rb-giochi-waiting-player rb-giochi-waiting-empty">
             <span className="rb-giochi-waiting-avatar-placeholder">?</span>
-            <strong>In attesa di un avversario…</strong>
+            <strong>In attesa di un giocatore…</strong>
           </div>
-        )}
+        ))}
       </div>
 
       <div className="rb-giochi-waiting-actions">
         <button type="button" className="rb-reset-filters-btn" onClick={handleLeave}>Abbandona</button>
-        <button type="button" className="rb-btn-primary" onClick={toggleReady} disabled={!opponent}>
+        <button type="button" className="rb-btn-primary" onClick={toggleReady} disabled={!isFull}>
           {me?.pronto ? 'Non sono più pronto' : 'Sono pronto'}
         </button>
       </div>
