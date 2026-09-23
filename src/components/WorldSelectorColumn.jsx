@@ -22,6 +22,16 @@ function MiniGlobeIcon() {
 // mouse invece NON esiste di default su un overflow (il tasto sinistro
 // serve alla selezione testo), quindi è l'unica parte gestita a mano qui
 // sotto, solo per pointerType 'mouse'.
+//
+// IMPORTANTE: el.setPointerCapture() va chiamato SOLO una volta confermato
+// un vero trascinamento (in onPointerMove, dopo la soglia), MAI subito in
+// onPointerDown. Catturarlo subito ritargetizza anche il "click" nativo
+// successivo sull'elemento che ha catturato (qui il contenitore lista,
+// che non ha un onClick) invece che sul bottone premuto: ogni singolo
+// click su un mondo, anche senza alcun trascinamento, smetteva di
+// funzionare (bug live segnalato dall'utente — "clicco e non succede
+// niente" — verificato: un click sintetico diretto sul bottone funzionava,
+// un click reale del mouse no, proprio per questa ritargetizzazione).
 export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWorld }) {
   const { t } = useTranslation();
   const containerRef = useRef(null);
@@ -86,8 +96,10 @@ export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWor
     if (e.pointerType !== 'mouse') return; // touch/pen: scroll nativo, niente da gestire qui
     const el = containerRef.current;
     if (!el) return;
-    dragRef.current = { startY: e.clientY, startScrollTop: el.scrollTop, moved: false };
-    el.setPointerCapture(e.pointerId);
+    // Niente setPointerCapture qui: va chiamato solo se/quando si conferma
+    // un vero trascinamento (vedi onPointerMove) — vedi commento in cima al
+    // file sul perché catturarlo subito rompe il click.
+    dragRef.current = { startY: e.clientY, startScrollTop: el.scrollTop, moved: false, pointerId: e.pointerId };
   };
 
   const onPointerMove = (e) => {
@@ -95,7 +107,10 @@ export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWor
     const el = containerRef.current;
     if (!drag || !el) return;
     const dy = e.clientY - drag.startY;
-    if (Math.abs(dy) > 6) drag.moved = true;
+    if (Math.abs(dy) > 6) {
+      if (!drag.moved) el.setPointerCapture(drag.pointerId);
+      drag.moved = true;
+    }
     el.scrollTop = drag.startScrollTop - dy;
   };
 
