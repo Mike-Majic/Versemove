@@ -6,7 +6,6 @@ import MusicaApp from './musica/MusicaApp';
 import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
-import DogWorldMap from './dogworld/DogWorldMap';
 import TattooColumn from './tattoo/TattooColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
@@ -85,8 +84,6 @@ export default function ArteExplorer({
             <PodcastColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'cinema' ? (
             <CinemaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} />
-          ) : category.id === 'cani' ? (
-            <DogWorldMap key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'tattoo' ? (
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (

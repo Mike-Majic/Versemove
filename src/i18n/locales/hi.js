@@ -26,7 +26,7 @@ export default {
   categories: {
     vetrina: {
       novita: 'नया',
-      cani: 'कुत्ते',
+      'offerte-animali': 'पालतू जानवर',
       'offerte-casa-arredamento': 'घर और फर्नीचर',
       'offerte-cibo-supermercati': 'भोजन और सुपरमार्केट',
       'offerte-abbigliamento': 'कपड़े',

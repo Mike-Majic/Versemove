@@ -26,7 +26,7 @@ export default {
   categories: {
     vetrina: {
       novita: 'Nouveautés',
-      cani: 'Chiens',
+      'offerte-animali': 'Animaux',
       'offerte-casa-arredamento': 'Maison & Ameublement',
       'offerte-cibo-supermercati': 'Alimentation & Supermarchés',
       'offerte-abbigliamento': 'Vêtements',

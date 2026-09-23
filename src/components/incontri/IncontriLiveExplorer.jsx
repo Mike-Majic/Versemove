@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery } from '../../data/incontriCategories';
 import MatchColumn from './MatchColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
+import SponsorCard from '../ads/SponsorCard';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Incontri: stesso pattern di ArteExplorer
@@ -86,6 +87,8 @@ export default function IncontriLiveExplorer({
             onConsumeInitialTab={onConsumeInitialMatchTab}
             matchFilters={matchFilters}
           />
+          {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
+          <SponsorCard mondo="incontri" categoria={category.id} formato="banner_pannello" />
         </>
       )}
     </div>

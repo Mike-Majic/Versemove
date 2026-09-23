@@ -331,3 +331,94 @@
   border-radius: 999px;
   cursor: pointer;
 }
+
+/* --- Sponsorizzazioni: elenco campagne + form di creazione/modifica --- */
+
+.rb-admin-sponsor-form {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 12px 0 20px;
+  text-align: left;
+  white-space: normal;
+}
+
+.rb-admin-sponsor-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 14px;
+}
+
+.rb-admin-sponsor-form .rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+.rb-admin-sponsor-form .rb-field > span {
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rb-admin-sponsor-form input,
+.rb-admin-sponsor-form select,
+.rb-admin-sponsor-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 13px;
+}
+
+.rb-admin-sponsor-form textarea {
+  resize: vertical;
+}
+
+.rb-admin-sponsor-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.rb-admin-sponsor-checkbox input {
+  width: auto !important;
+}
+
+.rb-admin-sponsor-error {
+  color: #ff6b6b;
+  font-size: 12.5px;
+  margin: 0 0 10px;
+}
+
+.rb-admin-sponsor-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rb-admin-sponsor-stato-attiva {
+  background: color-mix(in srgb, #22c55e 25%, transparent);
+  color: #22c55e;
+}
+
+.rb-admin-sponsor-stato-bozza {
+  background: color-mix(in srgb, #8a8a92 30%, transparent);
+  color: #d0d0d4;
+}
+
+.rb-admin-sponsor-stato-sospesa {
+  background: color-mix(in srgb, #ffb020 25%, transparent);
+  color: #ffb020;
+}
+
+.rb-admin-sponsor-stato-conclusa {
+  background: color-mix(in srgb, #ff3860 25%, transparent);
+  color: #ff3860;
+}

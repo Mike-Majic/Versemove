@@ -1,8 +1,6 @@
 // Categorie del mondo Vetrina (rosa): "Novità" (ancora senza contenuto
-// editoriale, CategoryColumn mostra da sé lo stato vuoto), "Cani" (mappa
-// reale di luoghi pet-friendly + recensioni, componente dedicato
-// DogWorldMap — vedi ArteExplorer.jsx, stesso meccanismo di musica/cinema)
-// e le categorie "Offerte" (vedi VETRINA_OFFERTE_CATEGORY_IDS sotto,
+// editoriale, CategoryColumn mostra da sé lo stato vuoto) e le categorie
+// "Offerte" (vedi VETRINA_OFFERTE_CATEGORY_IDS sotto,
 // componente dedicato VetrinaOfferteColumn — stesso meccanismo). Stessa
 // struttura di LAVORO_CATEGORIES/SOCIAL_CATEGORIES, stesso meccanismo di
 // triangoli sul globo (vedi App.jsx, CATEGORY_WORLDS).
@@ -25,11 +23,15 @@ export const VETRINA_CATEGORIES = [
     subfamilies: [],
   },
   {
-    id: 'cani',
-    label: 'Cani',
+    // La mappa dei luoghi pet-friendly (DogWorldMap) si è spostata nel
+    // mondo Social come categoria "Animali": qui resta solo la versione
+    // "negozio" (prodotti/sconti, stesso VetrinaOfferteColumn delle altre
+    // offerte-*), stesso anchor già verificato in oceano.
+    id: 'offerte-animali',
+    label: 'Animali',
     icon: '🐕',
     anchor: { lat: -40, lng: -170 }, // Pacifico meridionale
-    aliases: ['cani', 'cane', 'dog', 'dogs', 'pet friendly', 'aree cani'],
+    aliases: ['animali', 'cani', 'cane', 'pet', 'mangime', 'guinzagli', 'accessori animali'],
     subfamilies: [],
   },
   {

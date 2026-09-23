@@ -1,0 +1,158 @@
+/* Spazio sponsorizzato: 3 formati, nessuno finisce mai sopra al globo o si
+   muove da solo — sempre dentro il normale flusso di una colonna/lista,
+   mai position:fixed/sticky. L'etichetta "Sponsorizzato" è sempre a
+   contrasto pieno (mai grigio chiarissimo), richiesta esplicita. */
+
+.rb-sponsor-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rb-sponsor-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rb-sponsor-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rb-sponsor-advertiser {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.65);
+}
+
+.rb-sponsor-title {
+  display: block;
+  font-size: 14.5px;
+  margin-bottom: 4px;
+}
+
+.rb-sponsor-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(245, 245, 247, 0.8);
+}
+
+/* --- card_feed: stesso ingombro/stile di rb-post-card, dentro rb-post-list --- */
+.rb-sponsor-card_feed {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px 16px;
+  list-style: none;
+}
+
+.rb-sponsor-card_feed .rb-sponsor-media {
+  margin: 4px -16px 10px;
+  overflow: hidden;
+}
+
+.rb-sponsor-card_feed .rb-sponsor-media img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+/* --- banner_pannello: striscia bassa, in fondo alla colonna --- */
+.rb-sponsor-banner_pannello {
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-label {
+  margin-bottom: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-media {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-body {
+  min-width: 0;
+}
+
+.rb-sponsor-banner_pannello .rb-sponsor-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- riga_lista: una riga dentro una lista di annunci/offerte --- */
+.rb-sponsor-riga_lista {
+  list-style: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.rb-sponsor-riga_lista .rb-sponsor-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rb-sponsor-riga_lista .rb-sponsor-label {
+  margin-bottom: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.rb-sponsor-riga_lista .rb-sponsor-media {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rb-sponsor-riga_lista .rb-sponsor-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rb-sponsor-riga_lista .rb-sponsor-text {
+  display: none;
+}

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import PostComposer from './PostComposer';
 import PostCard from './PostCard';
+import SponsorCard from '../ads/SponsorCard';
 import GroupsDirectory from './GroupsDirectory';
 import CategoryHub from './CategoryHub';
 import LiveWorldPanel from '../live/LiveWorldPanel';
@@ -40,6 +41,9 @@ import './SocialFeed.css';
 // 2°, ...) tra TUTTI i post esistenti — così chi filtra per regione vede
 // comunque cosa va per la maggiore nel resto del mondo Social.
 const TRENDING_EVERY = 3;
+
+// Una card sponsorizzata ogni 8 post del feed, mai la prima — richiesta esplicita.
+const SPONSOR_FEED_EVERY = 8;
 
 // Un post è "della zona" se il suo autore ha una città nota che rispetta i
 // filtri Dove di Impostazioni. I profili reali (vedi public_profiles) non
@@ -690,26 +694,33 @@ export default function SocialFeed({
 
           <ul className="rb-post-list">
             {displayedItems.map(({ post, trendingRank }, i) => (
-              <PostCard
-                key={`${post.id}-${i}`}
-                post={post}
-                comments={comments}
-                user={user}
-                onOpenAuth={onOpenAuth}
-                onToggleLike={toggleLike}
-                onToggleContentLike={toggleContentLike}
-                onEditPost={editPost}
-                onDeletePost={deletePost}
-                onAddComment={addComment}
-                onReactToComment={reactToComment}
-                onDeleteComment={removeComment}
-                trendingRank={trendingRank}
-                following={following}
-                onToggleFollow={toggleFollow}
-                saved={savedPosts.includes(post.id)}
-                onToggleSave={toggleSavePost}
-                onOpenGroup={openGroup}
-              />
+              <Fragment key={`${post.id}-${i}`}>
+                <PostCard
+                  post={post}
+                  comments={comments}
+                  user={user}
+                  onOpenAuth={onOpenAuth}
+                  onToggleLike={toggleLike}
+                  onToggleContentLike={toggleContentLike}
+                  onEditPost={editPost}
+                  onDeletePost={deletePost}
+                  onAddComment={addComment}
+                  onReactToComment={reactToComment}
+                  onDeleteComment={removeComment}
+                  trendingRank={trendingRank}
+                  following={following}
+                  onToggleFollow={toggleFollow}
+                  saved={savedPosts.includes(post.id)}
+                  onToggleSave={toggleSavePost}
+                  onOpenGroup={openGroup}
+                />
+                {/* Una card sponsorizzata ogni 8 post, mai la prima (richiesta
+                    esplicita): SPONSOR_FEED_EVERY posti dopo l'inizio, poi si
+                    ripete. */}
+                {(i + 1) % SPONSOR_FEED_EVERY === 0 && (
+                  <SponsorCard as="li" mondo="social" formato="card_feed" />
+                )}
+              </Fragment>
             ))}
           </ul>
         </>

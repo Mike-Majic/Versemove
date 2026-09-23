@@ -30,7 +30,7 @@ export default {
   categories: {
     vetrina: {
       novita: 'الجديد',
-      cani: 'كلاب',
+      'offerte-animali': 'حيوانات أليفة',
       'offerte-casa-arredamento': 'المنزل والأثاث',
       'offerte-cibo-supermercati': 'الطعام والسوبرماركت',
       'offerte-abbigliamento': 'الملابس',

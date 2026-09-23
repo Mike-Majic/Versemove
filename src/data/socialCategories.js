@@ -16,6 +16,18 @@ export const SOCIAL_CATEGORIES = [
     aliases: ['world', 'mondo', 'feed', 'bacheca', 'social'],
     subfamilies: [],
   },
+  {
+    id: 'animali',
+    label: 'Animali',
+    icon: '🐕',
+    // Dal lato opposto del globo rispetto a "World" (lng vicino a 180),
+    // così restano ben distanziati: mappa reale di luoghi pet-friendly +
+    // recensioni, stessa DogWorldMap che prima viveva in Vetrina (spostata
+    // qui su richiesta, resta "cani" solo come dato/alias, non come mondo).
+    anchor: { lat: -10, lng: 175 }, // Pacifico, a est della Nuova Zelanda
+    aliases: ['animali', 'cani', 'cane', 'dog', 'dogs', 'pet', 'pet friendly', 'aree cani'],
+    subfamilies: [],
+  },
 ];
 
 export function resolveCategoryQuery(query) {

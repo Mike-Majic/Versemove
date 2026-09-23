@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LAVORO_CATEGORIES, resolveCategoryQuery } from '../../data/lavoroCategories';
 import LiveWorldPanel from '../live/LiveWorldPanel';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
+import SponsorCard from '../ads/SponsorCard';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Lavoro: stesso pattern di ArteExplorer/
@@ -74,6 +75,8 @@ export default function LavoroWorldExplorer({
           </div>
 
           <LiveWorldPanel mondo="lavoro" user={user} onOpenAuth={onOpenAuth} />
+          {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
+          <SponsorCard mondo="lavoro" categoria={category.id} formato="banner_pannello" />
         </>
       )}
     </div>

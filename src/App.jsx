@@ -31,6 +31,7 @@ import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery
 import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
 import AccessGate from './components/AccessGate';
+import CookieConsentBanner from './components/CookieConsentBanner';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
@@ -1302,6 +1303,8 @@ export default function App() {
           <PasswordRecoveryModal open={passwordRecoveryOpen} onClose={() => setPasswordRecoveryOpen(false)} />
         </Suspense>
       )}
+
+      <CookieConsentBanner user={user} onOpenPrivacyInfo={() => navigateToCategory('faq', 'informazioni')} />
     </div>
   );
 }

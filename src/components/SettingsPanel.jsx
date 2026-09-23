@@ -12,8 +12,9 @@ import {
   updateOwnProfileDetails,
   profileCooldownRemaining,
   changeOwnEmail,
+  setProfilazioneConsent,
 } from '../data/accounts';
-import { computeAge } from '../data/age';
+import { computeAge, isAdult } from '../data/age';
 import { ROLES } from '../data/roles';
 import { fetchProfilesMap } from '../data/posts';
 import { isSoundEnabled, setSoundEnabled } from '../fx/sound';
@@ -314,6 +315,8 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
   const [pwSent, setPwSent] = useState(false);
   const [lavoroConsent, setLavoroConsentValue] = useState(false);
   const [lavoroBusy, setLavoroBusy] = useState(false);
+  const [adBusy, setAdBusy] = useState(false);
+  const [adError, setAdError] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -402,6 +405,25 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
 
   const blockableFriends = (friends ?? []).filter((id) => !blocked.includes(String(id)));
   const toggleSub = (name) => setSub((s) => (s === name ? '' : name));
+
+  // Il consenso vive su user.consensoProfilazioneAt (non un fetch a parte:
+  // user è già il profilo aggiornato, vedi onUpdateUser sotto e in
+  // ProfileSubsection). Il database stesso rifiuta di attivarlo per i
+  // minorenni (set_profilazione_consent solleva un errore), qui il toggle
+  // resta comunque disattivato per loro per non far provare a spuntarlo.
+  const adConsent = Boolean(user?.consensoProfilazioneAt);
+  const isUserAdult = isAdult(user?.dataNascita);
+  const toggleAdConsent = async (checked) => {
+    setAdBusy(true);
+    setAdError('');
+    const { account, error: err } = await setProfilazioneConsent(checked);
+    setAdBusy(false);
+    if (err) {
+      setAdError(err);
+      return;
+    }
+    onUpdateUser?.(account);
+  };
 
   return (
     <>
@@ -530,6 +552,47 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
           <button type="button" className="rb-reset-filters-btn" onClick={changePassword} disabled={pwBusy}>
             {pwBusy ? 'Un attimo…' : 'Cambia password'}
           </button>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        level="sub"
+        title="Pubblicità"
+        infoText="Oggi Versemove mostra solo pubblicità legata al contenuto della pagina che stai guardando, mai basata sul tuo profilo o comportamento — a prescindere da questo interruttore."
+        open={sub === 'pubblicita'}
+        onToggle={() => toggleSub('pubblicita')}
+      >
+        {!user ? (
+          <button type="button" className="rb-settings-nav-btn" onClick={onOpenAuth}>
+            <span><strong>Accedi per gestire la pubblicità personalizzata</strong></span>
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : (
+          <>
+            {adError && <p className="rb-privacy-error">{adError}</p>}
+            <label className="rb-toggle-row">
+              <span className="rb-toggle-text-row">
+                <strong>Pubblicità personalizzata</strong>
+                <InfoBadge
+                  text={
+                    isUserAdult
+                      ? "Se attivo, in futuro la pubblicità potrà tenere conto anche del tuo profilo, non solo della pagina che stai guardando. Puoi disattivarlo quando vuoi."
+                      : 'Non disponibile sotto i 18 anni.'
+                  }
+                />
+              </span>
+              <span className="rb-toggle">
+                <input
+                  type="checkbox"
+                  checked={adConsent}
+                  disabled={adBusy || !isUserAdult}
+                  onChange={(e) => toggleAdConsent(e.target.checked)}
+                />
+                <span className="rb-toggle-slider" />
+              </span>
+            </label>
+            {!isUserAdult && <p className="rb-settings-hint">Non disponibile sotto i 18 anni.</p>}
+          </>
         )}
       </CollapsibleSection>
 

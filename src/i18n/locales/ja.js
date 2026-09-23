@@ -26,7 +26,7 @@ export default {
   categories: {
     vetrina: {
       novita: '新着',
-      cani: '犬',
+      'offerte-animali': 'ペット',
       'offerte-casa-arredamento': 'ホーム＆家具',
       'offerte-cibo-supermercati': '食品＆スーパー',
       'offerte-abbigliamento': '衣料品',

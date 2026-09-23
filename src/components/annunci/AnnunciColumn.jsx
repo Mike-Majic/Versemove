@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { listListings, listMyListings, renewListing, setListingStatus, deleteListing } from '../../data/annunci';
 import { isAdult } from '../../data/age';
 import AnnuncioCard from './AnnuncioCard';
+import SponsorCard from '../ads/SponsorCard';
 import AnnunciFilters from './AnnunciFilters';
 import AnnunciMapView from './AnnunciMapView';
 import AnnuncioDetailModal from './AnnuncioDetailModal';
@@ -136,16 +137,22 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
               <EmptyState icon={category.icon} title="Nessun annuncio qui, per ora" subtitle="Allarga i filtri o pubblica il primo tu." />
             ) : (
               <div className={`rb-annunci-list ${view}`}>
-                {listings.map((l) => (
-                  <AnnuncioCard
-                    key={l.id}
-                    listing={l}
-                    user={user}
-                    onOpenAuth={onOpenAuth}
-                    onOpen={setSelected}
-                    onFavoriteChanged={onFavoriteChanged}
-                    view={view}
-                  />
+                {listings.map((l, i) => (
+                  <Fragment key={l.id}>
+                    <AnnuncioCard
+                      listing={l}
+                      user={user}
+                      onOpenAuth={onOpenAuth}
+                      onOpen={setSelected}
+                      onFavoriteChanged={onFavoriteChanged}
+                      view={view}
+                    />
+                    {/* Solo in vista Lista (non Griglia/Mappa): una riga
+                        sponsorizzata ogni 10 risultati, richiesta esplicita. */}
+                    {view === 'list' && (i + 1) % 10 === 0 && (
+                      <SponsorCard mondo="annunci" categoria={category.id} formato="riga_lista" />
+                    )}
+                  </Fragment>
                 ))}
               </div>
             )}

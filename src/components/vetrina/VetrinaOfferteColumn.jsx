@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listDeals } from '../../data/vetrinaDeals';
 import { translateCategoryLabel } from '../../i18n/categoryLabels';
 import DealCard from './DealCard';
+import SponsorCard from '../ads/SponsorCard';
 import SubmitDealModal from './SubmitDealModal';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
@@ -119,8 +120,14 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
         />
       ) : (
         <ul className="rb-deal-list">
-          {visibleDeals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} user={user} onOpenAuth={onOpenAuth} />
+          {visibleDeals.map((deal, i) => (
+            <Fragment key={deal.id}>
+              <DealCard deal={deal} user={user} onOpenAuth={onOpenAuth} />
+              {/* Una riga sponsorizzata ogni 10 risultati, richiesta esplicita. */}
+              {(i + 1) % 10 === 0 && (
+                <SponsorCard as="li" mondo="vetrina" categoria={category.id} formato="riga_lista" />
+              )}
+            </Fragment>
           ))}
         </ul>
       )}

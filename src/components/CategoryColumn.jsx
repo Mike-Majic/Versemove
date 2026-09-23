@@ -8,6 +8,7 @@ import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import EmptyState from './EmptyState';
 import LabelMorphTitle from './LabelMorphTitle';
 import ParticleBurst from './ParticleBurst';
+import SponsorCard from './ads/SponsorCard';
 import './CategoryColumn.css';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
@@ -191,6 +192,10 @@ export default function CategoryColumn({
           </li>
         ))}
       </ul>
+
+      {/* Uno spazio sponsorizzato in fondo alla colonna, non sopra ai
+          contenuti: richiesta esplicita. */}
+      <SponsorCard mondo={world} categoria={category.id} formato="banner_pannello" />
     </>
   );
 

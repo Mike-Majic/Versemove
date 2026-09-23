@@ -26,7 +26,7 @@ export default {
   categories: {
     vetrina: {
       novita: 'Новинки',
-      cani: 'Собаки',
+      'offerte-animali': 'Питомцы',
       'offerte-casa-arredamento': 'Дом и мебель',
       'offerte-cibo-supermercati': 'Еда и супермаркеты',
       'offerte-abbigliamento': 'Одежда',

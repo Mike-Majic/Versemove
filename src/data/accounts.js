@@ -56,6 +56,9 @@ function mapProfile(row) {
     lastNicknameChangeAt: row.last_nickname_change_at,
     lastNameChangeAt: row.last_name_change_at,
     lastProfileChangeAt: row.last_profile_change_at,
+    consensoProfilazioneAt: row.consenso_profilazione_at,
+    cookieConsent: row.cookie_consent,
+    cookieConsentAt: row.cookie_consent_at,
   };
 }
 
@@ -544,6 +547,29 @@ export async function setOwnWorlds(mondi) {
 // dispositivo all'altro. Nessun limite di cambi, a differenza dei mondi.
 export async function setOwnLingua(lingua) {
   const { error } = await supabase.rpc('set_own_lingua', { p_lingua: lingua });
+  if (error) return { error: error.message };
+  return { account: await fetchOwnProfile() };
+}
+
+// Consenso alla pubblicità personalizzata (Impostazioni → Privacy): il
+// database stesso rifiuta di attivarlo per i minorenni (vedi
+// set_profilazione_consent, solleva un errore), qui lo si traduce in un
+// messaggio leggibile invece di lasciarlo passare come errore tecnico.
+export async function setProfilazioneConsent(consenso) {
+  const { error } = await supabase.rpc('set_profilazione_consent', { p_consenso: consenso });
+  if (error) {
+    const msg = /minorenni/i.test(error.message) ? 'Non disponibile sotto i 18 anni.' : error.message;
+    return { error: msg };
+  }
+  return { account: await fetchOwnProfile() };
+}
+
+// Scelta del banner cookie, salvata anche sull'account quando si è
+// loggati (oltre che sul dispositivo, vedi src/data/cookieConsent.js) —
+// chiamata "a mo' di best effort": se fallisce (utente non loggato, rete
+// assente) la scelta resta comunque valida sul dispositivo.
+export async function setOwnCookieConsent(scelta) {
+  const { error } = await supabase.rpc('set_cookie_consent', { p_scelta: scelta });
   if (error) return { error: error.message };
   return { account: await fetchOwnProfile() };
 }

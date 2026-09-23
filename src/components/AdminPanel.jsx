@@ -3,6 +3,7 @@ import { getAccounts, updateAccountRole, setAccountVerified, resetAccountPasswor
 import { getMailboxMessages, markMessageRead } from '../data/modMailbox';
 import { getReports, updateReportStatus } from '../data/reports';
 import { getAuditLog, logAdminAction, AUDIT_LABELS } from '../data/adminAuditLog';
+import { listAllSponsorships, createSponsorship, updateSponsorship } from '../data/sponsorships';
 import { supabase } from '../data/supabaseClient';
 import { computeAge } from '../data/age';
 import { ROLES } from '../data/roles';
@@ -26,8 +27,271 @@ const ADMIN_TABS = [
   { id: 'utenti', label: 'Utenti' },
   { id: 'posta', label: 'Posta' },
   { id: 'moderazione', label: 'Moderazione' },
+  { id: 'sponsorizzazioni', label: 'Sponsorizzazioni' },
   { id: 'log', label: 'Log azioni' },
 ];
+
+const SPONSOR_MONDI = ['social', 'vetrina', 'annunci', 'arte', 'nerd', 'lavoro', 'incontri'];
+const SPONSOR_FORMATI = ['card_feed', 'banner_pannello', 'riga_lista'];
+const SPONSOR_STATI = ['bozza', 'attiva', 'sospesa', 'conclusa'];
+const SPONSOR_STATO_LABELS = { bozza: 'Bozza', attiva: 'Attiva', sospesa: 'Sospesa', conclusa: 'Conclusa' };
+
+// datetime-local vuole 'YYYY-MM-DDTHH:mm' in ora locale, il database dà/vuole
+// ISO in UTC: le due conversioni sotto tengono i campi data del form
+// coerenti senza reinventare un date-picker.
+function toDatetimeLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromDatetimeLocal(value) {
+  if (!value) return null;
+  return new Date(value).toISOString();
+}
+
+function SponsorshipForm({ initial, onCancel, onSave }) {
+  const [mondo, setMondo] = useState(initial?.mondo ?? SPONSOR_MONDI[0]);
+  const [categoria, setCategoria] = useState(initial?.categoria ?? '');
+  const [formato, setFormato] = useState(initial?.formato ?? SPONSOR_FORMATI[0]);
+  const [titolo, setTitolo] = useState(initial?.titolo ?? '');
+  const [testo, setTesto] = useState(initial?.testo ?? '');
+  const [immagine, setImmagine] = useState(initial?.immagine ?? '');
+  const [url, setUrl] = useState(initial?.url ?? '');
+  const [inserzionista, setInserzionista] = useState(initial?.inserzionista ?? '');
+  const [citta, setCitta] = useState(initial?.citta ?? '');
+  const [raggioKm, setRaggioKm] = useState(initial?.raggioKm ?? '');
+  const [soloMaggiorenni, setSoloMaggiorenni] = useState(initial?.soloMaggiorenni ?? false);
+  const [peso, setPeso] = useState(initial?.peso ?? 1);
+  const [inizio, setInizio] = useState(toDatetimeLocal(initial?.inizio) || toDatetimeLocal(new Date().toISOString()));
+  const [fine, setFine] = useState(toDatetimeLocal(initial?.fine));
+  const [stato, setStato] = useState(initial?.stato ?? 'attiva');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    const err = await onSave({
+      mondo,
+      categoria: categoria.trim(),
+      formato,
+      titolo: titolo.trim(),
+      testo: testo.trim(),
+      immagine: immagine.trim(),
+      url: url.trim(),
+      inserzionista: inserzionista.trim(),
+      citta: citta.trim(),
+      raggio_km: raggioKm,
+      solo_maggiorenni: soloMaggiorenni,
+      peso,
+      inizio: fromDatetimeLocal(inizio),
+      fine: fromDatetimeLocal(fine),
+      stato,
+    });
+    setSaving(false);
+    if (err) setError(err);
+  };
+
+  return (
+    <form className="rb-admin-sponsor-form" onSubmit={submit}>
+      {error && <p className="rb-admin-sponsor-error">{error}</p>}
+      <div className="rb-admin-sponsor-form-grid">
+        <label className="rb-field">
+          <span>Mondo</span>
+          <select value={mondo} onChange={(e) => setMondo(e.target.value)}>
+            {SPONSOR_MONDI.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </label>
+        <label className="rb-field">
+          <span>Categoria (vuoto = tutto il mondo)</span>
+          <input type="text" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+        </label>
+        <label className="rb-field">
+          <span>Formato</span>
+          <select value={formato} onChange={(e) => setFormato(e.target.value)}>
+            {SPONSOR_FORMATI.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </label>
+        <label className="rb-field">
+          <span>Stato</span>
+          <select value={stato} onChange={(e) => setStato(e.target.value)}>
+            {SPONSOR_STATI.map((s) => (
+              <option key={s} value={s}>{SPONSOR_STATO_LABELS[s]}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="rb-field">
+        <span>Titolo</span>
+        <input type="text" value={titolo} onChange={(e) => setTitolo(e.target.value)} minLength={3} maxLength={80} required />
+      </label>
+      <label className="rb-field">
+        <span>Testo (max 200 caratteri, facoltativo)</span>
+        <textarea rows={2} maxLength={200} value={testo} onChange={(e) => setTesto(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Immagine (URL, facoltativa)</span>
+        <input type="text" value={immagine} onChange={(e) => setImmagine(e.target.value)} placeholder="https://..." />
+      </label>
+      <label className="rb-field">
+        <span>Link di destinazione</span>
+        <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." required />
+      </label>
+      <label className="rb-field">
+        <span>Inserzionista</span>
+        <input type="text" value={inserzionista} onChange={(e) => setInserzionista(e.target.value)} minLength={2} maxLength={80} required />
+      </label>
+
+      <div className="rb-admin-sponsor-form-grid">
+        <label className="rb-field">
+          <span>Città (facoltativa)</span>
+          <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
+        </label>
+        <label className="rb-field">
+          <span>Raggio km (facoltativo)</span>
+          <input type="number" min={1} max={500} value={raggioKm} onChange={(e) => setRaggioKm(e.target.value)} />
+        </label>
+        <label className="rb-field">
+          <span>Peso (1-10, più alto = più mostrata)</span>
+          <input type="number" min={1} max={10} value={peso} onChange={(e) => setPeso(e.target.value)} />
+        </label>
+        <label className="rb-field rb-admin-sponsor-checkbox">
+          <span>Solo maggiorenni</span>
+          <input type="checkbox" checked={soloMaggiorenni} onChange={(e) => setSoloMaggiorenni(e.target.checked)} />
+        </label>
+      </div>
+
+      <div className="rb-admin-sponsor-form-grid">
+        <label className="rb-field">
+          <span>Inizio</span>
+          <input type="datetime-local" value={inizio} onChange={(e) => setInizio(e.target.value)} required />
+        </label>
+        <label className="rb-field">
+          <span>Fine (vuoto = senza scadenza)</span>
+          <input type="datetime-local" value={fine} onChange={(e) => setFine(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="rb-admin-sponsor-form-actions">
+        <button type="button" className="rb-reset-filters-btn" onClick={onCancel}>Annulla</button>
+        <button type="submit" className="rb-btn-primary" disabled={saving}>{saving ? 'Salvo…' : 'Salva'}</button>
+      </div>
+    </form>
+  );
+}
+
+// Elenco campagne (con CTR calcolato al volo) + form di creazione/modifica:
+// niente rete pubblicitaria esterna, sono le campagne interne servite da
+// get_sponsorships/SponsorCard. Chiunque arrivi qui è già owner/moderatore
+// (lo impone comunque la RLS sponsorships_staff_write).
+function SponsorshipsPane({ sponsorships, onCreate, onUpdate }) {
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  return (
+    <div>
+      <p className="rb-admin-hint">
+        Spazi sponsorizzati interni (nessuna rete esterna): card nel feed Social, righe negli annunci/vetrina, banner
+        nei pannelli di Arte/Nerd/Lavoro/Incontri. Mai in Bambini, FAQ o nelle chat.
+      </p>
+
+      {!creating && (
+        <button type="button" className="rb-btn-primary" onClick={() => setCreating(true)}>
+          + Nuova campagna
+        </button>
+      )}
+
+      {creating && (
+        <SponsorshipForm
+          onCancel={() => setCreating(false)}
+          onSave={async (fields) => {
+            const { error } = await onCreate(fields);
+            if (error) return error;
+            setCreating(false);
+          }}
+        />
+      )}
+
+      <div className="rb-admin-table-wrap">
+        <table className="rb-admin-table">
+          <thead>
+            <tr>
+              <th>Mondo</th>
+              <th>Categoria</th>
+              <th>Formato</th>
+              <th>Titolo</th>
+              <th>Inserzionista</th>
+              <th>Periodo</th>
+              <th>Stato</th>
+              <th>Visual.</th>
+              <th>Clic</th>
+              <th>CTR</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sponsorships.map((s) => {
+              const ctr = s.visualizzazioni > 0 ? ((s.clic / s.visualizzazioni) * 100).toFixed(1) : '—';
+              return editingId === s.id ? (
+                <tr key={s.id}>
+                  <td colSpan={11}>
+                    <SponsorshipForm
+                      initial={s}
+                      onCancel={() => setEditingId(null)}
+                      onSave={async (fields) => {
+                        const { error } = await onUpdate(s.id, fields);
+                        if (error) return error;
+                        setEditingId(null);
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                <tr key={s.id}>
+                  <td>{s.mondo}</td>
+                  <td>{s.categoria || '—'}</td>
+                  <td>{s.formato}</td>
+                  <td>{s.titolo}</td>
+                  <td>{s.inserzionista}</td>
+                  <td>
+                    {new Date(s.inizio).toLocaleDateString('it-IT')}
+                    {s.fine ? ` → ${new Date(s.fine).toLocaleDateString('it-IT')}` : ' → —'}
+                  </td>
+                  <td>
+                    <span className={`rb-admin-role-badge rb-admin-sponsor-stato-${s.stato}`}>
+                      {SPONSOR_STATO_LABELS[s.stato] ?? s.stato}
+                    </span>
+                  </td>
+                  <td>{s.visualizzazioni}</td>
+                  <td>{s.clic}</td>
+                  <td>{ctr === '—' ? ctr : `${ctr}%`}</td>
+                  <td>
+                    <button type="button" className="rb-admin-reset-btn" onClick={() => setEditingId(s.id)}>
+                      Modifica
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {sponsorships.length === 0 && (
+              <tr>
+                <td colSpan={11} className="rb-admin-empty">Nessuna campagna ancora.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // Apre un allegato in una nuova scheda: il bucket "attachments" è privato,
 // quindi serve un URL firmato temporaneo (valido 60 secondi) invece di un
@@ -172,6 +436,7 @@ export default function AdminPanel({ user, onClose }) {
   const [messages, setMessages] = useState([]);
   const [reports, setReports] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [sponsorships, setSponsorships] = useState([]);
   const [resetSentTo, setResetSentTo] = useState(null);
   const isOwner = user?.ruolo === ROLES.OWNER;
   const unreadCount = messages.filter((m) => !m.letto).length;
@@ -181,12 +446,14 @@ export default function AdminPanel({ user, onClose }) {
   const refreshMessages = () => getMailboxMessages().then(setMessages);
   const refreshReports = () => getReports().then(setReports);
   const refreshAuditLog = () => getAuditLog().then(setAuditLog);
+  const refreshSponsorships = () => listAllSponsorships().then(setSponsorships);
 
   useEffect(() => {
     refreshAccounts();
     refreshMessages();
     refreshReports();
     refreshAuditLog();
+    refreshSponsorships();
   }, []);
 
   const changeRole = async (accountId, newRole) => {
@@ -347,6 +614,23 @@ export default function AdminPanel({ user, onClose }) {
 
         {tab === 'posta' && <MailboxPane messages={messages} onMarkRead={markRead} />}
         {tab === 'moderazione' && <ReportsPane reports={reports} onChangeStatus={changeReportStatus} />}
+        {tab === 'sponsorizzazioni' && (
+          <SponsorshipsPane
+            sponsorships={sponsorships}
+            onCreate={async (fields) => {
+              const { error } = await createSponsorship(fields);
+              if (error) return { error };
+              refreshSponsorships();
+              return {};
+            }}
+            onUpdate={async (id, fields) => {
+              const { error } = await updateSponsorship(id, fields);
+              if (error) return { error };
+              refreshSponsorships();
+              return {};
+            }}
+          />
+        )}
         {tab === 'log' && <AuditLogPane entries={auditLog} />}
       </div>
 

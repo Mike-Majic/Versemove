@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SOCIAL_CATEGORIES, resolveCategoryQuery } from '../../data/socialCategories';
 import SocialFeed from './SocialFeed';
+import DogWorldMap from '../dogworld/DogWorldMap';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import '../shared/categoryExplorerShell.css';
 
@@ -74,7 +75,11 @@ export default function SocialWorldExplorer({
             </form>
           </div>
 
-          <SocialFeed world={world} {...feedProps} />
+          {category.id === 'animali' ? (
+            <DogWorldMap key={category.id} user={feedProps.user} onOpenAuth={feedProps.onOpenAuth} />
+          ) : (
+            <SocialFeed world={world} {...feedProps} />
+          )}
         </>
       )}
     </div>

@@ -26,7 +26,7 @@ export default {
   categories: {
     vetrina: {
       novita: '신상품',
-      cani: '강아지',
+      'offerte-animali': '반려동물',
       'offerte-casa-arredamento': '홈 & 가구',
       'offerte-cibo-supermercati': '식품 & 슈퍼마켓',
       'offerte-abbigliamento': '의류',
