@@ -14,6 +14,7 @@ import {
 } from '../data/directChat';
 import ChatAttachment from './chat/ChatAttachment';
 import ContactProfileModal from './chat/ContactProfileModal';
+import TranslateHint from './shared/TranslateHint';
 import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
 import ModalOverlay from './ModalOverlay';
@@ -128,6 +129,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               testo: row.testo,
               tipo: row.tipo ?? 'testo',
               allegato: row.allegato ?? null,
+              lingua: row.lingua ?? null,
               data: row.created_at,
             },
           ];
@@ -314,6 +316,9 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
                   </div>
                 ) : (
                   <span className="rb-friend-chat-bubble">{m.testo}</span>
+                )}
+                {m.senderId !== user.id && (!m.tipo || m.tipo === 'testo') && (
+                  <TranslateHint text={m.testo} sourceLang={m.lingua} />
                 )}
                 <span className="rb-friend-chat-date">{formatRelativeDate(m.data)}</span>
                 {m.id === lastMineId && (

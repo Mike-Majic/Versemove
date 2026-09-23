@@ -3,6 +3,7 @@ import { formatRelativeDate } from './resolveAuthor';
 import LinkPreview from './LinkPreview';
 import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
+import TranslateHint from '../shared/TranslateHint';
 import './PostCard.css';
 
 const REACTION_EMOJIS = ['❤️', '😂', '👍'];
@@ -207,7 +208,10 @@ export default function PostCard({
           </div>
         </div>
       ) : (
-        <p className="rb-post-text">{post.testo}</p>
+        <>
+          <p className="rb-post-text">{post.testo}</p>
+          {post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+        </>
       )}
       {post.gif && (
         <MediaImage className="rb-post-gif" src={post.gif} alt="GIF" errorText="GIF non disponibile (il link non si è caricato)" />

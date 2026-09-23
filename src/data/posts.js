@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { translateInteractionError } from './errors';
+import i18n from '../i18n';
 
 // Feed Social reale (tabelle posts/comments/post_likes/saved_posts), al
 // posto del vecchio localStorage di SocialFeed.jsx. La colonna "media"
@@ -108,6 +109,7 @@ export async function fetchFeed({ mondo = 'social' } = {}) {
       autoreId: row.author_id,
       author: profilesMap.get(row.author_id) ?? { id: row.author_id, name: 'Utente', avatar: '' },
       testo: row.testo ?? '',
+      lingua: row.lingua ?? null,
       data: row.created_at,
       mi_piace: likesByPost.get(row.id) ?? [],
       commenti: [],
@@ -166,7 +168,7 @@ export async function createPost({ testo, gif, link_esterno, gruppoId, contentId
     const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags });
     const { data, error } = await supabase
       .from('posts')
-      .insert({ author_id: auth.user.id, mondo, testo: testo ?? '', media, gruppo_id: gruppoId ?? null })
+      .insert({ author_id: auth.user.id, mondo, testo: testo ?? '', media, gruppo_id: gruppoId ?? null, lingua: i18n.language })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };

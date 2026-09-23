@@ -1,0 +1,38 @@
+.rb-translate-hint {
+  margin-top: 4px;
+}
+
+.rb-translate-hint-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(245, 245, 247, 0.55);
+  font-size: 11px;
+  font-style: italic;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rb-translate-hint-link:hover:not(:disabled) {
+  color: rgba(245, 245, 247, 0.8);
+}
+
+.rb-translate-hint-link:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.rb-translate-hint-error {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: #ff8080;
+}
+
+.rb-translate-hint-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: inherit;
+  color: inherit;
+}

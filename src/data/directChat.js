@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
+import i18n from '../i18n';
 
 // Apre (o riusa, se già esiste) la conversazione diretta con un altro
 // utente reale — la funzione lato server aggiunge entrambi come
@@ -36,6 +37,7 @@ export async function fetchMessages(conversationId) {
       testo: row.testo,
       tipo: row.tipo ?? 'testo',
       allegato: row.allegato ?? null,
+      lingua: row.lingua ?? null,
       data: row.created_at,
     }));
     return { messages };
@@ -50,13 +52,16 @@ export async function fetchMessages(conversationId) {
 // leggono solo il testo, restano leggibili. `mondo` è il mondo attivo al
 // momento dell'invio (non quello in cui è nata la conversazione): serve solo
 // a colorare la card dell'ultimo messaggio nell'hub, vedi listMyConversations.
+// `lingua` è sempre quella attiva di chi scrive: serve solo a decidere lato
+// client se mostrare "Traduci messaggio" a chi legge (confronto con la sua
+// lingua), niente traduzione automatica — vedi TranslateHint.
 export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null, mondo = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato, mondo })
+      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato, mondo, lingua: i18n.language })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
