@@ -49,6 +49,7 @@ export default {
     nerd: { label: '너드', tagline: '보드게임, 게이밍, 코스프레, 스트리밍' },
     incontri: { label: '만남', tagline: '주변 사람들과 만나보세요' },
     vetrina: { label: '쇼케이스', tagline: '눈여겨볼 신상품' },
+    wip: { label: 'Work in progress', tagline: '공사 중인 월드' },
   },
   auth: {
     title: { login: 'Versemove 로그인', register: '계정 만들기' },

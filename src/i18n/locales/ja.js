@@ -49,6 +49,7 @@ export default {
     nerd: { label: 'ナード', tagline: 'ボードゲーム、ゲーム、コスプレ、配信' },
     incontri: { label: '出会い', tagline: '近くの人と出会おう' },
     vetrina: { label: 'ショーケース', tagline: '注目の新着情報' },
+    wip: { label: 'Work in progress', tagline: '建設中のワールド' },
   },
   auth: {
     title: { login: 'Versemoveにログイン', register: 'アカウントを作成' },

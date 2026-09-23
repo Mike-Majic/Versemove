@@ -53,6 +53,9 @@ export default {
     nerd: { label: 'Nerd', tagline: 'Giochi da tavolo, gaming, cosplay, streaming' },
     incontri: { label: 'Incontri', tagline: 'Conosci persone vicino a te' },
     vetrina: { label: 'Vetrina', tagline: 'Novità in mostra' },
+    // Nome proprio: resta "Work in progress" in ogni lingua, solo la
+    // tagline si traduce.
+    wip: { label: 'Work in progress', tagline: 'Mondo in costruzione' },
   },
   auth: {
     title: { login: 'Accedi a Versemove', register: 'Crea un account' },

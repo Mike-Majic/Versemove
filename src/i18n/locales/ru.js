@@ -49,6 +49,7 @@ export default {
     nerd: { label: 'Нёрд', tagline: 'Настольные игры, гейминг, косплей, стримы' },
     incontri: { label: 'Знакомства', tagline: 'Знакомьтесь с людьми рядом с вами' },
     vetrina: { label: 'Витрина', tagline: 'Новинки на витрине' },
+    wip: { label: 'Work in progress', tagline: 'Мир в разработке' },
   },
   auth: {
     title: { login: 'Войти в Versemove', register: 'Создать аккаунт' },

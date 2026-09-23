@@ -1,0 +1,44 @@
+.rb-wip-panel {
+  position: absolute;
+  top: 76px;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 94vw);
+  background: rgba(2, 8, 20, 0.92);
+  border: 1px solid color-mix(in srgb, var(--accent, #0a84ff) 45%, transparent);
+  border-radius: 18px;
+  pointer-events: auto;
+  color: #eaf4ff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #0a84ff) 18%, transparent);
+}
+
+.rb-wip-icon {
+  font-size: 40px;
+}
+
+.rb-wip-panel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.rb-wip-panel p {
+  margin: 0;
+  font-size: 13.5px;
+  color: rgba(234, 244, 255, 0.7);
+}
+
+@media (max-width: 480px) {
+  .rb-wip-panel {
+    top: 168px;
+    bottom: 26px;
+    width: calc(100vw - 28px);
+  }
+}

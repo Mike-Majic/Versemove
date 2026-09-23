@@ -49,6 +49,7 @@ export default {
     nerd: { label: '极客', tagline: '桌游、电玩、角色扮演、直播' },
     incontri: { label: '交友', tagline: '结识身边的人' },
     vetrina: { label: '橱窗', tagline: '精选新品展示' },
+    wip: { label: 'Work in progress', tagline: '建设中的世界' },
   },
   auth: {
     title: { login: '登录 Versemove', register: '创建账户' },

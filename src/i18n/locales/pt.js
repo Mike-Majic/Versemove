@@ -49,6 +49,7 @@ export default {
     nerd: { label: 'Nerd', tagline: 'Jogos de tabuleiro, games, cosplay, streaming' },
     incontri: { label: 'Encontros', tagline: 'Conheça pessoas perto de você' },
     vetrina: { label: 'Vitrine', tagline: 'Novidades em destaque' },
+    wip: { label: 'Work in progress', tagline: 'Mundo em construção' },
   },
   auth: {
     title: { login: 'Entrar no Versemove', register: 'Criar uma conta' },

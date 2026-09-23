@@ -48,11 +48,6 @@ export const WORLDS = [
     lineColor: '#1a4d2e',
     landFillColor: '#ffffff',
     landFillOpacity: 0.78,
-    // Sui satelliti il contorno dei continenti si calcola di default per
-    // contrasto rispetto a "color": con questo marrone chiaro sceglierebbe
-    // da solo un contorno scuro, quindi va forzato bianco (stesso
-    // meccanismo già usato da Nerd, vedi satelliteContinentColor sotto).
-    satelliteContinentColor: '#ffffff',
     textOnGlobe: '#fdf6ec',
   },
   {
@@ -105,9 +100,6 @@ export const WORLDS = [
     label: 'Nerd',
     tagline: 'Giochi da tavolo, gaming, cosplay, streaming',
     color: '#d4f634',
-    // Contorni dei continenti bianchi anche sul satellite giallo (richiesta di
-    // Mike): il calcolo automatico per luminanza gli darebbe contorni scuri.
-    satelliteContinentColor: '#ffffff',
     colorSoft: 'rgba(212, 246, 52, 0.18)',
     globeColor: '#0c0f02',
     atmosphereColor: '#d4f634',
@@ -152,6 +144,20 @@ export const WORLDS = [
     // (linee più chiare dei puntini per restare leggibili sul nero).
     lineColor: '#5a5a66',
     textOnGlobe: '#f2f2f5',
+  },
+  {
+    id: 'wip',
+    label: 'Work in progress',
+    tagline: 'Mondo in costruzione',
+    // Guscio e reticolo blu elettrico, puntini bianchi e contorni dei
+    // continenti bianchi (richiesta di Mike).
+    color: '#ffffff',
+    satelliteContinentColor: '#ffffff',
+    colorSoft: 'rgba(10, 132, 255, 0.18)',
+    globeColor: '#02132e',
+    atmosphereColor: '#0a84ff',
+    lineColor: '#0a84ff',
+    textOnGlobe: '#eaf4ff',
   },
 ];
 

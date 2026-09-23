@@ -3,13 +3,13 @@ import GeoJsonGeometry from 'three-geojson-geometry';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
-import { SATELLITE_SPIN_PERIOD_S, IDLE_SATELLITE_ORBIT_DEG_S } from '../fx/globeRotation';
+import { SATELLITE_SPIN_PERIOD_S } from '../fx/globeRotation';
 
 const DEG2RAD = Math.PI / 180;
 
 // Raggio intrinseco della geometria di un satellite (fisso, uguale per
 // tutti: mai ricreata, vedi buildSatelliteGlobes). La dimensione APPARENTE
-// varia invece per slot tramite una scala (vedi SLOTS.radius sotto e
+// varia invece per slot tramite una scala (vedi wavePoint sotto e
 // slotScale in setActiveWorld) — cambiare solo la scala, mai la geometria,
 // evita di ricompilare gli shader ad ogni cambio di mondo (il costo vero
 // del blocco durante il warp misurato in origine, vedi commento più giù).
@@ -30,73 +30,57 @@ const SATELLITE_DETAIL = 2;
 const CONTINENT_RADIUS_SCALE = 1.015;
 const CONTINENT_RESOLUTION_DEG = 6;
 
-// Sei posizioni FISSE in coordinate di scena (raggio del globo grande =
-// 100), sparse nelle tre dimensioni attorno a lui — non su un'unica fascia
-// frontale — per avere vera profondità/parallasse mentre la camera gira,
-// invece di restare "attaccati" a lei. Coordinate scelte a mano guardando
-// la scena (compresa una sesta, nello stesso stile, per il sesto mondo
-// possibile — Vetrina — che le prime cinque non coprivano). `radius`
-// (22-45) è il raggio APPARENTE voluto per quello slot: più vicino/grande
-// per chi deve leggersi come "in primo piano", più piccolo per chi è
-// dietro — la prospettiva fa il resto.
-const SLOTS = [
-  { pos: [320, 180, -260], radius: 26 }, // dietro-sopra a destra
-  { pos: [-360, 40, 120], radius: 36 }, // sinistra, più vicino
-  { pos: [-200, -230, -80], radius: 42 }, // sotto a sinistra, il più vicino
-  { pos: [60, 260, -380], radius: 22 }, // dietro in alto, il più lontano
-  { pos: [300, -170, 160], radius: 36 }, // destra in basso, davanti
-  { pos: [-90, -300, 210], radius: 30 }, // sotto, davanti (sesto slot)
-  // Settimo e ottavo slot: con 9 mondi i satelliti visibili sono 8. Con solo
-  // 6 slot gli ultimi due mondi dell'elenco (di solito Incontri e FAQ) non
-  // comparivano come satelliti, quindi getWorldLatLng non trovava la loro
-  // posizione e il warp saltava direttamente al mondo senza animazione.
-  { pos: [-340, 210, -150], radius: 28 }, // in alto a sinistra, dietro
-  { pos: [230, -40, -330], radius: 30 }, // destra, a metà altezza, dietro
-];
+// ANELLO attorno al globo: i satelliti stanno su un cerchio orizzontale che
+// gira attorno al globo grande, alternando uno più in alto e uno più in basso
+// — è la "saetta" a triangolo chiusa ad anello. Di fronte si legge come la
+// fila a zigzag del disegno; ruotando la camera si vede che è un anello vero.
+//
+// Nota: la metà "dietro" passa dietro al globo, quindi il satellite al posto 6
+// non si vede (è per questo che lì ci va il mondo Work in progress).
+const RING_RADIUS_WIDE = 330; // raggio dell'anello in unità di scena
+const RING_SWING_WIDE = 105; // quanto sale e scende il zigzag
+const RING_RADIUS_TALL = 250; // telefono
+const RING_SWING_TALL = 95;
+// Il posto 1 sta davanti al centro (il più grande, in primo piano) e i numeri
+// crescono verso destra. Il giro va all'indietro (segno meno in wavePoint),
+// così il posto 6 finisce esattamente dietro al globo.
+const RING_START_DEG = 90;
 
-// Se un giorno i mondi diventano più degli slot scelti a mano, gli slot in
-// più si generano da soli su una spirale di Fibonacci attorno al globo, così
-// nessun mondo resta senza satellite (e senza warp).
-function slotAt(i) {
-  if (i < SLOTS.length) return SLOTS[i];
-  const k = i - SLOTS.length;
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  const y = 1 - ((k % 12) + 0.5) * (2 / 12);
-  const r = Math.sqrt(1 - y * y);
-  const theta = golden * (k + 3);
-  const dist = 430;
-  return { pos: [Math.cos(theta) * r * dist, y * dist * 0.7, Math.sin(theta) * r * dist - 120], radius: 24 };
+// Servono solo per dare a ogni sfera il raggio giusto: le posizioni hanno
+// profondità molto diverse, quindi il raggio in scena si calcola sulla
+// distanza dalla camera, altrimenti quelle davanti sembrano palloni e quelle
+// dietro puntini.
+const CAMERA_DISTANCE_GUESS = 700;
+const PROJECTION_PX = 957;
+const BEAD_PX_WIDE = 46; // taglia apparente voluta, in pixel
+const BEAD_PX_TALL = 36;
+
+function isNarrow() {
+  return typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
 }
 
-// Ampiezza (unità di scena) del galleggiamento sinusoidale verticale: fissa
-// per tutti, non più proporzionale al raggio del satellite (era così
-// quando i satelliti erano piccoli e vicini alla camera; ora sono grandi e
-// lontani, un valore assoluto si legge meglio).
-const BOB_AMPLITUDE = 8;
+function wavePoint(index, total) {
+  const narrow = isNarrow();
+  const R = narrow ? RING_RADIUS_TALL : RING_RADIUS_WIDE;
+  const swing = narrow ? RING_SWING_TALL : RING_SWING_WIDE;
+  const beadPx = narrow ? BEAD_PX_TALL : BEAD_PX_WIDE;
+  const a = (RING_START_DEG - (index * 360) / Math.max(total, 1)) * DEG2RAD;
+  // Cerchio orizzontale attorno al globo (piano XZ) + zigzag su e giù.
+  const pos = new THREE.Vector3(
+    Math.cos(a) * R,
+    index % 2 === 0 ? swing : -swing,
+    Math.sin(a) * R
+  );
+  const dist = Math.sqrt(pos.x * pos.x + pos.y * pos.y + (CAMERA_DISTANCE_GUESS - pos.z) ** 2);
+  const proximity = 0.7 + 0.3 * Math.max(0, Math.min(1, (dist - 220) / 220));
+  const radius = Math.round((beadPx * dist) / (PROJECTION_PX * proximity));
+  return { pos, radius };
+}
 
-// Orbita propria lenta attorno all'asse verticale del globo (radianti al
-// secondo), attiva solo quando il mouse è fuori dal canvas (vedi
-// idleFactor in update() sotto, pilotato da WorldGlobe.jsx): un giro
-// completo dura 360/IDLE_SATELLITE_ORBIT_DEG_S secondi. Il segno
-// (orario/antiorario) resta casuale per satellite, solo per varietà — la
-// MAGNITUDINE è fissa e uguale per tutti (prima era un valore casuale,
-// 0.02-0.05 rad/s, ~1.1-2.9°/s). Nota sul "mai nascosto": la CAMERA non
-// orbita più da sola attorno alla scena (lo faceva, ogni 40 secondi circa,
-// prima che questo file venisse riscritto: disorientava, i satelliti
-// sembravano sfrecciare sullo schermo) — resta solo questa deriva lenta,
-// indipendente. Un primo tentativo di "inseguire" attivamente la camera
-// (ruotare il satellite verso di lei quando usciva dai bordi) è stato
-// scartato perché lo portava a passarle troppo vicino, esplodendo di
-// dimensione in prospettiva (bug visto in uno screenshot di verifica).
-// Resta solo la difesa sotto (il pavimento fisso MIN_CAMERA_DISTANCE), che
-// quel bug lo previene senza inseguire nessuno e senza impedire a un
-// satellite di passare davanti al globo quando l'orbita lo porta lì.
-const ORBIT_SPEED_RAD_S = IDLE_SATELLITE_ORBIT_DEG_S * DEG2RAD;
-
-// Distanza minima ASSOLUTA dalla camera: se l'orbita porta un satellite
-// più vicino di così, viene respinto lungo la stessa direzione fino a
-// questa distanza (la direzione — quindi "da che parte si vede" — resta
-// la stessa, solo la prospettiva non lo fa più esplodere di dimensione).
+// Distanza minima ASSOLUTA dalla camera: se un satellite risultasse più
+// vicino di così, viene respinto lungo la stessa direzione fino a questa
+// distanza (la direzione — quindi "da che parte si vede" — resta la
+// stessa, solo la prospettiva non lo fa più esplodere di dimensione).
 // Nessun legame con la distanza camera-globo centrale: un satellite PUÒ
 // stare più vicino alla camera del globo stesso e passargli davanti,
 // occludendolo — comportamento realistico richiesto esplicitamente (prima
@@ -126,8 +110,6 @@ const PROXIMITY_SCALE_MIN = 0.7;
 const FOG_NEAR = 420;
 const FOG_FAR = 950;
 const FOG_MIN_OPACITY = 0.4;
-
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 // L'occlusione fra satellite e globo grande NON è più simulata a mano (un
 // test raggio/sfera JS che abbassava l'opacità quando "calcolava" un
@@ -252,14 +234,9 @@ function buildSatelliteMesh(world) {
     { mesh: nodes, baseOpacity: 1 },
     { mesh: label, baseOpacity: 1 },
   ];
-  // Fase/velocità del galleggiamento: proprietà del SATELLITE (non dello
-  // slot), così restano coerenti anche se lo stesso satellite cambia slot
-  // da un warp all'altro. Il galleggiamento resta leggermente casuale per
-  // varietà; la rotazione propria invece no (vedi SATELLITE_SPIN_PERIOD_S
-  // in fx/globeRotation.js): stesso giro pulito per tutti, richiesto
-  // esplicitamente dall'utente al posto del valore casuale di prima.
-  group.userData.bobPhase = Math.random() * Math.PI * 2;
-  group.userData.bobSpeed = ((2 * Math.PI) / 10) * (0.95 + Math.random() * 0.1);
+  // Velocità di rotazione propria: stesso giro pulito per tutti, richiesto
+  // esplicitamente dall'utente al posto del valore casuale di prima (vedi
+  // SATELLITE_SPIN_PERIOD_S in fx/globeRotation.js).
   group.userData.spinSpeed = (2 * Math.PI) / SATELLITE_SPIN_PERIOD_S;
   // Impostati per davvero da setActiveWorld() quando il satellite diventa
   // visibile: finché createdAtMs resta -Infinity l'oggetto è comunque
@@ -299,6 +276,27 @@ export function buildSatelliteGlobes({ worlds }) {
   // non è arrivato.
   const warpState = { targetWorldId: null, startMs: null, durationMs: 0 };
 
+  // Ordine dei posti nell'anello, numerato come nel disegno di Mike:
+  // 1 Intrattenimento, 2 Bambini, 3 Nerd, 4 Animali, 5 Incontri,
+  // 6 Work in progress (finisce dietro al globo), 7 Annunci, 8 Vetrina,
+  // 9 Lavoro, 10 FAQ. I dispari stanno in alto, i pari in basso.
+  const RING_ORDER = [
+    'arte',
+    'bambini',
+    'nerd',
+    'animali',
+    'incontri',
+    'wip',
+    'annunci',
+    'vetrina',
+    'lavoro',
+    'faq',
+  ];
+
+  // Posto di ogni mondo nell'anello (worldId -> indice), deciso una volta sola.
+  let slotOf = null;
+  let previousActiveId = null;
+
   function setWarpTarget(worldId, durationMs = 0) {
     warpState.targetWorldId = worldId;
     warpState.startMs = worldId ? performance.now() : null;
@@ -313,22 +311,6 @@ export function buildSatelliteGlobes({ worlds }) {
     return vectorToLatLng(sat.userData.basePos);
   }
 
-  // Sceglie bianco o quasi-nero per i contorni dei continenti in base alla
-  // luminanza del colore del mondo (stessa idea di un "testo leggibile su
-  // qualunque sfondo"): sul globo grande i continenti si distinguono dal
-  // reticolo perché hanno anche un riempimento tenue oltre al contorno
-  // (polygonCapColor); qui, senza riempimento, usare lo stesso colore della
-  // rete (world.atmosphereColor, il tentativo iniziale) li mimetizzava
-  // completamente — invisibili a colpo d'occhio anche se tecnicamente
-  // disegnati. Un mondo chiaro (es. Lavoro, quasi bianco) prende contorni
-  // scuri; uno scuro o saturo prende contorni bianchi.
-  const _luminanceColor = new THREE.Color();
-  function pickContrastColor(hex) {
-    _luminanceColor.set(hex);
-    const luminance = 0.2126 * _luminanceColor.r + 0.7152 * _luminanceColor.g + 0.0722 * _luminanceColor.b;
-    return luminance > 0.6 ? '#0a0a12' : '#ffffff';
-  }
-
   // Disegna sulla sfera di OGNI satellite il vero contorno dei continenti
   // (stessi dati GeoJSON del globo grande, vedi WorldGlobe.jsx/landGeo.js),
   // niente categorie né altro sopra: solo il disegno del mondo, richiesta
@@ -336,7 +318,16 @@ export function buildSatelliteGlobes({ worlds }) {
   // arrivare dopo che i satelliti sono già visibili — build asincrona,
   // vedi WorldGlobe.jsx). La geometria è identica per tutti (stesso pianeta),
   // quindi si costruisce UNA VOLTA SOLA per feature e si condivide tra i sei
-  // satelliti: solo il colore (vedi pickContrastColor sopra) resta per-satellite.
+  // satelliti.
+  //
+  // Colore SEMPRE bianco (richiesta esplicita di Mike): un tentativo
+  // precedente sceglieva il colore per contrasto rispetto a world.color (il
+  // colore della rete/dei puntini), ma il contorno si disegna sopra al
+  // NUCLEO del satellite, che è sempre scuro/nero per ogni mondo (vedi
+  // world.globeColor in worlds.js) — su un mondo chiaro come Lavoro quel
+  // calcolo sbagliava riferimento e sceglieva contorni scuri, invisibili sul
+  // nucleo nero sotto. Resta comunque possibile forzare un altro colore per
+  // un singolo mondo con world.satelliteContinentColor, se mai servisse.
   let continentGeometries = null;
   function setContinentMap(features) {
     if (continentGeometries || !features?.length) return;
@@ -346,9 +337,7 @@ export function buildSatelliteGlobes({ worlds }) {
 
     satellites.forEach((sat) => {
       const world = worlds.find((w) => w.id === sat.userData.worldId);
-      // Un mondo può forzare il colore dei contorni (world.satelliteContinentColor):
-      // es. Nerd, giallo chiaro, che col calcolo automatico prenderebbe contorni scuri.
-      const color = world?.satelliteContinentColor ?? pickContrastColor(world?.color ?? '#888888');
+      const color = world?.satelliteContinentColor ?? '#ffffff';
       const continentGroup = sat.userData.continentGroup;
 
       continentGeometries.forEach((geometry) => {
@@ -363,58 +352,59 @@ export function buildSatelliteGlobes({ worlds }) {
     });
   }
 
-  // Mostra come satelliti tutti i mondi tranne quello attivo (al massimo
-  // SLOTS.length), assegnando ad ognuno uno slot FISSO in coordinate
-  // assolute (vedi SLOTS) — la posizione vera e propria (slot + orbita
-  // lenta + galleggiamento + eventuale correzione) si calcola poi ad ogni
-  // fotogramma in update(). Non tocca mai geometrie/materiali: solo
-  // visibilità e stato di posizionamento, più — se richiesto — un riavvio
-  // dell'animazione di comparsa sui satelliti ora visibili.
+  // Mostra come satelliti tutti i mondi tranne quello attivo, ognuno sul
+  // SUO posto fisso nell'anello (vedi RING_ORDER/wavePoint sopra). Quando
+  // entri in un mondo il suo satellite sparisce (diventa il globo centrale)
+  // e il mondo da cui vieni prende il suo posto: i due si SCAMBIANO, tutti
+  // gli altri restano fermi — non un semplice ricalcolo "primi N mondi
+  // rimasti" come nel vecchio sistema a slot, altrimenti ogni cambio di
+  // mondo avrebbe rimescolato tutti i satelliti.
   function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
-    const visibleWorlds = worlds.filter((w) => w.id !== activeWorldId);
-    const visibleIds = new Set(visibleWorlds.map((w) => w.id));
     const nowMs = performance.now();
 
-    satellites.forEach((sat) => {
-      sat.visible = visibleIds.has(sat.userData.worldId);
-    });
+    if (!slotOf) {
+      slotOf = new Map();
+      RING_ORDER.forEach((id, i) => slotOf.set(id, i));
+      // Mondi non elencati (aggiunti in futuro): in coda, sui posti liberi.
+      let next = RING_ORDER.length;
+      worlds.forEach((w) => {
+        if (!slotOf.has(w.id)) slotOf.set(w.id, next++);
+      });
+    } else if (previousActiveId && previousActiveId !== activeWorldId) {
+      const freed = slotOf.get(activeWorldId);
+      if (freed !== undefined) slotOf.set(previousActiveId, freed);
+    }
+    previousActiveId = activeWorldId;
 
-    visibleWorlds.forEach((world, i) => {
-      const sat = satellitesById.get(world.id);
-      if (!sat) return;
-      const slot = slotAt(i);
-      sat.userData.basePosRef = new THREE.Vector3(...slot.pos);
+    const totalSlots = worlds.length - 1; // tutti i mondi tranne quello attivo
+
+    satellites.forEach((sat) => {
+      const id = sat.userData.worldId;
+      sat.visible = id !== activeWorldId;
+      if (!sat.visible) return;
+      const slotIndex = slotOf.get(id);
+      if (slotIndex === undefined) return;
+      const slot = wavePoint(slotIndex, totalSlots);
+      sat.userData.basePosRef = slot.pos;
       sat.userData.slotScale = slot.radius / SATELLITE_RADIUS;
-      // Riparte da angolo 0 (cioè esattamente la posizione dello slot,
-      // quella scelta a mano) ad ogni cambio di mondo attivo: l'orbita
-      // lenta e l'eventuale correzione (vedi update()) accumulano da lì.
-      sat.userData.orbitAngle = 0;
-      sat.userData.baseOrbitSpeed = ORBIT_SPEED_RAD_S * (Math.random() < 0.5 ? -1 : 1);
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
   }
 
-  // Galleggiamento (sempre attivo) + rotazione propria e orbita lenta
-  // attorno al globo (entrambe SOLO quando il mouse è fuori dal canvas,
-  // scalate da idleFactor 0..1 — 0 = camera/mouse dentro, ferme; 1 = mouse
-  // fuori, velocità piena — pilotato da WorldGlobe.jsx in sincrono con la
-  // stessa rampa morbida del globo centrale), più le due animazioni
-  // temporanee (materializzazione e crescita durante il warp) sopra.
-  // "Riduci animazioni" (reduceMotion): niente rotazioni proprio, resta
-  // solo il galleggiamento. Una sola difesa attiva per fotogramma: se
-  // l'orbita porterebbe il satellite più vicino della soglia ASSOLUTA
-  // MIN_CAMERA_DISTANCE (nessun legame con la distanza camera-globo: un
-  // satellite può stare più vicino del globo centrale e passargli
-  // davanti, occludendolo — voluto), lo si respinge (stessa direzione,
-  // solo distanza minima garantita) — evita solo che l'oggetto esploda di
-  // dimensione in prospettiva a distanza quasi zero, senza mai bloccare o
-  // deviare l'orbita stessa. In più la scala scende con continuità (mai a
-  // scatti, fino a -30%) quando un satellite è vicino alla camera, solo
-  // per non farlo sembrare sproporzionato — l'occlusione vera resta
-  // sempre quella del depth buffer (vedi sopra), non dipende da questo.
-  // elapsedSec/deltaSec vengono da WorldGlobe.jsx, agganciati allo stesso
-  // giro di rendering del globo grande (si fermano quando lui si ferma
-  // per risparmiare CPU).
+  // Rotazione propria (sempre attiva, tranne con "Riduci animazioni") più
+  // le due animazioni temporanee (materializzazione e crescita durante il
+  // warp). Niente più galleggiamento né orbita: la posizione è FISSA
+  // (vedi basePosRef, impostato da setActiveWorld sopra). Una sola difesa
+  // resta attiva per fotogramma: se un satellite risultasse più vicino
+  // della soglia ASSOLUTA MIN_CAMERA_DISTANCE, lo si respinge (stessa
+  // direzione, solo distanza minima garantita) — evita solo che l'oggetto
+  // esploda di dimensione in prospettiva a distanza quasi zero. In più la
+  // scala scende con continuità (mai a scatti, fino a -30%) quando un
+  // satellite è vicino alla camera, solo per non farlo sembrare
+  // sproporzionato — l'occlusione vera resta sempre quella del depth
+  // buffer (vedi sopra), non dipende da questo. elapsedSec/deltaSec
+  // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
+  // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
   const _toCam = new THREE.Vector3();
   function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
@@ -426,9 +416,10 @@ export function buildSatelliteGlobes({ worlds }) {
       const ud = sat.userData;
       if (!ud.basePosRef) continue;
 
-      if (!reduceMotion) ud.orbitAngle += ud.baseOrbitSpeed * deltaSec * idleFactor;
-      const basePos = ud.basePosRef.clone().applyAxisAngle(Y_AXIS, ud.orbitAngle);
-      basePos.y += Math.sin(elapsedSec * ud.bobSpeed + ud.bobPhase) * BOB_AMPLITUDE;
+      // Posizione FISSA. Il clone serve solo perché il pavimento
+      // MIN_CAMERA_DISTANCE può spostare la copia quando è la CAMERA ad
+      // avvicinarsi.
+      const basePos = ud.basePosRef.clone();
 
       _toCam.copy(basePos).sub(camPos);
       const naturalDistToCam = _toCam.length();

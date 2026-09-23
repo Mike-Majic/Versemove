@@ -69,6 +69,7 @@ const LavoroConsentGate = lazyWithRetry(() => import('./components/lavoro/Lavoro
 const FaqWorldExplorer = lazyWithRetry(() => import('./components/faq/FaqWorldExplorer'));
 const AnnunciWorldExplorer = lazyWithRetry(() => import('./components/annunci/AnnunciWorldExplorer'));
 const AnimaliWorldExplorer = lazyWithRetry(() => import('./components/animali/AnimaliWorldExplorer'));
+const WipWorldExplorer = lazyWithRetry(() => import('./components/wip/WipWorldExplorer'));
 const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel'));
 const ProfileModal = lazyWithRetry(() => import('./components/ProfileModal'));
 const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
@@ -853,9 +854,16 @@ export default function App() {
   const needsAuthForWorld = !user;
   const ageBlockedForWorld = isAgeGatedWorld && !needsAuthForWorld && !isAdult(user?.dataNascita);
   // FAQ resta sempre attivo (è il posto dove si chiede aiuto): non lo si
-  // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui.
+  // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui. Work in
+  // progress idem: è nuovo, non è ancora fra i mondi salvabili in
+  // mondiAbilitati (nessuna modifica al database per questo mondo, vedi
+  // WipWorldExplorer) e non deve mai apparire come "disattivato".
   const worldDisabledByUser =
-    world.id !== 'faq' && !needsAuthForWorld && !ageBlockedForWorld && !(user.mondiAbilitati ?? []).includes(world.id);
+    world.id !== 'faq' &&
+    world.id !== 'wip' &&
+    !needsAuthForWorld &&
+    !ageBlockedForWorld &&
+    !(user.mondiAbilitati ?? []).includes(world.id);
 
   return (
     <div className="rb-app" style={{ '--accent': world.color }}>
@@ -1053,6 +1061,12 @@ export default function App() {
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
           />
+        </Suspense>
+      )}
+
+      {world.id === 'wip' && (
+        <Suspense fallback={<PageLoading />}>
+          <WipWorldExplorer world={world} />
         </Suspense>
       )}
 

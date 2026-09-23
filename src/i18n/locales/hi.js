@@ -49,6 +49,7 @@ export default {
     nerd: { label: 'नर्ड', tagline: 'बोर्ड गेम्स, गेमिंग, कॉस्प्ले, स्ट्रीमिंग' },
     incontri: { label: 'मुलाक़ात', tagline: 'अपने आस-पास के लोगों से मिलें' },
     vetrina: { label: 'शोकेस', tagline: 'नई चीज़ें प्रदर्शन पर' },
+    wip: { label: 'Work in progress', tagline: 'निर्माणाधीन दुनिया' },
   },
   auth: {
     title: { login: 'Versemove में लॉगिन करें', register: 'खाता बनाएं' },

@@ -53,6 +53,7 @@ export default {
     nerd: { label: 'النرد', tagline: 'ألعاب الطاولة، الألعاب الإلكترونية، الكوسبلاي، البث المباشر' },
     incontri: { label: 'التعارف', tagline: 'تعرّف على أشخاص بالقرب منك' },
     vetrina: { label: 'الواجهة', tagline: 'أحدث العروض المميزة' },
+    wip: { label: 'Work in progress', tagline: 'عالم قيد الإنشاء' },
   },
   auth: {
     title: { login: 'تسجيل الدخول إلى Versemove', register: 'إنشاء حساب' },

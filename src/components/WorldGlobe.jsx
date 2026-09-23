@@ -144,12 +144,17 @@ function makeClusterEl(cluster, world, onExpand) {
 const NEARBY_DEGREES = 1;
 
 // Altitudine di partenza della camera (unità react-globe.gl: distanza dal
-// centro = raggio globo * (1 + altitude)). Tenuta più lontana apposta
-// (prima 2.4): a questa distanza il globo grande occupa circa il 45-50%
-// dell'altezza dello schermo, lasciando spazio ai satelliti in "sistema
-// solare" (vedi globe/satelliteGlobes.js) di stare visibilmente più in là,
-// invece di accalcarsi appena fuori dal suo bordo.
-const DEFAULT_ALTITUDE = 4.2;
+// centro = raggio globo * (1 + altitude)). Più alta di prima (era 4.2)
+// perché i satelliti stanno su un anello attorno al globo (vedi
+// globe/satelliteGlobes.js) e serve spazio per vederlo tutto; più alta
+// ancora in verticale (schermo stretto) perché l'anello lì è più "alto"
+// che "largo" rispetto all'inquadratura.
+const DEFAULT_ALTITUDE_WIDE = 6;
+const DEFAULT_ALTITUDE_TALL = 7.5;
+function defaultAltitude() {
+  if (typeof window === 'undefined') return DEFAULT_ALTITUDE_WIDE;
+  return window.innerHeight > window.innerWidth ? DEFAULT_ALTITUDE_TALL : DEFAULT_ALTITUDE_WIDE;
+}
 // Piano di clipping lontano della camera: di serie (vedi
 // three-render-objects) è troppo vicino per le posizioni assolute dei
 // satelliti (fino a ~450-500 unità dal centro, più l'orbita lenta), che
@@ -273,7 +278,7 @@ export default function WorldGlobe({
   // categoria/città/grumo) non passano da li', quindi si controlla con un
   // piccolo polling, abbastanza leggero da non pesare (legge tre numeri
   // ogni 250ms).
-  const [view, setView] = useState({ altitude: DEFAULT_ALTITUDE, lat: 0, lng: 0 });
+  const [view, setView] = useState({ altitude: defaultAltitude(), lat: 0, lng: 0 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -674,9 +679,10 @@ export default function WorldGlobe({
   // Quale mondo è attivo adesso (quindi quali sono satelliti, e dove):
   // nessuna geometria/materiale nuovo, solo setActiveWorld() sul pool già
   // costruito sopra — l'unica cosa che un warp deve davvero fare a runtime.
-  // Le posizioni sono assolute (vedi satelliteGlobes.js SLOTS), non legate
-  // alla camera: non serve più ricalcolarle al resize/rotazione schermo, ci
-  // pensa già la correzione anti-sparizione dentro update() ad ogni frame.
+  // Le posizioni sono assolute (vedi satelliteGlobes.js wavePoint/RING_ORDER,
+  // l'anello a zigzag attorno al globo), non legate alla camera: non serve
+  // ricalcolarle ad ogni frame, ci pensa già la correzione anti-sparizione
+  // dentro update() quando la camera si avvicina troppo.
   useEffect(() => {
     const g = globeRef.current;
     const sats = satellitesRef.current;
@@ -768,7 +774,7 @@ export default function WorldGlobe({
         // in posizioni diverse dalla disposizione consueta a seconda di quale
         // satellite si è cliccato — la vista di arrivo deve essere sempre la
         // stessa, comoda e prevedibile.
-        g.pointOfView({ lat: 0, lng: 0, altitude: DEFAULT_ALTITUDE }, 0);
+        g.pointOfView({ lat: 0, lng: 0, altitude: defaultAltitude() }, 0);
         onWarpArrived(worldId);
         window.setTimeout(() => {
           warpFlashRef.current?.classList.remove('active');
@@ -829,7 +835,7 @@ export default function WorldGlobe({
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
-    g.pointOfView({ altitude: DEFAULT_ALTITUDE }, 0);
+    g.pointOfView({ altitude: defaultAltitude() }, 0);
     if (isTouchDevice) globeActivity.wake();
     else globeActivity.startAutoRotate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
