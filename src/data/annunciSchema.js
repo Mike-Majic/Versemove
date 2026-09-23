@@ -205,6 +205,68 @@ export const ANNUNCI_CATEGORIES_META = {
       { key: 'available_from', label: 'Disponibile dal', type: 'date', forRent: true },
     ],
   },
+  abbigliamento: {
+    label: 'Abbigliamento & Accessori',
+    icon: '👕',
+    fields: [
+      {
+        key: 'clothing_type',
+        label: 'Tipo',
+        type: 'select',
+        options: [
+          { value: 'abbigliamento', label: 'Abbigliamento' },
+          { value: 'scarpe', label: 'Scarpe' },
+          { value: 'borse', label: 'Borse' },
+          { value: 'orologi_gioielli', label: 'Orologi & Gioielli' },
+          { value: 'accessori', label: 'Altri accessori' },
+        ],
+      },
+      { key: 'brand', label: 'Marca', type: 'text' },
+      {
+        key: 'gender',
+        label: 'Genere',
+        type: 'select',
+        options: [
+          { value: 'uomo', label: 'Uomo' },
+          { value: 'donna', label: 'Donna' },
+          { value: 'unisex', label: 'Unisex' },
+          { value: 'bambino', label: 'Bambino/a' },
+        ],
+      },
+      { key: 'size', label: 'Taglia', type: 'text' },
+      {
+        key: 'condition',
+        label: 'Condizioni',
+        type: 'select',
+        options: [
+          { value: 'nuovo_con_cartellino', label: 'Nuovo con cartellino' },
+          { value: 'nuovo_senza_cartellino', label: 'Nuovo senza cartellino' },
+          { value: 'ottimo', label: 'Ottimo' },
+          { value: 'buono', label: 'Buono' },
+          { value: 'discreto', label: 'Discreto' },
+        ],
+      },
+    ],
+  },
+  'oggetti-vari': {
+    label: 'Oggetti vari',
+    icon: '📦',
+    fields: [
+      { key: 'item_category', label: 'Categoria', type: 'text' },
+      { key: 'brand', label: 'Marca (facoltativo)', type: 'text' },
+      {
+        key: 'condition',
+        label: 'Condizioni',
+        type: 'select',
+        options: [
+          { value: 'nuovo', label: 'Nuovo' },
+          { value: 'ottimo', label: 'Ottimo' },
+          { value: 'buono', label: 'Buono' },
+          { value: 'da_riparare', label: 'Da riparare' },
+        ],
+      },
+    ],
+  },
 };
 
 export const ANNUNCI_CATEGORY_IDS = Object.keys(ANNUNCI_CATEGORIES_META);

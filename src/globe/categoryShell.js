@@ -152,6 +152,204 @@ function buildBriefcaseShape() {
   return shape;
 }
 
+// Sagome per il mondo Annunci (arancione): una forma diversa PER CATEGORIA
+// (non una sola per tutto il mondo come altrove, e non a rotazione
+// sull'indice come Bambini — qui la forma segue proprio il NOME della
+// categoria, richiesta esplicita: "se la categoria si chiama auto, la
+// forma dell'auto"). Vedi buildCategoryFaceShape più sotto per lo switch
+// per categoryId. Un contorno per volta, "solo la forma" come le altre:
+// nessun dettaglio a colore diverso, quello resta il colore del mondo.
+
+// Auto: corpo (cofano+abitacolo+baule) con due ruote "ritagliate" (buchi
+// che sporgono sotto il bordo inferiore, quindi tagliano solo una mezzaluna
+// visibile — lo stesso trucco delle ruote in un'icona flat).
+function buildCarShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.9, -0.32);
+  shape.lineTo(-0.9, -0.05);
+  shape.quadraticCurveTo(-0.75, -0.05, -0.62, 0.08);
+  shape.lineTo(-0.42, 0.3);
+  shape.quadraticCurveTo(-0.32, 0.4, -0.15, 0.4);
+  shape.lineTo(0.25, 0.4);
+  shape.quadraticCurveTo(0.4, 0.4, 0.48, 0.28);
+  shape.lineTo(0.62, 0.08);
+  shape.quadraticCurveTo(0.72, -0.05, 0.9, -0.05);
+  shape.lineTo(0.9, -0.32);
+  shape.quadraticCurveTo(0.9, -0.4, 0.82, -0.4);
+  shape.lineTo(-0.82, -0.4);
+  shape.quadraticCurveTo(-0.9, -0.4, -0.9, -0.32);
+  shape.closePath();
+
+  const wheelL = new THREE.Path();
+  wheelL.absarc(-0.5, -0.4, 0.19, 0, Math.PI * 2, false);
+  shape.holes.push(wheelL);
+  const wheelR = new THREE.Path();
+  wheelR.absarc(0.5, -0.4, 0.19, 0, Math.PI * 2, false);
+  shape.holes.push(wheelR);
+
+  return shape;
+}
+
+// Moto: corpo basso (sella+serbatoio) con un manubrio stilizzato che sporge
+// a destra, due ruote ritagliate come nell'auto ma più separate e in basso.
+function buildMotoShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.85, -0.22);
+  shape.quadraticCurveTo(-0.85, -0.05, -0.6, 0.0);
+  shape.lineTo(-0.1, 0.08);
+  shape.quadraticCurveTo(0.15, 0.12, 0.25, 0.3);
+  shape.quadraticCurveTo(0.32, 0.42, 0.42, 0.32);
+  shape.quadraticCurveTo(0.48, 0.25, 0.4, 0.15);
+  shape.lineTo(0.3, 0.02);
+  shape.quadraticCurveTo(0.55, -0.02, 0.75, -0.15);
+  shape.quadraticCurveTo(0.85, -0.2, 0.85, -0.3);
+  shape.lineTo(0.5, -0.3);
+  shape.quadraticCurveTo(0.3, -0.24, 0.0, -0.26);
+  shape.lineTo(-0.5, -0.3);
+  shape.lineTo(-0.85, -0.3);
+  shape.closePath();
+
+  const wheelL = new THREE.Path();
+  wheelL.absarc(-0.62, -0.32, 0.24, 0, Math.PI * 2, false);
+  shape.holes.push(wheelL);
+  const wheelR = new THREE.Path();
+  wheelR.absarc(0.62, -0.32, 0.24, 0, Math.PI * 2, false);
+  shape.holes.push(wheelR);
+
+  return shape;
+}
+
+// Un anello (cerchio cavo): base per le ruote della bicicletta, uno spesso
+// "bastoncino" fra due punti: base per il telaio. Robusti e semplici (niente
+// giunti da calcolare come in offsetPolyline), a differenza della M o del
+// nastro sotto, qui il contorno può restare aperto in più pezzi separati —
+// vedi buildBikeShape, che infatti restituisce un ARRAY di sagome invece di
+// una sola (THREE.ShapeGeometry accetta anche un array, le unisce in una
+// sola geometria).
+function buildRingShape(cx, cy, r, thickness) {
+  const shape = new THREE.Shape();
+  shape.absarc(cx, cy, r, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(cx, cy, r - thickness, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  return shape;
+}
+function buildBarShape(x1, y1, x2, y2, width) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const nx = (-dy / len) * (width / 2);
+  const ny = (dx / len) * (width / 2);
+  const shape = new THREE.Shape();
+  shape.moveTo(x1 + nx, y1 + ny);
+  shape.lineTo(x2 + nx, y2 + ny);
+  shape.lineTo(x2 - nx, y2 - ny);
+  shape.lineTo(x1 - nx, y1 - ny);
+  shape.closePath();
+  return shape;
+}
+
+// Bicicletta: due ruote (anelli) + telaio a rombo fatto di quattro
+// "bastoncini" (sella-manubrio, manubrio-ruota davanti, ruota dietro-pedale,
+// pedale-ruota davanti) — un array di 6 sagome invece di una sola.
+function buildBikeShape() {
+  const wheelL = buildRingShape(-0.55, -0.12, 0.32, 0.09);
+  const wheelR = buildRingShape(0.55, -0.12, 0.32, 0.09);
+  const seatTube = buildBarShape(-0.55, -0.12, 0.05, 0.42, 0.09);
+  const topTube = buildBarShape(0.05, 0.42, 0.55, -0.12, 0.09);
+  const downTube = buildBarShape(-0.55, -0.12, 0.3, -0.05, 0.09);
+  const chainStay = buildBarShape(0.3, -0.05, 0.55, -0.12, 0.09);
+  return [wheelL, wheelR, seatTube, topTube, downTube, chainStay];
+}
+
+// Barca: scafo a mezzaluna + albero (un bastoncino sottile) + vela
+// triangolare — tre sagome separate, come la bicicletta.
+function buildBoatShape() {
+  const hull = new THREE.Shape();
+  hull.moveTo(-0.95, -0.15);
+  hull.quadraticCurveTo(-0.55, -0.4, 0.1, -0.38);
+  hull.quadraticCurveTo(0.65, -0.36, 0.95, -0.12);
+  hull.quadraticCurveTo(0.6, -0.05, 0.0, -0.03);
+  hull.quadraticCurveTo(-0.5, -0.02, -0.95, -0.15);
+  hull.closePath();
+
+  const mast = buildBarShape(-0.05, -0.05, -0.05, 0.55, 0.045);
+
+  const sail = new THREE.Shape();
+  sail.moveTo(-0.03, 0.55);
+  sail.lineTo(0.45, 0.0);
+  sail.lineTo(-0.03, -0.02);
+  sail.closePath();
+
+  return [hull, mast, sail];
+}
+
+// Casa: sagoma a "pentagono" (corpo + tetto a punta) classica, con un buco
+// rettangolare per la porta.
+function buildHouseShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.75, -0.55);
+  shape.lineTo(-0.75, 0.05);
+  shape.lineTo(-1.0, 0.05);
+  shape.lineTo(0, 0.7);
+  shape.lineTo(1.0, 0.05);
+  shape.lineTo(0.75, 0.05);
+  shape.lineTo(0.75, -0.55);
+  shape.closePath();
+
+  const door = new THREE.Path();
+  door.moveTo(-0.18, -0.55);
+  door.lineTo(-0.18, -0.05);
+  door.lineTo(0.18, -0.05);
+  door.lineTo(0.18, -0.55);
+  door.closePath();
+  shape.holes.push(door);
+
+  return shape;
+}
+
+// Maglietta (categoria Abbigliamento/Accessori): scollo, due maniche corte,
+// tacche sotto le ascelle, orlo dritto in basso.
+function buildShirtShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.3, 0.55);
+  shape.lineTo(-0.65, 0.35);
+  shape.lineTo(-0.95, 0.05);
+  shape.lineTo(-0.68, -0.2);
+  shape.lineTo(-0.5, -0.05);
+  shape.lineTo(-0.5, -0.65);
+  shape.lineTo(0.5, -0.65);
+  shape.lineTo(0.5, -0.05);
+  shape.lineTo(0.68, -0.2);
+  shape.lineTo(0.95, 0.05);
+  shape.lineTo(0.65, 0.35);
+  shape.lineTo(0.3, 0.55);
+  shape.quadraticCurveTo(0.15, 0.4, 0, 0.4);
+  shape.quadraticCurveTo(-0.15, 0.4, -0.3, 0.55);
+  shape.closePath();
+  return shape;
+}
+
+// Scatola con fiocco (categoria Oggetti vari, un generico "pacco/regalo"
+// per tutto ciò che non rientra nelle altre categorie): corpo rettangolare
+// con un doppio anello stilizzato sopra, come un fiocco.
+function buildBoxShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.8, -0.6);
+  shape.lineTo(0.8, -0.6);
+  shape.lineTo(0.8, 0.1);
+  shape.lineTo(0.35, 0.1);
+  shape.lineTo(0.35, 0.35);
+  shape.quadraticCurveTo(0.35, 0.55, 0.15, 0.55);
+  shape.quadraticCurveTo(0, 0.55, 0, 0.35);
+  shape.quadraticCurveTo(0, 0.55, -0.15, 0.55);
+  shape.quadraticCurveTo(-0.35, 0.55, -0.35, 0.35);
+  shape.lineTo(-0.35, 0.1);
+  shape.lineTo(-0.8, 0.1);
+  shape.closePath();
+  return shape;
+}
+
 // Ispessisce una spezzata aperta (array di THREE.Vector2) di "width" unità,
 // un lato alla volta (side = 1 o -1): normale perpendicolare al segmento a
 // ogni estremo, media delle due normali (giunto a becco d'anatra) nei punti
@@ -299,6 +497,28 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
         shape: KIDS_SHAPES[index % KIDS_SHAPES.length](),
         color: KIDS_PALETTE[index % KIDS_PALETTE.length],
       };
+    case 'annunci':
+      // Qui la forma segue il NOME della categoria (categoryId), non
+      // l'indice: ogni categoria del mondo Annunci ha la propria sagoma
+      // dedicata, non una condivisa da tutto il mondo.
+      switch (categoryId) {
+        case 'auto':
+          return { shape: buildCarShape(), color: null };
+        case 'moto':
+          return { shape: buildMotoShape(), color: null };
+        case 'biciclette':
+          return { shape: buildBikeShape(), color: null };
+        case 'barche':
+          return { shape: buildBoatShape(), color: null };
+        case 'case':
+          return { shape: buildHouseShape(), color: null };
+        case 'abbigliamento':
+          return { shape: buildShirtShape(), color: null };
+        case 'oggetti-vari':
+          return { shape: buildBoxShape(), color: null };
+        default:
+          return null;
+      }
     default:
       return null; // triangolo, gestito a parte (non è una THREE.Shape 2D)
   }
@@ -427,7 +647,17 @@ export function makeLabelSprite(text, spriteScale) {
 // almeno una faccia vuota di margine, così restano nettamente staccate, senza
 // dover rimpicciolire ulteriormente i triangoli), così la stessa coordinata
 // può essere riusata per centrare la camera (vedi App.jsx).
-export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6', shapeType = 'triangle' } = {}) {
+//
+// marginRings: quante "corone" di facce vicine restano bloccate attorno a
+// ogni categoria appena piazzata (1 = solo i vicini diretti, il default
+// storico; 2 = anche i vicini dei vicini, il doppio dello spazio libero fra
+// due categorie). Usato dal mondo Annunci, che con poche categorie (7 su
+// almeno 80 facce) ha ampiamente spazio per stare più larghe — richiesta
+// esplicita ("le categorie le vedo troppo vicine").
+export function buildCategoryShell(
+  categories,
+  { radius = 122, color = '#8b5cf6', shapeType = 'triangle', marginRings = 1 } = {}
+) {
   const detail = pickDetailLevel(categories.length);
   const geo = new THREE.IcosahedronGeometry(radius, detail);
   const pos = geo.getAttribute('position'); // non indicizzata: 3 vertici propri per faccia
@@ -516,7 +746,11 @@ export function buildCategoryShell(categories, { radius = 122, color = '#8b5cf6'
 
     usedFaces.add(bestFace);
     blockedFaces.add(bestFace);
-    adjacency[bestFace].forEach((n) => blockedFaces.add(n));
+    const ring1 = adjacency[bestFace];
+    ring1.forEach((n) => blockedFaces.add(n));
+    if (marginRings >= 2) {
+      ring1.forEach((n) => adjacency[n].forEach((n2) => blockedFaces.add(n2)));
+    }
 
     a.fromBufferAttribute(pos, bestFace * 3);
     b.fromBufferAttribute(pos, bestFace * 3 + 1);

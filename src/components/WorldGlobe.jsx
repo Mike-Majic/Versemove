@@ -54,7 +54,13 @@ const CATEGORY_SHAPE_BY_WORLD = {
   arte: 'star',
   bambini: 'kids',
   faq: 'cloud',
+  annunci: 'annunci',
 };
+
+// Solo Annunci ha bisogno di più margine fra le categorie (poche categorie
+// su un guscio con parecchie facce libere, vedi marginRings in
+// categoryShell.js): gli altri mondi restano sul margine storico.
+const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2 };
 
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio
 // marker quando si condivide la posizione in tempo reale (vedi App.jsx,
@@ -564,6 +570,7 @@ export default function WorldGlobe({
       radius: 122,
       color: world.color,
       shapeType: CATEGORY_SHAPE_BY_WORLD[world.id] ?? 'triangle',
+      marginRings: CATEGORY_MARGIN_RINGS_BY_WORLD[world.id] ?? 1,
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;
