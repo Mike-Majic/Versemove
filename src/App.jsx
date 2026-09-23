@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
+import { lazyWithRetry } from './fx/lazyWithRetry';
 import { translateWorld } from './i18n/worldLabels';
 import { translateCategoryLabel } from './i18n/categoryLabels';
 import { setAppLanguage } from './i18n';
@@ -56,26 +57,26 @@ import './App.css';
 // qui sotto e nei singoli punti d'uso). WorldGlobe da solo si porta dietro
 // Three.js + react-globe.gl, il pezzo più grosso di tutti: è nel proprio
 // chunk a parte anche solo per questo.
-const WorldGlobe = lazy(() => import('./components/WorldGlobe'));
-const ArteExplorer = lazy(() => import('./components/ArteExplorer'));
-const BambiniGameExplorer = lazy(() => import('./components/BambiniGameExplorer'));
-const SocialWorldExplorer = lazy(() => import('./components/social/SocialWorldExplorer'));
-const IncontriLiveExplorer = lazy(() => import('./components/incontri/IncontriLiveExplorer'));
-const LavoroWorldExplorer = lazy(() => import('./components/lavoro/LavoroWorldExplorer'));
-const LavoroConsentGate = lazy(() => import('./components/lavoro/LavoroConsentGate'));
-const FaqWorldExplorer = lazy(() => import('./components/faq/FaqWorldExplorer'));
-const AnnunciWorldExplorer = lazy(() => import('./components/annunci/AnnunciWorldExplorer'));
-const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-const ProfileModal = lazy(() => import('./components/ProfileModal'));
-const AuthModal = lazy(() => import('./components/AuthModal'));
-const EventLikersModal = lazy(() => import('./components/EventLikersModal'));
-const ReactorsModal = lazy(() => import('./components/cultural/ReactorsModal'));
-const FriendChatModal = lazy(() => import('./components/FriendChatModal'));
-const DMHub = lazy(() => import('./components/DMHub'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
-const ProfileSettingsPanel = lazy(() => import('./components/ProfileSettingsPanel'));
-const PasswordRecoveryModal = lazy(() => import('./components/PasswordRecoveryModal'));
-const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'));
+const WorldGlobe = lazyWithRetry(() => import('./components/WorldGlobe'));
+const ArteExplorer = lazyWithRetry(() => import('./components/ArteExplorer'));
+const BambiniGameExplorer = lazyWithRetry(() => import('./components/BambiniGameExplorer'));
+const SocialWorldExplorer = lazyWithRetry(() => import('./components/social/SocialWorldExplorer'));
+const IncontriLiveExplorer = lazyWithRetry(() => import('./components/incontri/IncontriLiveExplorer'));
+const LavoroWorldExplorer = lazyWithRetry(() => import('./components/lavoro/LavoroWorldExplorer'));
+const LavoroConsentGate = lazyWithRetry(() => import('./components/lavoro/LavoroConsentGate'));
+const FaqWorldExplorer = lazyWithRetry(() => import('./components/faq/FaqWorldExplorer'));
+const AnnunciWorldExplorer = lazyWithRetry(() => import('./components/annunci/AnnunciWorldExplorer'));
+const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel'));
+const ProfileModal = lazyWithRetry(() => import('./components/ProfileModal'));
+const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
+const EventLikersModal = lazyWithRetry(() => import('./components/EventLikersModal'));
+const ReactorsModal = lazyWithRetry(() => import('./components/cultural/ReactorsModal'));
+const FriendChatModal = lazyWithRetry(() => import('./components/FriendChatModal'));
+const DMHub = lazyWithRetry(() => import('./components/DMHub'));
+const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
+const ProfileSettingsPanel = lazyWithRetry(() => import('./components/ProfileSettingsPanel'));
+const PasswordRecoveryModal = lazyWithRetry(() => import('./components/PasswordRecoveryModal'));
+const NotificationsPanel = lazyWithRetry(() => import('./components/NotificationsPanel'));
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
 const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
