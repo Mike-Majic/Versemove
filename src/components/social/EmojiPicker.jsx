@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from '../shared/Icon';
 import './EmojiPicker.css';
 
 // Set curato ma ampio, diviso per categoria come nei picker di WhatsApp/
@@ -132,12 +133,12 @@ export default function EmojiPicker({ onSelect }) {
     <div className="rb-emoji-picker">
       <button
         type="button"
-        className="rb-composer-icon-btn"
+        className={`rb-iconbtn ${open ? 'active' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-label="Aggiungi un'emoji"
         title="Emoji"
       >
-        😊
+        <Icon name="smile" />
       </button>
       {open && (
         <div className="rb-emoji-popover">

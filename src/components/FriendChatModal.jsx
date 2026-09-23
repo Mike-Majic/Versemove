@@ -13,6 +13,7 @@ import {
   CHAT_MAX_FILE_BYTES,
 } from '../data/directChat';
 import ChatAttachment from './chat/ChatAttachment';
+import Icon from './shared/Icon';
 import ContactProfileModal from './chat/ContactProfileModal';
 import TranslateHint from './shared/TranslateHint';
 import { areConnected } from '../data/friends';
@@ -267,7 +268,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   return (
     <ModalOverlay onClose={onClose}>
       <div className="rb-friend-chat-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi"><Icon name="close" size={16} /></button>
         <div className="rb-friend-chat-header">
           {friend && (
             <>
@@ -297,7 +298,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               aria-label="Videochiamata"
               title="Videochiamata"
             >
-              📹
+              <Icon name="video" size={18} />
             </button>
           )}
         </div>
@@ -379,15 +380,15 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               aria-expanded={attachMenuOpen}
               title="Allega"
             >
-              <span className="rb-friend-chat-plus-glyph">+</span>
+              <Icon name="plus" size={20} className="rb-friend-chat-plus-glyph" />
             </button>
             {attachMenuOpen && (
               <div className="rb-friend-chat-attach-menu" role="menu">
                 <button type="button" role="menuitem" onClick={() => photoInputRef.current?.click()}>
-                  <span>📷</span> Foto
+                  <Icon name="camera" size={17} /> Foto
                 </button>
                 <button type="button" role="menuitem" onClick={() => fileInputRef.current?.click()}>
-                  <span>📎</span> File
+                  <Icon name="paperclip" size={17} /> File
                 </button>
                 <button
                   type="button"
@@ -397,7 +398,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
                     setConfirmLocation(true);
                   }}
                 >
-                  <span>📍</span> Posizione
+                  <Icon name="pin" size={17} /> Posizione
                 </button>
               </div>
             )}

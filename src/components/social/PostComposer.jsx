@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Icon from '../shared/Icon';
 import EmojiPicker from './EmojiPicker';
 import GifPicker from './GifPicker';
 import { publishContent } from '../../data/contents';
@@ -234,7 +235,7 @@ export default function PostComposer({
           ) : (
             <img src={gif} alt="GIF selezionata" onError={() => setGifLoadFailed(true)} />
           )}
-          <button type="button" onClick={() => setGif(null)} aria-label="Rimuovi GIF">✕</button>
+          <button type="button" onClick={() => setGif(null)} aria-label="Rimuovi GIF"><Icon name="close" size={16} /></button>
         </div>
       )}
 
@@ -287,7 +288,7 @@ export default function PostComposer({
           <EmojiPicker onSelect={(emoji) => setText((t) => t + emoji)} />
           <button
             type="button"
-            className="rb-composer-icon-btn rb-composer-gif-btn"
+            className="rb-iconbtn rb-composer-gif-btn"
             onClick={() => (requireAuth() ? null : setShowGifPicker((v) => !v))}
             aria-label="Aggiungi una GIF"
             title="GIF"
@@ -297,13 +298,13 @@ export default function PostComposer({
           {!compact && !mediaPreviewUrl && (
             <>
               <label
-                className="rb-composer-icon-btn rb-composer-media-btn"
+                className="rb-iconbtn rb-composer-media-btn"
                 title="Scatta una foto"
                 onClick={(e) => {
                   if (requireAuth()) e.preventDefault();
                 }}
               >
-                📸
+                <Icon name="camera" />
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -313,13 +314,13 @@ export default function PostComposer({
                 />
               </label>
               <label
-                className="rb-composer-icon-btn rb-composer-media-btn"
+                className="rb-iconbtn rb-composer-media-btn"
                 title="Foto o video dalla galleria"
                 onClick={(e) => {
                   if (requireAuth()) e.preventDefault();
                 }}
               >
-                🖼️
+                <Icon name="image" />
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"

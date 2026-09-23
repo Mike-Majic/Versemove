@@ -92,6 +92,16 @@
   border-color: var(--accent, #1d9bf0);
 }
 
+/* Barra in alto in "stile D": niente cornice tonda attorno alle icone, si
+   accende solo lo sfondo al passaggio (vedi styles/icons.css). */
+.rb-topbar .rb-iconbtn {
+  position: relative;
+}
+
+.rb-topbar .rb-iconbtn:hover {
+  transform: none;
+}
+
 .rb-btn-primary {
   background: var(--accent, #1d9bf0);
   color: #06060a;
