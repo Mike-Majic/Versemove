@@ -4,9 +4,10 @@ import { supabase } from './supabaseClient';
 // (richiede un utente loggato, risponde 401 altrimenti — stessa logica di
 // link-preview). Non altera username/menzioni/link, non aggiunge commenti:
 // stesse regole del relay di traduzione usato da Jarvis su Discord.
-// `targetLang` è uno dei codici di SUPPORTED_LANGUAGES (it/en/es/fr/de);
-// se omesso la Edge Function usa l'italiano. Lancia un errore con un
-// messaggio in italiano pronto da mostrare in UI.
+// `targetLang` è uno dei codici di SUPPORTED_LANGUAGES (~80 lingue, vedi
+// src/i18n/index.js); se omesso o non supportato dalla Edge Function usa
+// l'italiano. Lancia un errore con un messaggio in italiano pronto da
+// mostrare in UI.
 export async function translateText(text, targetLang) {
   const trimmed = String(text ?? '').trim();
   if (!trimmed) return trimmed;
