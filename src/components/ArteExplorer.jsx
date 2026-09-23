@@ -7,6 +7,7 @@ import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
 import TattooColumn from './tattoo/TattooColumn';
+import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import { VETRINA_OFFERTE_CATEGORY_IDS } from '../data/vetrinaCategories';
@@ -86,6 +87,8 @@ export default function ArteExplorer({
             <CinemaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} />
           ) : category.id === 'tattoo' ? (
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : category.id === 'giochi-tavolo' ? (
+            <GiochiTavoloColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (

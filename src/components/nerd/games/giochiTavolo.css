@@ -1,0 +1,174 @@
+.rb-giochi-tavolo {
+  padding: 4px 2px 20px;
+  color: #f5f5f7;
+}
+
+.rb-giochi-header h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.rb-giochi-hint {
+  margin: 0 0 16px;
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-giochi-error {
+  color: #ff6b6b;
+  font-size: 12.5px;
+  margin: 0 0 12px;
+}
+
+.rb-giochi-catalogo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.rb-giochi-catalogo-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.rb-giochi-catalogo-icon {
+  font-size: 26px;
+}
+
+.rb-giochi-catalogo-card > div {
+  flex: 1;
+}
+
+.rb-giochi-catalogo-card strong {
+  display: block;
+  font-size: 14px;
+}
+
+.rb-giochi-catalogo-card p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-giochi-lobby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rb-giochi-lobby-header h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.rb-giochi-room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb-giochi-room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.rb-giochi-room-game {
+  font-size: 20px;
+}
+
+.rb-giochi-room-info {
+  flex: 1;
+}
+
+.rb-giochi-room-info strong {
+  display: block;
+  font-size: 13px;
+}
+
+.rb-giochi-room-info span {
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+/* --- Sala d'attesa --- */
+
+.rb-giochi-waiting-players {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+
+.rb-giochi-waiting-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 120px;
+  text-align: center;
+  padding: 14px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rb-giochi-waiting-player.ready {
+  border-color: var(--accent, #d4f634);
+  background: color-mix(in srgb, var(--accent, #d4f634) 12%, transparent);
+}
+
+.rb-giochi-waiting-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rb-giochi-waiting-avatar-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: rgba(245, 245, 247, 0.4);
+}
+
+.rb-giochi-waiting-player strong {
+  font-size: 12.5px;
+}
+
+.rb-giochi-waiting-player span {
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-giochi-waiting-empty {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.rb-giochi-waiting-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
