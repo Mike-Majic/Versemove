@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { listOpenRooms, createRoom, joinRoom, leaveRoom, setRoomReady, fetchRoom, subscribeToGameEvents, unsubscribe } from '../../../data/gameRooms';
 import { startScopaHand } from '../../../data/scopa';
+import { startBurracoHand } from '../../../data/burraco';
 import ScopaTable from './ScopaTable';
+import BurracoTable from './BurracoTable';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import './giochiTavolo.css';
 
-const GAMES = [{ id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane' }];
+const GAMES = [
+  { id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane' },
+  { id: 'burraco', label: 'Burraco', icon: '🎴', tagline: '2 giocatori, mazzo doppio da 108 carte' },
+];
+
+// Ogni gioco ha la sua funzione per far partire la mano e il suo tavolo:
+// aggiungerne uno nuovo vuol dire aggiungerlo qui e alla lista GAMES sopra.
+const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand };
+const TABLES = { scopa: ScopaTable, burraco: BurracoTable };
 
 // Guscio "Giochi da tavolo & carte" del mondo Nerd: lobby (partite aperte a
-// cui unirsi + crea nuova), sala d'attesa (pronto/via) e, quando la stanza
-// passa "in_corso", il tavolo di gioco vero e proprio (ScopaTable). Tutte le
-// regole del gioco restano lato database (vedi data/scopa.js): qui solo
-// interfaccia e sottoscrizione agli eventi della stanza.
+// cui unirsi + crea nuova, per qualunque gioco del catalogo GAMES), sala
+// d'attesa (pronto/via) e, quando la stanza passa "in_corso", il tavolo del
+// gioco scelto (vedi TABLES). Tutte le regole restano lato database (vedi
+// data/scopa.js, data/burraco.js): qui solo interfaccia e sottoscrizione
+// agli eventi della stanza, condivisa da tutti i giochi.
 export default function GiochiTavoloColumn({ user, onOpenAuth }) {
   const [roomId, setRoomId] = useState(null);
 
@@ -29,15 +40,17 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
 
   const refresh = () => {
     setRooms(null);
-    listOpenRooms('scopa').then(setRooms);
+    Promise.all(GAMES.map((g) => listOpenRooms(g.id))).then((lists) => {
+      setRooms(lists.flat().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    });
   };
   useEffect(refresh, []);
 
-  const handleCreate = async () => {
+  const handleCreate = async (gioco) => {
     if (!user) return onOpenAuth?.();
     setBusy(true);
     setError('');
-    const { id, error: err } = await createRoom('scopa', 2);
+    const { id, error: err } = await createRoom(gioco, 2);
     setBusy(false);
     if (err) return setError(err);
     onEnterRoom(id);
@@ -68,7 +81,7 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
               <strong>{g.label}</strong>
               <p>{g.tagline}</p>
             </div>
-            <button type="button" className="rb-btn-primary" onClick={handleCreate} disabled={busy}>
+            <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id)} disabled={busy}>
               + Nuova partita
             </button>
           </div>
@@ -92,7 +105,7 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
             <li key={r.id} className="rb-giochi-room-item">
               <span className="rb-giochi-room-game">{GAMES.find((g) => g.id === r.gioco)?.icon ?? '🎲'}</span>
               <div className="rb-giochi-room-info">
-                <strong>Scopa · {r.creatore?.name ?? 'Utente'}</strong>
+                <strong>{GAMES.find((g) => g.id === r.gioco)?.label ?? 'Partita'} · {r.creatore?.name ?? 'Utente'}</strong>
                 <span>In attesa di un avversario</span>
               </div>
               <button type="button" className="rb-btn-primary" onClick={() => handleJoin(r.id)} disabled={busy}>
@@ -133,10 +146,10 @@ function RoomView({ roomId, user, onExit }) {
   useEffect(() => {
     if (room?.stato === 'in_attesa' && bothReady && me?.posizione === 0 && !startAttemptedRef.current) {
       startAttemptedRef.current = true;
-      startScopaHand(roomId);
+      START_HAND[room.gioco]?.(roomId);
     }
     if (!bothReady) startAttemptedRef.current = false;
-  }, [room?.stato, bothReady, me?.posizione, roomId]);
+  }, [room?.stato, room?.gioco, bothReady, me?.posizione, roomId]);
 
   const toggleReady = async () => {
     setError('');
@@ -167,15 +180,17 @@ function RoomView({ roomId, user, onExit }) {
   }
 
   if (room.stato === 'in_corso') {
-    return <ScopaTable roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />;
+    const Table = TABLES[room.gioco];
+    return <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />;
   }
 
   const opponent = room.giocatori.find((g) => g.userId !== user?.id);
+  const gameLabel = GAMES.find((g) => g.id === room.gioco)?.label ?? 'Partita';
 
   return (
     <div className="rb-giochi-tavolo">
       <div className="rb-giochi-header">
-        <h3>Scopa · Sala d'attesa</h3>
+        <h3>{gameLabel} · Sala d'attesa</h3>
         <p className="rb-giochi-hint">Quando siete entrambi pronti la partita comincia da sola.</p>
       </div>
 
