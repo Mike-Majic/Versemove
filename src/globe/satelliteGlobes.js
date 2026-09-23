@@ -9,10 +9,10 @@ const DEG2RAD = Math.PI / 180;
 
 // Raggio intrinseco della geometria di un satellite (fisso, uguale per
 // tutti: mai ricreata, vedi buildSatelliteGlobes). La dimensione APPARENTE
-// varia invece per slot tramite una scala (vedi wavePoint sotto e
-// slotScale in setActiveWorld) — cambiare solo la scala, mai la geometria,
-// evita di ricompilare gli shader ad ogni cambio di mondo (il costo vero
-// del blocco durante il warp misurato in origine, vedi commento più giù).
+// varia invece per satellite tramite una scala ricalcolata ad ogni
+// fotogramma in update() — cambiare solo la scala, mai la geometria, evita
+// di ricompilare gli shader ad ogni cambio di mondo (il costo vero del
+// blocco durante il warp misurato in origine, vedi commento più giù).
 const SATELLITE_RADIUS = 30;
 const SATELLITE_DETAIL = 2;
 
@@ -46,24 +46,31 @@ const RING_SWING_TALL = 95;
 // così il posto 6 finisce esattamente dietro al globo.
 const RING_START_DEG = 90;
 
-// Servono solo per dare a ogni sfera il raggio giusto: le posizioni hanno
-// profondità molto diverse, quindi il raggio in scena si calcola sulla
-// distanza dalla camera, altrimenti quelle davanti sembrano palloni e quelle
-// dietro puntini.
-const CAMERA_DISTANCE_GUESS = 700;
+// Taglia apparente voluta di OGNI satellite, in pixel — stessa per tutti
+// (richiesta esplicita: tutti come "Vetrina", nessuno più grande/piccolo
+// degli altri). Il raggio 3D vero che la produce si ricava dalla distanza
+// REALE dalla camera, ricalcolata ad ogni fotogramma in update() (non più
+// una volta sola qui, su una distanza camera solo indovinata): altrimenti,
+// appena l'utente zooma o ruota la vista, ogni satellite si sbilancia in
+// modo diverso dagli altri (bug segnalato dal vivo — "Incontri" enorme e
+// "Vetrina" minuscola nello stesso schermo). Il testo dell'etichetta scala
+// insieme alla sfera (stesso gruppo, stessa scala), quindi si sistema da sé.
 const PROJECTION_PX = 957;
-const BEAD_PX_WIDE = 46; // taglia apparente voluta, in pixel
+const BEAD_PX_WIDE = 46;
 const BEAD_PX_TALL = 36;
 
 function isNarrow() {
   return typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
 }
 
+function targetBeadPx() {
+  return isNarrow() ? BEAD_PX_TALL : BEAD_PX_WIDE;
+}
+
 function wavePoint(index, total) {
   const narrow = isNarrow();
   const R = narrow ? RING_RADIUS_TALL : RING_RADIUS_WIDE;
   const swing = narrow ? RING_SWING_TALL : RING_SWING_WIDE;
-  const beadPx = narrow ? BEAD_PX_TALL : BEAD_PX_WIDE;
   const a = (RING_START_DEG - (index * 360) / Math.max(total, 1)) * DEG2RAD;
   // Cerchio orizzontale attorno al globo (piano XZ) + zigzag su e giù.
   const pos = new THREE.Vector3(
@@ -71,10 +78,7 @@ function wavePoint(index, total) {
     index % 2 === 0 ? swing : -swing,
     Math.sin(a) * R
   );
-  const dist = Math.sqrt(pos.x * pos.x + pos.y * pos.y + (CAMERA_DISTANCE_GUESS - pos.z) ** 2);
-  const proximity = 0.7 + 0.3 * Math.max(0, Math.min(1, (dist - 220) / 220));
-  const radius = Math.round((beadPx * dist) / (PROJECTION_PX * proximity));
-  return { pos, radius };
+  return { pos };
 }
 
 // Distanza minima ASSOLUTA dalla camera: se un satellite risultasse più
@@ -384,9 +388,7 @@ export function buildSatelliteGlobes({ worlds }) {
       if (!sat.visible) return;
       const slotIndex = slotOf.get(id);
       if (slotIndex === undefined) return;
-      const slot = wavePoint(slotIndex, totalSlots);
-      sat.userData.basePosRef = slot.pos;
-      sat.userData.slotScale = slot.radius / SATELLITE_RADIUS;
+      sat.userData.basePosRef = wavePoint(slotIndex, totalSlots).pos;
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
   }
@@ -410,6 +412,7 @@ export function buildSatelliteGlobes({ worlds }) {
     const nowMs = performance.now();
     const camPos = camera.position;
     const globeDistToCam = camPos.length();
+    const beadPx = targetBeadPx();
 
     for (const sat of satellites) {
       if (!sat.visible) continue;
@@ -462,7 +465,14 @@ export function buildSatelliteGlobes({ worlds }) {
       );
       const proximityScale = PROXIMITY_SCALE_MIN + (1 - PROXIMITY_SCALE_MIN) * proximityT;
 
-      sat.scale.setScalar(ud.slotScale * spawnT * warpScale * proximityScale);
+      // Raggio 3D vero calcolato sulla distanza REALE dalla camera in
+      // questo fotogramma (mai una distanza indovinata una tantum): dà a
+      // tutti i satelliti la stessa taglia apparente sullo schermo
+      // (beadPx), qualunque sia la loro profondità o quanto l'utente abbia
+      // zoomato/ruotato la vista.
+      const slotScale = (beadPx * naturalDistToCam) / (PROJECTION_PX * SATELLITE_RADIUS);
+
+      sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
       ud.opacityMeshes.forEach(({ mesh, baseOpacity }) => {
         mesh.material.opacity = baseOpacity * spawnT * depthFactor;
       });
