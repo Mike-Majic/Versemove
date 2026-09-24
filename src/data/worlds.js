@@ -31,25 +31,28 @@ export const WORLDS = [
     id: 'animali',
     label: 'Animali',
     tagline: 'Luoghi pet-friendly vicino a te',
-    // Richiesta esplicita: puntini marrone chiaro, linee verde scuro,
+    // Richiesta esplicita: color sabbia (non chiaro), linee verde scuro,
     // lineamenti dei continenti bianchi. Stessa "grandezza" (una sola
     // categoria) del mondo Lavoro: qui c'è solo "Cani" (la mappa reale di
     // luoghi pet-friendly + recensioni, DogWorldMap), spostata qui dal
     // mondo Vetrina.
-    // Un marrone troppo desaturato (vicino al beige) si "lava" quasi bianco
-    // sui puntini della rete, che usano blending additivo — vedi il
-    // commento su Incontri più sotto, stesso fenomeno: qui serve un
-    // marrone più saturo (canale verde/blu più bassi rispetto al rosso)
-    // perché resti leggibile come marrone anche dopo l'additivo.
-    color: '#b8794a',
-    colorSoft: 'rgba(184, 121, 74, 0.18)',
-    globeColor: '#140f08',
-    atmosphereColor: '#b8794a',
+    // Sabbia media #c2a878 (scelta da Mike su foto di confronto, 24/9): sui
+    // puntini della rete, che usano blending additivo, un colore così poco
+    // saturo esce comunque quasi crema — vedi il commento su Incontri più
+    // sotto — quindi il colore del mondo si vede soprattutto sul
+    // riempimento dei continenti qui sotto e sull'alone.
+    color: '#c2a878',
+    colorSoft: 'rgba(194, 168, 120, 0.18)',
+    globeColor: '#1a1509',
+    atmosphereColor: '#c2a878',
     lineColor: '#1a4d2e',
     // Contorni dei continenti bianchi (vedi landStrokeColor in
-    // WorldGlobe.jsx); il riempimento resta quello di default di tutti i
-    // mondi (colore del mondo al 10%), non il bianco pieno di Lavoro.
+    // WorldGlobe.jsx) e riempimento sabbia al 35%: con il velo di default
+    // (10%) il colore del mondo non si vedeva quasi, il globo restava
+    // scuro con una punta di marrone.
     landStrokeColor: '#ffffff',
+    landFillColor: '#c2a878',
+    landFillOpacity: 0.35,
     textOnGlobe: '#fdf6ec',
   },
   {
