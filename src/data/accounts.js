@@ -588,18 +588,12 @@ export async function updateOwnSocialExtra(cittaOrigine, statoRelazionale, lingu
 }
 
 // Gamertag (profiles.gamertags, oggetto con chiavi psn/xbox/steam/epic/
-// nintendo/battlenet/riot/ea, vedi data/gaming.js): update diretto della
-// propria riga. Se il server non ha (ancora) un permesso di UPDATE su
-// profiles la richiesta non tocca righe: si dice chiaramente invece di
-// far finta di aver salvato.
+// nintendo/battlenet/riot/ea, vedi data/gaming.js): RPC update_own_gamertags,
+// che tocca solo la propria riga e solo quella colonna (profiles non ha
+// un permesso di UPDATE diretto). Gli altri li leggono da public_profiles.
 export async function updateOwnGamertags(gamertags) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return { error: 'Devi essere loggato.' };
-  const { data, error } = await supabase.from('profiles').update({ gamertags }).eq('id', session.user.id).select('id');
+  const { error } = await supabase.rpc('update_own_gamertags', { p_gamertags: gamertags ?? {} });
   if (error) return { error: error.message };
-  if (!data?.length) {
-    return { error: 'Il server non permette ancora di salvare i gamertag (manca il permesso di modifica del profilo). Riprova più avanti.' };
-  }
   return {};
 }
 

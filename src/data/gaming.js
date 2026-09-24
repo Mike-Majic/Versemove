@@ -289,11 +289,9 @@ export async function fetchTitlePlayers(titleId) {
 }
 
 // ---------------------------------------------------------------------------
-// Gamertag degli altri: si leggono dalla vista pubblica se la espone
-// (public_profiles.gamertags). Se la colonna non c'è ancora la vista
-// risponde con un errore e qui si torna una mappa vuota: l'interfaccia
-// mostra i gamertag appena il server li rende leggibili, senza cambiare
-// nulla qui.
+// Gamertag degli altri, dalla vista pubblica (public_profiles.gamertags,
+// visibile a chi non è bloccato, come il resto del Profilo Social). In
+// caso di errore si torna una mappa vuota: la lista resta, senza chip.
 export async function fetchGamertagsMap(ids) {
   const unique = Array.from(new Set((ids ?? []).filter(Boolean)));
   if (!unique.length) return new Map();
