@@ -4,6 +4,7 @@ import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
 import { SATELLITE_SPIN_PERIOD_S } from '../fx/globeRotation';
+import { PX, COLLAPSE_S, REVIVE_S, addSuckWarp, buildBlackHole, collapsePhase, makeDisabledTagSprite, revivePhase } from './blackHole';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -217,6 +218,15 @@ function buildSideLitNodeMaterial() {
 
 function buildSatelliteMesh(world) {
   const group = new THREE.Group();
+  // Il "corpo" (nucleo, rete, nodi, continenti) sta in un sottogruppo: è lui
+  // a ruotare su se stesso, non l'intero satellite, così l'etichetta e il
+  // buco nero di un mondo disattivato (vedi blackHole.js) restano fermi.
+  const body = new THREE.Group();
+  group.add(body);
+  // Risucchio a spirale del corpo quando il mondo viene disattivato (0 =
+  // fermo, 1 = inghiottito): un solo uniform condiviso da tutti i suoi
+  // materiali, vedi addSuckWarp.
+  const suck = { value: 0 };
 
   const coreGeometry = new THREE.IcosahedronGeometry(SATELLITE_RADIUS, SATELLITE_DETAIL);
   const coreMaterial = new THREE.MeshBasicMaterial({
@@ -228,7 +238,7 @@ function buildSatelliteMesh(world) {
   const core = new THREE.Mesh(coreGeometry, coreMaterial);
   core.userData.worldId = world.id;
   core.userData.isSatellite = true;
-  group.add(core);
+  body.add(core);
 
   // Come nel guscio del globo grande (vedi applyOverlayColor in
   // WorldGlobe.jsx): un mondo può avere un world.lineColor separato solo
@@ -244,7 +254,7 @@ function buildSatelliteMesh(world) {
   });
   const net = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeometry), netMaterial);
   net.renderOrder = 2;
-  group.add(net);
+  body.add(net);
 
   const nodeMaterial =
     world.nodeShading === 'luce-laterale'
@@ -260,10 +270,12 @@ function buildSatelliteMesh(world) {
         });
   const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
   nodes.renderOrder = 2;
-  group.add(nodes);
+  body.add(nodes);
+  [coreMaterial, netMaterial, nodeMaterial].forEach((m) => addSuckWarp(m, suck));
 
   const { sprite: label } = makeLabelSprite(world.label, SATELLITE_RADIUS * 1.1);
   label.position.set(0, SATELLITE_RADIUS * 1.6, 0);
+  label.renderOrder = 10;
   group.add(label);
 
   // Guscio per i contorni reali dei continenti (vedi setContinentMap più
@@ -272,19 +284,31 @@ function buildSatelliteMesh(world) {
   // mette in cache), viene riusato qui senza una seconda richiesta di rete.
   const continentGroup = new THREE.Group();
   continentGroup.visible = false;
-  group.add(continentGroup);
+  body.add(continentGroup);
 
   group.userData.worldId = world.id;
+  group.userData.world = world;
+  group.userData.body = body;
+  group.userData.suck = suck;
+  group.userData.label = label;
+  group.userData.labelBase = { y: label.position.y, sx: label.scale.x, sy: label.scale.y };
+  // Buco nero (vedi setDisabledWorlds): costruito solo al primo bisogno.
+  group.userData.hole = null;
+  group.userData.holeState = 'none'; // none | collapsing | hole | reviving
+  group.userData.holeStartMs = 0;
+  group.userData.holeT = 0;
   group.userData.hitMesh = core;
   group.userData.continentGroup = continentGroup;
   // Il nucleo NON è più in questa lista: è opaco, la sua opacity è sempre
   // 1 e non deve mai sfumare (né per foschia né per occlusione, richiesta
   // esplicita — "davanti l'opacità resta 1"). Sfumano solo le decorazioni
   // trasparenti sopra di lui.
+  // part: a quale moltiplicatore risponde durante disattivazione e
+  // riattivazione (corpo che sparisce nel buco, etichetta che ci cade dentro).
   group.userData.opacityMeshes = [
-    { mesh: net, baseOpacity: 0.85 },
-    { mesh: nodes, baseOpacity: 1 },
-    { mesh: label, baseOpacity: 1 },
+    { mesh: net, baseOpacity: 0.85, part: 'body' },
+    { mesh: nodes, baseOpacity: 1, part: 'body' },
+    { mesh: label, baseOpacity: 1, part: 'label' },
   ];
   // Velocità di rotazione propria: stesso giro pulito per tutti, richiesto
   // esplicitamente dall'utente al posto del valore casuale di prima (vedi
@@ -398,10 +422,11 @@ export function buildSatelliteGlobes({ worlds }) {
 
       continentGeometries.forEach((geometry) => {
         const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
+        addSuckWarp(material, sat.userData.suck);
         const lines = new THREE.LineSegments(geometry, material);
         lines.renderOrder = 2;
         continentGroup.add(lines);
-        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85 });
+        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85, part: 'body' });
       });
 
       continentGroup.visible = true;
@@ -440,6 +465,69 @@ export function buildSatelliteGlobes({ worlds }) {
       sat.userData.basePosRef = wavePoint(slotIndex, totalSlots).pos;
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
+  }
+
+  // Mondi disattivati dall'utente (Impostazioni -> Mondi): al posto del
+  // satellite resta un buco nero che continua a risucchiare (vedi
+  // blackHole.js). animate: true quando la disattivazione avviene adesso
+  // (risucchio del globo in ~7 s, poi buco nero stabile) o quando un mondo
+  // viene riattivato (il globo si srotola fuori in ~1,6 s); false per lo
+  // stato già salvato all'apertura dell'app, che compare direttamente.
+  function ensureHole(sat, index) {
+    const ud = sat.userData;
+    if (ud.hole) return ud.hole;
+    const hole = buildBlackHole(ud.world, 7 + index * 131);
+    const billboard = new THREE.Group();
+    billboard.add(hole.group);
+    sat.add(billboard);
+    const { sprite: dimLabel } = makeLabelSprite(ud.world.label, SATELLITE_RADIUS * 1.1, '#8d8d9a');
+    dimLabel.position.set(0, 60 * PX, 0);
+    dimLabel.renderOrder = 10;
+    const tag = makeDisabledTagSprite(SATELLITE_RADIUS * 0.34);
+    tag.position.set(0, 30 * PX, 0);
+    sat.add(dimLabel, tag);
+    ud.hole = { ...hole, billboard, dimLabel, tag };
+    return ud.hole;
+  }
+
+  function setDisabledWorlds(worldIds, { animate = false } = {}) {
+    const disabled = new Set(worldIds);
+    const nowMs = performance.now();
+    satellites.forEach((sat, index) => {
+      const ud = sat.userData;
+      const off = disabled.has(ud.worldId);
+      if (off && (ud.holeState === 'none' || ud.holeState === 'reviving')) {
+        ensureHole(sat, index);
+        ud.holeState = animate ? 'collapsing' : 'hole';
+        ud.holeStartMs = nowMs;
+      } else if (!off && (ud.holeState === 'hole' || ud.holeState === 'collapsing')) {
+        ud.holeState = animate ? 'reviving' : 'none';
+        ud.holeStartMs = nowMs;
+      }
+    });
+  }
+
+  function isDisabled(worldId) {
+    const state = satellitesById.get(worldId)?.userData.holeState;
+    return state === 'hole' || state === 'collapsing';
+  }
+
+  // Fase del buco nero per questo fotogramma (null = satellite normale).
+  function holePhase(ud, nowMs, reduceMotion) {
+    const t = (nowMs - ud.holeStartMs) / 1000;
+    if (ud.holeState === 'collapsing') {
+      if (reduceMotion || t >= COLLAPSE_S) ud.holeState = 'hole';
+      return collapsePhase(ud.holeState === 'hole' ? Infinity : t);
+    }
+    if (ud.holeState === 'hole') return collapsePhase(Infinity);
+    if (ud.holeState === 'reviving') {
+      if (reduceMotion || t >= REVIVE_S) {
+        ud.holeState = 'none';
+        return null;
+      }
+      return revivePhase(t);
+    }
+    return null;
   }
 
   // Rotazione propria (sempre attiva, tranne con "Riduci animazioni") più
@@ -483,7 +571,7 @@ export function buildSatelliteGlobes({ worlds }) {
 
       ud.basePos = basePos;
       sat.position.copy(basePos);
-      if (!reduceMotion) sat.rotation.y += ud.spinSpeed * deltaSec;
+      if (!reduceMotion) ud.body.rotation.y += ud.spinSpeed * deltaSec;
 
       // Foschia leggera solo per le decorazioni trasparenti (mai per il
       // nucleo, opaco e sempre a piena opacità — vedi sopra), e solo se il
@@ -530,8 +618,56 @@ export function buildSatelliteGlobes({ worlds }) {
         (beadPx * referenceCamDist * naturalDistToCam) / (globeDistToCam * PROJECTION_PX * SATELLITE_RADIUS);
 
       sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
-      ud.opacityMeshes.forEach(({ mesh, baseOpacity }) => {
-        mesh.material.opacity = baseOpacity * spawnT * depthFactor;
+
+      // Buco nero di un mondo disattivato (vedi setDisabledWorlds).
+      const phase = ud.holeState === 'none' ? null : holePhase(ud, nowMs, reduceMotion);
+      let bodyMul = 1;
+      let labelMul = 1;
+      const label = ud.label;
+      const base = ud.labelBase;
+      ud.suck.value = phase ? phase.suck : 0;
+      ud.body.visible = !phase || phase.suck < 1;
+      if (phase) {
+        bodyMul = 1 - THREE.MathUtils.clamp((phase.suck - 0.75) / 0.25, 0, 1);
+        labelMul = phase.oldLabel;
+      }
+      if (phase && ud.holeState === 'collapsing') {
+        // L'etichetta trema, gira e cade nel buco insieme al mondo.
+        const e = phase.suck * phase.suck * phase.suck;
+        const jitter = phase.born > 0 && phase.suck < 1 ? Math.sin(elapsedSec * 40) * 2 * PX : 0;
+        label.position.set(jitter, base.y * (1 - e), 0);
+        label.material.rotation = e * 2.4;
+        label.scale.set(base.sx * (1 - 0.8 * phase.suck), base.sy * (1 - 0.8 * phase.suck), 1);
+      } else if (label.material.rotation !== 0 || label.position.y !== base.y) {
+        label.position.set(0, base.y, 0);
+        label.material.rotation = 0;
+        label.scale.set(base.sx, base.sy, 1);
+      }
+      label.visible = labelMul > 0.001;
+
+      const hole = ud.hole;
+      if (hole) {
+        hole.billboard.visible = Boolean(phase);
+        hole.dimLabel.visible = Boolean(phase) && phase.newLabel > 0.001;
+        hole.tag.visible = hole.dimLabel.visible;
+        if (phase) {
+          if (!reduceMotion) ud.holeT += deltaSec;
+          // Cartellone rivolto alla camera e spostato verso di lei di un
+          // raggio: il nucleo opaco del satellite non copre il buco mentre
+          // il mondo ci cade dentro.
+          hole.billboard.quaternion.copy(camera.quaternion);
+          _toCam.copy(camPos).sub(sat.position).normalize().multiplyScalar(SATELLITE_RADIUS * 1.05);
+          hole.billboard.position.copy(_toCam);
+          const fade = spawnT * depthFactor;
+          hole.update(ud.holeT, phase, fade, sat.scale.x);
+          hole.dimLabel.material.opacity = phase.newLabel * 0.9 * fade;
+          hole.tag.material.opacity = phase.newLabel * fade;
+        }
+      }
+
+      ud.opacityMeshes.forEach(({ mesh, baseOpacity, part }) => {
+        const mul = part === 'body' ? bodyMul : part === 'label' ? labelMul : 1;
+        mesh.material.opacity = baseOpacity * spawnT * depthFactor * mul;
       });
     }
   }
@@ -561,6 +697,8 @@ export function buildSatelliteGlobes({ worlds }) {
     setWarpTarget,
     getWorldLatLng,
     setContinentMap,
+    setDisabledWorlds,
+    isDisabled,
     dispose,
   };
 }

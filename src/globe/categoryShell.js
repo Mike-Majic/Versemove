@@ -579,7 +579,9 @@ function wrapLabelLines(ctx, text, singleLineMax) {
 // dietro al testo garantisce contrasto anche sopra ai puntini dei continenti. Il
 // canvas si allarga quanto serve al testo (mai più stretto di prima, per le
 // etichette corte): niente viene mai tagliato ai bordi.
-export function makeLabelSprite(text, spriteScale) {
+// textColor: colore del testo (default bianco); il satellite di un mondo
+// disattivato usa un grigio spento (vedi satelliteGlobes.js).
+export function makeLabelSprite(text, spriteScale, textColor = '#ffffff') {
   const canvasScale = 4;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -622,7 +624,7 @@ export function makeLabelSprite(text, spriteScale) {
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = textColor;
   const startY = canvasH / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, i) => ctx.fillText(line, centerX, startY + i * lineHeight));
 

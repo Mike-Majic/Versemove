@@ -224,6 +224,8 @@ export default function WorldGlobe({
   events = [],
   onSelectEvent,
   onWarpArrived,
+  disabledWorlds,
+  onDisabledWorldClick,
   warpRequest,
 }) {
   const globeRef = useRef();
@@ -811,6 +813,23 @@ export default function WorldGlobe({
     }, WARP_DIVE_MS);
   };
 
+  // Mondi disattivati dall'utente: buco nero al posto del satellite (vedi
+  // globe/blackHole.js). disabledWorlds = { key: 'id1,id2', animate }
+  // (vedi App.jsx): animate solo per un cambio fatto adesso dall'utente,
+  // mai al primo giro (stato già salvato all'apertura dell'app). Durante
+  // l'animazione il disegno resta a pieno regime.
+  const disabledFirstRunRef = useRef(true);
+  useEffect(() => {
+    const sats = satellitesRef.current;
+    if (!sats || !disabledWorlds) return;
+    const ids = disabledWorlds.key ? disabledWorlds.key.split(',') : [];
+    const animate = disabledWorlds.animate && !disabledFirstRunRef.current;
+    disabledFirstRunRef.current = false;
+    sats.setDisabledWorlds(ids, { animate });
+    if (animate) globeActivity.wake(8000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabledWorlds]);
+
   // Scorciatoia da App.jsx: il selettore a icone a destra fa partire lo
   // stesso identico warp di un click sul satellite, non un cambio istantaneo.
   useEffect(() => {
@@ -818,7 +837,9 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warpRequest]);
 
-  // Click su un satellite: fa partire il warp verso quel mondo.
+  // Click su un satellite: fa partire il warp verso quel mondo. Su un buco
+  // nero (mondo disattivato) invece niente warp: App.jsx mostra lì accanto
+  // "Riattiva mondo".
   useEffect(() => {
     const g = globeRef.current;
     if (!g || !onWarpArrived) return undefined;
@@ -841,7 +862,13 @@ export default function WorldGlobe({
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
       const hits = raycaster.intersectObjects(satellitesRef.current.getHitMeshes());
-      if (hits.length > 0) runWarp(hits[0].object.userData.worldId);
+      if (hits.length === 0) return;
+      const worldId = hits[0].object.userData.worldId;
+      if (satellitesRef.current.isDisabled(worldId) && onDisabledWorldClick) {
+        onDisabledWorldClick({ worldId, x: e.clientX, y: e.clientY });
+        return;
+      }
+      runWarp(worldId);
     };
 
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -851,7 +878,7 @@ export default function WorldGlobe({
       canvas.removeEventListener('pointerup', onPointerUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onWarpArrived]);
+  }, [onWarpArrived, onDisabledWorldClick]);
 
   useEffect(() => {
     const g = globeRef.current;

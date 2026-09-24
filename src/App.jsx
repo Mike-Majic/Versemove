@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORY_FLY_MS, CATEGORY_CLOSE_MS } from './fx/timing';
 import { lazyWithRetry } from './fx/lazyWithRetry';
@@ -6,6 +6,7 @@ import { translateWorld } from './i18n/worldLabels';
 import { translateCategoryLabel } from './i18n/categoryLabels';
 import { setAppLanguage } from './i18n';
 import TopBar from './components/TopBar';
+import DisabledWorldPopover from './components/DisabledWorldPopover';
 import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
@@ -229,6 +230,32 @@ export default function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Mondi disattivati dall'utente (Impostazioni -> Mondi): sul mappamondo il
+  // loro satellite diventa un buco nero (vedi globe/blackHole.js). Il globo
+  // riceve l'elenco solo a Impostazioni chiuse, così la disattivazione si
+  // vede davvero (su telefono il pannello copre tutto) invece di finire
+  // dietro. animate: il cambio l'ha fatto adesso lo stesso utente (dalle
+  // Impostazioni o da "Riattiva mondo"); un login o un cambio account
+  // mostrano invece subito lo stato salvato, senza animazione. FAQ e Work in
+  // progress non si possono disattivare (vedi worldDisabledByUser più giù).
+  const disabledWorldsKey = user
+    ? WORLDS.filter((w) => w.id !== 'faq' && w.id !== 'wip' && !(user.mondiAbilitati ?? []).includes(w.id))
+        .map((w) => w.id)
+        .join(',')
+    : '';
+  const globeUserId = user?.id ?? null;
+  const [globeDisabledWorlds, setGlobeDisabledWorlds] = useState({ key: disabledWorldsKey, userId: globeUserId, animate: false });
+  if (!settingsOpen && (globeDisabledWorlds.key !== disabledWorldsKey || globeDisabledWorlds.userId !== globeUserId)) {
+    setGlobeDisabledWorlds({
+      key: disabledWorldsKey,
+      userId: globeUserId,
+      animate: globeDisabledWorlds.userId !== null && globeDisabledWorlds.userId === globeUserId,
+    });
+  }
+  // Riquadro "Riattiva mondo" aperto cliccando un buco nero: { worldId, x, y }.
+  const [disabledWorldPopover, setDisabledWorldPopover] = useState(null);
+  const closeDisabledWorldPopover = useCallback(() => setDisabledWorldPopover(null), []);
 
   const [filters, setFilters] = useState(() => loadStored('rb-filters', DEFAULT_FILTERS));
   const [locationFilters, setLocationFilters] = useState(() => loadStored('rb-location-filters', DEFAULT_LOCATION_FILTERS));
@@ -960,6 +987,8 @@ export default function App() {
           events={world.id === 'social' ? visibleEvents : []}
           onSelectEvent={(eventId) => setEventLikersId(eventId)}
           warpRequest={warpRequest}
+          disabledWorlds={globeDisabledWorlds}
+          onDisabledWorldClick={user ? setDisabledWorldPopover : undefined}
           onWarpArrived={(worldId) => {
             const i = WORLDS.findIndex((w) => w.id === worldId);
             if (i !== -1) setIndex(i);
@@ -1259,6 +1288,16 @@ export default function App() {
             onNavigate={openNotificationTarget}
           />
         </Suspense>
+      )}
+
+      {disabledWorldPopover && user && (
+        <DisabledWorldPopover
+          {...disabledWorldPopover}
+          user={user}
+          onClose={closeDisabledWorldPopover}
+          onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
       )}
 
       {exitToastVisible && (
