@@ -305,3 +305,146 @@ export async function fetchGamertagsMap(ids) {
     return new Map();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cerco compagni (gaming_lfg + gaming_lfg_members, tutte e due su Realtime).
+// L'autore è anche membro (riga in gaming_lfg_members): "posti" conta gli
+// altri, quindi i posti occupati sono i membri meno l'autore.
+
+function mapLfg(row) {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    categoria: row.categoria,
+    piattaforma: row.piattaforma,
+    titleId: row.title_id ?? null,
+    gioco: row.gioco_nome,
+    modalita: row.modalita ?? '',
+    quando: row.quando,
+    posti: row.posti,
+    mic: Boolean(row.mic),
+    lingua: row.lingua ?? 'it',
+    note: row.note ?? '',
+    stato: row.stato,
+    videoRoomId: row.video_room_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+// Annunci aperti della categoria (più quelli chiusi di cui si è membri,
+// che la RLS lascia vedere), ordinati per quando, con autore, membri
+// (senza l'autore) e gioco del catalogo.
+export async function fetchLfgList(categoria) {
+  const { data, error } = await supabase
+    .from('gaming_lfg')
+    .select('*')
+    .eq('categoria', categoria)
+    .eq('stato', 'aperto')
+    .order('quando', { ascending: true });
+  if (error || !data) return [];
+  return hydrateLfg(data.map(mapLfg));
+}
+
+export async function fetchLfg(id) {
+  if (!id) return null;
+  const { data } = await supabase.from('gaming_lfg').select('*').eq('id', id).maybeSingle();
+  if (!data) return null;
+  const [one] = await hydrateLfg([mapLfg(data)]);
+  return one ?? null;
+}
+
+async function hydrateLfg(list) {
+  if (!list.length) return [];
+  const ids = list.map((l) => l.id);
+  const { data: memberRows } = await supabase
+    .from('gaming_lfg_members')
+    .select('lfg_id, user_id, joined_at')
+    .in('lfg_id', ids)
+    .order('joined_at', { ascending: true });
+  const members = memberRows ?? [];
+  const userIds = [...list.map((l) => l.authorId), ...members.map((m) => m.user_id)];
+  const [profiles, gamertags, titles] = await Promise.all([
+    fetchProfilesMap(userIds),
+    fetchGamertagsMap(userIds),
+    fetchTitles(list.map((l) => l.titleId)),
+  ]);
+  const profileOf = (id) => ({ ...(profiles.get(id) ?? { id, name: 'Utente', avatar: '' }), gamertags: gamertags.get(id) ?? {} });
+  return list.map((l) => ({
+    ...l,
+    author: profileOf(l.authorId),
+    title: l.titleId ? titles.get(l.titleId) ?? null : null,
+    members: members
+      .filter((m) => m.lfg_id === l.id && m.user_id !== l.authorId)
+      .map((m) => ({ userId: m.user_id, joinedAt: m.joined_at, profile: profileOf(m.user_id) })),
+  }));
+}
+
+const rpcVoid = async (name, args) => {
+  const { error } = await supabase.rpc(name, args);
+  return error ? { error: error.message } : {};
+};
+
+// -> { id } | { error }. Massimo 5 annunci aperti a testa, data fra ora e
+// 30 giorni: lo dice il server, in italiano.
+export async function createLfg({ categoria, giocoNome, quando, posti, titleId = null, modalita = null, mic = true, lingua = 'it', note = null }) {
+  const { data, error } = await supabase.rpc('create_gaming_lfg', {
+    p_categoria: categoria,
+    p_gioco_nome: String(giocoNome ?? '').trim(),
+    p_quando: quando,
+    p_posti: posti,
+    p_title_id: titleId,
+    p_modalita: modalita?.trim() || null,
+    p_mic: Boolean(mic),
+    p_lingua: lingua || 'it',
+    p_note: note?.trim() || null,
+  });
+  if (error) return { error: error.message };
+  return { id: data };
+}
+
+export const joinLfg = (id) => rpcVoid('join_gaming_lfg', { p_id: id });
+export const leaveLfg = (id) => rpcVoid('leave_gaming_lfg', { p_id: id });
+export const kickLfg = (id, userId) => rpcVoid('kick_gaming_lfg', { p_id: id, p_user: userId });
+export const closeLfg = (id) => rpcVoid('close_gaming_lfg', { p_id: id });
+
+// Solo l'autore: crea (o riusa) la stanza video di gruppo dell'annuncio
+// e restituisce il suo id.
+export async function openLfgRoom(id) {
+  const { data, error } = await supabase.rpc('open_gaming_lfg_room', { p_id: id });
+  if (error) return { error: error.message };
+  return { roomId: data };
+}
+
+// Un canale per categoria: qualunque cambiamento agli annunci di quella
+// categoria o ai membri (che non hanno la categoria: si filtra dopo)
+// chiama onChange(). Da rimuovere con supabase.removeChannel.
+export function subscribeLfg(categoria, onChange) {
+  return supabase
+    .channel(`gaming-lfg-${categoria}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gaming_lfg', filter: `categoria=eq.${categoria}` }, () => onChange())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gaming_lfg_members' }, () => onChange())
+    .subscribe();
+}
+
+// "Oggi 21:30", "Domani 18:00", "gio 26 · 21:30".
+export function formatLfgWhen(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const today = new Date();
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (sameDay(d, today)) return `Oggi ${time}`;
+  if (sameDay(d, tomorrow)) return `Domani ${time}`;
+  return `${d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' })} · ${time}`;
+}
+
+// Fra 1 ora, arrotondato ai 15 minuti, nel formato di <input type="datetime-local">.
+export function defaultLfgWhen() {
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  d.setSeconds(0, 0);
+  d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

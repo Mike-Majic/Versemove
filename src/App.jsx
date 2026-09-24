@@ -9,6 +9,7 @@ import TopBar from './components/TopBar';
 import DisabledWorldPopover from './components/DisabledWorldPopover';
 import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
+import { fetchLfg } from './data/gaming';
 import { usersForWorld } from './data/mockUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
@@ -328,6 +329,8 @@ export default function App() {
   const [focusPost, setFocusPost] = useState(null);
   // Profilo aperto cliccando una "@menzione" fuori dal feed Social.
   const [mentionProfileId, setMentionProfileId] = useState(null);
+  // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
+  const [gamingFocus, setGamingFocus] = useState(null);
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
@@ -889,6 +892,17 @@ export default function App() {
       }
       return;
     }
+    if (tipo === 'lfg_join' || tipo === 'lfg_leave' || tipo === 'lfg_kick') {
+      // Cerco compagni: la categoria giusta del mondo Nerd con l'annuncio
+      // evidenziato. Se l'annuncio non è più leggibile (chiuso, espulso)
+      // si apre comunque Gaming PC.
+      const lfgId = notif.riferimentoId ?? null;
+      fetchLfg(lfgId).then((lfg) => {
+        setGamingFocus(lfgId ? { lfgId, seq: Date.now() } : null);
+        navigateToCategory('nerd', lfg?.categoria ?? 'gaming-pc');
+      });
+      return;
+    }
     if (tipo === 'friend_request') {
       setDmHubInitialTab('contatti');
       setFriendsModalOpen(true);
@@ -1079,6 +1093,7 @@ export default function App() {
             onShowReactors={setCulturalReactorsView}
             morphTitleFromCenter={categoryOpenedViaFly}
             isClosing={closingCategoryId !== null}
+            gamingFocus={gamingFocus}
           />
         </Suspense>
       )}

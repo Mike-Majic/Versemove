@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { GAMING_TABS, PLATFORM_BY_CATEGORY, PLATFORM_TAB } from '../../../data/gaming';
 import EmptyState from '../../EmptyState';
+import { RoomView } from '../VideoRoomsColumn';
 import GiochiTab from './GiochiTab';
+import LfgTab from './LfgTab';
 import '../videoRooms.css';
 import './gaming.css';
 
@@ -11,18 +13,48 @@ import './gaming.css';
 // il contesto di tutto. Schede in alto (stessa barra della Live): Cerco
 // compagni · Giochi · Clip · Community più quella propria della
 // piattaforma (Build / Trofei / Game Pass).
-export default function GamingColumn({ category, user, onOpenAuth }) {
+// focus: { lfgId, seq } da una notifica di "Cerco compagni": apre quella
+// scheda con l'annuncio evidenziato.
+export default function GamingColumn({ category, user, onOpenAuth, focus = null }) {
   const platform = PLATFORM_BY_CATEGORY[category.id];
   const tabs = [...GAMING_TABS, PLATFORM_TAB[platform]];
-  const [tab, setTab] = useState('giochi');
+  const [tab, setTab] = useState(focus ? 'lfg' : 'giochi');
   // Gioco scelto da "Cerco compagni per questo gioco": precompila il form
   // della scheda Cerco compagni.
   const [lfgPrefill, setLfgPrefill] = useState(null);
+  // Stanza party aperta (video di gruppo, stessa RoomView della Live):
+  // prende il posto della colonna finché non si esce.
+  const [roomId, setRoomId] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  // Una nuova notifica (seq diverso) porta sulla scheda Cerco compagni.
+  const focusSeqRef = useRef(focus?.seq ?? null);
+  if ((focus?.seq ?? null) !== focusSeqRef.current) {
+    focusSeqRef.current = focus?.seq ?? null;
+    if (focus) setTab('lfg');
+  }
 
   const openLfgFor = (title) => {
     setLfgPrefill(title);
     setTab('lfg');
   };
+
+  if (roomId && user) {
+    return (
+      <div className="rb-vroom-panel rb-vroom-panel--room">
+        <RoomView
+          key={roomId}
+          roomId={roomId}
+          user={user}
+          onExit={(message) => {
+            setRoomId(null);
+            setNotice(message);
+            setTab('lfg');
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -42,12 +74,25 @@ export default function GamingColumn({ category, user, onOpenAuth }) {
       </div>
       <div className="rb-vroom-panel rb-gaming-panel" key={tab}>
         {tab === 'giochi' && <GiochiTab platform={platform} user={user} onOpenAuth={onOpenAuth} onLfgFor={openLfgFor} />}
-        {tab !== 'giochi' && (
-          <EmptyState
-            icon="🚧"
-            title={`${tabs.find((t) => t.id === tab)?.label ?? ''}: in arrivo`}
-            subtitle={lfgPrefill && tab === 'lfg' ? `Gioco scelto: ${lfgPrefill.nome}` : 'Questa scheda arriva con la prossima parte.'}
+        {tab === 'lfg' && (
+          <LfgTab
+            category={category}
+            platform={platform}
+            user={user}
+            onOpenAuth={onOpenAuth}
+            prefill={lfgPrefill}
+            onPrefillConsumed={() => setLfgPrefill(null)}
+            focusId={focus?.lfgId ?? null}
+            onEnterRoom={(id) => {
+              setNotice('');
+              setRoomId(id);
+            }}
+            notice={notice}
+            onDismissNotice={() => setNotice('')}
           />
+        )}
+        {tab !== 'giochi' && tab !== 'lfg' && (
+          <EmptyState icon="🚧" title={`${tabs.find((t) => t.id === tab)?.label ?? ''}: in arrivo`} subtitle="Questa scheda arriva con la prossima parte." />
         )}
       </div>
     </>

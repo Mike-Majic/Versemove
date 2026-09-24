@@ -322,7 +322,7 @@ function useIdSet(ids) {
   return useMemo(() => new Set(ids), [key]);
 }
 
-function RoomView({ roomId, user, onExit }) {
+export function RoomView({ roomId, user, onExit }) {
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState(null);
   const [bans, setBans] = useState([]);

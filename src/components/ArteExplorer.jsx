@@ -40,6 +40,7 @@ export default function ArteExplorer({
   onShowReactors,
   morphTitleFromCenter = false,
   isClosing = false,
+  gamingFocus = null,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
   const genericColumn = category && (
@@ -111,7 +112,7 @@ export default function ArteExplorer({
           ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (
             // Gaming PC / PS / Xbox: una sola colonna, la piattaforma della
             // categoria fa da contesto (vedi nerd/gaming/GamingColumn.jsx).
-            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
+            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
