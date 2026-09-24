@@ -144,6 +144,10 @@ export const WORLDS = [
     // (linee più chiare dei puntini per restare leggibili sul nero).
     lineColor: '#5a5a66',
     textOnGlobe: '#f2f2f5',
+    // Solo sul satellite (vedi buildSatelliteMesh in satelliteGlobes.js): i
+    // puntini si accendono sul lato colpito da una luce fissa rispetto alla
+    // camera (in alto a sinistra) e sfumano verso il nero sul lato in ombra.
+    nodeShading: 'luce-laterale',
   },
   {
     id: 'wip',

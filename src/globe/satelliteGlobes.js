@@ -175,6 +175,46 @@ function easeOutCubic(t) {
 // sopra (stessa etichetta a pillola scura delle categorie sul globo grande
 // — vedi categoryShell.js makeLabelSprite — ma senza il triangolo colorato
 // dietro, qui non c'è una faccia da riempire).
+// Nodi "a luce laterale" (world.nodeShading === 'luce-laterale'): stesso
+// PointsMaterial di sempre (dimensione, attenuazione, texture tonda come
+// alfa, opacity pilotata da update() come per gli altri) ma col colore
+// calcolato per punto da una luce fissa in spazio vista — in alto a
+// sinistra verso chi guarda — così il lato illuminato resta lo stesso
+// mentre il satellite ruota e orbita. Fusione normale e non additiva: con
+// l'additiva i puntini in ombra sparirebbero invece di diventare scuri.
+// Estremi definiti in sRGB: il renderer converte l'uscita, quindi a
+// schermo restano i valori scelti (quasi nero -> quasi bianco).
+const SIDE_LIT_DARK = new THREE.Color().setRGB(0.1, 0.1, 0.12, THREE.SRGBColorSpace);
+const SIDE_LIT_LIGHT = new THREE.Color().setRGB(0.93, 0.93, 0.96, THREE.SRGBColorSpace);
+
+function buildSideLitNodeMaterial() {
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: SATELLITE_RADIUS * 0.22,
+    map: getDotTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    sizeAttenuation: true,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uColorDark = { value: SIDE_LIT_DARK };
+    shader.uniforms.uColorLight = { value: SIDE_LIT_LIGHT };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vLuce;')
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+  vec3 nodeNormal = normalize( normalMatrix * normalize( position ) );
+  vLuce = smoothstep( -0.15, 0.85, dot( nodeNormal, normalize( vec3( -0.6, 0.6, 0.8 ) ) ) );`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vLuce;\nuniform vec3 uColorDark;\nuniform vec3 uColorLight;')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( mix( uColorDark, uColorLight, vLuce ), opacity );');
+  };
+  return material;
+}
+
 function buildSatelliteMesh(world) {
   const group = new THREE.Group();
 
@@ -206,15 +246,18 @@ function buildSatelliteMesh(world) {
   net.renderOrder = 2;
   group.add(net);
 
-  const nodeMaterial = new THREE.PointsMaterial({
-    color: world.color,
-    size: SATELLITE_RADIUS * 0.22,
-    map: getDotTexture(),
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    sizeAttenuation: true,
-  });
+  const nodeMaterial =
+    world.nodeShading === 'luce-laterale'
+      ? buildSideLitNodeMaterial()
+      : new THREE.PointsMaterial({
+          color: world.color,
+          size: SATELLITE_RADIUS * 0.22,
+          map: getDotTexture(),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          sizeAttenuation: true,
+        });
   const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
   nodes.renderOrder = 2;
   group.add(nodes);
