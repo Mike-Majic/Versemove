@@ -1,0 +1,31 @@
+/* Carte francesi (vedi FrenchCard.jsx). La grandezza arriva dallo style
+   inline (larghezza + altezza 100:140), qui solo forma e comportamento. */
+.rb-fcard {
+  position: relative;
+  display: block;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  overflow: hidden;
+  color: inherit;
+  box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rb-fcard svg {
+  display: block;
+}
+
+.rb-fcard.clickable {
+  cursor: pointer;
+}
+
+.rb-fcard.clickable:disabled {
+  cursor: default;
+}
+
+.rb-fcard--neon {
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.5);
+}

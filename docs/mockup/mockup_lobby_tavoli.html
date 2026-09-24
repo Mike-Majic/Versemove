@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><title>Lobby tavoli</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#07070b;font-family:system-ui,"Segoe UI",sans-serif;color:#eee}
+.stage{width:1100px;height:860px;position:relative;overflow:hidden;background:
+ radial-gradient(circle at 20% 10%,rgba(214,232,74,.10),transparent 45%),radial-gradient(circle at 90% 90%,rgba(123,63,228,.14),transparent 50%),#07070b}
+.head{display:flex;align-items:center;gap:10px;padding:18px 24px 6px}
+.head h2{margin:0;font-size:22px}
+.sp{flex:1}
+.btn{border-radius:20px;padding:8px 15px;font-size:13px;font-weight:800;border:1px solid #3a3a50;background:#15151f;color:#ddd;display:flex;gap:6px;align-items:center}
+.btn.primary{background:#d6e84a;color:#15150a;border-color:#d6e84a}
+.chips{display:flex;gap:8px;padding:8px 24px;align-items:center}
+.chip{border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;border:1px solid #33334a;color:#bbb;background:#101018}
+.chip.on{border-color:#d6e84a;color:#e8f59a;background:rgba(214,232,74,.08)}
+.sep{width:1px;height:20px;background:#33334a;margin:0 6px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:10px 24px}
+.tile{background:rgba(22,22,32,.9);border:1px solid #2a2a3e;border-radius:16px;padding:12px;position:relative;height:232px}
+.tile .top{display:flex;justify-content:space-between;font-size:12px;font-weight:800}
+.tile .top .g{color:#fff}
+.tile .top .m{color:#9a9ab0;font-weight:700}
+.badge{font-size:10px;font-weight:900;border-radius:10px;padding:2px 8px}
+.wait{background:rgba(214,232,74,.15);color:#e8f59a}
+.live{background:rgba(255,56,96,.18);color:#ff8aa3}
+.scene{position:relative;height:170px;margin-top:6px}
+.tbl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:74px;border-radius:14px;background:linear-gradient(145deg,#6b4423,#3d240f);padding:5px;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+.tbl i{display:block;width:100%;height:100%;border-radius:10px;background:radial-gradient(ellipse,#1f7a4a,#0b3f24)}
+.tbl.blu i{background:radial-gradient(ellipse,#2458a8,#0d2a5a)}
+.tbl.bord i{background:radial-gradient(ellipse,#6e1f2c,#2e0b13)}
+.tbl.small{width:90px;height:60px}
+.seat{position:absolute;width:62px;text-align:center;font-size:10px;font-weight:700}
+.seat .c{width:40px;height:40px;margin:0 auto 3px;border-radius:50%;display:grid;place-items:center;font-size:19px;background:#1d1d27;border:2px solid #4a4a60}
+.seat.free .c{border:2px dashed #d6e84a;color:#d6e84a;font-size:22px;background:rgba(214,232,74,.06)}
+.seat.free span{color:#d6e84a}
+.seat.me .c{border-color:#d6e84a;box-shadow:0 0 10px rgba(214,232,74,.6)}
+.s-top{left:50%;top:-4px;transform:translateX(-50%)}
+.s-bot{left:50%;bottom:-8px;transform:translateX(-50%)}
+.s-left{left:6px;top:50%;transform:translateY(-50%)}
+.s-right{right:6px;top:50%;transform:translateY(-50%)}
+.team{position:absolute;font-size:9px;font-weight:900;letter-spacing:1px;color:#8a8aa0}
+.foot{position:absolute;left:24px;right:24px;bottom:16px;display:flex;justify-content:space-between;font-size:12px;color:#8a8aa0}
+</style></head>
+<body><div class="stage">
+<div class="head"><h2>Giochi da tavolo & carte</h2><span class="sp"></span>
+  <span class="btn">🔍 Cerca giocatore</span><span class="btn">🤖 Gioca col computer</span><span class="btn primary">＋ Crea tavolo</span></div>
+<div class="chips">
+  <span class="chip on">Tutti</span><span class="chip">🎴 Burraco</span><span class="chip">🃏 Scopa</span><span class="chip">🂡 31</span><span class="chip">🏙️ Cosmopoli</span>
+  <span class="sep"></span><span class="chip">1 vs 1</span><span class="chip on">2 vs 2</span><span class="chip">Tutti contro tutti</span>
+  <span class="sep"></span><span class="chip">Solo con posti liberi</span>
+</div>
+<div class="grid" id="g"></div>
+<div class="foot"><span>Clicca una sedia libera ＋ per sederti a quel posto. A coppie: chi ti siede di fronte è il tuo compagno.</span><span>12 tavoli aperti · 31 giocatori online</span></div>
+</div>
+<script>
+const P = (e, n, cls='') => ({ e, n, cls });
+const FREE = { free: true };
+const tables = [
+  { g:'Burraco', m:'2 vs 2 · 2000 punti', st:'wait', t:'', seats:{top:P('🧔','Luca88'), bot:FREE, left:P('👩','Sara_R'), right:FREE} },
+  { g:'Burraco', m:'2 vs 2 · 2000 punti', st:'live', t:'blu', seats:{top:P('🤖','Rino CPU'), bot:P('💀','Mike (tu)','me'), left:P('🤖','Gigi CPU'), right:P('🤖','Tina CPU')} },
+  { g:'Burraco', m:'Tutti contro tutti · 4', st:'wait', t:'bord', seats:{top:FREE, bot:P('🧑‍🎤','Dani_X'), left:FREE, right:P('🤖','Rino CPU')} },
+  { g:'Scopa', m:'1 vs 1 · 11 punti', st:'wait', t:'', two:true, seats:{left:P('👨','Peppe'), right:FREE} },
+  { g:'Burraco', m:'1 vs 1 · 2000 punti', st:'live', t:'', two:true, seats:{left:P('👩‍🦰','Giulia'), right:P('🧔','Marco_T')} },
+  { g:'Cosmopoli', m:'4 giocatori', st:'wait', t:'bord', seats:{top:P('🧑','Ale'), bot:FREE, left:FREE, right:FREE} },
+];
+document.getElementById('g').innerHTML = tables.map(t => {
+  const seat = (pos) => {
+    const s = t.seats[pos]; if (!s) return '';
+    return s.free ? `<div class="seat free s-${pos}"><div class="c">＋</div><span>Siediti</span></div>`
+                  : `<div class="seat ${s.cls} s-${pos}"><div class="c">${s.e}</div>${s.n}</div>`;
+  };
+  const coppie = t.m.startsWith('2 vs 2');
+  return `<div class="tile"><div class="top"><span class="g">${t.g} <span class="m">· ${t.m}</span></span>
+      <span class="badge ${t.st}">${t.st==='wait'?'In attesa':'In corso'}</span></div>
+    <div class="scene"><div class="tbl ${t.t} ${t.two?'small':''}"><i></i></div>
+      ${['top','bot','left','right'].map(seat).join('')}
+      ${coppie ? `<span class="team" style="left:50%;top:50%;transform:translate(-50%,-50%)">A · B</span>` : ''}
+    </div></div>`;
+}).join('');
+</script></body></html>
