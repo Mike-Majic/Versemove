@@ -21,6 +21,7 @@ import {
   cancelTrade,
 } from '../../../data/cosmopoli';
 import { BOARD, GROUPS, squareAt, groupSquares, PURCHASABLE_SQUARES } from '../../../data/cosmopoliBoard';
+import useBotDriver from './useBotDriver';
 import Skeleton from '../../Skeleton';
 import './cosmopoliTable.css';
 
@@ -95,6 +96,16 @@ export default function CosmopoliTable({ roomId, room, user, eventTick, onLeave 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, eventTick]);
 
+  const isBot = (uid) => room.giocatori.find((g) => g.userId === uid)?.isBot ?? false;
+  // I bot rispondono da soli agli scambi ricevuti (anche fuori dal loro
+  // turno): li passiamo a useBotDriver perché il "motore" chiami
+  // game_bot_step anche in quel caso, non solo quando tocca a loro. Il
+  // hook va chiamato sempre (mai dopo un return condizionale, vedi regole
+  // degli hook), anche prima che "state" sia pronto — turnUserId sarà
+  // semplicemente undefined finché non arriva.
+  const pendingBotTrades = trades.filter((t) => t.stato === 'in_attesa' && isBot(t.aUserId));
+  const { isBotTurn, botName } = useBotDriver({ roomId, room, turnUserId: state?.turnoUserId, user, eventTick, pendingBotTrades });
+
   if (!state) return <Skeleton lines={6} />;
 
   const me = players.find((p) => p.userId === user.id);
@@ -161,7 +172,7 @@ export default function CosmopoliTable({ roomId, room, user, eventTick, onLeave 
           <div key={p.userId} className={`rb-cosmo-player-chip ${p.userId === state.turnoUserId ? 'turn' : ''} ${p.bancarotta ? 'bancarotta' : ''}`}>
             <span className="rb-cosmo-token" style={{ background: colorOf(p.userId) }} />
             <div>
-              <strong>{playerName(p.userId)}{p.userId === user.id ? ' (tu)' : ''}</strong>
+              <strong>{isBot(p.userId) ? '🤖 ' : ''}{playerName(p.userId)}{p.userId === user.id ? ' (tu)' : ''}</strong>
               <span>{p.bancarotta ? 'Fallito' : `${p.denaro}`}{p.inQuarantena && !p.bancarotta ? ' · Quarantena' : ''}</span>
             </div>
           </div>
@@ -196,7 +207,7 @@ export default function CosmopoliTable({ roomId, room, user, eventTick, onLeave 
 
           <div className="rb-cosmo-center">
             <div className={`rb-cosmo-turn-banner ${isMyTurn ? 'mine' : ''}`}>
-              {isMyTurn ? 'Tocca a te' : `Turno di ${playerName(state.turnoUserId)}`}
+              {isMyTurn ? 'Tocca a te' : isBotTurn ? `🤖 ${botName ?? 'Il computer'} sta pensando…` : `Turno di ${playerName(state.turnoUserId)}`}
             </div>
             {state.ultimoDado1 != null && (
               <div className="rb-cosmo-dice">
