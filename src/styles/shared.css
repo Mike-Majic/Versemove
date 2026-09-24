@@ -54,6 +54,68 @@
   to { opacity: 1; }
 }
 
+/* Conferma "Hai modifiche non salvate" mostrata da ModalOverlay quando si
+   clicca fuori (o si preme Esc) su un pannello con un modulo modificato.
+   Fixed e non absolute: alcuni overlay personalizzati non sono posizionati. */
+.rb-modal-unsaved-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  animation: rb-fade-in 0.12s ease;
+}
+
+.rb-modal-unsaved-confirm {
+  width: min(320px, 100%);
+  padding: 18px;
+  border-radius: 16px;
+  background: #16161c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color: #f5f5f7;
+  text-align: center;
+}
+
+.rb-modal-unsaved-confirm p {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.rb-modal-unsaved-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-modal-unsaved-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f5f7;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rb-modal-unsaved-actions button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.rb-modal-unsaved-actions .rb-modal-unsaved-close {
+  border-color: rgba(255, 56, 96, 0.7);
+  background: rgba(255, 56, 96, 0.55);
+}
+
+.rb-modal-unsaved-actions .rb-modal-unsaved-close:hover {
+  background: rgba(255, 56, 96, 0.7);
+}
+
 /* Selettore a due bottoni (es. Persona/Azienda): usato da AuthModal e da
    ProfileSettingsPanel — prima duplicato identico in entrambi i file, come
    .rb-close-btn/.rb-modal-overlay prima del riordino di questo file. */

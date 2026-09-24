@@ -39,6 +39,7 @@ import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import ModalOverlay from './ModalOverlay';
+import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
 import './ProfileSettingsPanel.css';
@@ -263,6 +264,7 @@ function AlbumsPanel() {
   const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  useReportUnsaved(showNewForm && (newNome.trim() !== '' || newDesc.trim() !== ''));
 
   useEffect(() => {
     listMyAlbums().then(setAlbums);
@@ -393,6 +395,7 @@ function AccountTab({ user, onUpdateUser }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
+  const [, markSaved] = useFormDirty({ tipoAccount, ragioneSociale, partitaIva, codiceFiscale, pec, codiceSdi, genere, pronomiPreset, pronomiCustom });
 
   const save = async () => {
     setError('');
@@ -434,6 +437,7 @@ function AccountTab({ user, onUpdateUser }) {
       return;
     }
     setSuccess('Dati account aggiornati.');
+    markSaved();
     onUpdateUser(account);
   };
 
@@ -573,6 +577,9 @@ function AccountLinkPanel({ user, onClose }) {
   const [switchPasswordNeeded, setSwitchPasswordNeeded] = useState(false);
   const [switchPassword, setSwitchPassword] = useState('');
   const [switchError, setSwitchError] = useState('');
+  useReportUnsaved(
+    (showLinkForm && (otherEmail.trim() !== '' || otherPassword !== '')) || (switchPasswordNeeded && switchPassword !== ''),
+  );
 
   useEffect(() => {
     getMyLinkedAccount().then(setLinked);
@@ -717,6 +724,7 @@ function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMes
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
+  const [, markSaved] = useFormDirty({ citta, bio });
 
   const save = async () => {
     setError('');
@@ -729,6 +737,7 @@ function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMes
       return;
     }
     setSuccess(successMessage);
+    markSaved();
   };
 
   return (
@@ -779,6 +788,7 @@ function SocialExtraCard({ user, onUpdateUser }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
+  const [, markSaved] = useFormDirty({ cittaOrigine, statoRelazionale, lingue, mostraData });
 
   const toggleLingua = (code) => {
     setLingue((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
@@ -795,6 +805,7 @@ function SocialExtraCard({ user, onUpdateUser }) {
       return;
     }
     setSuccess('Informazioni aggiornate.');
+    markSaved();
     onUpdateUser?.({ ...user, cittaOrigine: cittaOrigine.trim(), statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
   };
 
@@ -988,6 +999,7 @@ function AddEsperienzaForm({ onDone, onCancel }) {
   const [attuale, setAttuale] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  useFormDirty({ azienda, posizione, citta, descrizione, annoDa, annoA, attuale });
 
   const submit = async () => {
     setError('');
@@ -1133,6 +1145,7 @@ function AddIstruzioneForm({ onDone, onCancel }) {
   const [annoA, setAnnoA] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  useFormDirty({ tipo, istituto, corsoDiStudi, citta, annoDa, annoA });
 
   const submit = async () => {
     setError('');
@@ -1199,6 +1212,7 @@ function LavoroContattiCard({ user, onUpdateUser }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
+  const [, markSaved] = useFormDirty({ socialMedia, telefono });
 
   const save = async () => {
     setError('');
@@ -1211,6 +1225,7 @@ function LavoroContattiCard({ user, onUpdateUser }) {
       return;
     }
     setSuccess('Contatti aggiornati.');
+    markSaved();
     onUpdateUser?.({ ...user, lavoroSocialMedia: socialMedia.trim(), lavoroTelefono: telefono.trim() });
   };
 
@@ -1403,6 +1418,14 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
 
   if (!open || !user) return null;
 
+  // Nickname e nome/cognome vivono qui (non in una scheda annidata): il
+  // confronto va fatto a mano coi valori dell'account. Le schede interne
+  // segnalano da sole le loro modifiche a ModalOverlay (useFormDirty).
+  const hasUnsavedChanges =
+    (nickname.trim() !== '' && nickname.trim() !== (user.nickname ?? '')) ||
+    nome.trim() !== (user.nome ?? '').trim() ||
+    cognome.trim() !== (user.cognome ?? '').trim();
+
   const saveNickname = async () => {
     const { account, error } = await updateNickname(user.id, nickname);
     if (error) {
@@ -1445,7 +1468,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
   };
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
         <h2>Il mio profilo</h2>
@@ -1511,7 +1534,11 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
         )}
 
         {urgentField && (
-          <ModalOverlay onClose={() => setUrgentField(null)} className="rb-profile-confirm-overlay">
+          <ModalOverlay
+            onClose={() => setUrgentField(null)}
+            hasUnsavedChanges={!urgentSent && urgentBody.trim() !== ''}
+            className="rb-profile-confirm-overlay"
+          >
             <div className="rb-profile-confirm-card" onClick={(e) => e.stopPropagation()}>
               {urgentSent ? (
                 <>

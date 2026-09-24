@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createStudio, createPost, uploadTattooPhoto, findNearbyStudio } from '../../data/tattoo';
 import { STILI_TATUAGGIO, PARTI_CORPO, DIMENSIONI_TATUAGGIO } from '../../data/tattooMeta';
 import ModalOverlay from '../ModalOverlay';
+import { useDirtySnapshot } from '../../hooks/useUnsavedChanges';
 import CustomSelect from '../shared/CustomSelect';
 import './tattoo.css';
 // Riusa le classi del modulo di pubblicazione di Vetrina (rb-deal-field,
@@ -120,6 +121,10 @@ export default function TattooSubmitModal({ onClose, onPublished }) {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fieldsDirty] = useDirtySnapshot({
+    lat, lng, studioIdScelto, nomeStudio, cittaStudio, stile, parteCorpo, colore, dimensione, artistaNome, voto, testo, prezzoIndicativo,
+  });
+  const hasUnsavedChanges = fieldsDirty || fotoFiles.length > 0;
 
   const handlePick = (newLat, newLng) => {
     setLat(newLat);
@@ -211,7 +216,7 @@ export default function TattooSubmitModal({ onClose, onPublished }) {
   };
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-deal-submit-card rb-tattoo-submit-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
         <h3>Pubblica un tatuaggio</h3>

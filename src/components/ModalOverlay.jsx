@@ -1,12 +1,29 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { UnsavedChangesContext, useUnsavedChangesRegistry } from '../hooks/useUnsavedChanges';
 
-// Sfondo condiviso da tutti i pannelli a comparsa. Richiesta esplicita
-// dell'utente: il click sullo sfondo non chiude più nulla, nemmeno un vero
-// click intenzionale — ogni pannello si chiude solo con un controllo
-// esplicito (la ✕ in alto, "Annulla", "Chiudi"...). Prima chiudeva anche
-// solo lo sfondo "vero" (non un trascinamento per selezionare del testo
-// che finiva fuori dai bordi), ma restava comunque troppo facile chiudere
-// per sbaglio un modulo compilato a metà: meglio blindarlo del tutto.
+// Sfondo condiviso da tutti i pannelli a comparsa.
+//
+// Chiusura: un clic sullo sfondo (fuori dalla card) o il tasto Esc
+// chiamano onClose, come la ✕. Il clic conta solo se il pointerdown e il
+// pointerup sono avvenuti ENTRAMBI sullo sfondo stesso: una selezione di
+// testo iniziata dentro la card e finita fuori non chiude niente. La card
+// può continuare a fermare la propagazione del click
+// (onClick={(e) => e.stopPropagation()}): qui si guardano i pointer event
+// e si confronta e.target con e.currentTarget, quindi non cambia nulla.
+// Senza onClose lo sfondo resta inerte.
+//
+// Protezione dei moduli (la ragione per cui prima lo sfondo non chiudeva
+// mai nulla): se il pannello ha modifiche non salvate — prop
+// hasUnsavedChanges, oppure una scheda interna che le segnala con
+// useFormDirty/useReportUnsaved (vedi hooks/useUnsavedChanges.js) — il
+// clic fuori e l'Esc non chiudono subito: compare una piccola conferma "Hai
+// modifiche non salvate. Chiudere lo stesso?" con [Chiudi] e [Resta]. La ✕
+// e i pulsanti espliciti del pannello restano come sono.
+//
+// Esc agisce solo sul pannello aperto più di recente (quello in cima): un
+// modale di conferma aperto sopra "Il mio profilo" si chiude da solo senza
+// portarsi dietro il pannello sotto.
 //
 // Portato con createPortal dentro .rb-app (mai document.body: lì sopra
 // perderebbe --accent, impostato proprio su .rb-app — vedi App.jsx) invece
@@ -19,7 +36,91 @@ import { createPortal } from 'react-dom';
 // schermo (bug osservato: il modulo "Aggiungi luogo" di Cani appariva
 // schiacciato e tagliato). Il portal scavalca il problema alla radice,
 // qualunque antenato lo richiami.
-export default function ModalOverlay({ className = 'rb-modal-overlay', children }) {
+
+// Pannelli aperti, per sapere quale è in cima quando si preme Esc. Il
+// numero viene assegnato al primo render: un genitore renderizza sempre
+// prima dei figli, quindi un modale annidato ha un numero più alto.
+let overlaySeq = 0;
+const openOverlays = new Set();
+const topOverlay = () => Math.max(...openOverlays);
+
+export default function ModalOverlay({ className = 'rb-modal-overlay', children, onClose, hasUnsavedChanges = false }) {
+  const [seq] = useState(() => ++overlaySeq);
+  const { anyDirty, report } = useUnsavedChangesRegistry();
+  const dirty = hasUnsavedChanges || anyDirty;
+  const [confirming, setConfirming] = useState(false);
+  const downOnBackdrop = useRef(false);
+
+  const latest = useRef({ onClose, dirty });
+  useEffect(() => {
+    latest.current = { onClose, dirty };
+  });
+
+  const requestClose = useCallback(() => {
+    const { onClose: close, dirty: isDirty } = latest.current;
+    if (!close) return;
+    if (isDirty) {
+      setConfirming(true);
+      return;
+    }
+    close();
+  }, []);
+
+  useEffect(() => {
+    openOverlays.add(seq);
+    return () => {
+      openOverlays.delete(seq);
+    };
+  }, [seq]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || topOverlay() !== seq) return;
+      e.preventDefault();
+      if (confirming) setConfirming(false);
+      else requestClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [seq, confirming, requestClose]);
+
   const target = document.querySelector('.rb-app') ?? document.body;
-  return createPortal(<div className={className}>{children}</div>, target);
+  return createPortal(
+    <div
+      className={className}
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        const wasDown = downOnBackdrop.current;
+        downOnBackdrop.current = false;
+        if (wasDown && e.target === e.currentTarget) requestClose();
+      }}
+    >
+      <UnsavedChangesContext.Provider value={report}>{children}</UnsavedChangesContext.Provider>
+      {confirming && (
+        <div className="rb-modal-unsaved-backdrop" onClick={() => setConfirming(false)}>
+          <div className="rb-modal-unsaved-confirm" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <p>Hai modifiche non salvate. Chiudere lo stesso?</p>
+            <div className="rb-modal-unsaved-actions">
+              <button
+                type="button"
+                className="rb-modal-unsaved-close"
+                onClick={() => {
+                  setConfirming(false);
+                  latest.current.onClose?.();
+                }}
+              >
+                Chiudi
+              </button>
+              <button type="button" onClick={() => setConfirming(false)} autoFocus>
+                Resta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    target,
+  );
 }

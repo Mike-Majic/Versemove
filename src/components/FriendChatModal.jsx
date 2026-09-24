@@ -266,7 +266,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   const lastMineId = [...messages].reverse().find((m) => m.senderId === user.id)?.id ?? null;
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={draft.trim() !== ''}>
       <div className="rb-friend-chat-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi"><Icon name="close" size={16} /></button>
         <div className="rb-friend-chat-header">

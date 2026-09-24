@@ -9,7 +9,7 @@ import './contactProfile.css';
 export default function ContactProfileModal({ contact, onClose }) {
   if (!contact) return null;
   return (
-    <ModalOverlay>
+    <ModalOverlay onClose={onClose}>
       <div className="rb-contact-profile-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
         {contact.avatar ? (

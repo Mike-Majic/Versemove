@@ -55,7 +55,7 @@ export default function ReportModal({ targetType, targetId, targetLabel, motivi 
   };
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={stato !== 'inviata' && (motivo !== '' || dettagli.trim() !== '')}>
       <div className="rb-report-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
 

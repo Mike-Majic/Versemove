@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ModalOverlay from '../ModalOverlay';
+import { useFormDirty, useReportUnsaved } from '../../hooks/useUnsavedChanges';
 import './MediaEditor.css';
 
 // Editor gratuito "scalato" (non un vero CapCut, l'utente lo sapeva già
@@ -33,6 +34,7 @@ function PhotoEditor({ src, onCancel, onSave }) {
   const [filterId, setFilterId] = useState('none');
   const [text, setText] = useState('');
   const [textPos, setTextPos] = useState('bottom');
+  useFormDirty({ crop, filterId, text, textPos });
   const filter = PHOTO_FILTERS.find((f) => f.id === filterId) ?? PHOTO_FILTERS[0];
 
   const startDrag = (e) => {
@@ -174,6 +176,9 @@ function VideoEditor({ src, onCancel, onSave }) {
   const [duration, setDuration] = useState(0);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+  // trimEnd parte da 0 e diventa la durata solo a metadati caricati: il
+  // confronto va fatto con la durata, non col primo render.
+  useReportUnsaved(duration > 0 && (trimStart > 0 || trimEnd < duration));
 
   useEffect(() => {
     const v = videoRef.current;

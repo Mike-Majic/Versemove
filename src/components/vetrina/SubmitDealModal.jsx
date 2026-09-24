@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { submitDeal, findRecentDuplicate, fetchLinkPreview } from '../../data/vetrinaDeals';
 import { VETRINA_CATEGORIES } from '../../data/vetrinaCategories';
 import ModalOverlay from '../ModalOverlay';
+import { useDirtySnapshot } from '../../hooks/useUnsavedChanges';
 import CustomSelect from '../shared/CustomSelect';
 import './vetrinaOfferte.css';
 
@@ -33,6 +34,8 @@ export default function SubmitDealModal({ categoria: categoriaIniziale, onClose,
   const [duplicate, setDuplicate] = useState(null); // offerta trovata, in attesa di conferma
   const [stato, setStato] = useState('form'); // form | invio | pubblicata
   const [errore, setErrore] = useState('');
+  const [fieldsDirty] = useDirtySnapshot({ url, categoria, titolo, immagine, negozio, prezzo, prezzoOriginale, valuta, online, citta, scadeIl });
+  const hasUnsavedChanges = stato !== 'pubblicata' && fieldsDirty;
 
   const handleUrlBlur = async () => {
     if (!url.trim() || titolo) return;
@@ -88,7 +91,7 @@ export default function SubmitDealModal({ categoria: categoriaIniziale, onClose,
   };
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-deal-submit-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
 

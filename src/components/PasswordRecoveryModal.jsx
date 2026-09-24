@@ -48,7 +48,7 @@ export default function PasswordRecoveryModal({ open, onClose }) {
   };
 
   return (
-    <ModalOverlay>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={!done && (password !== '' || passwordConfirm !== '')}>
       <form className="rb-auth-card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
         <h2>Scegli una nuova password</h2>

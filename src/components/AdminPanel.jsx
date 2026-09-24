@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import { getAccounts, updateAccountRole, setAccountVerified, resetAccountPassword, banAccount, unbanAccount } from '../data/accounts';
 import { getMailboxMessages, markMessageRead } from '../data/modMailbox';
 import { getReports, updateReportStatus } from '../data/reports';
@@ -69,6 +70,7 @@ function SponsorshipForm({ initial, onCancel, onSave }) {
   const [stato, setStato] = useState(initial?.stato ?? 'attiva');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  useFormDirty({ mondo, categoria, formato, titolo, testo, immagine, url, inserzionista, citta, raggioKm, soloMaggiorenni, peso, inizio, fine, stato });
 
   const submit = async (e) => {
     e.preventDefault();
@@ -306,6 +308,7 @@ function BanCell({ account, canBan, onBan, onUnban }) {
   const [motivo, setMotivo] = useState('');
   const [finoAl, setFinoAl] = useState('');
   const [saving, setSaving] = useState(false);
+  useReportUnsaved(open && (motivo.trim() !== '' || finoAl !== ''));
 
   if (account.bannato) {
     return (

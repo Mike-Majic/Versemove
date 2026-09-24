@@ -298,8 +298,17 @@ export default function AuthModal({ open, onClose, onLogin }) {
     finishAuth(account, attachmentError);
   };
 
+  // Solo la registrazione conta come modulo da proteggere: il login sono
+  // due campi, riscriverli non costa niente.
+  const hasUnsavedChanges =
+    mode === 'register' &&
+    ([username, nickname, email, password, passwordConfirm, dataNascita, phone, backupEmail, ragioneSociale, partitaIva, codiceFiscale, pec, codiceSdi, genere, pronomiCustom].some(
+      (v) => v.trim() !== '',
+    ) ||
+      attachments.length > 0);
+
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <form
         className="rb-auth-card"
         onClick={(e) => e.stopPropagation()}

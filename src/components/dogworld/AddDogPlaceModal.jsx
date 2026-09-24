@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPlace, uploadDogPhoto } from '../../data/dogWorld';
 import { DOG_PLACE_TYPES } from './dogPlaceMeta';
 import ModalOverlay from '../ModalOverlay';
+import { useDirtySnapshot } from '../../hooks/useUnsavedChanges';
 import './AddDogPlaceModal.css';
 
 // Modulo "Aggiungi luogo": la posizione arriva già scelta (click sulla
@@ -21,6 +22,8 @@ export default function AddDogPlaceModal({ lat, lng, onClose, onCreated }) {
   const [fotoFiles, setFotoFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fieldsDirty] = useDirtySnapshot({ tipo, nome, descrizione, taglia, recintata, acqua, ombra, illuminata });
+  const hasUnsavedChanges = fieldsDirty || fotoFiles.length > 0;
 
   const onPickFiles = (e) => {
     const files = Array.from(e.target.files ?? []).slice(0, 10 - fotoFiles.length);
@@ -67,7 +70,7 @@ export default function AddDogPlaceModal({ lat, lng, onClose, onCreated }) {
   };
 
   return (
-    <ModalOverlay>
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <form className="rb-dogadd-card" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <button type="button" className="rb-close-btn rb-dogadd-close" onClick={onClose} aria-label="Chiudi">
           ✕

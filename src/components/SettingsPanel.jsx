@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import { useTranslation } from 'react-i18next';
 import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
@@ -160,6 +161,8 @@ function ProfileSubsection({ user, onOpenAuth, onUpdateUser }) {
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMsg, setEmailMsg] = useState('');
   const [emailErr, setEmailErr] = useState('');
+  const [, markSaved] = useFormDirty({ username, dataNascita, phone, backupEmail });
+  useReportUnsaved(newEmail.trim() !== '');
 
   if (!user) {
     return (
@@ -196,6 +199,7 @@ function ProfileSubsection({ user, onOpenAuth, onUpdateUser }) {
       return;
     }
     setSuccess('Dati aggiornati.');
+    markSaved();
     onUpdateUser?.(account);
   };
 
@@ -599,6 +603,7 @@ function DeleteAccountSection({ user, onAccountDeleted }) {
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useReportUnsaved(open && (password !== '' || confirmText !== ''));
 
   if (!user || user.ruolo === ROLES.OWNER) return null;
 
@@ -797,7 +802,7 @@ export default function SettingsPanel({
   };
 
   return (
-    <ModalOverlay onClose={onClose} className="rb-settings-overlay">
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={isDirty} className="rb-settings-overlay">
       <aside className="rb-settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rb-settings-header">
           <h2>{t('settings.title')}</h2>

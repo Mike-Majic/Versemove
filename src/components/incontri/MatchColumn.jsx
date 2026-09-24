@@ -470,7 +470,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matchToast && <div className="rb-match-toast">🎉 È un Match con {matchToast.name}!</div>}
 
       {pendingUnmatch && (
-        <ModalOverlay className="rb-profile-confirm-overlay">
+        <ModalOverlay onClose={() => setPendingUnmatch(null)} className="rb-profile-confirm-overlay">
           <div className="rb-profile-confirm-card" onClick={(e) => e.stopPropagation()}>
             <p>Annullare il match con {pendingUnmatch.name}? Non potrete più scrivervi.</p>
             <p className="rb-profile-confirm-question">Confermi?</p>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { searchProfiles } from '../../data/friends';
+import { useReportUnsaved } from '../../hooks/useUnsavedChanges';
 import {
   FAMILY_RELATIONS,
   familyRelationLabel,
@@ -164,6 +165,7 @@ function AddFamilyForm({ onDone, onCancel }) {
   const [relazione, setRelazione] = useState(FAMILY_RELATIONS[0].value);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useReportUnsaved(query.trim() !== '' || target !== null);
 
   useEffect(() => {
     if (!query.trim()) {
