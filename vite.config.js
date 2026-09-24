@@ -17,6 +17,10 @@ export default defineConfig({
         // I chunk più pesanti (WorldGlobe, localVision) restano appena sotto i
         // 2MB di default: margine per non escluderli in silenzio se crescono.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // Il worker dei continenti dettagliati serve solo zoomando (vedi
+        // globe/landLod.js), come i file di public/geo: niente precache,
+        // altrimenti la prima visita scaricherebbe anche lui.
+        globIgnores: ['**/landWorker-*.js'],
         runtimeCaching: [
           {
             // I dati veri (profili, messaggi, eventi, realtime) vivono su

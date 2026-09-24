@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { WORLDS } from '../data/worlds';
 import { loadLandDots } from '../globe/landDots';
 import { loadLandGeo } from '../globe/landGeo';
-import { buildLandMesh } from '../globe/landMesh';
+import { createLandLod } from '../globe/landLod';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
@@ -254,6 +254,8 @@ export default function WorldGlobe({
   // IDLE_EASE_OUT_S quando rientra — calcolata "al volo" ad ogni
   // fotogramma (vedi computeIdleFactor), mai con un rAF a parte.
   const globeRootRef = useRef(null);
+  // Continenti a più livelli di dettaglio (globe/landLod.js), vedi più giù.
+  const landLodRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
   const idleTargetRef = useRef(0);
   const idleRampFromRef = useRef(0);
@@ -299,6 +301,8 @@ export default function WorldGlobe({
       const g = globeRef.current;
       if (!g) return;
       const pov = g.pointOfView();
+      // Livello di dettaglio dei continenti (110m / 50m / riquadri 10m).
+      landLodRef.current?.update(pov, g.camera());
       setView((prev) => {
         const altChanged = Math.abs(prev.altitude - pov.altitude) > 0.03;
         // La posizione (lat/lng) conta solo a zoom ravvicinato, dove serve
@@ -604,23 +608,21 @@ export default function WorldGlobe({
     };
   }, []);
 
-  // I contorni appena arrivati diventano due soli oggetti (calotte unite +
-  // contorni uniti, vedi globe/landMesh.js) dentro l'oggetto del globo, dove
+  // I contorni appena arrivati diventano pochi oggetti (calotte unite,
+  // coste unite, confini di stato uniti, a più livelli di dettaglio secondo
+  // lo zoom: vedi globe/landLod.js) dentro l'oggetto del globo, dove
   // stava il layer polygonsData di react-globe.gl. L'oggetto si cerca qui,
   // non da globeRootRef: quello viene cercato al mount, quando react-globe.gl
   // non l'ha ancora messo nella scena, e resta null.
-  const landMeshRef = useRef(null);
   useEffect(() => {
     const g = globeRef.current;
     const root = g && findGlobeRootObject(g.scene());
     if (!USE_REALISTIC_CONTINENTS || !root || landPolygons.length === 0) return undefined;
-    const land = buildLandMesh(landPolygons);
-    root.add(land.group);
-    landMeshRef.current = land;
+    const land = createLandLod({ parent: root, features110: landPolygons });
+    landLodRef.current = land;
     return () => {
-      root.remove(land.group);
       land.dispose();
-      landMeshRef.current = null;
+      landLodRef.current = null;
     };
   }, [landPolygons]);
 
@@ -630,7 +632,7 @@ export default function WorldGlobe({
   // world.landFillColor (vedi Lavoro in data/worlds.js: col bianco al 10%
   // sul globo quasi nero i continenti sembravano grigio scuro).
   useEffect(() => {
-    landMeshRef.current?.setColors({
+    landLodRef.current?.setColors({
       fillColor: world.landFillColor ?? world.atmosphereColor,
       fillOpacity: world.landFillOpacity,
       strokeColor: world.atmosphereColor,
