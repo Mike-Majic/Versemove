@@ -30,11 +30,20 @@ const PIPS = {
   10: [[32, 30], [68, 30], [50, 44], [32, 57], [68, 57], [32, 83], [68, 83], [50, 96], [32, 110], [68, 110]],
 };
 
+// Contrasto alto: nero #111 e rosso #c8102e pieni sul fondo chiaro.
 function suitColor(suit, deck) {
-  if (deck === 'moderno') return { H: '#e0344b', D: '#2f7de1', C: '#1f9d55', S: '#1d1d24' }[suit];
+  if (deck === 'moderno') return { H: '#c8102e', D: '#1f5fcf', C: '#137a3f', S: '#111111' }[suit];
   if (deck === 'neon') return { H: '#ff4f8b', D: '#ffb03b', C: '#38e0a0', S: '#7fb2ff' }[suit];
-  return suit === 'H' || suit === 'D' ? '#c8102e' : '#15151a';
+  return suit === 'H' || suit === 'D' ? '#c8102e' : '#111111';
 }
+
+// Angoli grandi (valore 24 e seme 19 su una carta 100x140, +60% rispetto a
+// prima) in grassetto pieno, seme subito sotto il valore: nelle colonne sul
+// tavolo si vede solo l'angolo e deve bastare da solo. Occupano la fascia
+// alta fino a y≈48 (vedi CORNER_H): il disegno centrale si stringe (BODY)
+// per non finirci sotto.
+export const CORNER_H = 48 / 140;
+const BODY = { scale: 0.72, cx: 50, cy: 72 };
 
 const paper = (deck) => (deck === 'neon' ? '#12121c' : deck === 'moderno' ? '#ffffff' : '#fbf7ee');
 
@@ -86,8 +95,18 @@ function Face({ card, deck, glowId }) {
 
   const corner = (
     <>
-      <text x="9" y="20" fontSize="15" fontWeight="800" fill={col} fontFamily="system-ui, sans-serif">{rank}</text>
-      <text x="9" y="34" fontSize="12" fill={col}>{sym}</text>
+      <text
+        x={rank === '10' ? 4 : 7}
+        y="25"
+        fontSize="24"
+        fontWeight="900"
+        fill={col}
+        fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        letterSpacing={rank === '10' ? -1.5 : 0}
+      >
+        {rank}
+      </text>
+      <text x="6" y="45" fontSize="19" fill={col} fontFamily="'Segoe UI Symbol', 'DejaVu Sans', sans-serif">{sym}</text>
     </>
   );
 
@@ -96,7 +115,7 @@ function Face({ card, deck, glowId }) {
       <rect x="1" y="1" width="98" height="138" rx="9" fill={paper(deck)} stroke={border} strokeWidth="2" />
       {corner}
       <g transform="rotate(180 50 70)">{corner}</g>
-      {body}
+      <g transform={`translate(${BODY.cx} ${BODY.cy}) scale(${BODY.scale}) translate(${-BODY.cx} ${-BODY.cy})`}>{body}</g>
     </>
   );
 }

@@ -27,7 +27,7 @@
   position: relative;
   /* Il tavolo si prende lo spazio che resta nel pannello dopo giocatori in
      alto, barra e mano, così la mano resta visibile senza scorrere. */
-  height: clamp(250px, calc(100dvh - 510px), 430px);
+  height: clamp(220px, calc(100dvh - 540px - var(--bt-hand-extra, 0px)), 430px);
   border-radius: 28px;
   padding: 10px;
 }
@@ -37,6 +37,8 @@
   inset: 10px;
   border-radius: 18px;
   overflow: hidden;
+  /* Per limitare mazzo e scarti all'altezza del panno (vedi .rb-bt-piles). */
+  container-type: size;
 }
 
 /* Trama a puntini del panno. */
@@ -79,7 +81,7 @@
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 104px;
+  width: calc(var(--bt-pile-w, 64px) + 40px);
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.28);
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.06), inset -1px 0 0 rgba(255, 255, 255, 0.06);
@@ -115,6 +117,14 @@
   cursor: default;
 }
 
+/* Mazzo e scarti uno sopra l'altro: grandi quanto scelto nel 🎨 ma mai più
+   alti di metà panno (tolte scritte e spazi), così non escono dal tavolo. */
+.rb-bt-piles .rb-fcard {
+  width: min(var(--bt-pile-w, 64px), calc((100cqh - 64px) / 2.8)) !important;
+  height: auto !important;
+  aspect-ratio: 100 / 140;
+}
+
 .rb-bt-pile.can .rb-fcard {
   box-shadow: 0 0 0 3px #d6e84a, 0 0 18px rgba(214, 232, 74, 0.7);
 }
@@ -132,7 +142,8 @@
 .rb-bt-half {
   position: absolute;
   top: 16px;
-  bottom: 40px;
+  /* Sotto restano "NOI/LORO" con punteggio e pozzetto. */
+  bottom: 50px;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
@@ -144,12 +155,36 @@
 
 .rb-bt-half.noi {
   left: 18px;
-  right: calc(50% + 62px);
+  right: calc(50% + var(--bt-pile-w, 64px) / 2 + 30px);
 }
 
 .rb-bt-half.loro {
   right: 18px;
-  left: calc(50% + 62px);
+  left: calc(50% + var(--bt-pile-w, 64px) / 2 + 30px);
+}
+
+/* Carte selezionate: la propria metà diventa il posto dove calare. Verde se
+   le carte scelte formano una combinazione valida (anteprima del server). */
+.rb-bt-half.noi.selecting {
+  cursor: pointer;
+  border-radius: 12px;
+  outline: 1px dashed rgba(255, 255, 255, 0.28);
+  outline-offset: -4px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rb-bt-half.noi.can-lay {
+  outline: 2px solid #3ee07a;
+  background: rgba(62, 224, 122, 0.14);
+  box-shadow: inset 0 0 24px rgba(62, 224, 122, 0.3);
+}
+
+.rb-bt-lay-label {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 800;
+  color: #b9f5cf;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .rb-bt-stage.has-left .rb-bt-half.noi {
@@ -178,23 +213,25 @@
   color: inherit;
 }
 
-.rb-bt-col .rb-bt-col-card + .rb-bt-col-card {
-  margin-top: -50px;
-}
-
 .rb-bt-col.burraco {
   padding: 4px;
   background: rgba(255, 213, 74, 0.16);
   box-shadow: 0 0 0 2px #ffd54a;
 }
 
-.rb-bt-col.attachable {
+/* Con carte selezionate: verde dove si può attaccare, spenta dove no. */
+.rb-bt-col.attach-ok,
+.rb-bt-col.attach-no,
+.rb-bt-col.attach-wait {
   cursor: pointer;
-  box-shadow: 0 0 0 2px rgba(214, 232, 74, 0.55);
 }
 
-.rb-bt-col.attachable:hover {
-  box-shadow: 0 0 0 3px #d6e84a, 0 0 14px rgba(214, 232, 74, 0.5);
+.rb-bt-col.attach-ok {
+  box-shadow: 0 0 0 3px #3ee07a, 0 0 16px rgba(62, 224, 122, 0.55);
+}
+
+.rb-bt-col.attach-no {
+  opacity: 0.45;
 }
 
 .rb-bt-group {
@@ -228,12 +265,164 @@
   margin-left: 6px;
 }
 
+.rb-bt-pozzetto {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rb-bt-pozzetto.preso {
+  color: #b9f5cf;
+}
+
+.rb-bt-group-name .rb-bt-pozzetto {
+  display: inline;
+}
+
+/* Pozzetto appena preso: scritta grande a centro tavolo. */
+.rb-bt-pozzetto-msg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  padding: 14px 26px;
+  border-radius: 18px;
+  background: rgba(10, 10, 16, 0.88);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: rb-bt-pozzetto-in 2.8s ease forwards;
+}
+
+.rb-bt-pozzetto-msg.mine {
+  border-color: #d6e84a;
+  color: #e8f59a;
+  box-shadow: 0 0 30px rgba(214, 232, 74, 0.45);
+}
+
+@keyframes rb-bt-pozzetto-in {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  20% { transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.rb-bt-pile {
+  position: relative;
+}
+
+.rb-bt-pile-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #e8f59a;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Monte degli scarti a ventaglio sopra il tavolo. */
+.rb-bt-fan-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 28px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.rb-bt-fan-box {
+  width: 100%;
+  max-width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(18, 18, 26, 0.96);
+  border: 1px solid #34344a;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+
+.rb-bt-fan-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #cfcfe0;
+  margin-bottom: 10px;
+}
+
+.rb-bt-fan-head b {
+  color: #fff;
+  font-size: 14px;
+}
+
+.rb-bt-fan-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+
+.rb-bt-fan {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  cursor: default;
+}
+
+.rb-bt-fan.can {
+  cursor: pointer;
+}
+
+.rb-bt-fan.can:hover {
+  background: rgba(214, 232, 74, 0.1);
+  box-shadow: 0 0 0 2px #d6e84a;
+}
+
+.rb-bt-fan-row {
+  display: flex;
+  justify-content: center;
+}
+
+.rb-bt-fan-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e8f59a;
+  text-align: center;
+}
+
 .rb-bt-team.noi {
   left: 18px;
 }
 
 .rb-bt-team.loro {
   right: 18px;
+  text-align: right;
+}
+
+.rb-bt-team {
+  max-width: calc(50% - var(--bt-pile-w, 64px) / 2 - 30px);
 }
 
 .rb-bt-stage.has-left .rb-bt-team.noi {
@@ -462,8 +651,79 @@
   margin: 10px 0 0;
 }
 
+.rb-bt-opt-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: #b9f5cf;
+}
+
+.rb-bt-size-sample {
+  display: block;
+  height: 24px;
+  line-height: 24px;
+  margin-bottom: 4px;
+  font-weight: 900;
+  color: #fff;
+}
+
+/* Pannello "i" Regole, centrato nel pannello del gioco: position fixed
+   dentro .rb-giochi-tavolo (che ha un transform) vale rispetto al pannello
+   stesso, quindi resta tutto visibile anche se il pannello è scorso. */
+.rb-bt-rules {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  width: min(520px, 100%);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #dcdce8;
+}
+
+.rb-bt-rules-head {
+  display: flex;
+  align-items: center;
+}
+
+.rb-bt-rules h5 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #e8f59a;
+}
+
+.rb-bt-rules ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rb-bt-rules li + li {
+  margin-top: 3px;
+}
+
+.rb-bt-rules-btn span {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 11px;
+  line-height: 1;
+}
+
 /* Barra sotto il tavolo: ordinamento a sinistra, azioni a destra. */
 .rb-bt-bar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -524,6 +784,15 @@
   color: #e8f59a;
 }
 
+/* Perché una mossa non si può fare, sotto la selezione (niente chiamata al
+   server). */
+.rb-bt-reason {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffb4c2;
+}
+
 .rb-bt-error {
   margin: 0;
 }
@@ -533,6 +802,8 @@
 .rb-bt-hand {
   width: 100%;
   overflow: hidden;
+  /* Spazio per la carta selezionata che si alza e per "NUOVA". */
+  padding-top: 38px;
 }
 
 .rb-bt-hand-row {
@@ -541,13 +812,60 @@
   align-items: flex-end;
 }
 
-.rb-bt-hand-card.selected {
-  transform: translateY(-20px);
-  box-shadow: 0 0 0 3px #d6e84a, 0 8px 20px rgba(0, 0, 0, 0.6);
+.rb-bt-slot {
+  position: relative;
+  flex: none;
+  transition: transform 0.15s ease;
 }
 
-.rb-bt-hand-card.clickable:not(:disabled):not(.selected):hover {
+.rb-bt-slot.selected {
+  transform: translateY(-20px);
+}
+
+.rb-bt-slot.selected .rb-fcard {
+  box-shadow: 0 0 0 3px #7fb2ff, 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.rb-bt-slot.can:not(.selected):hover {
   transform: translateY(-8px);
+}
+
+/* Carte appena arrivate: bordo giallo luminoso e "NUOVA" sopra, fino alla
+   mossa dopo. */
+.rb-bt-slot.is-new .rb-fcard {
+  box-shadow: 0 0 0 3px #d6e84a, 0 0 16px rgba(214, 232, 74, 0.75);
+}
+
+.rb-bt-slot.is-new.selected .rb-fcard {
+  box-shadow: 0 0 0 3px #d6e84a, 0 0 0 6px #7fb2ff, 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.rb-bt-new-tag {
+  position: absolute;
+  left: 0;
+  top: -17px;
+  z-index: 1;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #d6e84a;
+  color: #111;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+.rb-bt-lock {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 1;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 13px;
+  line-height: 1.2;
+  pointer-events: auto;
 }
 
 @media (max-width: 520px) {
@@ -556,7 +874,7 @@
   }
 
   .rb-bt-table {
-    height: clamp(230px, calc(100dvh - 540px), 380px);
+    height: clamp(230px, calc(100dvh - 540px - var(--bt-hand-extra, 0px)), 380px);
   }
 
   /* Su telefono il 🎨 esce dal panno (sopra l'angolo destro): dentro
@@ -593,22 +911,30 @@
   }
 
   .rb-bt-strip {
-    width: 74px;
+    width: calc(var(--bt-pile-w, 48px) + 26px);
   }
 
-  .rb-bt-piles .rb-fcard {
-    width: 48px !important;
-    height: 67px !important;
+  .rb-bt-team {
+    max-width: calc(50% - var(--bt-pile-w, 48px) / 2 - 16px);
+    font-size: 11px;
+  }
+
+  .rb-bt-half {
+    bottom: 64px;
+  }
+
+  .rb-bt-pozzetto {
+    font-size: 9.5px;
   }
 
   .rb-bt-half.noi {
     left: 10px;
-    right: calc(50% + 42px);
+    right: calc(50% + var(--bt-pile-w, 48px) / 2 + 18px);
   }
 
   .rb-bt-half.loro {
     right: 10px;
-    left: calc(50% + 42px);
+    left: calc(50% + var(--bt-pile-w, 48px) / 2 + 18px);
   }
 
   .rb-bt-stage.has-left .rb-bt-half.noi,
@@ -619,15 +945,6 @@
   .rb-bt-stage.has-right .rb-bt-half.loro,
   .rb-bt-stage.has-right .rb-bt-team.loro {
     right: 40px;
-  }
-
-  .rb-bt-col .rb-bt-col-card {
-    width: 34px !important;
-    height: 48px !important;
-  }
-
-  .rb-bt-col .rb-bt-col-card + .rb-bt-col-card {
-    margin-top: -35px;
   }
 
   .rb-bt-seat {

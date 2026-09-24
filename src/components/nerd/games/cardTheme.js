@@ -10,11 +10,21 @@ import { useEffect, useState } from 'react';
 // Larghezze delle carte francesi per taglia (altezza sempre 140/100).
 export const CARD_WIDTHS = { xs: 34, sm: 48, md: 64, lg: 80 };
 
+// Moderno in cima: quattro colori e numero grande al centro, il più
+// leggibile.
 export const DECKS = [
+  { id: 'moderno', label: 'Moderno', note: 'Più leggibile' },
   { id: 'classico', label: 'Classico' },
-  { id: 'moderno', label: 'Moderno' },
   { id: 'neon', label: 'Neon' },
 ];
+
+// Dimensione delle carte nel Burraco (mano, colonne sul tavolo e pila).
+export const CARD_SIZES = [
+  { id: 'normale', label: 'Normale', scale: 1 },
+  { id: 'grande', label: 'Grande', scale: 1.25 },
+  { id: 'molto-grande', label: 'Molto grande', scale: 1.5 },
+];
+export const cardSizeScale = (id) => CARD_SIZES.find((s) => s.id === id)?.scale ?? 1.25;
 
 export const TABLES = [
   { id: 'verde', label: 'Feltro verde', felt: '#1f7a4a', frame: '#6b4423' },
@@ -22,12 +32,13 @@ export const TABLES = [
   { id: 'bordeaux', label: 'Bordeaux Versemove', felt: '#6e1f2c', frame: '#d6e84a' },
 ];
 
-const KEYS = { deck: 'vm-cards-deck', table: 'vm-cards-table', sort: 'vm-burraco-sort' };
-const DEFAULTS = { deck: 'classico', table: 'verde', sort: 'seme' };
+const KEYS = { deck: 'vm-cards-deck', table: 'vm-cards-table', sort: 'vm-burraco-sort', size: 'vm-cards-size' };
+const DEFAULTS = { deck: 'classico', table: 'verde', sort: 'seme', size: 'grande' };
 const VALID = {
   deck: DECKS.map((d) => d.id),
   table: TABLES.map((t) => t.id),
   sort: ['seme', 'numero'],
+  size: CARD_SIZES.map((s) => s.id),
 };
 
 function read(name) {
@@ -39,7 +50,7 @@ function read(name) {
   }
 }
 
-const values = { deck: read('deck'), table: read('table'), sort: read('sort') };
+const values = { deck: read('deck'), table: read('table'), sort: read('sort'), size: read('size') };
 const listeners = new Set();
 
 function setValue(name, value) {
@@ -67,6 +78,7 @@ function usePreference(name) {
 export const useCardDeck = () => usePreference('deck');
 export const useCardTable = () => usePreference('table');
 export const useHandSort = () => usePreference('sort');
+export const useCardSize = () => usePreference('size');
 
 // Ordinamento della mano, solo per la vista (il database non cambia).
 // Codici carta come in data/burraco.js: "H7", "S10", "SA", "JK".

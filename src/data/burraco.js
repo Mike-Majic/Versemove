@@ -37,6 +37,14 @@ function mapPublicState(row) {
     scartoCima: row.scarto_cima,
     carteInMano: row.carte_in_mano ?? {},
     updatedAt: row.updated_at,
+    // Tutto il monte degli scarti, dal più vecchio al più recente (chi
+    // pesca dagli scarti li prende tutti).
+    pilaScarti: row.pila_scarti ?? [],
+    // Pozzetti per squadra (chiave = squadra come burraco_team_of: posto % 2
+    // a coppie, altrimenti il posto): { carte, preso }.
+    pozzetti: row.pozzetti ?? {},
+    // Carta che in questo turno non si può riscartare (l'unica raccolta).
+    vincoloScarto: row.vincolo_scarto ?? null,
   };
 }
 
@@ -99,4 +107,20 @@ export async function discardCard(roomId, carta) {
   const { error } = await supabase.rpc('burraco_discard', { p_room_id: roomId, p_carta: carta });
   if (error) return { error: error.message };
   return {};
+}
+
+// Anteprima senza scrivere niente: meldId null valuta una combinazione
+// nuova, altrimenti l'attacco a quella colonna. { ok, tipo, pulizia,
+// errore } (tipo 'scala' | 'tris', pulizia 'pulito' | 'semipulito' |
+// 'sporco'; per il tris anche valore).
+export async function checkMeld(roomId, meldId, carte) {
+  const { data, error } = await supabase.rpc('burraco_check_meld', { p_room_id: roomId, p_meld_id: meldId, p_carte: carte });
+  if (error) return { ok: false, errore: error.message };
+  return {
+    ok: data?.ok === true,
+    tipo: data?.tipo ?? null,
+    pulizia: data?.pulizia ?? null,
+    valore: data?.valore ?? null,
+    errore: data?.errore ?? null,
+  };
 }
