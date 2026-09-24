@@ -8,12 +8,14 @@ import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
+import VideoRoomsColumn from './nerd/VideoRoomsColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import { VETRINA_OFFERTE_CATEGORY_IDS } from '../data/vetrinaCategories';
 import './shared/categoryExplorerShell.css';
 
 const COMMUNITY_EVENT_CATEGORIES = new Set(['teatro', 'arti-visive', 'live']);
+const NERD_LIVE_CATEGORY = 'nerd-live';
 
 // Guscio di navigazione categorie, generico per qualunque mondo che abbia un
 // proprio set di categorie (categorySet = { categories, featured, results,
@@ -38,6 +40,21 @@ export default function ArteExplorer({
   isClosing = false,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
+  const genericColumn = category && (
+    <CategoryColumn
+      key={category.id}
+      world={world.id}
+      category={category}
+      initialSubfamily={initialSubfamily}
+      locationFilters={locationFilters}
+      featured={categorySet.featured[category.id] ?? []}
+      allResults={categorySet.results[category.id] ?? []}
+      user={user}
+      onOpenAuth={onOpenAuth}
+      morphTitleFromCenter={morphTitleFromCenter}
+      isClosing={isClosing}
+    />
+  );
 
   return (
     <div className="rb-arte-explorer" style={{ '--accent': world.color }}>
@@ -91,6 +108,10 @@ export default function ArteExplorer({
             <GiochiTavoloColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
+          ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
+            // Live del mondo Nerd: stanze video di gruppo, più la scheda
+            // "Eventi" con la colonna di prima, identica.
+            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} events={genericColumn} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}
@@ -101,19 +122,7 @@ export default function ArteExplorer({
               onShowReactors={onShowReactors}
             />
           ) : (
-            <CategoryColumn
-              key={category.id}
-              world={world.id}
-              category={category}
-              initialSubfamily={initialSubfamily}
-              locationFilters={locationFilters}
-              featured={categorySet.featured[category.id] ?? []}
-              allResults={categorySet.results[category.id] ?? []}
-              user={user}
-              onOpenAuth={onOpenAuth}
-              morphTitleFromCenter={morphTitleFromCenter}
-              isClosing={isClosing}
-            />
+            genericColumn
           )}
         </>
       )}
