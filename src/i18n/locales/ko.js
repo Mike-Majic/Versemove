@@ -86,7 +86,7 @@ export default {
       hidePassword: '비밀번호 숨기기',
     },
     accountType: { person: '개인', company: '기업 / 부가세' },
-    gender: { placeholder: '선택하세요…', male: '남성', female: '여성' },
+    gender: { placeholder: '선택하세요…', male: '남성', female: '여성', nonBinary: '논바이너리' },
     pronouns: {
       unspecified: '밝히지 않음',
       he: '그 (he/him)',

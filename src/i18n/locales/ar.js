@@ -90,7 +90,7 @@ export default {
       hidePassword: 'إخفاء كلمة المرور',
     },
     accountType: { person: 'فرد', company: 'شركة / رقم ضريبي' },
-    gender: { placeholder: 'اختر…', male: 'ذكر', female: 'أنثى' },
+    gender: { placeholder: 'اختر…', male: 'ذكر', female: 'أنثى', nonBinary: 'غير ثنائي' },
     pronouns: {
       unspecified: 'أفضّل عدم التحديد',
       he: 'هو (he/him)',

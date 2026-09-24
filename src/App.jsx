@@ -1120,7 +1120,7 @@ export default function App() {
           requireAdult={isAgeGatedWorld}
           disabledByUser={worldDisabledByUser}
           onOpenAuth={() => setAuthOpen(true)}
-          onOpenSettings={() => setProfileSettingsOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
           onDecline={() => setIndex(DEFAULT_WORLD_INDEX)}
         />
       )}

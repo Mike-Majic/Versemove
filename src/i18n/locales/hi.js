@@ -86,7 +86,7 @@ export default {
       hidePassword: 'पासवर्ड छिपाएं',
     },
     accountType: { person: 'व्यक्ति', company: 'कंपनी / वैट' },
-    gender: { placeholder: 'चुनें…', male: 'पुरुष', female: 'महिला' },
+    gender: { placeholder: 'चुनें…', male: 'पुरुष', female: 'महिला', nonBinary: 'नॉन-बाइनरी' },
     pronouns: {
       unspecified: 'बताना नहीं चाहते',
       he: 'वह (he/him)',

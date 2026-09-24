@@ -86,7 +86,7 @@ export default {
       hidePassword: 'Passwort verbergen',
     },
     accountType: { person: 'Privatperson', company: 'Unternehmen / USt-IdNr.' },
-    gender: { placeholder: 'Auswählen...', male: 'Mann', female: 'Frau' },
+    gender: { placeholder: 'Auswählen...', male: 'Mann', female: 'Frau', nonBinary: 'Nicht-binär' },
     pronouns: {
       unspecified: 'Möchte ich nicht angeben',
       he: 'Er/ihm',

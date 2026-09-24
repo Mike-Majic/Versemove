@@ -86,7 +86,7 @@ export default {
       hidePassword: 'パスワードを非表示',
     },
     accountType: { person: '個人', company: '法人・VAT' },
-    gender: { placeholder: '選択してください…', male: '男性', female: '女性' },
+    gender: { placeholder: '選択してください…', male: '男性', female: '女性', nonBinary: 'ノンバイナリー' },
     pronouns: {
       unspecified: '回答しない',
       he: '彼 (he/him)',

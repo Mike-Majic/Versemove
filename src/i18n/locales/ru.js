@@ -86,7 +86,7 @@ export default {
       hidePassword: 'Скрыть пароль',
     },
     accountType: { person: 'Физлицо', company: 'Компания / НДС' },
-    gender: { placeholder: 'Выберите...', male: 'Мужской', female: 'Женский' },
+    gender: { placeholder: 'Выберите...', male: 'Мужской', female: 'Женский', nonBinary: 'Небинарный' },
     pronouns: {
       unspecified: 'Предпочитаю не указывать',
       he: 'Он (he/him)',

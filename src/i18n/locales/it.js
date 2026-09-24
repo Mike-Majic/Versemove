@@ -92,7 +92,7 @@ export default {
       hidePassword: 'Nascondi password',
     },
     accountType: { person: 'Persona', company: 'Azienda / P.IVA' },
-    gender: { placeholder: 'Seleziona...', male: 'Uomo', female: 'Donna' },
+    gender: { placeholder: 'Seleziona...', male: 'Uomo', female: 'Donna', nonBinary: 'Non binario' },
     pronouns: {
       unspecified: 'Preferisco non specificare',
       he: 'Lui (he/him)',

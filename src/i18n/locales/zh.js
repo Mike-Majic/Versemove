@@ -86,7 +86,7 @@ export default {
       hidePassword: '隐藏密码',
     },
     accountType: { person: '个人', company: '公司/增值税号' },
-    gender: { placeholder: '请选择…', male: '男', female: '女' },
+    gender: { placeholder: '请选择…', male: '男', female: '女', nonBinary: '非二元性别' },
     pronouns: {
       unspecified: '不愿透露',
       he: '他 (he/him)',

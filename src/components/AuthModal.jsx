@@ -547,20 +547,27 @@ export default function AuthModal({ open, onClose, onLogin }) {
 
             <label className="rb-field">
               <span>{t('auth.fields.gender')} *</span>
-              <select value={genere} onChange={(e) => setGenere(e.target.value)}>
-                <option value="" disabled>{t('auth.gender.placeholder')}</option>
-                <option value="uomo">{t('auth.gender.male')}</option>
-                <option value="donna">{t('auth.gender.female')}</option>
-              </select>
+              <CustomSelect
+                ariaLabel={t('auth.fields.gender')}
+                value={genere}
+                onChange={setGenere}
+                options={[
+                  { value: '', label: t('auth.gender.placeholder') },
+                  { value: 'uomo', label: t('auth.gender.male') },
+                  { value: 'donna', label: t('auth.gender.female') },
+                  { value: 'non_binario', label: t('auth.gender.nonBinary') },
+                ]}
+              />
             </label>
 
             <label className="rb-field">
               <span>{t('auth.fields.pronouns')}</span>
-              <select value={pronomiPreset} onChange={(e) => setPronomiPreset(e.target.value)}>
-                {PRONOMI_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>{t(`auth.pronouns.${p.key}`)}</option>
-                ))}
-              </select>
+              <CustomSelect
+                ariaLabel={t('auth.fields.pronouns')}
+                value={pronomiPreset}
+                onChange={setPronomiPreset}
+                options={PRONOMI_PRESETS.map((p) => ({ value: p.value, label: t(`auth.pronouns.${p.key}`) }))}
+              />
               {pronomiPreset === 'altro' && (
                 <input
                   type="text"
