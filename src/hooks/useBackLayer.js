@@ -43,6 +43,10 @@ export const nextLayerOrder = () => ++orderSeq;
 const layers = [];
 let currentIdx = 0; // vmIdx della voce di cronologia attuale (0 = non nostra)
 let sentinel = false;
+// vmIdx della sentinella: sotto di lei le voci non sono di questo documento
+// (o sono di un caricamento precedente della pagina), e tornarci con
+// history.go vorrebbe dire uscire dal documento e ricaricare la pagina.
+let sentinelIdx = 0;
 let ignorePops = 0;
 let pendingBack = 0;
 let exitArmedUntil = 0;
@@ -53,6 +57,19 @@ let rootMounted = false;
 // in sviluppo React (StrictMode) smonta e rimonta subito gli effect, e un
 // secondo giro aggiungerebbe voci doppie.
 let rootInitialized = false;
+
+// Solo in sviluppo: traccia di ogni go/back/popstate, per poter
+// riprodurre un eventuale giro strano della cronologia.
+function debugLog(event, extra) {
+  if (!import.meta.env.DEV) return;
+  console.debug(`[back] ${event}`, {
+    ...extra,
+    currentIdx,
+    ignorePops,
+    sentinel: sentinel ? sentinelIdx : null,
+    layers: layers.map((l) => l.id),
+  });
+}
 
 const topLayer = () =>
   layers.reduce(
@@ -69,14 +86,20 @@ function ensureSentinel() {
   if (sentinel) return;
   sentinel = true;
   pushEntry();
+  sentinelIdx = currentIdx;
 }
 
 function flushBack() {
-  const n = pendingBack;
+  const requested = pendingBack;
   pendingBack = 0;
+  // Mai più indietro delle voci nostre sopra la sentinella: un go(-n) troppo
+  // lungo uscirebbe dal documento e la pagina si ricaricherebbe.
+  const n = Math.min(requested, currentIdx - (sentinel ? sentinelIdx : 0));
+  if (n !== requested) debugLog('go limitato', { requested, n });
   if (n <= 0) return;
   ignorePops += 1;
   currentIdx -= n;
+  debugLog('go', { delta: -n });
   window.history.go(-n);
 }
 
@@ -116,6 +139,7 @@ function showExitToast() {
 
 function onPopState(e) {
   const newIdx = e.state?.vmIdx ?? 0;
+  debugLog('popstate', { newIdx });
   if (ignorePops > 0) {
     ignorePops -= 1;
     currentIdx = newIdx;
@@ -124,6 +148,7 @@ function onPopState(e) {
   if (newIdx > currentIdx) {
     // Avanti del browser verso una voce nostra: si torna dove si era.
     ignorePops += 1;
+    debugLog('go (annulla Avanti)', { delta: currentIdx - newIdx });
     window.history.go(currentIdx - newIdx);
     return;
   }
@@ -136,7 +161,10 @@ function onPopState(e) {
       if (Date.now() < exitArmedUntil) {
         // Secondo Indietro, ma sotto c'erano ancora voci nostre rimaste da
         // un ricaricamento della pagina: si continua a scendere per uscire.
-        if (e.state?.vmIdx) window.history.back();
+        if (e.state?.vmIdx) {
+          debugLog('back (uscita)');
+          window.history.back();
+        }
         return;
       }
       sentinel = false;
@@ -170,6 +198,7 @@ export function useBackNavigationRoot() {
         // Pagina ricaricata su una voce nostra: la si riusa come sentinella.
         currentIdx = state.vmIdx;
         sentinel = true;
+        sentinelIdx = currentIdx;
       } else {
         currentIdx = 0;
         sentinel = false;
