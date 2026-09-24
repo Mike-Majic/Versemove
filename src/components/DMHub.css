@@ -102,3 +102,157 @@
 .rb-contacts-panel {
   overflow-y: auto;
 }
+
+/* --- Hub multicolore -----------------------------------------------------
+   Contorno di 2px coi colori di tutti i mondi (--hub-conic, costruito in
+   DMHub.jsx da WORLD_COLOR_BY_ID): contenitore esterno col gradiente e
+   padding 2px, interno opaco. La rotazione lenta (un giro ogni 20 s) è un
+   transform su un livello a parte, quindi la fa il compositore senza
+   ridisegnare il gradiente a ogni fotogramma; ferma con
+   prefers-reduced-motion e in pausa quando l'hub non si vede. */
+.rb-dm-hub-frame {
+  position: relative;
+  box-sizing: border-box;
+  isolation: isolate;
+  width: min(460px, 100%);
+  max-height: 84vh;
+  display: flex;
+  padding: 2px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.rb-dm-hub-frame::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: max(300%, 300vh);
+  aspect-ratio: 1;
+  background: var(--hub-conic);
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: rb-dm-hub-spin 20s linear infinite;
+  will-change: transform;
+}
+
+.rb-dm-hub-frame.paused::before {
+  animation-play-state: paused;
+}
+
+@keyframes rb-dm-hub-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-dm-hub-frame::before {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+.rb-friends-card.rb-dm-hub {
+  flex: 1;
+  width: auto;
+  max-height: none;
+  min-height: 0;
+  background: rgba(12, 12, 17, 0.98);
+  border: none;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.rb-dm-hub-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.rb-dm-hub-title-text {
+  background: var(--hub-linear);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rb-dm-hub .rb-friends-tab-btn {
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+}
+
+.rb-dm-hub .rb-friends-tab-btn.active {
+  border-color: transparent;
+  background:
+    linear-gradient(#1b1b24, #1b1b24) padding-box,
+    var(--hub-linear) border-box;
+  color: #fff;
+}
+
+.rb-dm-list {
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.rb-dm-row-main {
+  background: rgba(255, 255, 255, 0.03);
+  border-width: 1.5px;
+}
+
+.rb-dm-row-main[style*='--row']:hover {
+  background: color-mix(in srgb, var(--row) 10%, transparent);
+}
+
+.rb-dm-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rb-dm-row-world {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.rb-dm-row-unread {
+  margin-left: 0;
+  min-width: 18px;
+  text-align: center;
+  line-height: 16px;
+}
+
+.rb-dm-hub-legend {
+  margin: 12px 2px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(245, 245, 247, 0.45);
+}
+
+.rb-dm-hub .rb-dm-list,
+.rb-dm-hub .rb-contacts-panel {
+  flex: 1 1 auto;
+}
+
+/* Testata e schede non si schiacciano: scorre solo la lista. */
+.rb-dm-hub > * {
+  flex-shrink: 0;
+}
+
+.rb-dm-hub > .rb-dm-list,
+.rb-dm-hub > .rb-contacts-panel {
+  flex-shrink: 1;
+}
+
+.rb-dm-hub > .rb-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+}
