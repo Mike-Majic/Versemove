@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { formatRelativeDate } from './social/resolveAuthor';
-import { getMyNotifications, markNotificationsRead } from '../data/notifications';
+import { getMyNotifications, markNotificationsRead, describeNotification } from '../data/notifications';
 import { getReceivedRequests } from '../data/friends';
 import { getReceivedFamilyRequests, familyRelationLabel } from '../data/family';
 import ModalOverlay from './ModalOverlay';
 import './NotificationsPanel.css';
 
-function notificationLabel(n) {
-  if (n.tipo === 'friend_request') return `${n.actor.name} ti ha mandato una richiesta di amicizia`;
-  if (n.tipo === 'family_request') return `${n.actor.name} vuole essere tuo/a ${familyRelationLabel(n.relazione)}`;
-  if (n.tipo === 'new_post') return `${n.actor.name} ha pubblicato qualcosa di nuovo`;
-  return n.tipo === 'super_like'
-    ? `${n.actor.name} ti ha mandato un Super Like ⭐`
-    : `È un match con ${n.actor.name}! 🎉`;
+function NotificationLabel({ n }) {
+  const { who, text } = describeNotification(n, n.tipo === 'family_request' ? familyRelationLabel(n.relazione) : undefined);
+  return (
+    <span className="rb-notifications-row-label">
+      {who && <strong>{who}</strong>} {text}
+    </span>
+  );
 }
 
 // Pannello notifiche (campanella in alto): match e super like reali
@@ -73,11 +73,12 @@ export default function NotificationsPanel({ onClose, onRead, onNavigate }) {
                 <button
                   type="button"
                   className={`rb-notifications-row ${n.letta ? '' : 'unread'}`}
-                  onClick={() => onNavigate(n.tipo)}
+                  onClick={() => onNavigate(n)}
                 >
                   <img src={n.actor.avatar} alt="" />
                   <span className="rb-notifications-row-text">
-                    <strong>{notificationLabel(n)}</strong>
+                    <NotificationLabel n={n} />
+                    {n.tipo === 'menzione' && n.anteprima && <span className="rb-notifications-row-preview">“{n.anteprima}”</span>}
                     <span className="rb-notifications-row-date">{formatRelativeDate(n.createdAt)}</span>
                   </span>
                 </button>

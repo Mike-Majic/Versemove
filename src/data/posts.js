@@ -128,6 +128,7 @@ export async function fetchFeed({ mondo = 'social', authorId = null } = {}) {
       autoreId: row.author_id,
       author: profilesMap.get(row.author_id) ?? { id: row.author_id, name: 'Utente', avatar: '' },
       testo: row.testo ?? '',
+      menzioni: row.menzioni ?? [],
       lingua: row.lingua ?? null,
       data: row.created_at,
       mi_piace: likesByPost.get(row.id) ?? [],
@@ -169,6 +170,7 @@ export async function fetchComments(postIds) {
         autoreId: row.author_id,
         author: profilesMap.get(row.author_id) ?? { id: row.author_id, name: 'Utente', avatar: '' },
         testo: row.testo ?? '',
+        menzioni: row.menzioni ?? [],
         data: row.created_at,
         gif: gifItem?.url ?? null,
         reazioni: {},
@@ -180,18 +182,18 @@ export async function fetchComments(postIds) {
   }
 }
 
-export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social' }) {
+export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social', menzioni = [] }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags });
     const { data, error } = await supabase
       .from('posts')
-      .insert({ author_id: auth.user.id, mondo, testo: testo ?? '', media, gruppo_id: gruppoId ?? null, lingua: i18n.language })
+      .insert({ author_id: auth.user.id, mondo, testo: testo ?? '', media, gruppo_id: gruppoId ?? null, lingua: i18n.language, menzioni })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
-    return { id: data.id, createdAt: data.created_at };
+    return { id: data.id, createdAt: data.created_at, menzioni: data.menzioni ?? [] };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
@@ -254,18 +256,18 @@ export async function toggleSavedPost(postId, currentlySaved) {
   }
 }
 
-export async function addComment({ postId, testo, gif }) {
+export async function addComment({ postId, testo, gif, menzioni = [] }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const media = gif ? [{ kind: 'gif', url: gif }] : [];
     const { data, error } = await supabase
       .from('comments')
-      .insert({ post_id: postId, author_id: auth.user.id, testo: testo ?? '', media })
+      .insert({ post_id: postId, author_id: auth.user.id, testo: testo ?? '', media, menzioni })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
-    return { id: data.id, createdAt: data.created_at };
+    return { id: data.id, createdAt: data.created_at, menzioni: data.menzioni ?? [] };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }

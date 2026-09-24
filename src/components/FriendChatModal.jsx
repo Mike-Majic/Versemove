@@ -16,6 +16,9 @@ import ChatAttachment from './chat/ChatAttachment';
 import Icon from './shared/Icon';
 import ContactProfileModal from './chat/ContactProfileModal';
 import TranslateHint from './shared/TranslateHint';
+import MentionInput from './shared/MentionInput';
+import MentionText from './shared/MentionText';
+import { mentionIdsInText } from '../data/mentions';
 import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
 import ModalOverlay from './ModalOverlay';
@@ -36,6 +39,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   const [friend, setFriend] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [mentions, setMentions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
@@ -131,6 +135,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               tipo: row.tipo ?? 'testo',
               allegato: row.allegato ?? null,
               lingua: row.lingua ?? null,
+              menzioni: row.menzioni ?? [],
               data: row.created_at,
             },
           ];
@@ -170,14 +175,18 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     const text = draft.trim();
     if (!text || !conversationId || sending) return;
     setSending(true);
-    const { id, createdAt, error: sendError } = await sendMessage(conversationId, text, { mondo: world?.id ?? null });
+    const { id, createdAt, menzioni, error: sendError } = await sendMessage(conversationId, text, {
+      mondo: world?.id ?? null,
+      menzioni: mentionIdsInText(text, mentions),
+    });
     setSending(false);
     if (sendError) {
       setError(sendError);
       return;
     }
-    appendMine({ id, testo: text, tipo: 'testo', allegato: null, data: createdAt });
+    appendMine({ id, testo: text, tipo: 'testo', allegato: null, menzioni, data: createdAt });
     setDraft('');
+    setMentions([]);
   };
 
   const appendMine = (msg) => {
@@ -316,7 +325,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
                     <ChatAttachment tipo={m.tipo} allegato={m.allegato} />
                   </div>
                 ) : (
-                  <span className="rb-friend-chat-bubble">{m.testo}</span>
+                  <MentionText className="rb-friend-chat-bubble" testo={m.testo} menzioni={m.menzioni} />
                 )}
                 {m.senderId !== user.id && (!m.tipo || m.tipo === 'testo') && (
                   <TranslateHint text={m.testo} sourceLang={m.lingua} />
@@ -403,11 +412,15 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               </div>
             )}
           </div>
-          <input
-            type="text"
+          <MentionInput
             placeholder="Scrivi un messaggio..."
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={setDraft}
+            mentions={mentions}
+            onMentionsChange={setMentions}
+            contesto="chat"
+            contestoId={conversationId}
+            dropdownTitle="Menziona qualcuno della chat"
             disabled={loading || Boolean(error) || !conversationId}
           />
           <button type="submit" disabled={sending || loading || Boolean(error) || !conversationId}>Invia</button>

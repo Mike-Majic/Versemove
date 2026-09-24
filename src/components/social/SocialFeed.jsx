@@ -114,6 +114,8 @@ export default function SocialFeed({
   onCreateEvent,
   onToggleEventLike,
   onOpenEventLikers,
+  // { postId, seq }: post da mostrare (clic su una notifica di menzione).
+  focusPost = null,
 }) {
   const [showEventComposer, setShowEventComposer] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(null);
@@ -217,13 +219,14 @@ export default function SocialFeed({
 
   const authorFromUser = () => ({ id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' });
 
-  const createPost = async ({ testo, gif, link_esterno, gruppo_id, contentId, mediaUrl, mediaType, tags }) => {
+  const createPost = async ({ testo, menzioni, gif, link_esterno, gruppo_id, contentId, mediaUrl, mediaType, tags }) => {
     if (!user) {
       onOpenAuth();
       return;
     }
-    const { id, createdAt, error } = await createPostApi({
+    const { id, createdAt, menzioni: savedMentions, error } = await createPostApi({
       testo,
+      menzioni,
       gif,
       link_esterno,
       gruppoId: gruppo_id,
@@ -243,6 +246,7 @@ export default function SocialFeed({
       autoreId: user.id,
       author: authorFromUser(),
       testo,
+      menzioni: savedMentions ?? [],
       data: createdAt,
       mi_piace: [],
       commenti: [],
@@ -358,12 +362,12 @@ export default function SocialFeed({
     setComments((prev) => prev.filter((c) => c.post_id !== postId));
   };
 
-  const addComment = async (postId, { testo, gif }) => {
+  const addComment = async (postId, { testo, gif, menzioni }) => {
     if (!user) {
       onOpenAuth();
       return;
     }
-    const { id, createdAt, error } = await addCommentApi({ postId, testo, gif });
+    const { id, createdAt, menzioni: savedMentions, error } = await addCommentApi({ postId, testo, gif, menzioni });
     if (error) {
       setFeedError(error);
       return;
@@ -374,6 +378,7 @@ export default function SocialFeed({
       autoreId: user.id,
       author: authorFromUser(),
       testo,
+      menzioni: savedMentions ?? [],
       data: createdAt,
       gif: gif ?? null,
       reazioni: {},
@@ -471,6 +476,40 @@ export default function SocialFeed({
     setActiveGroupId(groupId);
     setMobileView('primary');
   };
+
+  // Notifica di menzione: apre il gruppo del post se serve (altrimenti il
+  // tab "Per te"), lo porta in vista e lo evidenzia per qualche secondo.
+  useEffect(() => {
+    if (!focusPost || loading) return undefined;
+    const target = posts.find((p) => p.id === focusPost.postId);
+    if (!target) {
+      showActionError('Questo post non è più disponibile.');
+      return undefined;
+    }
+    setMobileView('primary');
+    if (target.gruppo_id) setActiveGroupId(target.gruppo_id);
+    else {
+      setActiveGroupId(null);
+      setFeedTab('foryou');
+    }
+    let tries = 0;
+    let timer;
+    const reveal = () => {
+      const el = document.querySelector(`[data-post-id="${focusPost.postId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('rb-post-card--focus');
+        timer = window.setTimeout(() => el.classList.remove('rb-post-card--focus'), 2600);
+      } else if (tries++ < 10) {
+        timer = window.setTimeout(reveal, 150);
+      } else {
+        showActionError('Il post è nascosto dai filtri di posizione attivi.');
+      }
+    };
+    timer = window.setTimeout(reveal, 100);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPost?.seq, loading]);
 
   const isGroupView = Boolean(activeGroupId);
   const activeGroup = isGroupView ? groupsList.find((g) => g.id === activeGroupId) ?? null : null;

@@ -38,6 +38,8 @@ export async function fetchMessages(conversationId) {
       tipo: row.tipo ?? 'testo',
       allegato: row.allegato ?? null,
       lingua: row.lingua ?? null,
+      mondo: row.mondo ?? null,
+      menzioni: row.menzioni ?? [],
       data: row.created_at,
     }));
     return { messages };
@@ -55,17 +57,18 @@ export async function fetchMessages(conversationId) {
 // `lingua` è sempre quella attiva di chi scrive: serve solo a decidere lato
 // client se mostrare "Traduci messaggio" a chi legge (confronto con la sua
 // lingua), niente traduzione automatica — vedi TranslateHint.
-export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null, mondo = null } = {}) {
+// menzioni: id scelti col suggerimento "@" (il server tiene solo quelli validi).
+export async function sendMessage(conversationId, testo, { tipo = 'testo', allegato = null, mondo = null, menzioni = [] } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato, mondo, lingua: i18n.language })
+      .insert({ conversation_id: conversationId, sender_id: auth.user.id, testo, tipo, allegato, mondo, lingua: i18n.language, menzioni })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };
-    return { id: data.id, createdAt: data.created_at };
+    return { id: data.id, createdAt: data.created_at, menzioni: data.menzioni ?? [] };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }

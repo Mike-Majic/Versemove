@@ -51,7 +51,7 @@ import {
 import { getReceivedFamilyRequests } from './data/family';
 import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
-import { getMyNotifications, subscribeToOwnNotifications } from './data/notifications';
+import { getMyNotifications, subscribeToOwnNotifications, describeNotification } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
 import { supabase } from './data/supabaseClient';
 import PageLoading from './components/PageLoading';
@@ -80,6 +80,7 @@ const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
 const EventLikersModal = lazyWithRetry(() => import('./components/EventLikersModal'));
 const ReactorsModal = lazyWithRetry(() => import('./components/cultural/ReactorsModal'));
 const FriendChatModal = lazyWithRetry(() => import('./components/FriendChatModal'));
+const MentionProfileViewer = lazyWithRetry(() => import('./components/shared/MentionProfileViewer'));
 const DMHub = lazyWithRetry(() => import('./components/DMHub'));
 const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
 const ProfileSettingsPanel = lazyWithRetry(() => import('./components/ProfileSettingsPanel'));
@@ -323,6 +324,10 @@ export default function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifToast, setNotifToast] = useState(null);
+  // Post da mostrare nel feed Social (clic su una notifica di menzione).
+  const [focusPost, setFocusPost] = useState(null);
+  // Profilo aperto cliccando una "@menzione" fuori dal feed Social.
+  const [mentionProfileId, setMentionProfileId] = useState(null);
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
@@ -567,7 +572,15 @@ export default function App() {
       setUnreadNotifCount((c) => c + 1);
       fetchProfilesMap([row.actor_id]).then((map) => {
         const actor = map.get(row.actor_id) ?? { id: row.actor_id, name: 'Utente', avatar: '' };
-        setNotifToast({ tipo: row.tipo, actor });
+        setNotifToast({
+          tipo: row.tipo,
+          actor,
+          actorId: row.actor_id,
+          riferimentoTipo: row.riferimento_tipo ?? null,
+          riferimentoId: row.riferimento_id ?? null,
+          riferimentoPadre: row.riferimento_padre ?? null,
+          anteprima: row.anteprima ?? null,
+        });
         window.setTimeout(() => setNotifToast(null), 4500);
       });
     });
@@ -837,9 +850,36 @@ export default function App() {
   // Click su una notifica (nel pannello o nel toast): apre Incontri sulla
   // scheda giusta — "A chi piaci" per un super like, "I tuoi match" per un
   // match nuovo.
-  const openNotificationTarget = (tipo) => {
+  // Clic su una "@menzione" (MentionText): profilo della persona.
+  useEffect(() => {
+    const onOpenProfile = (e) => {
+      if (e.detail?.id) setMentionProfileId(e.detail.id);
+    };
+    window.addEventListener('vm:open-profile', onOpenProfile);
+    return () => window.removeEventListener('vm:open-profile', onOpenProfile);
+  }, []);
+
+  // n: la notifica (oggetto), o solo il tipo per le chiamate vecchie.
+  const openNotificationTarget = (n) => {
+    const notif = typeof n === 'string' ? { tipo: n } : n ?? {};
+    const { tipo } = notif;
     setNotificationsOpen(false);
     setNotifToast(null);
+    if (tipo === 'menzione') {
+      // Post: il post stesso; commento: il suo post (riferimento_padre);
+      // chat: la conversazione con chi ha scritto; stanza_mod: la Stanza MOD.
+      if (notif.riferimentoTipo === 'post' || notif.riferimentoTipo === 'commento') {
+        const postId = notif.riferimentoTipo === 'post' ? notif.riferimentoId : notif.riferimentoPadre;
+        if (postId) setFocusPost({ postId, seq: Date.now() });
+        navigateToCategory('social', 'world');
+      } else if (notif.riferimentoTipo === 'chat') {
+        const actorId = notif.actorId ?? notif.actor?.id;
+        if (actorId) setActiveFriendChatId(actorId);
+      } else if (notif.riferimentoTipo === 'stanza_mod') {
+        navigateToCategory('faq', 'mod-room');
+      }
+      return;
+    }
     if (tipo === 'friend_request') {
       setDmHubInitialTab('contatti');
       setFriendsModalOpen(true);
@@ -1165,6 +1205,7 @@ export default function App() {
             onCreateEvent={createEvent}
             onToggleEventLike={toggleEventLike}
             onOpenEventLikers={(eventId) => setEventLikersId(eventId)}
+            focusPost={focusPost}
           />
         </Suspense>
       )}
@@ -1323,13 +1364,12 @@ export default function App() {
       )}
 
       {notifToast && (
-        <button type="button" className="rb-notif-toast" onClick={() => openNotificationTarget(notifToast.tipo)}>
+        <button type="button" className="rb-notif-toast" onClick={() => openNotificationTarget(notifToast)}>
           <img src={notifToast.actor.avatar} alt="" />
-          {notifToast.tipo === 'super_like'
-            ? `${notifToast.actor.name} ti ha mandato un Super Like ⭐`
-            : notifToast.tipo === 'new_post'
-              ? `${notifToast.actor.name} ha pubblicato qualcosa di nuovo`
-              : `È un match con ${notifToast.actor.name}! 🎉`}
+          {(() => {
+            const { who, text } = describeNotification(notifToast);
+            return who ? `${who} ${text}` : text;
+          })()}
         </button>
       )}
 
@@ -1379,6 +1419,17 @@ export default function App() {
               setActiveFriendChatId(friendId);
             }}
             onClose={() => setCulturalReactorsView(null)}
+          />
+        </Suspense>
+      )}
+
+      {mentionProfileId && (
+        <Suspense fallback={<PageLoading />}>
+          <MentionProfileViewer
+            userId={mentionProfileId}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            onClose={() => setMentionProfileId(null)}
           />
         </Suspense>
       )}

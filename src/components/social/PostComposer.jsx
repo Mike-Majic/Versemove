@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import Icon from '../shared/Icon';
 import EmojiPicker from './EmojiPicker';
 import GifPicker from './GifPicker';
+import MentionInput from '../shared/MentionInput';
+import { mentionIdsInText } from '../../data/mentions';
 import { publishContent } from '../../data/contents';
 import { analyzeImageElement, extractVideoFrame } from '../../data/localVision';
 import './PostComposer.css';
@@ -58,6 +60,7 @@ export default function PostComposer({
   defaultGroupId = null,
 }) {
   const [text, setText] = useState('');
+  const [mentions, setMentions] = useState([]);
   const [gif, setGif] = useState(null);
   const [gifLoadFailed, setGifLoadFailed] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
@@ -190,12 +193,14 @@ export default function PostComposer({
 
     onSubmit({
       testo: text.trim(),
+      menzioni: mentionIdsInText(text, mentions),
       gif,
       link_esterno: foundUrl ? { url: foundUrl } : null,
       gruppo_id: groups ? groupId : undefined,
       ...(mediaResult ?? {}),
     });
     setText('');
+    setMentions([]);
     setGif(null);
     setShowGifPicker(false);
     removeMedia();
@@ -220,9 +225,14 @@ export default function PostComposer({
           ))}
         </select>
       )}
-      <textarea
+      <MentionInput
+        multiline
+        className="rb-composer-mention"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={setText}
+        mentions={mentions}
+        onMentionsChange={setMentions}
+        contesto="generale"
         onFocus={() => requireAuth()}
         placeholder={placeholder}
         rows={compact ? 2 : 3}

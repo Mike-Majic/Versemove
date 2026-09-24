@@ -321,3 +321,9 @@
 .rb-comment-react-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* Post aperto da una notifica di menzione: bordo luminoso per un momento. */
+.rb-post-card--focus {
+  box-shadow: 0 0 0 2px #7cc0ff, 0 0 22px rgba(124, 192, 255, 0.45);
+  transition: box-shadow 0.3s ease;
+}

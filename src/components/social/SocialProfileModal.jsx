@@ -84,9 +84,9 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
     reload();
   };
 
-  const handleAddComment = async (postId, { testo, gif }) => {
+  const handleAddComment = async (postId, { testo, gif, menzioni }) => {
     if (!user) return onOpenAuth();
-    const { error: err } = await addCommentApi({ postId, testo, gif });
+    const { error: err } = await addCommentApi({ postId, testo, gif, menzioni });
     if (err) { setError(err); return; }
     reload();
   };

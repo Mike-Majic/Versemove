@@ -4,6 +4,7 @@ import LinkPreview from './LinkPreview';
 import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
+import MentionText from '../shared/MentionText';
 import { isStaff } from '../../data/roles';
 import './PostCard.css';
 
@@ -30,7 +31,7 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
       <div className="rb-comment-body">
         <div className="rb-comment-bubble">
           <strong>{author.name}</strong>
-          <p>{comment.testo}</p>
+          <MentionText as="p" testo={comment.testo} menzioni={comment.menzioni} />
           {comment.gif && (
             <MediaImage className="rb-comment-gif" src={comment.gif} alt="GIF" errorText="GIF non disponibile (il link non si è caricato)" />
           )}
@@ -174,7 +175,7 @@ export default function PostCard({
   };
 
   return (
-    <li className="rb-post-card">
+    <li className="rb-post-card" data-post-id={post.id}>
       {trendingRank !== null && (
         <span className="rb-post-trending-badge">🔥 #{trendingRank} di tendenza nel mondo Social</span>
       )}
@@ -217,7 +218,7 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          <p className="rb-post-text">{post.testo}</p>
+          <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />
           {post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
         </>
       )}
