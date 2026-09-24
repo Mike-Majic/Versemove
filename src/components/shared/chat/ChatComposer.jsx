@@ -17,6 +17,7 @@ import { MAX_FILES, MAX_VOICE_SECONDS, formatDuration, kindOfMime, mimeOf, newId
 // upload(file, onProgress) -> { path } | { error }: il percorso lo decide
 // chi usa il componente. onSend({ testo, menzioni, allegati }) riceve gli
 // allegati già caricati: [{ tipo, path, nome, mime, dimensione, durata? }].
+// onDirtyChange(bool): c'è una bozza non inviata.
 const HOLD_TO_SEND_MS = 600;
 
 export default function ChatComposer({
@@ -29,6 +30,7 @@ export default function ChatComposer({
   upload,
   onSend,
   extraMenuItems = [],
+  onDirtyChange,
 }) {
   const [text, setText] = useState('');
   const [mentions, setMentions] = useState([]);
@@ -43,6 +45,14 @@ export default function ChatComposer({
   const textRef = useRef(null);
   const holdRef = useRef(0);
   const rec = useVoiceRecorder();
+
+  // Chi usa il componente può chiedere conferma prima di chiudere se c'è
+  // una bozza (testo, allegati o vocale in corso).
+  const dirty = Boolean(text.trim()) || pending.length > 0 || rec.state !== 'idle';
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty]);
 
   // Conteggio aggiornato anche fra due aggiunte ravvicinate (trascina +
   // incolla), senza aspettare il render.

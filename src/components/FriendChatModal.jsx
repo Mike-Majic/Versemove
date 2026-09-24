@@ -1,69 +1,112 @@
-import { useEffect, useRef, useState } from 'react';
-import { formatRelativeDate } from './social/resolveAuthor';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchProfilesMap, displayName } from '../data/posts';
 import {
   startDirectConversation,
   fetchMessages,
+  mapMessageRow,
   sendMessage,
   markConversationRead,
   subscribeToConversationMessages,
+  subscribeToConversationPresence,
   getOtherParticipantLastRead,
   subscribeToParticipantUpdates,
-  uploadChatAttachment,
-  CHAT_MAX_FILE_BYTES,
+  setConversationArchived,
 } from '../data/directChat';
 import ChatAttachment from './chat/ChatAttachment';
-import Icon from './shared/Icon';
 import ContactProfileModal from './chat/ContactProfileModal';
 import TranslateHint from './shared/TranslateHint';
-import MentionInput from './shared/MentionInput';
 import MentionText from './shared/MentionText';
-import { mentionIdsInText } from '../data/mentions';
+import MessageList from './shared/chat/MessageList';
+import ChatBubble from './shared/chat/ChatBubble';
+import ChatComposer from './shared/chat/ChatComposer';
+import AttachmentView from './shared/chat/AttachmentView';
+import Lightbox from './shared/chat/Lightbox';
+import { formatDuration, kindOfMime, newId, safeFileName, timeLabel, uploadWithProgress } from './shared/chat/chatMedia';
 import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
+import { WORLDS } from '../data/worlds';
 import ModalOverlay from './ModalOverlay';
 import CallModal from './CallModal';
+import Icon from './shared/Icon';
+import './shared/chat/chat.css';
 import './FriendChatModal.css';
 
-// Messaggi privati con un altro utente reale: apre (o riusa) una vera
-// conversazione diretta su Supabase (start_direct_conversation), non più
-// una copia locale per browser — chi scrive e chi legge vedono davvero lo
-// stesso scambio. In tempo reale via un canale Supabase per la conversazione
-// aperta: se la connessione realtime cade e si ristabilisce, i messaggi
-// vengono ricaricati dal DB per non perderne nel frattempo. `world` è il
-// mondo da cui si sta scrivendo in questo momento: viaggia con ogni
-// messaggio (vedi sendMessage/sendFile/sendLocation) solo per colorare la
-// card dell'ultimo messaggio nell'hub 💬, non cambia nient'altro.
+const PAGE = 50;
+const WORLD_BY_ID = new Map(WORLDS.map((w) => [w.id, w]));
+const DEFAULT_WORLD = WORLD_BY_ID.get('social');
+
+// Testo scuro sui bottoni pieni quando il colore del mondo è chiaro (Lavoro
+// bianco, Nerd lime), bianco sugli altri.
+function inkFor(hex = '') {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#111116' : '#fff';
+}
+
+// Allegato di chat_messages -> formato di AttachmentView (Stanza MOD).
+function toAttachment(tipo, allegato) {
+  if (!allegato?.path) return null;
+  const mime = allegato.mime || '';
+  const kind = tipo === 'foto' ? 'immagine' : tipo === 'video' ? 'video' : tipo === 'audio' ? 'audio' : kindOfMime(mime);
+  return { ...allegato, tipo: kind, dimensione: allegato.dimensione ?? allegato.size };
+}
+
+// Allegato caricato dal ChatComposer -> riga di chat_messages. Il `testo`
+// resta un'etichetta breve per notifiche e client più vecchi.
+function toChatMessage(a) {
+  const allegato = { path: a.path, nome: a.nome, mime: a.mime, dimensione: a.dimensione, size: a.dimensione };
+  if (a.tipo === 'immagine') return { tipo: 'foto', testo: '📷 Foto', allegato };
+  if (a.tipo === 'video') return { tipo: 'video', testo: '🎬 Video', allegato };
+  if (a.tipo === 'audio') {
+    return { tipo: 'audio', testo: `🎤 Messaggio vocale · ${formatDuration(a.durata)}`, allegato: { ...allegato, durata: a.durata } };
+  }
+  return { tipo: 'file', testo: `📎 ${a.nome}`, allegato };
+}
+
+// Messaggi privati con un altro utente reale: una sola conversazione
+// (start_direct_conversation) fra tutti i mondi, in tempo reale. Lo stile è
+// quello della Stanza MOD (componenti in shared/chat), colorato col mondo
+// in cui la chat è aperta: `--a` = world.color sul pannello. Ogni messaggio
+// porta con sé il mondo da cui è stato scritto (`mondo`): se è diverso da
+// quello attuale, sotto la bolla compare "● scritto in <Mondo>".
 export default function FriendChatModal({ friendId, user, world, onClose, onMessagesRead }) {
+  const activeWorld = world ?? DEFAULT_WORLD;
   const [conversationId, setConversationId] = useState(null);
   const [friend, setFriend] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState('');
-  const [mentions, setMentions] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sending, setSending] = useState(false);
-  // last_read_at dell'altro partecipante: per capire se il mio ultimo
-  // messaggio è stato "Visualizzato" o solo "Inviato" (vedi sotto).
+  const [dirty, setDirty] = useState(false);
+  // last_read_at dell'altro partecipante: ✓ inviato / ✓✓ letto.
   const [otherLastReadAt, setOtherLastReadAt] = useState(null);
-  // Il pulsante 📹 compare solo se si è amici o si ha un match (are_connected):
-  // stessa condizione richiesta dalla RLS del canale della chiamata.
+  const [friendHere, setFriendHere] = useState(false);
+  // 📹 solo se la videochiamata 1:1 è già possibile (amici o match,
+  // are_connected): stessa condizione della RLS del canale della chiamata.
   const [canCall, setCanCall] = useState(false);
   const startCallRef = useRef(null);
-  // Menu "+" accanto a Invia: foto, file, posizione GPS.
-  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [attachStatus, setAttachStatus] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [archived, setArchived] = useState(false);
   const [confirmLocation, setConfirmLocation] = useState(false);
-  const photoInputRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [locationStatus, setLocationStatus] = useState('');
+  const [lightbox, setLightbox] = useState(null);
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  const panelRef = useRef(null);
+  const retryPayloadsRef = useRef(new Map());
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
     setConversationId(null);
+    setMessages([]);
 
     const load = async () => {
       const [{ conversationId: convId, error: convError }, profilesMap, connected] = await Promise.all([
@@ -80,7 +123,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
       }
       setFriend(profilesMap.get(friendId) ?? { id: friendId, name: 'Utente', avatar: '' });
       setConversationId(convId);
-      const { messages: fetched, error: msgError } = await fetchMessages(convId);
+      const { messages: fetched, hasMore: more, error: msgError } = await fetchMessages(convId, { limit: PAGE });
       if (cancelled) return;
       if (msgError) {
         setError(msgError);
@@ -88,6 +131,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
         return;
       }
       setMessages(fetched);
+      setHasMore(more);
       setLoading(false);
       markConversationRead(convId);
       onMessagesRead?.();
@@ -100,66 +144,52 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friendId]);
 
-  // "Ultimo valore" di friend leggibile dalla callback del canale realtime
-  // sotto (che altrimenti vedrebbe sempre il friend della sottoscrizione
-  // iniziale), senza riaprire il canale ogni volta che friend cambia.
+  // Ultimo `friend` per la callback del canale realtime, senza riaprirlo.
   const friendRef = useRef(friend);
   useEffect(() => {
     friendRef.current = friend;
   }, [friend]);
 
-  // Canale realtime per la conversazione aperta: rimosso a chiusura/cambio
-  // chat, così non ne resta nessuno appeso.
+  const me = useMemo(() => ({ id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' }), [user]);
+
+  // Nuovi messaggi in tempo reale (deduplicati per id: il mio arriva anche
+  // come conferma dell'invio ottimistico). Alla riconnessione si rilegge
+  // l'ultima pagina e si fonde con quello che c'è.
   useEffect(() => {
     if (!conversationId) return undefined;
-
     const channel = subscribeToConversationMessages(
       conversationId,
       (row) => {
         setMessages((prev) => {
           if (prev.some((m) => m.id === row.id)) return prev;
-          const isMine = row.sender_id === user.id;
-          const author = isMine
-            ? { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' }
-            : friendRef.current ?? { id: row.sender_id, name: 'Utente', avatar: '' };
-          return [
-            ...prev,
-            {
-              id: row.id,
-              conversationId: row.conversation_id,
-              senderId: row.sender_id,
-              author,
-              testo: row.testo,
-              tipo: row.tipo ?? 'testo',
-              allegato: row.allegato ?? null,
-              lingua: row.lingua ?? null,
-              menzioni: row.menzioni ?? [],
-              data: row.created_at,
-            },
-          ];
+          const author = row.sender_id === user.id ? me : friendRef.current;
+          return [...prev, mapMessageRow(row, author)];
         });
         markConversationRead(conversationId);
         onMessagesRead?.();
       },
       () => {
-        // Riconnessione dopo una caduta della connessione realtime: ricarica
-        // dal DB per non perdere messaggi arrivati nel frattempo.
-        fetchMessages(conversationId).then(({ messages: fetched, error: msgError }) => {
-          if (!msgError) setMessages(fetched);
+        fetchMessages(conversationId, { limit: PAGE }).then(({ messages: fetched, error: msgError }) => {
+          if (msgError) return;
+          setMessages((prev) => {
+            const ids = new Set(prev.map((m) => m.id));
+            const fresh = fetched.filter((m) => !ids.has(m.id));
+            if (!fresh.length) return prev;
+            return [...prev, ...fresh].sort((a, b) => new Date(a.data) - new Date(b.data));
+          });
         });
       }
     );
-
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, user.id]);
 
-  // Canale realtime su chat_participants: quando l'altra persona apre la
-  // chat (mark_conversation_read aggiorna la sua riga), il mio ultimo
-  // messaggio passa da "Inviato" a "Visualizzato" senza dover ricaricare.
+  // L'altra persona apre la chat -> i miei messaggi passano a ✓✓.
   useEffect(() => {
     if (!conversationId) return undefined;
     const channel = subscribeToParticipantUpdates(conversationId, (row) => {
@@ -170,182 +200,301 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     };
   }, [conversationId, user.id]);
 
-  const send = async (e) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text || !conversationId || sending) return;
-    setSending(true);
-    const { id, createdAt, menzioni, error: sendError } = await sendMessage(conversationId, text, {
-      mondo: world?.id ?? null,
-      menzioni: mentionIdsInText(text, mentions),
+  // "online" in testata quando anche l'altra persona ha la chat aperta.
+  useEffect(() => {
+    if (!conversationId) return undefined;
+    const channel = subscribeToConversationPresence(conversationId, user.id, (ids) => setFriendHere(ids.has(friendId)));
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, user.id, friendId]);
+
+  const loadOlder = async () => {
+    const oldest = messages.find((m) => !m.pending && !m.failed);
+    if (!oldest || !conversationId) return false;
+    const { messages: page, hasMore: more, error: msgError } = await fetchMessages(conversationId, { before: oldest.data, limit: PAGE });
+    if (msgError) return false;
+    setMessages((prev) => {
+      const ids = new Set(prev.map((m) => m.id));
+      return [...page.filter((m) => !ids.has(m.id)), ...prev];
     });
-    setSending(false);
-    if (sendError) {
-      setError(sendError);
-      return;
-    }
-    appendMine({ id, testo: text, tipo: 'testo', allegato: null, menzioni, data: createdAt });
-    setDraft('');
-    setMentions([]);
+    setHasMore(more);
+    return more;
   };
 
-  const appendMine = (msg) => {
-    setMessages((prev) =>
-      prev.some((m) => m.id === msg.id)
-        ? prev
-        : [
-            ...prev,
-            {
-              conversationId,
-              senderId: user.id,
-              author: { id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' },
-              ...msg,
-            },
-          ]
-    );
+  // Invio ottimistico, come nella Stanza MOD: la bolla compare subito
+  // (grigia), poi prende l'id vero; se Realtime è arrivato prima, la copia
+  // provvisoria sparisce. Errore -> "Non inviato · Riprova".
+  const sendPayload = async (payload, tempId = newId()) => {
+    if (!conversationId) return false;
+    retryPayloadsRef.current.set(tempId, payload);
+    setMessages((prev) => [
+      ...prev.filter((m) => m.id !== tempId),
+      {
+        id: tempId,
+        conversationId,
+        senderId: user.id,
+        author: me,
+        testo: payload.testo,
+        tipo: payload.tipo,
+        allegato: payload.allegato ?? null,
+        mondo: activeWorld.id,
+        menzioni: [],
+        data: new Date().toISOString(),
+        pending: true,
+      },
+    ]);
+    const res = await sendMessage(conversationId, payload.testo, {
+      tipo: payload.tipo,
+      allegato: payload.allegato ?? null,
+      mondo: activeWorld.id,
+      menzioni: payload.menzioni ?? [],
+    });
+    setMessages((prev) => {
+      if (res.error) return prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m));
+      retryPayloadsRef.current.delete(tempId);
+      if (prev.some((m) => m.id === res.id)) return prev.filter((m) => m.id !== tempId);
+      return prev.map((m) =>
+        m.id === tempId ? { ...m, id: res.id, data: res.createdAt ?? m.data, menzioni: res.menzioni ?? [], pending: false } : m
+      );
+    });
+    return !res.error;
   };
 
-  // Carica il file nel bucket privato della conversazione e manda il
-  // messaggio che lo contiene.
-  const sendFile = async (file, tipo) => {
-    if (!file || !conversationId) return;
-    if (file.size > CHAT_MAX_FILE_BYTES) {
-      setAttachStatus('⚠️ Il file supera i 20 MB.');
-      return;
-    }
-    setAttachMenuOpen(false);
-    setAttachStatus(tipo === 'foto' ? 'Invio foto…' : 'Invio file…');
-    const up = await uploadChatAttachment(conversationId, file);
-    if (up.error) {
-      setAttachStatus(`⚠️ ${up.error}`);
-      return;
-    }
-    const allegato = { path: up.path, nome: up.nome, mime: up.mime, size: up.size };
-    const label = tipo === 'foto' ? '📷 Foto' : `📎 ${up.nome}`;
-    const res = await sendMessage(conversationId, label, { tipo, allegato, mondo: world?.id ?? null });
-    if (res.error) {
-      setAttachStatus(`⚠️ ${res.error}`);
-      return;
-    }
-    setAttachStatus('');
-    appendMine({ id: res.id, testo: label, tipo, allegato, data: res.createdAt });
+  const retry = (tempId) => {
+    const payload = retryPayloadsRef.current.get(tempId);
+    if (payload) sendPayload(payload, tempId);
   };
+
+  // Un messaggio per allegato (chat_messages ne ha uno per riga), poi il
+  // testo con le menzioni.
+  const onSend = async ({ testo, menzioni, allegati }) => {
+    for (const a of allegati) await sendPayload(toChatMessage(a));
+    if (testo) await sendPayload({ tipo: 'testo', testo, menzioni });
+  };
+
+  // Stesso percorso di uploadChatAttachment (directChat.js), con la barra
+  // di avanzamento.
+  const upload = (file, onProgress) =>
+    uploadWithProgress(`${conversationId}/${user.id}/${Date.now()}-${safeFileName(file.name)}`, file, onProgress);
 
   // La posizione si manda SOLO dopo una conferma esplicita e solo quella
   // attuale (nessun tracciamento continuo, niente salvato sul profilo).
   const sendLocation = () => {
     setConfirmLocation(false);
-    setAttachMenuOpen(false);
     if (!navigator.geolocation) {
-      setAttachStatus('⚠️ Il tuo dispositivo non permette di leggere la posizione.');
+      setLocationStatus('⚠️ Il tuo dispositivo non permette di leggere la posizione.');
       return;
     }
-    setAttachStatus('Rilevo la posizione…');
+    setLocationStatus('Rilevo la posizione…');
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const allegato = {
-          lat: Number(pos.coords.latitude.toFixed(6)),
-          lng: Number(pos.coords.longitude.toFixed(6)),
-          precisione: Math.round(pos.coords.accuracy || 0),
-        };
-        const res = await sendMessage(conversationId, '📍 Posizione', { tipo: 'posizione', allegato, mondo: world?.id ?? null });
-        if (res.error) {
-          setAttachStatus(`⚠️ ${res.error}`);
-          return;
-        }
-        setAttachStatus('');
-        appendMine({ id: res.id, testo: '📍 Posizione', tipo: 'posizione', allegato, data: res.createdAt });
+      (pos) => {
+        setLocationStatus('');
+        sendPayload({
+          tipo: 'posizione',
+          testo: '📍 Posizione',
+          allegato: {
+            lat: Number(pos.coords.latitude.toFixed(6)),
+            lng: Number(pos.coords.longitude.toFixed(6)),
+            precisione: Math.round(pos.coords.accuracy || 0),
+          },
+        });
       },
       (err) => {
-        setAttachStatus(
-          err.code === 1 ? '⚠️ Permesso alla posizione negato dal browser.' : '⚠️ Posizione non disponibile, riprova.'
-        );
+        setLocationStatus(err.code === 1 ? '⚠️ Permesso alla posizione negato dal browser.' : '⚠️ Posizione non disponibile, riprova.');
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     );
   };
 
-  // Porta in vista l'ultimo messaggio quando ne arriva o se ne manda uno.
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, loading]);
+  const toggleArchive = async () => {
+    setMenuOpen(false);
+    if (!conversationId) return;
+    const next = !archived;
+    setArchived(next);
+    await setConversationArchived(conversationId, next);
+  };
 
-  // Solo l'ULTIMO messaggio mio ha lo stato "Inviato"/"Visualizzato" sotto
-  // (non ogni messaggio: sarebbe ridondante, come in qualunque chat).
-  const lastMineId = [...messages].reverse().find((m) => m.senderId === user.id)?.id ?? null;
+  const query = search.trim().toLowerCase();
+  const shown = useMemo(() => {
+    const list = messages.map((m) => ({ ...m, mine: m.senderId === user.id }));
+    if (!query) return list;
+    return list.filter((m) => (m.testo || '').toLowerCase().includes(query) || (m.allegato?.nome || '').toLowerCase().includes(query));
+  }, [messages, query, user.id]);
+
+  const renderMessage = (m) => {
+    const read = m.mine && otherLastReadAt && new Date(otherLastReadAt) >= new Date(m.data);
+    const from = m.mondo && m.mondo !== activeWorld.id ? WORLD_BY_ID.get(m.mondo) : null;
+    const att = m.tipo === 'posizione' ? null : toAttachment(m.tipo, m.allegato);
+    const isText = !m.tipo || m.tipo === 'testo';
+    return (
+      <ChatBubble
+        key={m.id}
+        mine={m.mine}
+        author={m.author}
+        showHeader={false}
+        pending={m.pending}
+        failed={m.failed}
+        onRetry={() => retry(m.id)}
+        footer={
+          from ? (
+            <span className="rb-dm-from">
+              <span className="rb-dm-from-dot" style={{ background: from.color }} aria-hidden="true" />
+              scritto in {from.label}
+            </span>
+          ) : null
+        }
+      >
+        {m.tipo === 'posizione' && m.allegato ? (
+          <ChatAttachment tipo="posizione" allegato={m.allegato} />
+        ) : att ? (
+          <div className="rb-chat-atts">
+            <AttachmentView allegato={att} onOpenImage={(src, nome) => setLightbox({ src, nome })} />
+          </div>
+        ) : (
+          <MentionText as="p" className="rb-chat-text" testo={m.testo} menzioni={m.menzioni} />
+        )}
+        {!m.mine && isText && <TranslateHint text={m.testo} sourceLang={m.lingua} />}
+        <span className="rb-dm-meta">
+          {timeLabel(m.data)}
+          {m.mine && !m.pending && !m.failed && (
+            <span className={`rb-dm-ticks ${read ? 'read' : ''}`} aria-label={read ? 'Letto' : 'Inviato'} title={read ? 'Letto' : 'Inviato'}>
+              {read ? '✓✓' : '✓'}
+            </span>
+          )}
+        </span>
+      </ChatBubble>
+    );
+  };
+
+  const color = activeWorld.color ?? '#1d9bf0';
+  const letter = (friend?.name || '?').trim().charAt(0).toUpperCase();
+  const ready = !loading && !error && Boolean(conversationId);
 
   return (
-    <ModalOverlay onClose={onClose} hasUnsavedChanges={draft.trim() !== ''}>
-      <div className="rb-friend-chat-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi"><Icon name="close" size={16} /></button>
-        <div className="rb-friend-chat-header">
-          {friend && (
-            <>
-              <button
-                type="button"
-                className="rb-friend-chat-avatar-btn"
-                onClick={() => setProfilePreviewOpen(true)}
-                aria-label={`Vedi profilo di ${friend.name}`}
-                title="Vedi profilo"
-              >
-                {friend.avatar ? (
-                  <img src={friend.avatar} alt="" />
-                ) : (
-                  <span className="rb-friend-chat-avatar-empty" aria-hidden="true">
-                    {(friend.name || '?').trim().charAt(0).toUpperCase()}
-                  </span>
-                )}
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={dirty}>
+      <div
+        ref={panelRef}
+        className="rb-dm-chat rb-chat-scope"
+        style={{ '--a': color, '--a-ink': inkFor(color) }}
+        data-world={activeWorld.id}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="rb-dm-chat-head">
+          <button
+            type="button"
+            className="rb-dm-chat-avatar"
+            onClick={() => friend && setProfilePreviewOpen(true)}
+            aria-label={friend ? `Vedi profilo di ${friend.name}` : 'Profilo'}
+            title="Vedi profilo"
+          >
+            {friend?.avatar ? <img src={friend.avatar} alt="" /> : <span aria-hidden="true">{letter}</span>}
+          </button>
+          <div className="rb-dm-chat-who">
+            <div className="rb-dm-chat-name">
+              <strong>{friend?.name ?? '…'}</strong>
+              <span className="rb-dm-world-label">{activeWorld.label}</span>
+            </div>
+            <span className={`rb-dm-chat-status ${friendHere ? 'on' : ''}`}>
+              {friendHere ? '● online' : archived ? 'Conversazione archiviata' : 'Chat privata'}
+            </span>
+          </div>
+          <div className="rb-dm-chat-actions">
+            {canCall && conversationId && (
+              <button type="button" className="rb-dm-chat-btn" onClick={() => startCallRef.current?.()} aria-label="Videochiamata" title="Videochiamata">
+                📹
               </button>
-              <strong>{friend.name}</strong>
-            </>
-          )}
-          {canCall && (
+            )}
             <button
               type="button"
-              className="rb-friend-chat-call-btn"
-              onClick={() => startCallRef.current?.()}
-              aria-label="Videochiamata"
-              title="Videochiamata"
+              className={`rb-dm-chat-btn ${searchOpen ? 'on' : ''}`}
+              onClick={() => {
+                setSearchOpen((v) => !v);
+                setSearch('');
+              }}
+              aria-label={searchOpen ? 'Chiudi ricerca' : 'Cerca nella conversazione'}
+              title="Cerca nella conversazione"
             >
-              <Icon name="video" size={18} />
+              🔍
             </button>
-          )}
-        </div>
+            <div className="rb-dm-chat-menu-wrap">
+              <button
+                type="button"
+                className="rb-dm-chat-btn"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Altre azioni"
+                aria-expanded={menuOpen}
+                title="Altre azioni"
+              >
+                ⋯
+              </button>
+              {menuOpen && (
+                <div className="rb-dm-chat-menu" role="menu" onMouseLeave={() => setMenuOpen(false)}>
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setProfilePreviewOpen(true); }} disabled={!friend}>
+                    👤 Vedi profilo
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSearchOpen(true); }}>
+                    🔍 Cerca nella conversazione
+                  </button>
+                  <button type="button" role="menuitem" onClick={toggleArchive} disabled={!conversationId}>
+                    🗂️ {archived ? 'Ripristina conversazione' : 'Archivia conversazione'}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        </header>
 
-        {loading && <p className="rb-friend-chat-empty">Caricamento...</p>}
-        {error && <p className="rb-privacy-error">⚠️ {error}</p>}
-
-        {!loading && !error && (
-          <ul className="rb-friend-chat-messages">
-            {messages.length === 0 && <p className="rb-friend-chat-empty">Nessun messaggio ancora, scrivi il primo!</p>}
-            {messages.map((m) => (
-              <li key={m.id} className={`rb-friend-chat-msg ${m.senderId === user.id ? 'me' : ''}`}>
-                {m.tipo && m.tipo !== 'testo' && m.allegato ? (
-                  <div className="rb-friend-chat-bubble-att">
-                    <ChatAttachment tipo={m.tipo} allegato={m.allegato} />
-                  </div>
-                ) : (
-                  <MentionText className="rb-friend-chat-bubble" testo={m.testo} menzioni={m.menzioni} />
-                )}
-                {m.senderId !== user.id && (!m.tipo || m.tipo === 'testo') && (
-                  <TranslateHint text={m.testo} sourceLang={m.lingua} />
-                )}
-                <span className="rb-friend-chat-date">{formatRelativeDate(m.data)}</span>
-                {m.id === lastMineId && (
-                  <span className="rb-friend-chat-receipt">
-                    {otherLastReadAt && new Date(otherLastReadAt) >= new Date(m.data) ? 'Visualizzato' : 'Inviato'}
-                  </span>
-                )}
-              </li>
-            ))}
-            <li ref={messagesEndRef} aria-hidden="true" className="rb-friend-chat-end" />
-          </ul>
+        {searchOpen && (
+          <div className="rb-dm-chat-search">
+            <input
+              type="search"
+              placeholder="Cerca nella conversazione…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.stopPropagation();
+                  setSearch('');
+                  setSearchOpen(false);
+                }
+              }}
+              autoFocus
+            />
+            {query && (
+              <small>
+                {shown.length} {shown.length === 1 ? 'messaggio trovato' : 'messaggi trovati'}
+              </small>
+            )}
+          </div>
         )}
 
-        {attachStatus && <p className="rb-friend-chat-att-status">{attachStatus}</p>}
+        {loading ? (
+          <p className="rb-dm-chat-empty">Caricamento…</p>
+        ) : error ? (
+          <p className="rb-privacy-error rb-dm-chat-empty">⚠️ {error}</p>
+        ) : (
+          <MessageList
+            items={shown}
+            renderItem={renderMessage}
+            onLoadOlder={query ? null : loadOlder}
+            hasMore={hasMore}
+            empty={<li className="rb-chat-older">{query ? 'Nessun messaggio trovato.' : 'Nessun messaggio ancora, scrivi il primo!'}</li>}
+          />
+        )}
+
+        {locationStatus && (
+          <p className="rb-dm-chat-status-line">
+            {locationStatus}
+            <button type="button" onClick={() => setLocationStatus('')} aria-label="Chiudi avviso">✕</button>
+          </p>
+        )}
 
         {confirmLocation && (
-          <div className="rb-friend-chat-confirm">
+          <div className="rb-dm-chat-confirm">
             <p>
               Vuoi inviare a <strong>{friend?.name ?? 'questa persona'}</strong> la tua posizione attuale? Verrà mostrata solo in
               questa chat.
@@ -357,88 +506,34 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           </div>
         )}
 
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            sendFile(e.target.files?.[0], 'foto');
-            e.target.value = '';
-          }}
+        <ChatComposer
+          contesto="chat"
+          contestoId={conversationId}
+          mentionTitle="Menziona qualcuno della chat"
+          placeholder="Scrivi un messaggio…"
+          disabled={!ready}
+          dropTargetRef={panelRef}
+          upload={upload}
+          onSend={onSend}
+          onDirtyChange={setDirty}
+          extraMenuItems={[{ label: 'Posizione', icon: '📍', onClick: () => setConfirmLocation(true) }]}
         />
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            sendFile(f, f?.type?.startsWith('image/') ? 'foto' : 'file');
-            e.target.value = '';
-          }}
-        />
-
-        <form className="rb-friend-chat-form" onSubmit={send}>
-          <div className="rb-friend-chat-attach">
-            <button
-              type="button"
-              className={`rb-friend-chat-plus ${attachMenuOpen ? 'open' : ''}`}
-              onClick={() => setAttachMenuOpen((v) => !v)}
-              disabled={loading || Boolean(error) || !conversationId}
-              aria-label="Allega foto, file o posizione"
-              aria-expanded={attachMenuOpen}
-              title="Allega"
-            >
-              <Icon name="plus" size={20} className="rb-friend-chat-plus-glyph" />
-            </button>
-            {attachMenuOpen && (
-              <div className="rb-friend-chat-attach-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => photoInputRef.current?.click()}>
-                  <Icon name="camera" size={17} /> Foto
-                </button>
-                <button type="button" role="menuitem" onClick={() => fileInputRef.current?.click()}>
-                  <Icon name="paperclip" size={17} /> File
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setAttachMenuOpen(false);
-                    setConfirmLocation(true);
-                  }}
-                >
-                  <Icon name="pin" size={17} /> Posizione
-                </button>
-              </div>
-            )}
-          </div>
-          <MentionInput
-            placeholder="Scrivi un messaggio..."
-            value={draft}
-            onChange={setDraft}
-            mentions={mentions}
-            onMentionsChange={setMentions}
-            contesto="chat"
-            contestoId={conversationId}
-            dropdownTitle="Menziona qualcuno della chat"
-            disabled={loading || Boolean(error) || !conversationId}
-          />
-          <button type="submit" disabled={sending || loading || Boolean(error) || !conversationId}>Invia</button>
-        </form>
       </div>
+
+      {lightbox && <Lightbox src={lightbox.src} nome={lightbox.nome} onClose={() => setLightbox(null)} />}
 
       {canCall && conversationId && (
         <CallModal
           conversationId={conversationId}
           user={user}
           friend={friend}
-          registerStart={(fn) => { startCallRef.current = fn; }}
+          registerStart={(fn) => {
+            startCallRef.current = fn;
+          }}
         />
       )}
 
-      {profilePreviewOpen && friend && (
-        <ContactProfileModal contact={friend} onClose={() => setProfilePreviewOpen(false)} />
-      )}
+      {profilePreviewOpen && friend && <ContactProfileModal contact={friend} onClose={() => setProfilePreviewOpen(false)} />}
     </ModalOverlay>
   );
 }

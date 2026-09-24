@@ -17,38 +17,63 @@ export async function startDirectConversation(otherId) {
 }
 
 // Messaggi di una conversazione, più vecchi prima, con il mittente già
-// risolto (vista public_profiles).
-export async function fetchMessages(conversationId) {
+// risolto (vista public_profiles). Con `limit` legge solo gli ultimi
+// `limit` (prima di `before`, se dato) e dice se ce ne sono altri più
+// vecchi: la chat li carica a 50 alla volta salendo.
+export async function fetchMessages(conversationId, { before = null, limit = null } = {}) {
   try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+    let query = supabase.from('chat_messages').select('*').eq('conversation_id', conversationId);
+    if (before) query = query.lt('created_at', before);
+    query = limit ? query.order('created_at', { ascending: false }).limit(limit + 1) : query.order('created_at', { ascending: true });
+    const { data, error } = await query;
     if (error) return { error: error.message };
-    if (!data) return { messages: [] };
+    if (!data) return { messages: [], hasMore: false };
+    let rows = data;
+    let hasMore = false;
+    if (limit) {
+      hasMore = rows.length > limit;
+      rows = rows.slice(0, limit).reverse();
+    }
 
-    const profilesMap = await fetchProfilesMap(data.map((m) => m.sender_id));
-    const messages = data.map((row) => ({
-      id: row.id,
-      conversationId: row.conversation_id,
-      senderId: row.sender_id,
-      author: profilesMap.get(row.sender_id) ?? { id: row.sender_id, name: 'Utente', avatar: '' },
-      testo: row.testo,
-      tipo: row.tipo ?? 'testo',
-      allegato: row.allegato ?? null,
-      lingua: row.lingua ?? null,
-      mondo: row.mondo ?? null,
-      menzioni: row.menzioni ?? [],
-      data: row.created_at,
-    }));
-    return { messages };
+    const profilesMap = await fetchProfilesMap(rows.map((m) => m.sender_id));
+    const messages = rows.map((row) => mapMessageRow(row, profilesMap.get(row.sender_id)));
+    return { messages, hasMore };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
 }
 
-// tipo: 'testo' | 'foto' | 'file' | 'posizione'. Per gli allegati `testo`
+export function mapMessageRow(row, author) {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    senderId: row.sender_id,
+    author: author ?? { id: row.sender_id, name: 'Utente', avatar: '' },
+    testo: row.testo,
+    tipo: row.tipo ?? 'testo',
+    allegato: row.allegato ?? null,
+    lingua: row.lingua ?? null,
+    mondo: row.mondo ?? null,
+    menzioni: row.menzioni ?? [],
+    data: row.created_at,
+  };
+}
+
+// Testo breve di un messaggio per le anteprime (hub 💬): i vocali con la
+// durata, i video con l'etichetta, il resto col testo salvato.
+export function messagePreviewText({ tipo, testo, allegato } = {}) {
+  if (tipo === 'audio') {
+    const s = Math.max(0, Math.round(Number(allegato?.durata) || 0));
+    return s ? `🎤 Messaggio vocale · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '🎤 Messaggio vocale';
+  }
+  if (tipo === 'video') return '🎬 Video';
+  if (tipo === 'foto') return testo || '📷 Foto';
+  if (tipo === 'file') return testo || `📎 ${allegato?.nome ?? 'File'}`;
+  if (tipo === 'posizione') return '📍 Posizione';
+  return testo ?? '';
+}
+
+// tipo: 'testo' | 'foto' | 'file' | 'posizione' | 'audio' | 'video'. Per gli allegati `testo`
 // contiene comunque un'etichetta breve ("📷 Foto", "📎 nome.pdf", "📍
 // Posizione") così le anteprime delle conversazioni e le notifiche, che
 // leggono solo il testo, restano leggibili. `mondo` è il mondo attivo al
@@ -152,6 +177,22 @@ export function subscribeToConversationMessages(conversationId, onInsert, onReco
     });
 }
 
+// Presenza nella chat aperta (Realtime presence, niente tabelle): ognuno
+// dei due segnala "sono qui" finché tiene aperta la conversazione, così la
+// testata mostra "online" quando anche l'altra persona è nella chat.
+// onChange(Set degli user_id presenti). Va rimosso con removeChannel.
+export function subscribeToConversationPresence(conversationId, myId, onChange) {
+  const channel = supabase.channel(`chat-presence-${conversationId}`, { config: { presence: { key: myId } } });
+  const emit = () => onChange(new Set(Object.keys(channel.presenceState())));
+  channel
+    .on('presence', { event: 'sync' }, emit)
+    .on('presence', { event: 'leave' }, emit)
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') channel.track({ at: Date.now() });
+    });
+  return channel;
+}
+
 // Un canale globale senza filtro (RLS limita già ai messaggi delle proprie
 // conversazioni) per aggiornare i badge "non letti" anche a chat chiusa.
 export function subscribeToOwnMessages(onInsert) {
@@ -191,7 +232,7 @@ export async function listMyConversations() {
 
     const { data: recentMessages } = await supabase
       .from('chat_messages')
-      .select('conversation_id, testo, created_at, mondo')
+      .select('conversation_id, testo, tipo, allegato, created_at, mondo')
       .in('conversation_id', convIds)
       .order('created_at', { ascending: false });
     const lastMsgByConv = new Map();
@@ -212,7 +253,7 @@ export async function listMyConversations() {
         return {
           conversationId: convId,
           other: profilesMap.get(otherId) ?? { id: otherId, name: 'Utente', avatar: '' },
-          lastMessage: lastMsg?.testo ?? null,
+          lastMessage: lastMsg ? messagePreviewText(lastMsg) : null,
           lastMessageAt: lastMsg?.created_at ?? null,
           lastMessageMondo: lastMsg?.mondo ?? null,
           unread: unreadCounts.get(convId) ?? 0,
