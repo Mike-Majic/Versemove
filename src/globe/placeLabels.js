@@ -120,9 +120,14 @@ function luminance(hex) {
   return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
 
-export function createPlaceLabels({ canvas, getRoot, getMarkers, onZoomTo }) {
+export function createPlaceLabels({ canvas, getRoot, getMarkers, onZoomTo, enabled: initiallyEnabled = true }) {
   const layer = document.createElement('div');
   layer.className = 'rb-place-labels';
+  // Spento (setEnabled(false), oggi in ogni mondo tranne Lavoro): niente
+  // calcoli né caricamento dati, marker come senza nomi, livello che sfuma
+  // via in CSS (.is-off).
+  let enabled = initiallyEnabled;
+  layer.classList.toggle('is-off', !enabled);
   // Subito sopra il canvas e sotto i marker HTML di react-globe.gl, che
   // stanno nel livello successivo.
   canvas.insertAdjacentElement('afterend', layer);
@@ -579,6 +584,7 @@ export function createPlaceLabels({ canvas, getRoot, getMarkers, onZoomTo }) {
   // o fermo, vedi WorldGlobe): lavora solo se la camera si è mossa o sono
   // arrivati dati nuovi.
   const update = (camera, altitude, now = performance.now()) => {
+    if (!enabled) return;
     const width = layer.clientWidth;
     const height = layer.clientHeight;
     const root = getRoot?.();
@@ -661,5 +667,21 @@ export function createPlaceLabels({ canvas, getRoot, getMarkers, onZoomTo }) {
     needsLayout = true;
   };
 
-  return { update, setTheme, getPlaced, invalidate, dispose };
+  // Acceso/spento insieme al cambio di mondo. Spegnendo, le scritte già
+  // piazzate restano ferme mentre sfumano (nessun calcolo in più) e i
+  // marker tornano subito al loro posto, interi e senza pillole; il
+  // prossimo update() da acceso rifà il piazzamento da capo.
+  const setEnabled = (on) => {
+    if (on === enabled) return;
+    enabled = on;
+    layer.classList.toggle('is-off', !on);
+    if (on) {
+      needsLayout = true;
+      lastCamKey = '';
+    } else {
+      resetMarkers();
+    }
+  };
+
+  return { update, setTheme, getPlaced: () => (enabled ? getPlaced() : []), invalidate, setEnabled, dispose };
 }

@@ -152,6 +152,9 @@ const NEARBY_DEGREES = 1;
 // globe/satelliteGlobes.js) e serve spazio per vederlo tutto; più alta
 // ancora in verticale (schermo stretto) perché l'anello lì è più "alto"
 // che "largo" rispetto all'inquadratura.
+// Mondi con i nomi di città, regioni, stati e mari (globe/placeLabels.js).
+const PLACE_LABEL_WORLDS = new Set(['lavoro']);
+
 const DEFAULT_ALTITUDE_WIDE = 6;
 const DEFAULT_ALTITUDE_TALL = 7.5;
 function defaultAltitude() {
@@ -668,12 +671,18 @@ export default function WorldGlobe({
   // Nomi dei luoghi: livello HTML sopra il canvas (vedi globe/placeLabels.js).
   // Si aggiornano dal giro di disegno (render wrapper sopra), solo quando la
   // camera si muove; l'oggetto del globo si cerca al momento (vedi il
-  // commento sui continenti più giù).
+  // commento sui continenti più giù). Solo nel mondo Lavoro
+  // (PLACE_LABEL_WORLDS): negli altri il livello è spento, senza calcoli, e
+  // i marker restano come senza nomi (niente pillole, spirale né "+N").
+  const placeLabelsEnabled = PLACE_LABEL_WORLDS.has(world.id);
+  const placeLabelsEnabledRef = useRef(placeLabelsEnabled);
+  placeLabelsEnabledRef.current = placeLabelsEnabled;
   useEffect(() => {
     const g = globeRef.current;
     if (!g) return undefined;
     let root = null;
     const labels = createPlaceLabels({
+      enabled: placeLabelsEnabledRef.current,
       canvas: g.renderer().domElement,
       getRoot: () => root ?? (root = findGlobeRootObject(g.scene())),
       getMarkers: () =>
@@ -701,6 +710,10 @@ export default function WorldGlobe({
       placeLabelsRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    placeLabelsRef.current?.setEnabled(placeLabelsEnabled);
+  }, [placeLabelsEnabled]);
 
   useEffect(() => {
     placeLabelsRef.current?.setTheme({
