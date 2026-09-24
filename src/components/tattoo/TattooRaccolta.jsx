@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import { photosNear, getStudioStats } from '../../data/tattoo';
 import TattooPostCard from './TattooPostCard';
 import EmptyState from '../EmptyState';
@@ -18,6 +19,7 @@ export default function TattooRaccolta({ point, user, onOpenAuth, stile, parteCo
   const [loading, setLoading] = useState(false);
   const [studioStats, setStudioStats] = useState(null);
   const [openPost, setOpenPost] = useState(null);
+  useBackLayer(openPost !== null, () => setOpenPost(null), 'viewer:tattoo');
   const sentinelRef = useRef(null);
 
   const loadMore = async () => {

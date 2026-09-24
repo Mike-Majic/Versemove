@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import {
   listActiveLiveSessions,
   startLiveSession,
@@ -145,6 +146,8 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth }) {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showGoLive, setShowGoLive] = useState(false);
+  // Diretta aperta = sottopagina: Indietro torna all'elenco, come "← Elenco dirette".
+  useBackLayer(selectedId !== null, () => setSelectedId(null), 'subpage:live');
   const [goLiveError, setGoLiveError] = useState('');
   // Solo nel mondo Lavoro: nome e cognome reali (se chi guarda e l'host
   // hanno entrambi dato il consenso, vedi data/lavoro.js) al posto del solo

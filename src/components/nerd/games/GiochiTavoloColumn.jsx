@@ -24,6 +24,8 @@ import TrentunoTable from './TrentunoTable';
 import CosmopoliTable from './CosmopoliTable';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
+import ModalOverlay from '../../ModalOverlay';
+import { useBackLayer } from '../../../hooks/useBackLayer';
 import './giochiTavolo.css';
 
 const GAMES = [
@@ -236,6 +238,7 @@ function RoomView({ roomId, user, onExit }) {
   const [eventTick, setEventTick] = useState(0);
   const [error, setError] = useState('');
   const [addBotDifficulty, setAddBotDifficulty] = useState('medio');
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const startAttemptedRef = useRef(false);
 
   const refresh = () => fetchRoom(roomId).then(setRoom);
@@ -308,6 +311,26 @@ function RoomView({ roomId, user, onExit }) {
     else refresh();
   };
 
+  // Tasto Indietro del telefono: dalla sala d'attesa si torna alla lobby
+  // con la stessa uscita del pulsante (lascia il posto, la stanza resta
+  // agli altri). A partita in corso invece l'unica uscita esistente
+  // (leave_game_room) chiude la partita per tutti: Indietro non lo fa di
+  // nascosto, chiede prima conferma come "Abbandona".
+  useBackLayer(true, onExit, 'subpage:giochi', {
+    onBack: () => {
+      if (!room || room.stato === 'conclusa') {
+        onExit();
+        return true;
+      }
+      if (room.stato === 'in_attesa') {
+        handleLeave();
+        return true;
+      }
+      setConfirmLeave(true);
+      return false;
+    },
+  });
+
   if (!room) return <Skeleton lines={4} />;
 
   if (room.stato === 'conclusa') {
@@ -337,7 +360,22 @@ function RoomView({ roomId, user, onExit }) {
 
   if (room.stato === 'in_corso') {
     const Table = TABLES[room.gioco];
-    return <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />;
+    return (
+      <>
+        <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />
+        {confirmLeave && (
+          <ModalOverlay onClose={() => setConfirmLeave(false)}>
+            <div className="rb-modal-unsaved-confirm" onClick={(e) => e.stopPropagation()}>
+              <p>La partita è in corso: uscendo finisce anche per gli altri giocatori. Abbandonare?</p>
+              <div className="rb-modal-unsaved-actions">
+                <button type="button" className="rb-modal-unsaved-close" onClick={handleLeave}>Abbandona</button>
+                <button type="button" onClick={() => setConfirmLeave(false)} autoFocus>Resta</button>
+              </div>
+            </div>
+          </ModalOverlay>
+        )}
+      </>
+    );
   }
 
   const gameLabel = GAMES.find((g) => g.id === room.gioco)?.label ?? 'Partita';

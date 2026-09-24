@@ -30,6 +30,26 @@
 
 /* Toast di una nuova notifica (match/super like) arrivata in tempo reale:
    cliccabile, apre Incontri sulla scheda giusta. */
+/* Avviso del tasto Indietro a mappamondo pulito (vedi hooks/useBackLayer.js). */
+.rb-back-exit-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1300;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(19, 19, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f5f5f7;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+  animation: rb-fade-in 0.15s ease;
+}
+
 .rb-notif-toast {
   position: fixed;
   top: 76px;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import {
   listMyPlaylists,
   createPlaylist,
@@ -615,6 +616,8 @@ export default function MusicaApp({ user, onOpenAuth }) {
   const [playlists, setPlaylists] = useState(() => (user ? null : []));
   const [openPlaylistId, setOpenPlaylistId] = useState(null);
   const [nowPlaying, setNowPlaying] = useState(null);
+  // Playlist aperta nella Raccolta = sottopagina: Indietro torna all'elenco.
+  useBackLayer(tab === 'raccolta' && openPlaylistId !== null, () => setOpenPlaylistId(null), 'subpage:playlist');
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(0);
 

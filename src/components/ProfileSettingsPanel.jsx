@@ -40,6 +40,7 @@ import { WORLDS } from '../data/worlds';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import ModalOverlay from './ModalOverlay';
 import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
+import { BACK_LEVELS, useBackLayer } from '../hooks/useBackLayer';
 import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
 import './ProfileSettingsPanel.css';
@@ -265,6 +266,9 @@ function AlbumsPanel() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   useReportUnsaved(showNewForm && (newNome.trim() !== '' || newDesc.trim() !== ''));
+  // Album aperto dentro il pannello: Indietro torna all'elenco album prima
+  // di chiudere il pannello stesso (quindi un gradino sopra i modali).
+  useBackLayer(openAlbumId !== null, () => setOpenAlbumId(null), 'subpage:album', { level: BACK_LEVELS.modal + 0.5 });
 
   useEffect(() => {
     listMyAlbums().then(setAlbums);

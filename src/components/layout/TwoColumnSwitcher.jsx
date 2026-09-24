@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useIsDesktopLayout } from '../../hooks/useIsDesktopLayout';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import './TwoColumnSwitcher.css';
 
 function SwitchIcon() {
@@ -34,6 +35,10 @@ export default function TwoColumnSwitcher({
   const [internalView, setInternalView] = useState('primary');
   const view = controlledView ?? internalView;
   const setView = onMobileViewChange ?? setInternalView;
+  // Su telefono la seconda colonna è una sottopagina: Indietro torna alla
+  // prima (vedi hooks/useBackLayer.js). Su desktop sono affiancate, niente
+  // da chiudere.
+  useBackLayer(!isDesktop && view === 'secondary' && !closing, () => setView('primary'), 'subpage:2col');
 
   if (isDesktop) {
     return (

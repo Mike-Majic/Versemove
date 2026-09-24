@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UnsavedChangesContext, useUnsavedChangesRegistry } from '../hooks/useUnsavedChanges';
+import { nextLayerOrder, useBackLayer } from '../hooks/useBackLayer';
 
 // Sfondo condiviso da tutti i pannelli a comparsa.
 //
@@ -25,6 +26,10 @@ import { UnsavedChangesContext, useUnsavedChangesRegistry } from '../hooks/useUn
 // modale di conferma aperto sopra "Il mio profilo" si chiude da solo senza
 // portarsi dietro il pannello sotto.
 //
+// Tasto Indietro del telefono: ogni pannello è un livello della pila di
+// hooks/useBackLayer.js. Indietro fa come il clic fuori (stessa conferma se
+// ci sono modifiche); se la conferma è già a schermo, Indietro vale "Resta".
+//
 // Portato con createPortal dentro .rb-app (mai document.body: lì sopra
 // perderebbe --accent, impostato proprio su .rb-app — vedi App.jsx) invece
 // di renderizzare nel punto esatto dell'albero React in cui viene
@@ -39,32 +44,45 @@ import { UnsavedChangesContext, useUnsavedChangesRegistry } from '../hooks/useUn
 
 // Pannelli aperti, per sapere quale è in cima quando si preme Esc. Il
 // numero viene assegnato al primo render: un genitore renderizza sempre
-// prima dei figli, quindi un modale annidato ha un numero più alto.
-let overlaySeq = 0;
+// prima dei figli, quindi un modale annidato ha un numero più alto (è lo
+// stesso numero d'ordine usato dalla pila del tasto Indietro).
 const openOverlays = new Set();
 const topOverlay = () => Math.max(...openOverlays);
 
 export default function ModalOverlay({ className = 'rb-modal-overlay', children, onClose, hasUnsavedChanges = false }) {
-  const [seq] = useState(() => ++overlaySeq);
+  const [seq] = useState(nextLayerOrder);
   const { anyDirty, report } = useUnsavedChangesRegistry();
   const dirty = hasUnsavedChanges || anyDirty;
   const [confirming, setConfirming] = useState(false);
   const downOnBackdrop = useRef(false);
 
-  const latest = useRef({ onClose, dirty });
+  const latest = useRef({ onClose, dirty, confirming });
   useEffect(() => {
-    latest.current = { onClose, dirty };
+    latest.current = { onClose, dirty, confirming };
   });
 
+  // true se il pannello si è chiuso davvero (serve al tasto Indietro).
   const requestClose = useCallback(() => {
     const { onClose: close, dirty: isDirty } = latest.current;
-    if (!close) return;
+    if (!close) return false;
     if (isDirty) {
       setConfirming(true);
-      return;
+      return false;
     }
     close();
+    return true;
   }, []);
+
+  useBackLayer(true, onClose, 'modal', {
+    order: seq,
+    onBack: () => {
+      if (latest.current.confirming) {
+        setConfirming(false);
+        return false;
+      }
+      return requestClose();
+    },
+  });
 
   useEffect(() => {
     openOverlays.add(seq);

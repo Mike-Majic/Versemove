@@ -10,6 +10,7 @@ import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { usersForWorld } from './data/mockUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
+import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
 import { getCityInfo, findCityMatch } from './data/geo';
 import {
   ARTE_CATEGORIES,
@@ -872,6 +873,14 @@ export default function App() {
     }
   };
 
+  // Tasto Indietro del telefono (vedi hooks/useBackLayer.js): pila di
+  // livelli + avviso "Premi di nuovo Indietro per uscire". La categoria
+  // aperta è il livello più esterno; sopra ci stanno le sottopagine delle
+  // colonne, i pannelli a comparsa e i visori a schermo intero, ognuno
+  // registrato dal proprio componente.
+  const exitToastVisible = useBackNavigationRoot();
+  useBackLayer(Boolean(activeArteCategory) && !closingCategoryId, () => toggleArteCategory(activeArteCategory), 'world:category');
+
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
   // su Incontri/Lavoro) serve essere maggiorenni, solo dopo conta se
   // l'utente ha scelto di disattivare questo mondo dalle Impostazioni.
@@ -1250,6 +1259,12 @@ export default function App() {
             onNavigate={openNotificationTarget}
           />
         </Suspense>
+      )}
+
+      {exitToastVisible && (
+        <div className="rb-back-exit-toast" role="status">
+          Premi di nuovo Indietro per uscire
+        </div>
       )}
 
       {notifToast && (

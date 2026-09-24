@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import {
   listClips,
   publishClip,
@@ -250,6 +251,7 @@ export default function MusicaClip({ user, onOpenAuth }) {
   const [clips, setClips] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [fullscreenId, setFullscreenId] = useState(null);
+  useBackLayer(fullscreenId !== null, () => setFullscreenId(null), 'viewer:clip');
 
   const refresh = () => listClips().then(setClips);
   useEffect(refresh, []);

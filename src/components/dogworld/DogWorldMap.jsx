@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import { placesInBbox } from '../../data/dogWorld';
 import { DOG_PLACE_TYPES, placeTypeMeta } from './dogPlaceMeta';
 import DogPlaceSheet from './DogPlaceSheet';
@@ -48,6 +49,8 @@ export default function DogWorldMap({ user, onOpenAuth }) {
   const [placeCount, setPlaceCount] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [addAtLatLng, setAddAtLatLng] = useState(null);
+  // Scheda del luogo aperta sopra la mappa: Indietro la chiude come la ✕.
+  useBackLayer(selectedPlace !== null, () => setSelectedPlace(null), 'subpage:dog-place');
   const [activeTipi, setActiveTipi] = useState([]);
   const [soloRecintate, setSoloRecintate] = useState(false);
 
