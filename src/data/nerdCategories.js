@@ -3,6 +3,17 @@
 // componente condiviso CategoryColumn funziona identico per entrambi i mondi.
 export const NERD_CATEGORIES = [
   {
+    // Bacheca del mondo Nerd: tutti i post con mondo = 'nerd', compresi
+    // quelli delle categorie gaming (col chip "Gaming PC · Build"), più i
+    // post liberi scritti da qui (vedi nerd/NerdBachecaColumn.jsx).
+    id: 'bacheca',
+    label: 'Bacheca',
+    icon: '📰',
+    anchor: { lat: -55, lng: -110 },
+    aliases: ['bacheca', 'feed', 'post', 'discussioni'],
+    subfamilies: ['Discussioni', 'Novità', 'Consigli'],
+  },
+  {
     id: 'giochi-tavolo',
     label: 'Giochi da tavolo & carte',
     icon: '🎲',
@@ -70,6 +81,7 @@ export function resolveCategoryQuery(query) {
 }
 
 export const FEATURED_SEARCHES = {
+  bacheca: ['Ultime build', 'Trofei rari', 'Novità Game Pass', 'Clip della settimana'],
   'giochi-tavolo': ['Giochi cooperativi', 'Party game per gruppi grandi', 'Carte collezionabili rare', 'Giochi di ruolo per principianti', 'Strategici tedeschi', 'Giochi per due'],
   'gaming-pc': ['Build economiche', 'RPG open world', 'Indie da scoprire', 'FPS competitivi', 'Simulatori realistici'],
   'gaming-ps': ['Esclusive PS5', 'Platform co-op', 'Giochi retrocompatibili', 'Multiplayer online', 'Nuove uscite PlayStation'],

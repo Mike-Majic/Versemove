@@ -10,6 +10,7 @@ import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
 import GamingColumn from './nerd/gaming/GamingColumn';
+import NerdBachecaColumn from './nerd/NerdBachecaColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import { VETRINA_OFFERTE_CATEGORY_IDS } from '../data/vetrinaCategories';
@@ -109,6 +110,8 @@ export default function ArteExplorer({
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'giochi-tavolo' ? (
             <GiochiTavoloColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'nerd' && category.id === 'bacheca' ? (
+            <NerdBachecaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (
             // Gaming PC / PS / Xbox: una sola colonna, la piattaforma della
             // categoria fa da contesto (vedi nerd/gaming/GamingColumn.jsx).

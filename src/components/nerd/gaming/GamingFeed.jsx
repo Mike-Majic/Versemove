@@ -21,7 +21,8 @@ import { BuildFields, ClipFields, GamePassFields, TrofeoFields } from './GamingC
 import { GAMEPASS_ACTIONS, emptyFields, fieldsToPost, formatDay } from './gamingPost';
 
 // Feed di posts filtrati per categoria + tag (Clip, Community, Build,
-// Trofei, Game Pass): stesso compositore della bacheca (testo, foto/video,
+// Trofei, Game Pass), o di tutto il mondo Nerd se categoria e tag sono
+// null (bacheca, vedi nerd/NerdBachecaColumn.jsx): stesso compositore della bacheca (testo, foto/video,
 // menzioni) con i campi strutturati del tag sotto il testo, e le stesse
 // PostCard (commenti, reazioni, salva, modifica, segnala). Dopo ogni azione
 // si ricarica da capo, come nel profilo pubblico: qui non serve la
@@ -112,7 +113,7 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
   const [viewer, setViewer] = useState(null);
 
   const reload = useCallback(async () => {
-    const res = await fetchFeed({ mondo: 'nerd', categoria: category.id, tag });
+    const res = await fetchFeed({ mondo: 'nerd', categoria: category?.id ?? null, tag: tag ?? null });
     if (res.error) {
       setError(res.error);
       setPosts([]);
@@ -124,7 +125,7 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
     setPosts(withTitles);
     const { comments: c } = await fetchComments(withTitles.map((p) => p.id));
     setComments(c ?? []);
-  }, [category.id, tag]);
+  }, [category?.id, tag]);
 
   useEffect(() => {
     reload();
@@ -152,8 +153,8 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
       ...data,
       gruppoId: undefined,
       mondo: 'nerd',
-      categoria: category.id,
-      tag,
+      categoria: category?.id ?? null,
+      tag: tag ?? null,
       titleId: parsed.titleId,
       extra: parsed.extra,
     });
@@ -203,7 +204,7 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
     return null;
   }, [tag, fields, platform, user, onOpenAuth]);
 
-  const info = POST_TAGS[tag];
+  const info = tag ? POST_TAGS[tag] : null;
 
   return (
     <>
@@ -211,10 +212,10 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
         user={user}
         onOpenAuth={onOpenAuth}
         onSubmit={createPost}
-        placeholder={PLACEHOLDERS[tag] ?? 'Scrivi qualcosa…'}
+        placeholder={PLACEHOLDERS[tag] ?? 'Cosa succede nel mondo Nerd?'}
         submitLabel={`Pubblica ${info?.label?.toLowerCase() ?? ''}`.trim()}
         mondo="nerd"
-        placementCategory={category.id}
+        placementCategory={category?.id ?? null}
         allowEmptyText={tag === 'build' || tag === 'trofeo' || tag === 'gamepass'}
       >
         {fieldsNode}
@@ -231,7 +232,7 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
           {layout === 'grid' ? (
             <ClipGrid posts={posts} onOpen={setViewer} />
           ) : posts.length === 0 ? (
-            <EmptyState icon={info?.icon ?? '💬'} title={`Nessun post in ${info?.label ?? 'questa scheda'}`} subtitle="Sii il primo a scrivere." />
+            <EmptyState icon={info?.icon ?? '📰'} title={info ? `Nessun post in ${info.label}` : 'Nessun post ancora nel mondo Nerd'} subtitle="Sii il primo a scrivere." />
           ) : (
             <ul className="rb-gaming-posts">
               {posts.map((post) => (
