@@ -20,6 +20,12 @@
   box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #0a84ff) 18%, transparent);
 }
 
+.rb-wip-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
 .rb-wip-icon {
   font-size: 40px;
 }

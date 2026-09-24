@@ -906,6 +906,22 @@ export default function App() {
   // colonne, i pannelli a comparsa e i visori a schermo intero, ognuno
   // registrato dal proprio componente.
   const exitToastVisible = useBackNavigationRoot();
+
+  // Mondo precedente, per uscire dal mondo "Work in progress" (niente
+  // categorie da chiudere: la ✕ del suo pannello e il tasto Indietro
+  // riportano dove si era prima, Social se non c'è un mondo precedente).
+  const lastWorldIndexRef = useRef(index);
+  const previousWorldIndexRef = useRef(DEFAULT_WORLD_INDEX);
+  useEffect(() => {
+    if (lastWorldIndexRef.current === index) return;
+    previousWorldIndexRef.current = lastWorldIndexRef.current;
+    lastWorldIndexRef.current = index;
+  }, [index]);
+  const leaveWipWorld = () => {
+    const prev = previousWorldIndexRef.current;
+    setIndex(WORLDS[prev] && WORLDS[prev].id !== 'wip' ? prev : DEFAULT_WORLD_INDEX);
+  };
+  useBackLayer(world.id === 'wip', leaveWipWorld, 'world:wip');
   useBackLayer(Boolean(activeArteCategory) && !closingCategoryId, () => toggleArteCategory(activeArteCategory), 'world:category');
 
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
@@ -1128,7 +1144,7 @@ export default function App() {
 
       {world.id === 'wip' && (
         <Suspense fallback={<PageLoading />}>
-          <WipWorldExplorer world={world} />
+          <WipWorldExplorer world={world} onClose={leaveWipWorld} />
         </Suspense>
       )}
 

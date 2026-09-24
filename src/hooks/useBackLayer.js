@@ -49,6 +49,10 @@ let exitArmedUntil = 0;
 let exitTimer = null;
 let toastListener = null;
 let rootMounted = false;
+// La sentinella e le voci dei livelli già aperti si mettono una volta sola:
+// in sviluppo React (StrictMode) smonta e rimonta subito gli effect, e un
+// secondo giro aggiungerebbe voci doppie.
+let rootInitialized = false;
 
 const topLayer = () =>
   layers.reduce(
@@ -159,19 +163,22 @@ export function useBackNavigationRoot() {
   useEffect(() => {
     rootMounted = true;
     toastListener = setExitToastVisible;
-    const state = window.history.state;
-    if (state && typeof state.vmIdx === 'number') {
-      // Pagina ricaricata su una voce nostra: la si riusa come sentinella.
-      currentIdx = state.vmIdx;
-      sentinel = true;
-    } else {
-      currentIdx = 0;
-      sentinel = false;
-      ensureSentinel();
+    if (!rootInitialized) {
+      rootInitialized = true;
+      const state = window.history.state;
+      if (state && typeof state.vmIdx === 'number') {
+        // Pagina ricaricata su una voce nostra: la si riusa come sentinella.
+        currentIdx = state.vmIdx;
+        sentinel = true;
+      } else {
+        currentIdx = 0;
+        sentinel = false;
+        ensureSentinel();
+      }
+      // Livelli aperti prima del montaggio della radice (gli effect dei
+      // figli partono prima dei suoi): una voce ciascuno.
+      layers.forEach(() => pushEntry());
     }
-    // Livelli già aperti prima del montaggio (non dovrebbe succedere, ma
-    // la cronologia deve restare allineata comunque).
-    layers.forEach(() => pushEntry());
     window.addEventListener('popstate', onPopState);
     return () => {
       window.removeEventListener('popstate', onPopState);
