@@ -79,10 +79,8 @@ export default function AuthModal({ open, onClose, onLogin }) {
   const [lingua, setLingua] = useState(i18n.language);
   // Tutti i mondi abilitati di default: chi si registra può deselezionarne
   // alcuni (es. vuole usare solo il mondo Nerd), non deve spuntarli a mano
-  // uno per uno per averli tutti. "Work in progress" resta fuori: il
-  // database non lo conosce ancora fra i mondi ammessi (vedi worlds.js), se
-  // finisse comunque nell'elenco la registrazione fallirebbe.
-  const [mondiAbilitati, setMondiAbilitati] = useState(WORLDS.filter((w) => w.id !== 'wip').map((w) => w.id));
+  // uno per uno per averli tutti (Work in progress compreso).
+  const [mondiAbilitati, setMondiAbilitati] = useState(WORLDS.map((w) => w.id));
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [consensoMarketing, setConsensoMarketing] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -591,7 +589,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
             <div className="rb-field">
               <span>{t('auth.fields.worldsToEnable')} *</span>
               <div className="rb-auth-worlds-box">
-                {WORLDS.filter((w) => w.id !== 'wip').map((w) => (
+                {WORLDS.map((w) => (
                   <label key={w.id} className="rb-auth-world-row">
                     <input
                       type="checkbox"

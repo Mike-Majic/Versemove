@@ -49,7 +49,7 @@ export default function DisabledWorldPopover({ worldId, x, y, user, onClose, onU
     setBusy(true);
     setError('');
     const current = user.mondiAbilitati ?? [];
-    const next = WORLDS.map((w) => w.id).filter((id) => id !== 'wip' && (id === 'faq' || id === worldId || current.includes(id)));
+    const next = WORLDS.map((w) => w.id).filter((id) => id === 'faq' || id === worldId || current.includes(id));
     const { account, error: err } = await setOwnWorlds(next);
     setBusy(false);
     if (err) {

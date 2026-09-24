@@ -45,12 +45,7 @@ const QUALITY_OPTIONS = [
 // (vedi il filtro su globeUsers in App.jsx).
 function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
   const { t } = useTranslation();
-  // "Work in progress" resta fuori dal default: il database non lo conosce
-  // ancora fra i mondi ammessi (vedi worlds.js), se finisse comunque
-  // nell'elenco salvato il salvataggio fallirebbe.
-  const [selected, setSelected] = useState(
-    user?.mondiAbilitati?.length ? user.mondiAbilitati : WORLDS.filter((w) => w.id !== 'wip').map((w) => w.id)
-  );
+  const [selected, setSelected] = useState(user?.mondiAbilitati?.length ? user.mondiAbilitati : WORLDS.map((w) => w.id));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
@@ -79,9 +74,8 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
     }
     // FAQ resta sempre abilitato: non è tra le caselle spuntabili qui sotto
     // (è il posto dove si chiede aiuto, non si può disattivare), ma va
-    // comunque incluso nell'elenco salvato. "Work in progress" è l'opposto:
-    // non va MAI salvato, il database non lo conosce ancora (vedi worlds.js).
-    const ordered = WORLDS.map((w) => w.id).filter((id) => (id === 'faq' || selected.includes(id)) && id !== 'wip');
+    // comunque incluso nell'elenco salvato.
+    const ordered = WORLDS.map((w) => w.id).filter((id) => id === 'faq' || selected.includes(id));
     setBusy(true);
     const { account, error: err } = await setOwnWorlds(ordered);
     setBusy(false);
@@ -96,7 +90,7 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
   return (
     <>
       <div className="rb-settings-worlds-list">
-        {WORLDS.filter((w) => w.id !== 'faq' && w.id !== 'wip').map((w) => (
+        {WORLDS.filter((w) => w.id !== 'faq').map((w) => (
           <label key={w.id} className="rb-settings-world-row">
             <input type="checkbox" checked={selected.includes(w.id)} onChange={() => toggle(w.id)} />
             <span className="rb-settings-world-dot" style={{ background: w.color }} />

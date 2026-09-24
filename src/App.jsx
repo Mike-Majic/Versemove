@@ -237,10 +237,10 @@ export default function App() {
   // vede davvero (su telefono il pannello copre tutto) invece di finire
   // dietro. animate: il cambio l'ha fatto adesso lo stesso utente (dalle
   // Impostazioni o da "Riattiva mondo"); un login o un cambio account
-  // mostrano invece subito lo stato salvato, senza animazione. FAQ e Work in
-  // progress non si possono disattivare (vedi worldDisabledByUser più giù).
+  // mostrano invece subito lo stato salvato, senza animazione. FAQ non si
+  // può disattivare (vedi worldDisabledByUser più giù).
   const disabledWorldsKey = user
-    ? WORLDS.filter((w) => w.id !== 'faq' && w.id !== 'wip' && !(user.mondiAbilitati ?? []).includes(w.id))
+    ? WORLDS.filter((w) => w.id !== 'faq' && !(user.mondiAbilitati ?? []).includes(w.id))
         .map((w) => w.id)
         .join(',')
     : '';
@@ -931,12 +931,9 @@ export default function App() {
   const ageBlockedForWorld = isAgeGatedWorld && !needsAuthForWorld && !isAdult(user?.dataNascita);
   // FAQ resta sempre attivo (è il posto dove si chiede aiuto): non lo si
   // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui. Work in
-  // progress idem: è nuovo, non è ancora fra i mondi salvabili in
-  // mondiAbilitati (nessuna modifica al database per questo mondo, vedi
-  // WipWorldExplorer) e non deve mai apparire come "disattivato".
+  // progress invece ora si attiva/disattiva come gli altri mondi.
   const worldDisabledByUser =
     world.id !== 'faq' &&
-    world.id !== 'wip' &&
     !needsAuthForWorld &&
     !ageBlockedForWorld &&
     !(user.mondiAbilitati ?? []).includes(world.id);
