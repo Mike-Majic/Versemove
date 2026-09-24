@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { GAMING_TABS, PLATFORM_BY_CATEGORY, PLATFORM_TAB } from '../../../data/gaming';
-import EmptyState from '../../EmptyState';
 import { RoomView } from '../VideoRoomsColumn';
 import GiochiTab from './GiochiTab';
 import LfgTab from './LfgTab';
+import GamingFeed from './GamingFeed';
 import '../videoRooms.css';
 import './gaming.css';
 
@@ -91,8 +91,10 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
             onDismissNotice={() => setNotice('')}
           />
         )}
-        {tab !== 'giochi' && tab !== 'lfg' && (
-          <EmptyState icon="🚧" title={`${tabs.find((t) => t.id === tab)?.label ?? ''}: in arrivo`} subtitle="Questa scheda arriva con la prossima parte." />
+        {tab === 'clip' && <GamingFeed key="clip" category={category} platform={platform} tag="clip" user={user} onOpenAuth={onOpenAuth} layout="grid" />}
+        {tab === 'community' && <GamingFeed key="community" category={category} platform={platform} tag="discussione" user={user} onOpenAuth={onOpenAuth} />}
+        {tab === PLATFORM_TAB[platform].id && (
+          <GamingFeed key={PLATFORM_TAB[platform].tag} category={category} platform={platform} tag={PLATFORM_TAB[platform].tag} user={user} onOpenAuth={onOpenAuth} />
         )}
       </div>
     </>

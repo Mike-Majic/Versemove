@@ -6,6 +6,9 @@ import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
 import MentionText from '../shared/MentionText';
 import { isStaff } from '../../data/roles';
+import { NERD_CATEGORIES } from '../../data/nerdCategories';
+import { POST_TAGS } from '../../data/gaming';
+import GamingPostExtra from '../nerd/gaming/GamingPostExtra';
 import './PostCard.css';
 
 const REACTION_EMOJIS = ['❤️', '😂', '👍'];
@@ -108,6 +111,13 @@ export default function PostCard({
   // dal conteggio comune (content_likes), non dall'array locale mi_piace.
   const hasSharedContent = Boolean(post.contentId);
   const liked = hasSharedContent ? post.contentLiked : Boolean(user) && post.mi_piace.includes(user.id);
+  // Post di categoria del mondo Nerd (Gaming PC/PS/Xbox): chip
+  // "🖥️ Gaming PC · Build" (icona e nome da NERD_CATEGORIES), anche in
+  // bacheca.
+  const nerdCategory = post.categoria ? NERD_CATEGORIES.find((c) => c.id === post.categoria) : null;
+  const categoryChip = nerdCategory
+    ? `${nerdCategory.icon} ${nerdCategory.label}${post.tag && POST_TAGS[post.tag] ? ` · ${POST_TAGS[post.tag].label}` : ''}`
+    : null;
   const likeCount = hasSharedContent ? post.contentLikeCount : post.mi_piace.length;
   const postComments = comments.filter((c) => c.post_id === post.id);
   const group = post.group ?? null;
@@ -192,6 +202,12 @@ export default function PostCard({
         )}
       </div>
 
+      {categoryChip && (
+        <span className="rb-post-category-chip" title="Categoria del mondo Nerd">
+          {categoryChip}
+        </span>
+      )}
+
       {group && (
         <button
           type="button"
@@ -218,10 +234,11 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />
-          {post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+          {post.testo && <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />}
+          {post.testo && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
         </>
       )}
+      {(post.extra || post.title) && post.tag && <GamingPostExtra post={post} user={user} />}
       {post.gif && (
         <MediaImage className="rb-post-gif" src={post.gif} alt="GIF" errorText="GIF non disponibile (il link non si è caricato)" />
       )}

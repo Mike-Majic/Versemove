@@ -89,13 +89,17 @@ async function fetchGroupsMap(ids) {
 // authorId: per il profilo pubblico di un utente (vedi SocialProfileModal),
 // gli stessi post del feed ma filtrati su un solo autore invece che su
 // tutto il mondo.
-export async function fetchFeed({ mondo = 'social', authorId = null } = {}) {
+// categoria/tag: post di categoria del mondo Nerd (Gaming PC/PS/Xbox, vedi
+// data/gaming.js): posts.categoria, posts.tag, posts.title_id, posts.extra.
+export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
 
     let query = supabase.from('posts').select('*').eq('mondo', mondo).is('deleted_at', null);
     if (authorId) query = query.eq('author_id', authorId);
+    if (categoria) query = query.eq('categoria', categoria);
+    if (tag) query = query.eq('tag', tag);
     const { data, error } = await query.order('created_at', { ascending: false }).limit(200);
     if (error) return { error: error.message };
     if (!data) return { posts: [] };
@@ -138,6 +142,10 @@ export async function fetchFeed({ mondo = 'social', authorId = null } = {}) {
       savedByMe: savedSet.has(row.id),
       contentLiked: false,
       contentLikeCount: 0,
+      categoria: row.categoria ?? null,
+      tag: row.tag ?? null,
+      titleId: row.title_id ?? null,
+      extra: row.extra ?? null,
       ...fieldsFromMedia(row.media),
     }));
     return { posts };
@@ -182,14 +190,25 @@ export async function fetchComments(postIds) {
   }
 }
 
-export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social', menzioni = [] }) {
+// categoria/tag/titleId/extra solo per i post di categoria del mondo Nerd
+// (il server accetta tag solo insieme a una categoria gaming e mondo nerd).
+export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social', menzioni = [], categoria = null, tag = null, titleId = null, extra = null }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags });
     const { data, error } = await supabase
       .from('posts')
-      .insert({ author_id: auth.user.id, mondo, testo: testo ?? '', media, gruppo_id: gruppoId ?? null, lingua: i18n.language, menzioni })
+      .insert({
+        author_id: auth.user.id,
+        mondo,
+        testo: testo ?? '',
+        media,
+        gruppo_id: gruppoId ?? null,
+        lingua: i18n.language,
+        menzioni,
+        ...(categoria ? { categoria, tag, title_id: titleId ?? null, extra: extra ?? null } : {}),
+      })
       .select()
       .single();
     if (error) return { error: translateInteractionError(error) };

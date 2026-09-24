@@ -327,3 +327,18 @@
   box-shadow: 0 0 0 2px #7cc0ff, 0 0 22px rgba(124, 192, 255, 0.45);
   transition: box-shadow 0.3s ease;
 }
+
+/* Post di categoria del mondo Nerd: chip categoria · tag. */
+.rb-post-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 6px 8px 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(212, 246, 52, 0.12);
+  border: 1px solid rgba(212, 246, 52, 0.45);
+  color: #f5f5f7;
+  font-size: 11px;
+  font-weight: 600;
+}

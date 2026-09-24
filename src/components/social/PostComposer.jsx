@@ -58,6 +58,13 @@ export default function PostComposer({
   // in uno dei gruppi, come iscriversi/postare in un subreddit.
   groups = null,
   defaultGroupId = null,
+  // Post di categoria del mondo Nerd (Gaming PC/PS/Xbox): mondo e
+  // categoria in cui pubblicare foto/video, campi extra sotto il testo
+  // (children) e invio permesso anche senza testo (es. una build).
+  mondo = 'social',
+  placementCategory = null,
+  allowEmptyText = false,
+  children = null,
 }) {
   const [text, setText] = useState('');
   const [mentions, setMentions] = useState([]);
@@ -97,7 +104,7 @@ export default function PostComposer({
     return false;
   };
 
-  const canSubmit = text.trim().length > 0 || !!gif || !!mediaFile;
+  const canSubmit = allowEmptyText || text.trim().length > 0 || !!gif || !!mediaFile;
 
   const removeMedia = () => {
     setMediaFile(null);
@@ -169,8 +176,8 @@ export default function PostComposer({
       // anche in Fotografia nel mondo Arte, e viceversa (vedi FotografiaColumn):
       // stesso contenuto, stessi like, condiviso tra i due mondi senza doverlo
       // ripubblicare a mano.
-      const crossPost = mediaType === 'foto' ? [{ world: 'arte', category: 'fotografia' }] : [];
-      const placements = [{ world: 'social' }, ...extraPlacements];
+      const crossPost = mondo === 'social' && mediaType === 'foto' ? [{ world: 'arte', category: 'fotografia' }] : [];
+      const placements = [{ world: mondo, category: placementCategory ?? undefined }, ...extraPlacements];
       for (const p of crossPost) {
         if (!placements.some((e) => placementKey(e) === placementKey(p))) placements.push(p);
       }
@@ -266,7 +273,7 @@ export default function PostComposer({
             <p className="rb-composer-media-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>
           )}
 
-          {mediaType === 'foto' && (
+          {mediaType === 'foto' && mondo === 'social' && (
             <p className="rb-composer-media-hint">Questa foto comparirà anche in Fotografia nel mondo Arte.</p>
           )}
 
@@ -292,6 +299,8 @@ export default function PostComposer({
           {uploadError && <p className="rb-composer-media-error">⚠️ {uploadError}</p>}
         </div>
       )}
+
+      {children}
 
       <div className="rb-composer-toolbar">
         <div className="rb-composer-toolbar-left">
