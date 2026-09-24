@@ -13,43 +13,96 @@ import { fetchProfilesMap, displayName } from './posts';
 // --- Stanza MOD (solo owner/moderatori, la RLS lo impone comunque anche
 // se questo file venisse chiamato da chi non ha i permessi) ---
 
-function mapModRoomMessage(row, profilesMap) {
-  const author = profilesMap.get(row.author_id);
+const MOD_ROOM_SELECT = 'id, author_id, testo, riferimento_tipo, riferimento_id, created_at, allegati, menzioni';
+export const MOD_ROOM_PAGE = 50;
+
+// Autori con nome, avatar e ruolo (OWNER/MOD): lo staff può leggere
+// profiles per intero (profiles_select_own_or_staff), la vista pubblica non
+// ha il ruolo. Piccola cache per i messaggi che arrivano da Realtime.
+const staffCache = new Map();
+async function fetchStaffProfiles(ids) {
+  const missing = Array.from(new Set(ids.filter((id) => id && !staffCache.has(id))));
+  if (missing.length) {
+    const { data } = await supabase.from('profiles').select('id, nickname, username, avatar_url, ruolo').in('id', missing);
+    (data ?? []).forEach((p) =>
+      staffCache.set(p.id, { id: p.id, name: displayName(p, 'Utente'), avatar: p.avatar_url || '', ruolo: p.ruolo })
+    );
+    if (!data) {
+      const fallback = await fetchProfilesMap(missing);
+      fallback.forEach((p, id) => staffCache.set(id, { ...p, ruolo: null }));
+    }
+  }
+  return staffCache;
+}
+
+function mapModRoomMessage(row, profiles) {
+  const author = profiles.get(row.author_id);
   return {
     id: row.id,
     authorId: row.author_id,
-    authorName: displayName(author, 'Utente'),
+    author: author ?? { id: row.author_id, name: 'Utente', avatar: '', ruolo: null },
+    authorName: author?.name ?? 'Utente',
     authorAvatar: author?.avatar ?? '',
-    testo: row.testo,
+    testo: row.testo ?? '',
+    allegati: Array.isArray(row.allegati) ? row.allegati : [],
+    menzioni: row.menzioni ?? [],
     riferimentoTipo: row.riferimento_tipo,
     riferimentoId: row.riferimento_id,
     data: row.created_at,
   };
 }
 
-export async function listModRoomMessages() {
-  const { data, error } = await supabase
+// Pagina di messaggi (i 50 più recenti, oppure i 50 prima di `before`), in
+// ordine dal più vecchio. hasMore: ce ne sono ancora di più vecchi.
+export async function listModRoomMessages({ before = null, limit = MOD_ROOM_PAGE } = {}) {
+  let query = supabase
     .from('mod_room_messages')
-    .select('id, author_id, testo, riferimento_tipo, riferimento_id, created_at')
+    .select(MOD_ROOM_SELECT)
     .is('deleted_at', null)
-    .order('created_at', { ascending: true });
-  if (error || !data) return [];
-  const profilesMap = await fetchProfilesMap(data.map((r) => r.author_id));
-  return data.map((row) => mapModRoomMessage(row, profilesMap));
+    .order('created_at', { ascending: false })
+    .limit(limit + 1);
+  if (before) query = query.lt('created_at', before);
+  const { data, error } = await query;
+  if (error || !data) return { messages: [], hasMore: false, error: error?.message };
+  const page = data.slice(0, limit).reverse();
+  const profiles = await fetchStaffProfiles(page.map((r) => r.author_id));
+  return { messages: page.map((row) => mapModRoomMessage(row, profiles)), hasMore: data.length > limit };
 }
 
-export async function sendModRoomMessage({ testo, riferimentoTipo, riferimentoId } = {}) {
+// Riga arrivata da Realtime -> messaggio con l'autore risolto.
+export async function resolveModRoomRow(row) {
+  const profiles = await fetchStaffProfiles([row.author_id]);
+  return mapModRoomMessage(row, profiles);
+}
+
+// testo può essere vuoto se ci sono allegati (es. un vocale). allegati:
+// [{ tipo: 'immagine'|'audio'|'documento'|'video', path, nome, mime,
+// dimensione, durata? }]; menzioni: id scelti col suggerimento "@".
+export async function sendModRoomMessage({ testo = '', allegati = [], menzioni = [], riferimentoTipo, riferimentoId } = {}) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: 'Devi essere loggato.' };
-  if (!testo?.trim()) return { error: 'Scrivi un messaggio.' };
-  const { error } = await supabase.from('mod_room_messages').insert({
-    author_id: auth.user.id,
-    testo: testo.trim(),
-    riferimento_tipo: riferimentoTipo ?? null,
-    riferimento_id: riferimentoId ? String(riferimentoId) : null,
-  });
+  if (!testo.trim() && !allegati.length) return { error: 'Scrivi un messaggio.' };
+  const { data, error } = await supabase
+    .from('mod_room_messages')
+    .insert({
+      author_id: auth.user.id,
+      testo: testo.trim(),
+      allegati,
+      menzioni,
+      riferimento_tipo: riferimentoTipo ?? null,
+      riferimento_id: riferimentoId ? String(riferimentoId) : null,
+    })
+    .select(MOD_ROOM_SELECT)
+    .single();
   if (error) return { error: error.message };
-  return {};
+  return { message: await resolveModRoomRow(data) };
+}
+
+// File dello staff: modroom/<mio id>/<uuid>-<nome> nel bucket chat-media
+// (solo owner e moderatori caricano e leggono, ognuno cancella i propri).
+export function modRoomFilePath(userId, fileName, uuid) {
+  const safe = (fileName || 'file').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80) || 'file';
+  return `modroom/${userId}/${uuid}-${safe}`;
 }
 
 export function subscribeToModRoomMessages(onInsert) {

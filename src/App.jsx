@@ -855,8 +855,17 @@ export default function App() {
     const onOpenProfile = (e) => {
       if (e.detail?.id) setMentionProfileId(e.detail.id);
     };
+    // "Rispondi" a un messaggio della casella dello staff (Stanza MOD):
+    // chat diretta con chi l'ha scritto.
+    const onOpenChat = (e) => {
+      if (e.detail?.userId) setActiveFriendChatId(e.detail.userId);
+    };
     window.addEventListener('vm:open-profile', onOpenProfile);
-    return () => window.removeEventListener('vm:open-profile', onOpenProfile);
+    window.addEventListener('vm:open-chat', onOpenChat);
+    return () => {
+      window.removeEventListener('vm:open-profile', onOpenProfile);
+      window.removeEventListener('vm:open-chat', onOpenChat);
+    };
   }, []);
 
   // n: la notifica (oggetto), o solo il tipo per le chiamate vecchie.

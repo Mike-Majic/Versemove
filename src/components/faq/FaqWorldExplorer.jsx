@@ -71,6 +71,9 @@ export default function FaqWorldExplorer({
               />
             </div>
 
+            {/* Sopra la Stanza MOD (pannello unico a tutto schermo) la
+                ricerca delle categorie coprirebbe la sua testata. */}
+            {category.id !== 'mod-room' && (
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
@@ -83,13 +86,14 @@ export default function FaqWorldExplorer({
                 className={invalid ? 'invalid' : ''}
               />
             </form>
+            )}
           </div>
 
           {/* Ogni categoria usa lo stesso layout a due pannelli degli altri
               mondi (TwoColumnSwitcher: pannello scuro con bordo del colore
               del mondo, apertura olografica, chiusura in particelle) —
               prima i contenuti erano disegnati "nudi" sopra al globo. */}
-          {category.id === 'mod-room' && staff && <ModRoomColumn user={user} closing={isClosing} />}
+          {category.id === 'mod-room' && staff && <ModRoomColumn user={user} onOpenCategory={onToggleCategory} />}
           {category.id === 'segnalazioni' && (
             <SegnalazioniColumn user={user} onOpenAuth={onOpenAuth} closing={isClosing} />
           )}
