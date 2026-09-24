@@ -786,7 +786,8 @@ export default function WorldGlobe({
   // Galleggiamento/rotazione dei satelliti + rotazione del globo centrale su
   // se stesso: tutti agganciati allo stesso giro di disegno del globo grande
   // (un wrapper attorno a renderer.render, non un requestAnimationFrame a
-  // parte) così si fermano da soli solo a scheda nascosta (vedi
+  // parte; il salto dei fotogrammi è sul composer, vedi sotto) così si
+  // fermano da soli solo a scheda nascosta (vedi
   // globeActivity). Qui anche il risparmio: senza interazioni da IDLE_MS
   // un fotogramma viene saltato se dall'ultimo disegno sono passati meno di
   // FRAME_MS_IDLE (~30 fps), o FRAME_MS_COVERED (~10 fps) con un pannello
@@ -808,18 +809,32 @@ export default function WorldGlobe({
     const g = globeRef.current;
     if (!g) return undefined;
     const renderer = g.renderer();
+    const composer = g.postProcessingComposer();
     const originalRender = renderer.render.bind(renderer);
+    const originalComposerRender = composer.render.bind(composer);
     const startedAt = performance.now();
     let lastElapsed = 0;
     let lastDrawAt = 0;
     const frameCap = createAdaptiveFrameCap();
-    renderer.render = (scene, camera) => {
+    // Il salto dei fotogrammi sta sul composer, non su renderer.render:
+    // three-render-objects disegna sempre passando dall'EffectComposer, il
+    // cui RenderPass chiama renderer.clear() PRIMA di renderer.render. Se si
+    // saltava solo renderer.render, nei fotogrammi saltati il canvas veniva
+    // comunque pulito e il browser mostrava un fotogramma vuoto: il
+    // mappamondo "tremava" e a tratti diventava tutto nero. Saltando il
+    // composer, in quei fotogrammi il canvas non si tocca e resta
+    // l'immagine precedente.
+    composer.render = (deltaTime) => {
       const now = performance.now();
       frameCap.tick(now);
       const idleFrameMs = globeCoverRef.current ? FRAME_MS_COVERED : FRAME_MS_IDLE;
       const minFrameMs = Math.max(now > fullFpsUntilRef.current ? idleFrameMs : 0, frameCap.frameMs());
       if (now - lastDrawAt < minFrameMs) return;
       lastDrawAt = now;
+      originalComposerRender(deltaTime);
+    };
+    renderer.render = (scene, camera) => {
+      const now = performance.now();
       const elapsed = (now - startedAt) / 1000;
       const deltaSec = elapsed - lastElapsed;
       lastElapsed = elapsed;
@@ -838,6 +853,7 @@ export default function WorldGlobe({
     };
     return () => {
       renderer.render = originalRender;
+      composer.render = originalComposerRender;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
