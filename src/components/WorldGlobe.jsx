@@ -146,15 +146,15 @@ function makeClusterEl(cluster, world, onExpand) {
 // di profili sarebbe di nuovo il problema di partenza (e anche lento).
 const NEARBY_DEGREES = 1;
 
+// Mondi con i nomi di città, regioni, stati e mari (globe/placeLabels.js).
+const PLACE_LABEL_WORLDS = new Set(['lavoro']);
+
 // Altitudine di partenza della camera (unità react-globe.gl: distanza dal
 // centro = raggio globo * (1 + altitude)). Più alta di prima (era 4.2)
 // perché i satelliti stanno su un anello attorno al globo (vedi
 // globe/satelliteGlobes.js) e serve spazio per vederlo tutto; più alta
 // ancora in verticale (schermo stretto) perché l'anello lì è più "alto"
 // che "largo" rispetto all'inquadratura.
-// Mondi con i nomi di città, regioni, stati e mari (globe/placeLabels.js).
-const PLACE_LABEL_WORLDS = new Set(['lavoro']);
-
 const DEFAULT_ALTITUDE_WIDE = 6;
 const DEFAULT_ALTITUDE_TALL = 7.5;
 function defaultAltitude() {
