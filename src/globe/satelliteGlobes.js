@@ -89,18 +89,18 @@ function wavePoint(index, total) {
 }
 
 // Distanza minima dalla camera: un satellite più vicino di così si
-// dissolve (vedi COVER_FADE_S). Prima veniva respinto lungo la stessa
-// direzione fino a questa distanza, ma così restava incollato davanti
-// all'obiettivo e seguiva la camera, col nucleo scuro e opaco che copriva
-// gran parte della vista (il mappamondo "diventava nero"). Un satellite
-// PUÒ comunque passare davanti al globo e coprirne un pezzo: sparisce solo
-// se sta proprio sulla linea camera → centro del globo (vedi
-// COVER_SEGMENT_RADIUS_MUL) o troppo vicino.
+// dissolve (vedi COVER_FADE_S). È l'UNICO caso in cui un satellite sparisce:
+// succede solo zoomando molto (camera a meno di ~550 unità dal centro),
+// mai nell'inquadratura del sistema solare, dove la camera sta a 700
+// (altitudine 6, telefono 850) e l'anello a 330 (250): il satellite più
+// vicino resta a più di 350. Serve a non avere un oggetto enorme incollato
+// all'obiettivo (prima veniva respinto lungo la stessa direzione, restava
+// davanti alla camera e il mappamondo "diventava nero").
+// Un satellite che passa fra la camera e il globo NON si dissolve più:
+// resta pieno e opaco e copre il pezzo di globo dietro di sé, come deve
+// (ci pensa il depth buffer). La vecchia regola sul segmento camera → globo
+// (71dad50) lo faceva sparire a turno mentre l'anello girava.
 const MIN_CAMERA_DISTANCE = 220;
-// Un satellite il cui centro dista dal segmento camera → centro del globo
-// meno del suo raggio per questo fattore sta "fra la camera e il globo":
-// si dissolve anche se è lontano dalla camera.
-const COVER_SEGMENT_RADIUS_MUL = 1.5;
 // Durata della dissolvenza in uscita e in entrata (secondi).
 const COVER_FADE_S = 0.3;
 
@@ -546,10 +546,10 @@ export function buildSatelliteGlobes({ worlds }) {
   // le due animazioni temporanee (materializzazione e crescita durante il
   // warp). Niente più galleggiamento né orbita: la posizione è FISSA
   // (vedi basePosRef, impostato da setActiveWorld sopra), anche quando la
-  // camera si avvicina. Un satellite troppo vicino alla camera
-  // (MIN_CAMERA_DISTANCE) o fra la camera e il globo centrale
-  // (COVER_SEGMENT_RADIUS_MUL) si dissolve in COVER_FADE_S e torna in
-  // dissolvenza quando la vista si libera. In più la
+  // camera si avvicina. Solo un satellite troppo vicino alla camera
+  // (MIN_CAMERA_DISTANCE) si dissolve in COVER_FADE_S e torna in
+  // dissolvenza quando la camera si allontana; davanti al globo resta
+  // sempre pieno (vedi MIN_CAMERA_DISTANCE). In più la
   // scala scende con continuità (mai a scatti, fino a -30%) quando un
   // satellite è vicino alla camera, solo per non farlo sembrare
   // sproporzionato — l'occlusione vera resta sempre quella del depth
@@ -557,20 +557,6 @@ export function buildSatelliteGlobes({ worlds }) {
   // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
   // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
   const _toCam = new THREE.Vector3();
-  const _camToCenter = new THREE.Vector3();
-  const _closest = new THREE.Vector3();
-
-  // Distanza del punto p dal segmento camera → centro del globo (origine),
-  // oppure Infinity se p non sta "fra" i due (proiezione fuori dal segmento).
-  function distFromViewSegment(p, camPos) {
-    _camToCenter.copy(camPos).negate();
-    const lenSq = _camToCenter.lengthSq();
-    if (lenSq === 0) return Infinity;
-    const t = _toCam.copy(p).sub(camPos).dot(_camToCenter) / lenSq;
-    if (t <= 0 || t >= 1) return Infinity;
-    _closest.copy(camPos).addScaledVector(_camToCenter, t);
-    return _closest.distanceTo(p);
-  }
 
   function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
@@ -636,14 +622,11 @@ export function buildSatelliteGlobes({ worlds }) {
 
       sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
 
-      // Dissolvenza quando copre la vista (troppo vicino alla camera o sulla
-      // linea camera → globo). Mai per il satellite verso cui si sta
-      // facendo il warp: la camera ci vola incontro apposta.
+      // Dissolvenza solo se è troppo vicino alla camera (zoom molto
+      // ravvicinato). Mai per il satellite verso cui si sta facendo il
+      // warp: la camera ci vola incontro apposta.
       const isWarpTarget = ud.worldId === warpState.targetWorldId && warpState.startMs !== null;
-      const satRadius = SATELLITE_RADIUS * slotScale * warpScale * proximityScale;
-      const blocksView =
-        !isWarpTarget &&
-        (naturalDistToCam < MIN_CAMERA_DISTANCE || distFromViewSegment(basePos, camPos) < satRadius * COVER_SEGMENT_RADIUS_MUL);
+      const blocksView = !isWarpTarget && naturalDistToCam < MIN_CAMERA_DISTANCE;
       const fadeStep = Math.min(1, Math.max(0, deltaSec) / COVER_FADE_S);
       ud.coverFade = blocksView ? Math.max(0, ud.coverFade - fadeStep) : Math.min(1, ud.coverFade + fadeStep);
       const coverFade = ud.coverFade;
