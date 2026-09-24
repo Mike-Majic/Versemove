@@ -29,6 +29,19 @@
   gap: 8px;
 }
 
+.rb-suggested-user-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
 .rb-suggested-user img {
   width: 32px;
   height: 32px;
@@ -56,7 +69,7 @@
   color: rgba(245, 245, 247, 0.5);
 }
 
-.rb-suggested-user button {
+.rb-suggested-user-follow-btn {
   flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--accent, #1d9bf0);
@@ -68,6 +81,6 @@
   cursor: pointer;
 }
 
-.rb-suggested-user button:hover {
+.rb-suggested-user-follow-btn:hover {
   background: color-mix(in srgb, var(--accent, #1d9bf0) 16%, transparent);
 }

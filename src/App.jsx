@@ -812,6 +812,10 @@ export default function App() {
       setFriendsModalOpen(true);
       return;
     }
+    if (tipo === 'new_post') {
+      setIndex(DEFAULT_WORLD_INDEX);
+      return;
+    }
     setIncontriInitialTab(tipo === 'super_like' ? 'likesYou' : 'matches');
     navigateToCategory('incontri', 'match');
   };
@@ -1245,7 +1249,9 @@ export default function App() {
           <img src={notifToast.actor.avatar} alt="" />
           {notifToast.tipo === 'super_like'
             ? `${notifToast.actor.name} ti ha mandato un Super Like ⭐`
-            : `È un match con ${notifToast.actor.name}! 🎉`}
+            : notifToast.tipo === 'new_post'
+              ? `${notifToast.actor.name} ha pubblicato qualcosa di nuovo`
+              : `È un match con ${notifToast.actor.name}! 🎉`}
         </button>
       )}
 

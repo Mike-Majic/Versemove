@@ -66,18 +66,17 @@ async function fetchGroupsMap(ids) {
 // Feed di un mondo (Social di default): post più recenti prima, con
 // autore/gruppo già risolti e like/salvataggio dell'utente loggato già
 // calcolati, per evitare una richiesta in più per ogni post mostrato.
-export async function fetchFeed({ mondo = 'social' } = {}) {
+// authorId: per il profilo pubblico di un utente (vedi SocialProfileModal),
+// gli stessi post del feed ma filtrati su un solo autore invece che su
+// tutto il mondo.
+export async function fetchFeed({ mondo = 'social', authorId = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
 
-    const { data, error } = await supabase
-      .from('posts')
-      .select('*')
-      .eq('mondo', mondo)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(200);
+    let query = supabase.from('posts').select('*').eq('mondo', mondo).is('deleted_at', null);
+    if (authorId) query = query.eq('author_id', authorId);
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(200);
     if (error) return { error: error.message };
     if (!data) return { posts: [] };
 

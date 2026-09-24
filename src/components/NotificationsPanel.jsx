@@ -7,6 +7,7 @@ import './NotificationsPanel.css';
 
 function notificationLabel(n) {
   if (n.tipo === 'friend_request') return `${n.actor.name} ti ha mandato una richiesta di amicizia`;
+  if (n.tipo === 'new_post') return `${n.actor.name} ha pubblicato qualcosa di nuovo`;
   return n.tipo === 'super_like'
     ? `${n.actor.name} ti ha mandato un Super Like ⭐`
     : `È un match con ${n.actor.name}! 🎉`;

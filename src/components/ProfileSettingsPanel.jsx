@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translateWorld } from '../i18n/worldLabels';
+import Icon from './shared/Icon';
 import {
   updateNickname,
   updateName,
@@ -148,10 +149,10 @@ function AvatarUploader({ user, onUpdateUser }) {
       <img className="rb-avatar-uploader-preview" src={preview ?? user.avatar} alt={user.nickname} />
       <div className="rb-avatar-uploader-btns">
         <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading}>
-          📸 Scatta
+          <Icon name="camera" size={16} /> Scatta
         </button>
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          🖼️ Galleria
+          <Icon name="image" size={16} /> Galleria
         </button>
       </div>
       {uploading && <p className="rb-avatar-uploader-status">Caricamento...</p>}
@@ -899,6 +900,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
         <div className="rb-profile-tabs">
           <button type="button" className={tab === 'profilo' ? 'active' : ''} onClick={() => setTab('profilo')}>Profilo</button>
           <button type="button" className={tab === 'album' ? 'active' : ''} onClick={() => setTab('album')}>Album</button>
+          <button type="button" className={tab === 'documenti' ? 'active' : ''} onClick={() => setTab('documenti')}>Documenti</button>
           <button type="button" className={tab === 'preferiti' ? 'active' : ''} onClick={() => setTab('preferiti')}>Preferiti</button>
           <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
         </div>
@@ -910,11 +912,12 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
             <ProfilePreviewCard user={user} />
             <DatingProfileSection user={user} onUpdateUser={onUpdateUser} />
-            <DocumentsSection user={user} onUpdateUser={onUpdateUser} />
           </>
         )}
 
         {tab === 'album' && <AlbumsPanel />}
+
+        {tab === 'documenti' && <DocumentsSection user={user} onUpdateUser={onUpdateUser} />}
 
         {tab === 'account' && (
           <>

@@ -9,6 +9,7 @@ import LiveWorldPanel from '../live/LiveWorldPanel';
 import EventComposer from './EventComposer';
 import EventCard from './EventCard';
 import SuggestedUsers from './SuggestedUsers';
+import SocialProfileModal from './SocialProfileModal';
 import TrendingGroups from './TrendingGroups';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
@@ -115,6 +116,7 @@ export default function SocialFeed({
   onOpenEventLikers,
 }) {
   const [showEventComposer, setShowEventComposer] = useState(false);
+  const [viewingProfileId, setViewingProfileId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [comments, setComments] = useState([]);
   const [following, setFollowing] = useState([]);
@@ -745,7 +747,13 @@ export default function SocialFeed({
 
   const secondary = (
     <>
-      <SuggestedUsers candidates={suggestedUsers} user={user} onOpenAuth={onOpenAuth} onToggleFollow={toggleFollow} />
+      <SuggestedUsers
+        candidates={suggestedUsers}
+        user={user}
+        onOpenAuth={onOpenAuth}
+        onToggleFollow={toggleFollow}
+        onOpenProfile={setViewingProfileId}
+      />
       <TrendingGroups
         groups={trendingGroups}
         joinedGroups={joinedGroups}
@@ -805,6 +813,16 @@ export default function SocialFeed({
         mobileView={mobileView}
         onMobileViewChange={setMobileView}
       />
+      {viewingProfileId && (
+        <SocialProfileModal
+          userId={viewingProfileId}
+          user={user}
+          following={following}
+          onToggleFollow={toggleFollow}
+          onOpenAuth={onOpenAuth}
+          onClose={() => setViewingProfileId(null)}
+        />
+      )}
     </div>
   );
 }
