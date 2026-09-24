@@ -272,3 +272,48 @@
   left: 0;
   transform: translate(-50%, 0);
 }
+
+/* Marker raccolto in una pillola o nascosto per non coprire una scritta
+   (vedi placeLabels.js placeMarkers). */
+.rb-marker--merged {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Pillola "👥 N" sotto il nome di una città e chip "+N" di un centro
+   piccolo: gli unici pezzi cliccabili del livello dei nomi. */
+.rb-pl-pill,
+.rb-pl--chip .rb-pl-text {
+  pointer-events: auto;
+  cursor: pointer;
+  font: 700 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 16px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(18, 20, 26, 0.88);
+  color: #f3f4f6;
+  white-space: nowrap;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+.rb-pl-pill {
+  position: absolute;
+  left: 8px;
+  top: 9px;
+}
+
+.rb-pl--pos-l .rb-pl-pill {
+  left: auto;
+  right: 8px;
+}
+
+.rb-pl-pill:hover,
+.rb-pl--chip .rb-pl-text:hover {
+  border-color: var(--pl-accent, #fff);
+}
+
+.rb-pl--chip {
+  pointer-events: none;
+}

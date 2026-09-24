@@ -339,6 +339,25 @@ export default function WorldGlobe({
     const g = globeRef.current;
     if (g) g.pointOfView({ lat: cluster.lat, lng: cluster.lng, altitude: cluster.targetAltitude }, 1200);
   };
+
+  // Elementi HTML dei marker (creati da htmlElement più giù), per chi deve
+  // spostarli fuori dalle scritte o raccoglierli in una pillola (vedi
+  // globe/placeLabels.js). Solo quelli dei displayItems attuali.
+  const markerElsRef = useRef(new Map());
+  const displayItemsRef = useRef(displayItems);
+  useEffect(() => {
+    displayItemsRef.current = displayItems;
+    const current = new Set(displayItems);
+    for (const item of markerElsRef.current.keys()) {
+      if (!current.has(item)) markerElsRef.current.delete(item);
+    }
+    placeLabelsRef.current?.invalidate();
+  }, [displayItems]);
+  const registerMarkerEl = (item, el) => {
+    markerElsRef.current.set(item, el);
+    placeLabelsRef.current?.invalidate();
+    return el;
+  };
   // Puntatore "grezzo" (touch) = dispositivo mobile: li' il globo deve stare
   // fermo di default e muoversi solo con le dita (trascinamento/pizzico),
   // mai da solo. Su desktop invece ruota da solo finche' il mouse non ci
@@ -657,6 +676,24 @@ export default function WorldGlobe({
     const labels = createPlaceLabels({
       canvas: g.renderer().domElement,
       getRoot: () => root ?? (root = findGlobeRootObject(g.scene())),
+      getMarkers: () =>
+        displayItemsRef.current
+          .filter((item) => markerElsRef.current.has(item))
+          .map((item) => ({ item, el: markerElsRef.current.get(item) })),
+      // Pillola di una città: zoom come expandCluster (un livello più
+      // vicino); chip "+N" di un centro piccolo: ancora più vicino, così gli
+      // avatar si aprono.
+      onZoomTo: (lat, lng, closer) => {
+        const altitude = g.pointOfView().altitude;
+        const target = closer
+          ? Math.max(0.02, altitude * 0.45)
+          : altitude >= ZOOM_TIER_COUNTRY
+          ? ZOOM_TIER_COUNTRY - 0.15
+          : altitude >= ZOOM_TIER_CITY
+          ? ZOOM_TIER_CITY - 0.15
+          : Math.max(0.02, altitude * 0.5);
+        g.pointOfView({ lat, lng, altitude: target }, 1200);
+      },
     });
     placeLabelsRef.current = labels;
     return () => {
@@ -1092,11 +1129,14 @@ export default function WorldGlobe({
         htmlLng="lng"
         htmlAltitude={0.03}
         htmlElement={(item) =>
-          item.kind === 'cluster'
-            ? makeClusterEl(item, world, expandCluster)
-            : item.kind === 'event'
-            ? makeEventMarkerEl(item, world, onSelectEvent)
-            : makeMarkerEl(item, world, onSelectUser)
+          registerMarkerEl(
+            item,
+            item.kind === 'cluster'
+              ? makeClusterEl(item, world, expandCluster)
+              : item.kind === 'event'
+              ? makeEventMarkerEl(item, world, onSelectEvent)
+              : makeMarkerEl(item, world, onSelectUser)
+          )
         }
         width={size.width}
         height={size.height}
