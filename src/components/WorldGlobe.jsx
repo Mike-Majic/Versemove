@@ -161,9 +161,12 @@ function defaultAltitude() {
 // altrimenti verrebbero tagliati via invece di sbiadire in lontananza.
 const CAMERA_FAR = 5000;
 
-// Dopo quanto tempo senza interazioni il globo smette di essere ridisegnato
-// (serve anche a far finire le transizioni/inerzie della camera).
+// Dopo quanto tempo senza interazioni il disegno passa da pieno regime a
+// ~30 fps (serve anche a far finire a pieno regime le transizioni/inerzie
+// della camera). Non si ferma mai: vedi globeActivity.
 const IDLE_MS = 3000;
+// Senza interazioni da IDLE_MS: un fotogramma ogni ~33 ms (~30 fps).
+const FRAME_MS_IDLE = 33;
 
 // Durate del warp fra mondi (Fase 2b, vedi runWarp più sotto): volo della
 // camera + crescita del satellite, poi il flash che copre lo scambio.
@@ -328,46 +331,55 @@ export default function WorldGlobe({
   const isTouchDevice = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
   const isHoveringRef = useRef(false);
 
-  // Risparmio CPU: react-globe.gl ridisegna la scena (e riposiziona tutti i
-  // marker HTML) ad ogni frame, per sempre, anche col globo fermo. Qui il
-  // disegno si mette in pausa quando nessuno interagisce e riparte al primo
-  // segno di attività (mouse, rotellina, tocco, voli della camera, dati
-  // nuovi) — oppure resta sveglio finché il mouse è fuori dal canvas,
-  // perché lì il globo/i satelliti continuano a muoversi da soli (vedi
-  // "keep-alive" in startAutoRotate sotto).
+  // Regola del ciclo di disegno: MAI fermo mentre è visibile, 30 fps quando
+  // nessuno interagisce, pausa solo a scheda nascosta.
+  //
+  // Prima il disegno si metteva in pausa (pauseAnimation) dopo pochi
+  // secondi senza eventi del mouse: col mouse fermo sopra il mappamondo
+  // (1,4 s dopo l'ingresso, la rampa di IDLE_EASE_OUT_S) si bloccava tutto,
+  // compresa la rotazione dei satelliti su se stessi, che gira solo quando
+  // la scena viene ridisegnata. Ora:
+  // - il ciclo di react-globe.gl gira sempre; il risparmio sta nel wrapper
+  //   di renderer.render più giù, che dopo IDLE_MS senza interazioni salta
+  //   un fotogramma ogni volta che dall'ultimo disegno sono passati meno di
+  //   FRAME_MS_IDLE (~30 fps invece di 60). wake() riporta subito al pieno
+  //   (movimento, clic, rotellina, tocco, voli della camera, dati nuovi);
+  // - pauseAnimation solo con la scheda nascosta (visibilitychange), e
+  //   resumeAnimation appena torna visibile.
   //
   // I nomi startAutoRotate/stopAutoRotate sono rimasti (li chiamano molti
   // punti sotto: mount, hover, warp, fly-to) ma NON toccano più
   // OrbitControls.autoRotate — la CAMERA non orbita più da sola, punto
   // (richiesta esplicita, il vecchio comportamento disorientava). "Start"
-  // ora vuol dire "il mouse è fuori, fai partire il movimento idle"
-  // (rotazione del globo + orbita dei satelliti, vedi il wrapper di
-  // renderer.render più giù), "stop" vuol dire il contrario: la rampa
-  // (idleTargetRef 0..1, calcolata al volo da computeIdleFactor) porta la
-  // velocità da 0 a piena in IDLE_EASE_IN_S secondi, e viceversa in
-  // IDLE_EASE_OUT_S.
+  // vuol dire "il mouse è fuori, fai partire la rotazione del globo
+  // centrale", "stop" il contrario (mouse sopra: il globo rallenta fino a
+  // fermarsi per poter mirare con calma, i satelliti invece continuano a
+  // girare): la rampa (idleTargetRef 0..1, calcolata al volo da
+  // computeIdleFactor) porta la velocità da 0 a piena in IDLE_EASE_IN_S
+  // secondi, e viceversa in IDLE_EASE_OUT_S. Su telefono il globo centrale
+  // non gira mai da solo, ma i satelliti sì, con la stessa regola dei 30 fps.
+  const fullFpsUntilRef = useRef(0);
   const globeActivity = useMemo(() => {
-    let idleTimer = null;
-    let keepAliveTimer = null;
-    let paused = false;
+    let hiddenPaused = false;
 
-    const sleep = () => {
-      const g = globeRef.current;
-      if (!g || paused) return;
-      g.pauseAnimation();
-      paused = true;
+    // Pieno regime di fotogrammi per almeno `ms` da adesso.
+    const wake = (ms = IDLE_MS) => {
+      fullFpsUntilRef.current = Math.max(fullFpsUntilRef.current, performance.now() + ms);
     };
 
-    const wake = (ms = IDLE_MS) => {
+    const onVisibilityChange = () => {
       const g = globeRef.current;
       if (!g) return;
-      if (paused) {
+      if (document.visibilityState === 'hidden') {
+        if (!hiddenPaused) g.pauseAnimation();
+        hiddenPaused = true;
+      } else if (hiddenPaused) {
+        hiddenPaused = false;
+        wake();
         g.resumeAnimation();
-        paused = false;
       }
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(sleep, ms);
     };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const setIdleTarget = (target, durationMs) => {
       const now = performance.now();
@@ -378,11 +390,8 @@ export default function WorldGlobe({
     };
 
     const stopAutoRotate = () => {
-      clearInterval(keepAliveTimer);
-      keepAliveTimer = null;
       setIdleTarget(0, IDLE_EASE_OUT_S * 1000);
-      // Resta sveglio solo il tempo di finire la decelerazione, poi il
-      // solito timeout di inattività (IDLE_MS) rimette in pausa da solo.
+      // La decelerazione si vede meglio a pieno regime.
       wake(IDLE_EASE_OUT_S * 1000 + 400);
     };
 
@@ -393,20 +402,11 @@ export default function WorldGlobe({
       // galleggiamento dei satelliti (già indipendente da questo stato).
       reduceMotionActiveRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       setIdleTarget(1, IDLE_EASE_IN_S * 1000);
-      wake(2000);
-      clearInterval(keepAliveTimer);
-      // Il mouse può restare fuori per minuti (è un salvaschermo, non ha
-      // una durata massima): senza questo, dopo IDLE_MS di inattività
-      // "apparente" (nessun evento pointer, il mouse è semplicemente
-      // altrove) il disegno si metterebbe in pausa e il movimento si
-      // fermerebbe di scatto invece di continuare finché il mouse non
-      // rientra davvero.
-      keepAliveTimer = setInterval(() => wake(2000), 1000);
+      wake(IDLE_EASE_IN_S * 1000 + 400);
     };
 
     const dispose = () => {
-      clearTimeout(idleTimer);
-      clearInterval(keepAliveTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
 
     return { wake, startAutoRotate, stopAutoRotate, dispose };
@@ -416,7 +416,7 @@ export default function WorldGlobe({
   useEffect(() => globeActivity.dispose, [globeActivity]);
 
   // Qualsiasi interazione dentro al globo (anche sui marker HTML, che stanno
-  // sopra al canvas) lo risveglia per qualche secondo.
+  // sopra al canvas) riporta il disegno a pieno regime per IDLE_MS.
   useEffect(() => {
     const g = globeRef.current;
     const target = containerRef?.current ?? g?.renderer().domElement;
@@ -716,9 +716,13 @@ export default function WorldGlobe({
   // Galleggiamento/rotazione dei satelliti + rotazione del globo centrale su
   // se stesso: tutti agganciati allo stesso giro di disegno del globo grande
   // (un wrapper attorno a renderer.render, non un requestAnimationFrame a
-  // parte) così si fermano da soli quando globeActivity mette in pausa il
-  // disegno per inattività — niente CPU sprecata a far muovere globi che
-  // nessuno sta guardando. idleFactor (0..1, calcolato al volo da
+  // parte) così si fermano da soli solo a scheda nascosta (vedi
+  // globeActivity). Qui anche il risparmio: senza interazioni da IDLE_MS
+  // un fotogramma viene saltato se dall'ultimo disegno sono passati meno di
+  // FRAME_MS_IDLE (~30 fps). elapsed/deltaSec sono sempre tempo reale
+  // misurato fra un disegno vero e il successivo (lastElapsed si aggiorna
+  // solo quando si disegna), quindi a 30 fps satelliti e globo girano alla
+  // stessa velocità, solo con meno fotogrammi. idleFactor (0..1, calcolato al volo da
   // computeIdleFactor — la rampa morbida di IDLE_EASE_IN_S/IDLE_EASE_OUT_S
   // secondi impostata da globeActivity.startAutoRotate/stopAutoRotate) è la
   // "velocità" di entrambi i movimenti: a 0 tutto è fermo (mouse dentro), a
@@ -734,12 +738,16 @@ export default function WorldGlobe({
     const originalRender = renderer.render.bind(renderer);
     const startedAt = performance.now();
     let lastElapsed = 0;
+    let lastDrawAt = 0;
     renderer.render = (scene, camera) => {
-      const elapsed = (performance.now() - startedAt) / 1000;
+      const now = performance.now();
+      if (now > fullFpsUntilRef.current && now - lastDrawAt < FRAME_MS_IDLE) return;
+      lastDrawAt = now;
+      const elapsed = (now - startedAt) / 1000;
       const deltaSec = elapsed - lastElapsed;
       lastElapsed = elapsed;
 
-      const idleFactor = computeIdleFactor(performance.now());
+      const idleFactor = computeIdleFactor(now);
       const reduceMotion = reduceMotionActiveRef.current;
       if (!reduceMotion) {
         globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
@@ -861,7 +869,7 @@ export default function WorldGlobe({
   }, []);
 
   // Quando cambia ciò che si vede (marker, continenti, mondo, categorie,
-  // dimensioni) il globo va ridisegnato anche se era in pausa.
+  // dimensioni) si ridisegna a pieno regime per un attimo.
   useEffect(() => {
     globeActivity.wake();
   }, [globeActivity, displayItems, landPolygons, world, categories, activeCategory, size]);
@@ -901,7 +909,7 @@ export default function WorldGlobe({
     if (!g || !flyTo) return undefined;
 
     globeActivity.stopAutoRotate();
-    // Il volo è animato dal ciclo di disegno: deve restare attivo finché dura.
+    // Il volo è animato dal ciclo di disegno: a pieno regime finché dura.
     globeActivity.wake(CATEGORY_FLY_MS + IDLE_MS);
     const pov = { altitude: flyTo.altitude ?? 1.3 };
     if (flyTo.lat !== undefined) pov.lat = flyTo.lat;
