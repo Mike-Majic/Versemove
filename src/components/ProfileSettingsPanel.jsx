@@ -20,6 +20,7 @@ import {
   updateOwnSocialProfile,
   updateOwnLavoroProfile,
   updateOwnSocialExtra,
+  updateOwnGamertags,
 } from '../data/accounts';
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
@@ -43,6 +44,7 @@ import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import { BACK_LEVELS, useBackLayer } from '../hooks/useBackLayer';
 import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
+import { GAMERTAG_FIELDS, GAMERTAG_MAX, cleanGamertags } from '../data/gaming';
 import './ProfileSettingsPanel.css';
 
 const CITTA_MAX = 80;
@@ -871,6 +873,67 @@ function SocialExtraCard({ user, onUpdateUser }) {
   );
 }
 
+// Gamertag (profiles.gamertags): PSN, Xbox, Steam... mostrati agli altri
+// come chip nel profilo pubblico e accanto al nome nel mondo Nerd
+// (Gaming PC / PS / Xbox), vedi data/gaming.js.
+function GamertagSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState(() => ({ ...(user?.gamertags ?? {}) }));
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [, markSaved] = useFormDirty(values);
+
+  const save = async () => {
+    setError('');
+    setSuccess('');
+    setBusy(true);
+    const clean = cleanGamertags(values);
+    const { error: err } = await updateOwnGamertags(clean);
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSuccess('Gamertag aggiornati.');
+    setValues(clean);
+    markSaved();
+    onUpdateUser?.({ ...user, gamertags: clean });
+  };
+
+  return (
+    <CollapsibleSection
+      title="Gamertag"
+      infoText="I tuoi nomi su PSN, Xbox, Steam e le altre piattaforme: gli altri li vedono nel tuo profilo e nel mondo Nerd, con un bottone per copiarli."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <div className="rb-profile-field-group">
+        <div className="rb-profile-name-row rb-gamertag-grid">
+          {GAMERTAG_FIELDS.map((f) => (
+            <label key={f.key} className="rb-field">
+              <span>{f.icon} {f.label}</span>
+              <input
+                type="text"
+                value={values[f.key] ?? ''}
+                maxLength={GAMERTAG_MAX}
+                placeholder={`Il tuo nome su ${f.label}`}
+                autoComplete="off"
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              />
+            </label>
+          ))}
+        </div>
+        {error && <p className="rb-profile-field-error">{error}</p>}
+        {success && <p className="rb-profile-field-success">{success}</p>}
+        <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
+          {busy ? 'Un attimo…' : 'Salva'}
+        </button>
+      </div>
+    </CollapsibleSection>
+  );
+}
+
 // Tre profili distinti, ognuno visibile solo dal suo contesto — chiusi di
 // default (richiesta esplicita: prima occupavano spazio sempre aperti).
 // Social è la base, mostrata ovunque tranne Lavoro e Incontri (letta da
@@ -1492,6 +1555,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
             <ProfilePreviewCard user={user} />
             <SocialProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <GamertagSection user={user} onUpdateUser={onUpdateUser} />
             <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
             <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} />
           </>

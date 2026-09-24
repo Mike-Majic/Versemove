@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import ModalOverlay from '../ModalOverlay';
+import GamertagChips from '../shared/GamertagChips';
+import { fetchGamertagsMap } from '../../data/gaming';
 import './contactProfile.css';
 
 // Anteprima minimale del profilo di un contatto della chat: oggi il backend
@@ -7,6 +10,18 @@ import './contactProfile.css';
 // globo — quando quella parte verrà estesa, questo pannello si arricchisce
 // di conseguenza senza cambiare i punti da cui viene aperto.
 export default function ContactProfileModal({ contact, onClose }) {
+  // Gamertag del contatto (chip con Copia), se il server li espone.
+  const [gamertags, setGamertags] = useState(null);
+  useEffect(() => {
+    if (!contact?.id) return undefined;
+    let cancelled = false;
+    fetchGamertagsMap([contact.id]).then((m) => {
+      if (!cancelled) setGamertags(m.get(contact.id) ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [contact?.id]);
   if (!contact) return null;
   return (
     <ModalOverlay onClose={onClose}>
@@ -20,6 +35,7 @@ export default function ContactProfileModal({ contact, onClose }) {
           </span>
         )}
         <strong className="rb-contact-profile-name">{contact.name}</strong>
+        <GamertagChips gamertags={gamertags} />
       </div>
     </ModalOverlay>
   );

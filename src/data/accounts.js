@@ -59,6 +59,7 @@ function mapProfile(row) {
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
     lingua: row.lingua ?? 'it',
+    gamertags: row.gamertags ?? {},
     ruolo: row.ruolo,
     verificato: row.verificato,
     bannato: row.bannato ?? false,
@@ -583,6 +584,22 @@ export async function updateOwnSocialExtra(cittaOrigine, statoRelazionale, lingu
     p_mostra_data_nascita: mostraDataNascita,
   });
   if (error) return { error: error.message };
+  return {};
+}
+
+// Gamertag (profiles.gamertags, oggetto con chiavi psn/xbox/steam/epic/
+// nintendo/battlenet/riot/ea, vedi data/gaming.js): update diretto della
+// propria riga. Se il server non ha (ancora) un permesso di UPDATE su
+// profiles la richiesta non tocca righe: si dice chiaramente invece di
+// far finta di aver salvato.
+export async function updateOwnGamertags(gamertags) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return { error: 'Devi essere loggato.' };
+  const { data, error } = await supabase.from('profiles').update({ gamertags }).eq('id', session.user.id).select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) {
+    return { error: 'Il server non permette ancora di salvare i gamertag (manca il permesso di modifica del profilo). Riprova più avanti.' };
+  }
   return {};
 }
 

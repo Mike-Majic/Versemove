@@ -14,6 +14,8 @@ import {
 import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
 import { getFamily, familyRelationLabel } from '../../data/family';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
+import { fetchGamertagsMap } from '../../data/gaming';
+import GamertagChips from '../shared/GamertagChips';
 import './SocialProfileModal.css';
 
 const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
@@ -37,16 +39,21 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
   const [posts, setPosts] = useState(null);
   const [comments, setComments] = useState([]);
   const [family, setFamily] = useState([]);
+  // Gamertag: i miei dal mio profilo, quelli degli altri dalla vista
+  // pubblica (vedi fetchGamertagsMap).
+  const [gamertags, setGamertags] = useState(null);
   const [error, setError] = useState('');
 
   const reload = async () => {
-    const [profilesMap, feedRes, familyList] = await Promise.all([
+    const [profilesMap, feedRes, familyList, tagsMap] = await Promise.all([
       fetchProfilesMap([userId]),
       fetchFeed({ mondo: 'social', authorId: userId }),
       getFamily(userId),
+      user?.id === userId ? Promise.resolve(new Map([[userId, user.gamertags ?? {}]])) : fetchGamertagsMap([userId]),
     ]);
     setProfile(profilesMap.get(userId) ?? null);
     setFamily(familyList);
+    setGamertags(tagsMap.get(userId) ?? null);
     const list = feedRes.posts ?? [];
     setPosts(list);
     const { comments: c } = await fetchComments(list.map((p) => p.id));
@@ -128,6 +135,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
             </div>
 
             {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}
+            <GamertagChips gamertags={gamertags} />
 
             {(profile.cittaOrigine || profile.statoRelazionale || profile.genere || profile.pronomi || profile.zodiaco || profile.lingueParlate?.length > 0) && (
               <ul className="rb-social-profile-info-list">

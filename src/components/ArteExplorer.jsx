@@ -9,9 +9,11 @@ import CommunityEventsColumn from './cultural/CommunityEventsColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
+import GamingColumn from './nerd/gaming/GamingColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import { VETRINA_OFFERTE_CATEGORY_IDS } from '../data/vetrinaCategories';
+import { GAMING_CATEGORY_IDS } from '../data/gaming';
 import './shared/categoryExplorerShell.css';
 
 const COMMUNITY_EVENT_CATEGORIES = new Set(['teatro', 'arti-visive', 'live']);
@@ -106,6 +108,10 @@ export default function ArteExplorer({
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'giochi-tavolo' ? (
             <GiochiTavoloColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (
+            // Gaming PC / PS / Xbox: una sola colonna, la piattaforma della
+            // categoria fa da contesto (vedi nerd/gaming/GamingColumn.jsx).
+            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
