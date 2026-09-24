@@ -45,6 +45,10 @@ function mapProfile(row) {
     pronomi: row.pronomi ?? '',
     citta: row.citta ?? '',
     bio: row.bio ?? '',
+    cittaSocial: row.citta_social ?? '',
+    bioSocial: row.bio_social ?? '',
+    cittaLavoro: row.citta_lavoro ?? '',
+    bioLavoro: row.bio_lavoro ?? '',
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
@@ -544,6 +548,22 @@ export async function updateOwnProfileDetails({ username, dataNascita, phone, ba
   });
   if (error) return { error: error.message };
   return { account: await fetchOwnProfile() };
+}
+
+// Profilo Social (base, mostrato ovunque tranne Lavoro/Incontri) e Profilo
+// Lavoro (struttura pronta, nessuna vista lo mostra ancora — vedi la
+// migrazione add_social_lavoro_profile_sections). Profilo Incontri resta
+// updateOwnDatingProfile in data/incontri.js, invariato.
+export async function updateOwnSocialProfile(citta, bio) {
+  const { error } = await supabase.rpc('update_own_social_profile', { p_citta: citta, p_bio: bio });
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function updateOwnLavoroProfile(citta, bio) {
+  const { error } = await supabase.rpc('update_own_lavoro_profile', { p_citta: citta, p_bio: bio });
+  if (error) return { error: error.message };
+  return {};
 }
 
 export async function updateName(accountId, nome, cognome) {

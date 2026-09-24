@@ -46,10 +46,21 @@ export function displayName(profile, fallback = 'Utente') {
 export async function fetchProfilesMap(ids) {
   const unique = Array.from(new Set(ids.filter(Boolean)));
   if (!unique.length) return new Map();
-  const { data, error } = await supabase.from('public_profiles').select('id, nickname, username, avatar_url').in('id', unique);
+  const { data, error } = await supabase
+    .from('public_profiles')
+    .select('id, nickname, username, avatar_url, citta_social, bio_social')
+    .in('id', unique);
   if (error || !data) return new Map();
   const map = new Map();
-  for (const p of data) map.set(p.id, { id: p.id, name: displayName(p), avatar: p.avatar_url || '' });
+  for (const p of data) {
+    map.set(p.id, {
+      id: p.id,
+      name: displayName(p),
+      avatar: p.avatar_url || '',
+      citta: p.citta_social || '',
+      bio: p.bio_social || '',
+    });
+  }
   return map;
 }
 

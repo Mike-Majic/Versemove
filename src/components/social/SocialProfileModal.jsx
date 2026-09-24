@@ -101,6 +101,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
               <img src={profile.avatar} alt={profile.name} />
               <div>
                 <strong>{profile.name}</strong>
+                {profile.citta && <span className="rb-social-profile-city">{profile.citta}</span>}
               </div>
               <button
                 type="button"
@@ -110,6 +111,8 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
                 {isFollowing ? 'Segui già' : '+ Segui'}
               </button>
             </div>
+
+            {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}
 
             {error && <p className="rb-giochi-error">{error}</p>}
 

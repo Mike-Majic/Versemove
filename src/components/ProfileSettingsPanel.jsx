@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translateWorld } from '../i18n/worldLabels';
 import Icon from './shared/Icon';
+import CollapsibleSection from './shared/CollapsibleSection';
 import {
   updateNickname,
   updateName,
@@ -15,6 +16,8 @@ import {
   linkSecondAccount,
   unlinkMyAccount,
   loginAccount,
+  updateOwnSocialProfile,
+  updateOwnLavoroProfile,
 } from '../data/accounts';
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
@@ -683,13 +686,13 @@ function AccountLinkPanel({ user, onClose }) {
   );
 }
 
-// Città e bio mostrate nel mazzo del mondo Incontri (get_match_candidates):
-// spostate qui da Impostazioni perché sono dati personali del profilo come
-// gli altri in questa scheda, aggiornabili quando si vuole — non più un
-// "filtro" con Applica. Salvataggio immediato, come nickname/nome.
-function DatingProfileSection({ user, onUpdateUser }) {
-  const [citta, setCitta] = useState(user?.citta ?? '');
-  const [bio, setBio] = useState(user?.bio ?? '');
+// Coppia Città+Bio con salvataggio immediato (come nickname/nome, niente
+// "Applica"): stessa card per i tre profili sotto (Social/Lavoro/Incontri),
+// parametrizzata coi valori iniziali e la funzione di salvataggio — invece
+// di ripetere lo stesso modulo tre volte.
+function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMessage }) {
+  const [citta, setCitta] = useState(initialCitta ?? '');
+  const [bio, setBio] = useState(initialBio ?? '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
@@ -698,20 +701,17 @@ function DatingProfileSection({ user, onUpdateUser }) {
     setError('');
     setSuccess('');
     setBusy(true);
-    const { error: err } = await updateOwnDatingProfile(citta.trim(), bio.trim());
+    const { error: err } = await onSave(citta.trim(), bio.trim());
     setBusy(false);
     if (err) {
       setError(err);
       return;
     }
-    setSuccess('Profilo Incontri aggiornato.');
-    onUpdateUser?.({ ...user, citta: citta.trim(), bio: bio.trim() });
+    setSuccess(successMessage);
   };
 
   return (
     <div className="rb-profile-field-group">
-      <div className="rb-profile-field-title"><strong>Profilo Incontri</strong></div>
-      <p className="rb-profile-link-hint">Città e bio mostrate agli altri nel mazzo del mondo Incontri.</p>
       <label className="rb-field">
         <span className="rb-field-label-row">
           Città
@@ -732,6 +732,84 @@ function DatingProfileSection({ user, onUpdateUser }) {
         {busy ? 'Un attimo…' : 'Salva'}
       </button>
     </div>
+  );
+}
+
+// Tre profili distinti, ognuno visibile solo dal suo contesto — chiusi di
+// default (richiesta esplicita: prima occupavano spazio sempre aperti).
+// Social è la base, mostrata ovunque tranne Lavoro e Incontri (letta da
+// chiunque tramite public_profiles/fetchProfilesMap, vedi SocialProfileModal
+// e data/posts.js). Lavoro è già salvabile ma non ha ancora una vista che
+// lo mostri ad altri: il mondo Lavoro oggi ha solo Live e il consenso nome
+// reale, nessun elenco colleghi/candidati — struttura pronta, si aggancia
+// quando costruiremo quella parte. Incontri resta il campo già esistente
+// (get_match_candidates), invariato.
+function SocialProfileSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CollapsibleSection
+      title="Profilo Social"
+      infoText="Città e bio mostrate agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <CittaBioCard
+        citta={user?.cittaSocial}
+        bio={user?.bioSocial}
+        successMessage="Profilo Social aggiornato."
+        onSave={async (citta, bio) => {
+          const { error } = await updateOwnSocialProfile(citta, bio);
+          if (!error) onUpdateUser?.({ ...user, cittaSocial: citta, bioSocial: bio });
+          return { error };
+        }}
+      />
+    </CollapsibleSection>
+  );
+}
+
+function LavoroProfileSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CollapsibleSection
+      title="Profilo di Lavoro"
+      infoText="Città e bio pensate per il mondo Lavoro, visibili solo da lì. Il mondo Lavoro non ha ancora una schermata che le mostra ad altri: per ora restano salvate, pronte per quando ci sarà."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <CittaBioCard
+        citta={user?.cittaLavoro}
+        bio={user?.bioLavoro}
+        successMessage="Profilo di Lavoro aggiornato."
+        onSave={async (citta, bio) => {
+          const { error } = await updateOwnLavoroProfile(citta, bio);
+          if (!error) onUpdateUser?.({ ...user, cittaLavoro: citta, bioLavoro: bio });
+          return { error };
+        }}
+      />
+    </CollapsibleSection>
+  );
+}
+
+function IncontriProfileSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CollapsibleSection
+      title="Profilo Incontri"
+      infoText="Città e bio mostrate agli altri nel mazzo del mondo Incontri, visibili solo da lì."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <CittaBioCard
+        citta={user?.citta}
+        bio={user?.bio}
+        successMessage="Profilo Incontri aggiornato."
+        onSave={async (citta, bio) => {
+          const { error } = await updateOwnDatingProfile(citta, bio);
+          if (!error) onUpdateUser?.({ ...user, citta, bio });
+          return { error };
+        }}
+      />
+    </CollapsibleSection>
   );
 }
 
@@ -911,7 +989,9 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
           <>
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
             <ProfilePreviewCard user={user} />
-            <DatingProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <SocialProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} />
           </>
         )}
 

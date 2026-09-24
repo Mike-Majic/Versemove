@@ -24,6 +24,7 @@ import { translateWorld } from '../i18n/worldLabels';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import CustomSelect from './shared/CustomSelect';
+import CollapsibleSection from './shared/CollapsibleSection';
 import './SettingsPanel.css';
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
@@ -35,45 +36,6 @@ const QUALITY_OPTIONS = [
   { value: 'medium', label: 'Leggeri' },
   { value: 'low', label: 'Ridotti' },
 ];
-
-// Riga di titolo cliccabile che apre/chiude il contenuto sotto — stesso
-// linguaggio visivo di rb-settings-nav-btn (che porta a un'altra vista),
-// qui invece resta nella stessa schermata e mostra/nasconde i campi. Le
-// spiegazioni non stanno più in un paragrafo sempre visibile: sono dentro
-// la (i), per occupare meno spazio (richiesta esplicita). Titolo, (i) e
-// freccetta sono tre elementi affiancati invece di un unico bottone: la
-// (i) apre una sua vignetta, non deve anche aprire/chiudere la voce.
-// "level" distingue la fisarmonica di primo livello (Luogo, Personalizza,
-// Privacy) da quella annidata dentro (le sue "sotto impostazioni").
-function CollapsibleSection({ title, infoText, open, onToggle, children, level = 'group' }) {
-  const Wrapper = level === 'group' ? 'section' : 'div';
-  const rowClass = level === 'group' ? 'rb-settings-accordion-row' : 'rb-settings-subaccordion-row';
-  const titleClass = level === 'group' ? 'rb-settings-accordion-header' : 'rb-settings-subaccordion-header';
-  return (
-    <Wrapper className={level === 'group' ? 'rb-settings-section' : 'rb-settings-subaccordion'}>
-      <div className={rowClass}>
-        <button type="button" className={titleClass} onClick={onToggle} aria-expanded={open}>
-          {title}
-        </button>
-        {infoText && <InfoBadge text={infoText} />}
-        <button
-          type="button"
-          className="rb-settings-accordion-chevron-btn"
-          onClick={onToggle}
-          tabIndex={-1}
-          aria-hidden="true"
-        >
-          {open ? '−' : '+'}
-        </button>
-      </div>
-      {open && (
-        <div className={level === 'group' ? 'rb-settings-accordion-body' : 'rb-settings-subaccordion-body'}>
-          {children}
-        </div>
-      )}
-    </Wrapper>
-  );
-}
 
 // Sotto-voce "Mondi" di "Personalizza il tuo Versemove": quali mondi
 // restano abilitati per l'account. Se un mondo viene disattivato, oltre a
