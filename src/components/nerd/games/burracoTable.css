@@ -148,7 +148,7 @@
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--bt-col-gap, 10px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -911,7 +911,7 @@
   }
 
   .rb-bt-strip {
-    width: calc(var(--bt-pile-w, 48px) + 26px);
+    width: calc(var(--bt-pile-w, 44px) + 16px);
   }
 
   .rb-bt-team {
@@ -927,14 +927,20 @@
     font-size: 9.5px;
   }
 
+  /* Margini stretti: la metà deve tenere due colonne affiancate. */
   .rb-bt-half.noi {
-    left: 10px;
-    right: calc(50% + var(--bt-pile-w, 48px) / 2 + 18px);
+    left: 8px;
+    right: calc(50% + var(--bt-pile-w, 44px) / 2 + 10px);
   }
 
   .rb-bt-half.loro {
-    right: 10px;
-    left: calc(50% + var(--bt-pile-w, 48px) / 2 + 18px);
+    right: 8px;
+    left: calc(50% + var(--bt-pile-w, 44px) / 2 + 10px);
+  }
+
+  /* Il bordo dorato del burraco non allarga la colonna. */
+  .rb-bt-col.burraco {
+    padding: 0;
   }
 
   .rb-bt-stage.has-left .rb-bt-half.noi,

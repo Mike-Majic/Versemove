@@ -131,6 +131,9 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
   const [newInfo, setNewInfo] = useState(null); // { keys: Set, source, seq }
   const [preview, setPreview] = useState({ key: '', nuova: null, attach: {} });
   const [rootW, setRootW] = useState(0);
+  // Larghezza della propria metà del tavolo (uguale a quella avversaria):
+  // decide quanto stringere le colonne perché ce ne stiano sempre due.
+  const [halfW, setHalfW] = useState(0);
   const [sortMode, setSortMode] = useHandSort();
   const [tableId] = useCardTable();
   const [sizeId] = useCardSize();
@@ -142,6 +145,7 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
   const pendingSourceRef = useRef(null);
   const myPozzettoRef = useRef(false);
   const rootRef = useRef(null);
+  const noiRef = useRef(null);
   const handRowRef = useRef(null);
   const deckRef = useRef(null);
   const discardRef = useRef(null);
@@ -251,6 +255,16 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
     return () => ro.disconnect();
   }, [isHandActive]);
 
+  useLayoutEffect(() => {
+    const el = noiRef.current;
+    if (!el) return undefined;
+    const measure = () => setHalfW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isHandActive]);
+
   const isMyTurn = state?.turnoUserId === user.id;
   const canDraw = isMyTurn && state?.fase === 'pesca';
   const canAct = isMyTurn && state?.fase === 'gioco';
@@ -314,8 +328,14 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
 
   // --- Dimensioni (🎨 Dimensione carte: mano, colonne e pila) -----------
   const scale = cardSizeScale(sizeId);
-  const pileW = Math.round((narrow ? 48 : 64) * scale);
-  const colW = Math.round((narrow ? 40 : 52) * scale);
+  const pileW = Math.round((narrow ? 44 : 64) * scale);
+  // Colonne sul tavolo: la larghezza scelta nel 🎨, ma mai più larghe di
+  // metà della propria metà (meno lo spazio tra le due), così su un telefono
+  // le combinazioni stanno su due colonne affiancate invece che una sola in
+  // fila con lo scorrimento. Sotto i 30 px l'angolo non si legge più.
+  const colGap = narrow ? 5 : 10;
+  const colBase = Math.round((narrow ? 40 : 52) * scale);
+  const colW = halfW ? Math.max(30, Math.min(colBase, Math.floor((halfW - colGap) / 2))) : colBase;
   const handBaseW = rootW && rootW < 420 ? 62 : rootW && rootW < 640 ? 84 : 108;
   const nHand = handItems.length;
   // Abbastanza stretta da starci tutta lasciando scoperto l'angolo di ogni
@@ -543,7 +563,7 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
     <div
       className="rb-burraco-table"
       ref={rootRef}
-      style={{ '--bt-pile-w': `${pileW}px`, '--bt-hand-extra': `${handExtra}px` }}
+      style={{ '--bt-pile-w': `${pileW}px`, '--bt-hand-extra': `${handExtra}px`, '--bt-col-gap': `${colGap}px` }}
     >
       {recap && <BurracoRecap recap={recap} room={room} user={user} isCoppie={isCoppie} teamOf={teamOf} onClose={() => setRecap(null)} />}
 
@@ -558,6 +578,7 @@ export default function BurracoTable({ roomId, room, user, eventTick, onLeave })
 
             <div
               className={noiClass}
+              ref={noiRef}
               onClick={selecting ? tryNewMeld : undefined}
               role={selecting ? 'button' : undefined}
               aria-label={selecting ? 'Cala le carte selezionate come nuova combinazione' : undefined}
