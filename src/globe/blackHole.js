@@ -43,14 +43,22 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 // Fasi della disattivazione, t in secondi dall'inizio (Infinity = buco nero
 // già stabile, per i mondi disattivati prima di aprire l'app):
 // 0-1,5 nasce il buco, 1,5-4,5 il globo viene risucchiato, 4,5-5,4 lampo,
-// da 4,8 buco nero stabile che poi si "calma" (più piccolo, meno puntini).
+// da 4,8 buco nero stabile che poi si "calma" (meno puntini e meno luce,
+// ma la stessa grandezza).
+//
+// Grandezza finale: l'anello di luce intorno al nero ha lo stesso raggio
+// del satellite che c'era prima (richiesta esplicita: nel prototipo il
+// buco finiva più piccolo dei satelliti). Il nero cresce durante la
+// nascita e il risucchio fino a quella misura e poi resta lì.
+const RING_RADIUS_FACTOR = 1.08; // anello di fotoni a 1,08 h (vedi ring più giù)
+const FINAL_SIZE_PX = (0.95 * (30 / PX)) / RING_RADIUS_FACTOR;
 export function collapsePhase(t) {
   const born = clamp01(t / 1.5);
   const suck = clamp01((t - 1.5) / 3);
   const flash = t >= 4.5 && t < 5.4 ? Math.sin(clamp01((t - 4.5) / 0.9) * Math.PI) : 0;
   const stable = clamp01((t - 4.8) / 1.2);
   const calm = clamp01((t - 5.7) / 1.3);
-  const sizePx = (3 + 14 * ease(born) + 9 * ease(suck)) * (1 - 0.3 * calm);
+  const sizePx = 3 + (FINAL_SIZE_PX - 3) * (0.6 * ease(born) + 0.4 * ease(suck));
   const strength = clamp01(born * 0.8 + suck * 0.2 + stable * 0.2) * (1 - 0.4 * calm);
   const infall = strength * (0.4 + 0.6 * stable + 0.4 * suck) * (1 - 0.45 * calm);
   return { born, suck, flash, stable, calm, sizePx, strength, infall, oldLabel: 1 - clamp01(suck / 0.85), newLabel: stable };
@@ -205,7 +213,9 @@ export function buildBlackHole(world, seed = 7) {
   const rnd = seededRandom(seed);
   const disk = Array.from({ length: DISK_COUNT }, () => ({
     a: rnd() * Math.PI * 2,
-    rr: 1.25 + Math.pow(rnd(), 1.6) * 2.4,
+    // Disco più raccolto del prototipo (lì arrivava a 3,65 h): con il nero
+    // grande quanto un satellite sarebbe diventato enorme.
+    rr: 1.2 + Math.pow(rnd(), 1.6) * 1.3,
     sp: 0.6 + rnd() * 0.8,
     s: 0.6 + rnd() * 1.6,
   }));
@@ -310,7 +320,7 @@ export function buildBlackHole(world, seed = 7) {
     // three.js fonde i trasparenti in spazio lineare: un velo al 20% sul nero
     // esce molto più chiaro che nel canvas 2D del prototipo. GLOW_GAIN e
     // FLASH_GAIN riportano alone e lampo alla luminosità del disegno.
-    glow.scale.setScalar(size * 8.4);
+    glow.scale.setScalar(size * 6);
     glow.material.opacity = phase.strength * GLOW_GAIN * fade;
     ring.scale.setScalar(size * 3.2);
     ring.material.opacity = phase.strength * fade;

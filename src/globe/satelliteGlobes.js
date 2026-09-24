@@ -481,10 +481,12 @@ export function buildSatelliteGlobes({ worlds }) {
     billboard.add(hole.group);
     sat.add(billboard);
     const { sprite: dimLabel } = makeLabelSprite(ud.world.label, SATELLITE_RADIUS * 1.1, '#8d8d9a');
-    dimLabel.position.set(0, 60 * PX, 0);
+    // Sopra l'arco di luce del buco (a ~1,46 volte il suo raggio, grande
+    // quanto il satellite): etichetta spenta e scritta "DISATTIVATO".
+    dimLabel.position.set(0, SATELLITE_RADIUS * 2.1, 0);
     dimLabel.renderOrder = 10;
     const tag = makeDisabledTagSprite(SATELLITE_RADIUS * 0.34);
-    tag.position.set(0, 30 * PX, 0);
+    tag.position.set(0, SATELLITE_RADIUS * 1.5, 0);
     sat.add(dimLabel, tag);
     ud.hole = { ...hole, billboard, dimLabel, tag };
     return ud.hole;
