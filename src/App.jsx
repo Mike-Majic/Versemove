@@ -46,6 +46,7 @@ import {
   sendFriendRequest as sendFriendRequestApi,
   removeFriend as removeFriendApi,
 } from './data/friends';
+import { getReceivedFamilyRequests } from './data/family';
 import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications } from './data/notifications';
@@ -275,6 +276,7 @@ export default function App() {
   const [friends, setFriends] = useState([]);
   const [friendRequestsSent, setFriendRequestsSent] = useState([]);
   const [receivedRequestsCount, setReceivedRequestsCount] = useState(0);
+  const [receivedFamilyRequestsCount, setReceivedFamilyRequestsCount] = useState(0);
   // Non letti per conversazione diretta (id conversazione -> numero), per il
   // totale sull'icona 💬 (vedi DMHub, che carica da solo la lista completa).
   const [unreadByConversation, setUnreadByConversation] = useState(new Map());
@@ -490,11 +492,13 @@ export default function App() {
       setFriends([]);
       setFriendRequestsSent([]);
       setReceivedRequestsCount(0);
+      setReceivedFamilyRequestsCount(0);
       return;
     }
     getFriends().then((list) => setFriends(list.map((f) => f.id)));
     getSentRequests().then((list) => setFriendRequestsSent(list.map((r) => r.toId)));
     getReceivedRequests().then((list) => setReceivedRequestsCount(list.length));
+    getReceivedFamilyRequests().then((list) => setReceivedFamilyRequestsCount(list.length));
   };
   useEffect(refreshFriendsState, [user?.id]);
 
@@ -812,6 +816,10 @@ export default function App() {
       setFriendsModalOpen(true);
       return;
     }
+    if (tipo === 'family_request') {
+      setProfileSettingsOpen(true);
+      return;
+    }
     if (tipo === 'new_post') {
       setIndex(DEFAULT_WORLD_INDEX);
       return;
@@ -903,7 +911,7 @@ export default function App() {
         }}
         onOpenNotifications={() => setNotificationsOpen(true)}
         unreadMessagesCount={totalUnreadMessages}
-        unreadNotifCount={unreadNotifCount + receivedRequestsCount}
+        unreadNotifCount={unreadNotifCount + receivedRequestsCount + receivedFamilyRequestsCount}
       />
 
       {justConfirmedEmail && (
