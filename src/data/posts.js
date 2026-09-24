@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { translateInteractionError } from './errors';
+import { zodiacSign } from './zodiac';
 import i18n from '../i18n';
 
 // Feed Social reale (tabelle posts/comments/post_likes/saved_posts), al
@@ -48,7 +49,9 @@ export async function fetchProfilesMap(ids) {
   if (!unique.length) return new Map();
   const { data, error } = await supabase
     .from('public_profiles')
-    .select('id, nickname, username, avatar_url, citta_social, bio_social')
+    .select(
+      'id, nickname, username, avatar_url, citta_social, bio_social, citta_origine, stato_relazionale, genere, pronomi, lingue_parlate, giorno_nascita, mese_nascita'
+    )
     .in('id', unique);
   if (error || !data) return new Map();
   const map = new Map();
@@ -59,6 +62,12 @@ export async function fetchProfilesMap(ids) {
       avatar: p.avatar_url || '',
       citta: p.citta_social || '',
       bio: p.bio_social || '',
+      cittaOrigine: p.citta_origine || '',
+      statoRelazionale: p.stato_relazionale || '',
+      genere: p.genere || '',
+      pronomi: p.pronomi || '',
+      lingueParlate: p.lingue_parlate || [],
+      zodiaco: zodiacSign(p.giorno_nascita, p.mese_nascita),
     });
   }
   return map;

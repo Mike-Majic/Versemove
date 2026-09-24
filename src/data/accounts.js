@@ -49,6 +49,10 @@ function mapProfile(row) {
     bioSocial: row.bio_social ?? '',
     cittaLavoro: row.citta_lavoro ?? '',
     bioLavoro: row.bio_lavoro ?? '',
+    cittaOrigine: row.citta_origine ?? '',
+    statoRelazionale: row.stato_relazionale ?? '',
+    lingueParlate: row.lingue_parlate ?? [],
+    mostraDataNascitaSocial: row.mostra_data_nascita_social ?? false,
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
@@ -562,6 +566,20 @@ export async function updateOwnSocialProfile(citta, bio) {
 
 export async function updateOwnLavoroProfile(citta, bio) {
   const { error } = await supabase.rpc('update_own_lavoro_profile', { p_citta: citta, p_bio: bio });
+  if (error) return { error: error.message };
+  return {};
+}
+
+// Campi extra del Profilo Social: città di origine, stato relazionale,
+// lingue parlate, e l'interruttore che mostra giorno+mese di nascita (mai
+// l'anno, calcolato server-side in public_profiles solo quando è acceso).
+export async function updateOwnSocialExtra(cittaOrigine, statoRelazionale, lingueParlate, mostraDataNascita) {
+  const { error } = await supabase.rpc('update_own_social_extra', {
+    p_citta_origine: cittaOrigine,
+    p_stato_relazionale: statoRelazionale,
+    p_lingue_parlate: lingueParlate,
+    p_mostra_data_nascita: mostraDataNascita,
+  });
   if (error) return { error: error.message };
   return {};
 }
