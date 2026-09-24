@@ -655,14 +655,16 @@ export default function WorldGlobe({
   // (0.1), così i contorni restano il segno principale. Un mondo può
   // chiedere un riempimento più pieno/diverso con world.landFillOpacity /
   // world.landFillColor (vedi Lavoro in data/worlds.js: col bianco al 10%
-  // sul globo quasi nero i continenti sembravano grigio scuro).
+  // sul globo quasi nero i continenti sembravano grigio scuro). I contorni
+  // sono del colore dell'atmosfera, oppure world.landStrokeColor se il mondo
+  // ne chiede uno diverso (Animali: bianchi).
   useEffect(() => {
     landLodRef.current?.setColors({
       fillColor: world.landFillColor ?? world.atmosphereColor,
       fillOpacity: world.landFillOpacity,
-      strokeColor: world.atmosphereColor,
+      strokeColor: world.landStrokeColor ?? world.atmosphereColor,
     });
-  }, [landPolygons, world.landFillColor, world.landFillOpacity, world.atmosphereColor]);
+  }, [landPolygons, world.landFillColor, world.landFillOpacity, world.landStrokeColor, world.atmosphereColor]);
 
   useEffect(() => {
     if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);

@@ -46,8 +46,10 @@ export const WORLDS = [
     globeColor: '#140f08',
     atmosphereColor: '#b8794a',
     lineColor: '#1a4d2e',
-    landFillColor: '#ffffff',
-    landFillOpacity: 0.78,
+    // Contorni dei continenti bianchi (vedi landStrokeColor in
+    // WorldGlobe.jsx); il riempimento resta quello di default di tutti i
+    // mondi (colore del mondo al 10%), non il bianco pieno di Lavoro.
+    landStrokeColor: '#ffffff',
     textOnGlobe: '#fdf6ec',
   },
   {
