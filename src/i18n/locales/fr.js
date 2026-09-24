@@ -154,7 +154,7 @@ export default {
       mostrami: { title: 'Montrez-moi et âge', hint: 'Genre et âge de qui vous voulez voir.' },
       mondi: {
         title: 'Mondes',
-        hint: 'Là où vous décochez, le monde disparaît pour vous et votre profil ne s\'affichera plus aux autres dans ce monde. Vous pouvez changer d\'avis quand vous voulez, jusqu\'à 4 fois par semaine.',
+        hint: 'Là où vous décochez, le monde disparaît pour vous et votre profil ne s\'affichera plus aux autres dans ce monde. Vous pouvez changer d\'avis quand vous voulez ; seuls Emploi et Rencontres sont limités à 4 changements par semaine.',
       },
     },
     luogo: {

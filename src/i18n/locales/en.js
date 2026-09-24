@@ -154,7 +154,7 @@ export default {
       mostrami: { title: 'Show me and age', hint: 'Gender and age of who you want to see.' },
       mondi: {
         title: 'Worlds',
-        hint: 'Where you uncheck, the world disappears for you and your profile no longer shows to others in that world. You can change your mind anytime, up to 4 times a week.',
+        hint: 'Where you uncheck, the world disappears for you and your profile no longer shows to others in that world. You can change your mind anytime; only for Jobs and Dating the limit is 4 changes a week.',
       },
     },
     luogo: {

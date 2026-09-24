@@ -154,7 +154,7 @@ export default {
       mostrami: { title: 'Muéstrame y edad', hint: 'Género y edad de quién quieres ver.' },
       mondi: {
         title: 'Mundos',
-        hint: 'Donde quites la marca, el mundo desaparece para ti y tu perfil ya no se mostrará a los demás en ese mundo. Puedes cambiar de idea cuando quieras, hasta 4 veces por semana.',
+        hint: 'Donde quites la marca, el mundo desaparece para ti y tu perfil ya no se mostrará a los demás en ese mundo. Puedes cambiar de idea cuando quieras; solo para Empleo y Citas el límite es de 4 cambios por semana.',
       },
     },
     luogo: {

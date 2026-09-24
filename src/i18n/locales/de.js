@@ -154,7 +154,7 @@ export default {
       mostrami: { title: 'Zeig mir und Alter', hint: 'Geschlecht und Alter von wem du sehen möchtest.' },
       mondi: {
         title: 'Welten',
-        hint: 'Wo du das Häkchen entfernst, verschwindet die Welt für dich und dein Profil wird anderen in dieser Welt nicht mehr angezeigt. Du kannst deine Meinung jederzeit ändern, bis zu 4 Mal pro Woche.',
+        hint: 'Wo du das Häkchen entfernst, verschwindet die Welt für dich und dein Profil wird anderen in dieser Welt nicht mehr angezeigt. Du kannst deine Meinung jederzeit ändern; nur für Jobs und Dating gilt ein Limit von 4 Änderungen pro Woche.',
       },
     },
     luogo: {

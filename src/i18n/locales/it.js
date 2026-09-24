@@ -160,7 +160,7 @@ export default {
       mostrami: { title: 'Mostrami ed età', hint: 'Genere ed età di chi vuoi vedere.' },
       mondi: {
         title: 'Mondi',
-        hint: 'Dove togli la spunta, il mondo sparisce per te e il tuo profilo non comparirà più agli altri in quel mondo. Puoi cambiare idea quando vuoi, fino a 4 volte a settimana.',
+        hint: 'Dove togli la spunta, il mondo sparisce per te e il tuo profilo non comparirà più agli altri in quel mondo. Puoi cambiare idea quando vuoi; solo per Lavoro e Incontri il limite è di 4 cambi a settimana.',
       },
     },
     luogo: {
