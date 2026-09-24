@@ -88,23 +88,26 @@ function wavePoint(index, total) {
   return { pos };
 }
 
-// Distanza minima ASSOLUTA dalla camera: se un satellite risultasse più
-// vicino di così, viene respinto lungo la stessa direzione fino a questa
-// distanza (la direzione — quindi "da che parte si vede" — resta la
-// stessa, solo la prospettiva non lo fa più esplodere di dimensione).
-// Nessun legame con la distanza camera-globo centrale: un satellite PUÒ
-// stare più vicino alla camera del globo stesso e passargli davanti,
-// occludendolo — comportamento realistico richiesto esplicitamente (prima
-// un margine dinamico lo respingeva sempre dietro anche quando sarebbe
-// dovuto passare davanti, bug segnalato dal vivo). Resta solo un
-// pavimento fisso per non avere un satellite gigante in faccia in
-// prospettiva a distanza quasi zero.
+// Distanza minima dalla camera: un satellite più vicino di così si
+// dissolve (vedi COVER_FADE_S). Prima veniva respinto lungo la stessa
+// direzione fino a questa distanza, ma così restava incollato davanti
+// all'obiettivo e seguiva la camera, col nucleo scuro e opaco che copriva
+// gran parte della vista (il mappamondo "diventava nero"). Un satellite
+// PUÒ comunque passare davanti al globo e coprirne un pezzo: sparisce solo
+// se sta proprio sulla linea camera → centro del globo (vedi
+// COVER_SEGMENT_RADIUS_MUL) o troppo vicino.
 const MIN_CAMERA_DISTANCE = 220;
+// Un satellite il cui centro dista dal segmento camera → centro del globo
+// meno del suo raggio per questo fattore sta "fra la camera e il globo":
+// si dissolve anche se è lontano dalla camera.
+const COVER_SEGMENT_RADIUS_MUL = 1.5;
+// Durata della dissolvenza in uscita e in entrata (secondi).
+const COVER_FADE_S = 0.3;
 
 // Zona di rimpicciolimento morbido quando un satellite è molto vicino
 // alla camera: la scala scende con continuità (mai a scatti) man mano che
-// la distanza NATURALE (prima dell'eventuale respinta sopra) scende da
-// PROXIMITY_SCALE_FAR_DISTANCE fino al pavimento MIN_CAMERA_DISTANCE, fino
+// la distanza dalla camera scende da PROXIMITY_SCALE_FAR_DISTANCE fino a
+// MIN_CAMERA_DISTANCE (dove ormai è sparito in dissolvenza), fino
 // a un massimo di PROXIMITY_SCALE_MIN (-30%). Puramente estetico — non
 // c'entra con l'occlusione, che resta solo del depth buffer (vedi sotto).
 const PROXIMITY_SCALE_FAR_DISTANCE = MIN_CAMERA_DISTANCE * 2;
@@ -299,6 +302,9 @@ function buildSatelliteMesh(world) {
   group.userData.holeStartMs = 0;
   group.userData.holeT = 0;
   group.userData.hitMesh = core;
+  group.userData.coreMaterial = core.material;
+  // 1 = visibile, 0 = dissolto perché copriva la vista (vedi update).
+  group.userData.coverFade = 1;
   group.userData.continentGroup = continentGroup;
   // Il nucleo NON è più in questa lista: è opaco, la sua opacity è sempre
   // 1 e non deve mai sfumare (né per foschia né per occlusione, richiesta
@@ -539,11 +545,11 @@ export function buildSatelliteGlobes({ worlds }) {
   // Rotazione propria (sempre attiva, tranne con "Riduci animazioni") più
   // le due animazioni temporanee (materializzazione e crescita durante il
   // warp). Niente più galleggiamento né orbita: la posizione è FISSA
-  // (vedi basePosRef, impostato da setActiveWorld sopra). Una sola difesa
-  // resta attiva per fotogramma: se un satellite risultasse più vicino
-  // della soglia ASSOLUTA MIN_CAMERA_DISTANCE, lo si respinge (stessa
-  // direzione, solo distanza minima garantita) — evita solo che l'oggetto
-  // esploda di dimensione in prospettiva a distanza quasi zero. In più la
+  // (vedi basePosRef, impostato da setActiveWorld sopra), anche quando la
+  // camera si avvicina. Un satellite troppo vicino alla camera
+  // (MIN_CAMERA_DISTANCE) o fra la camera e il globo centrale
+  // (COVER_SEGMENT_RADIUS_MUL) si dissolve in COVER_FADE_S e torna in
+  // dissolvenza quando la vista si libera. In più la
   // scala scende con continuità (mai a scatti, fino a -30%) quando un
   // satellite è vicino alla camera, solo per non farlo sembrare
   // sproporzionato — l'occlusione vera resta sempre quella del depth
@@ -551,6 +557,21 @@ export function buildSatelliteGlobes({ worlds }) {
   // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
   // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
   const _toCam = new THREE.Vector3();
+  const _camToCenter = new THREE.Vector3();
+  const _closest = new THREE.Vector3();
+
+  // Distanza del punto p dal segmento camera → centro del globo (origine),
+  // oppure Infinity se p non sta "fra" i due (proiezione fuori dal segmento).
+  function distFromViewSegment(p, camPos) {
+    _camToCenter.copy(camPos).negate();
+    const lenSq = _camToCenter.lengthSq();
+    if (lenSq === 0) return Infinity;
+    const t = _toCam.copy(p).sub(camPos).dot(_camToCenter) / lenSq;
+    if (t <= 0 || t >= 1) return Infinity;
+    _closest.copy(camPos).addScaledVector(_camToCenter, t);
+    return _closest.distanceTo(p);
+  }
+
   function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
     const camPos = camera.position;
@@ -563,17 +584,9 @@ export function buildSatelliteGlobes({ worlds }) {
       const ud = sat.userData;
       if (!ud.basePosRef) continue;
 
-      // Posizione FISSA. Il clone serve solo perché il pavimento
-      // MIN_CAMERA_DISTANCE può spostare la copia quando è la CAMERA ad
-      // avvicinarsi.
-      const basePos = ud.basePosRef.clone();
-
-      _toCam.copy(basePos).sub(camPos);
-      const naturalDistToCam = _toCam.length();
-      if (naturalDistToCam < MIN_CAMERA_DISTANCE) {
-        _toCam.setLength(MIN_CAMERA_DISTANCE);
-        basePos.copy(camPos).add(_toCam);
-      }
+      // Posizione FISSA, sempre: non segue più la camera.
+      const basePos = ud.basePosRef;
+      const naturalDistToCam = camPos.distanceTo(basePos);
 
       ud.basePos = basePos;
       sat.position.copy(basePos);
@@ -599,9 +612,7 @@ export function buildSatelliteGlobes({ worlds }) {
         warpScale = 1 + (WARP_GROW_SCALE - 1) * easeOutCubic(wt);
       }
 
-      // Rimpicciolimento morbido in prossimità della camera, sulla
-      // distanza NATURALE (prima dell'eventuale respinta sopra) così resta
-      // continuo anche quando il satellite è già al pavimento.
+      // Rimpicciolimento morbido in prossimità della camera.
       const proximityT = THREE.MathUtils.clamp(
         THREE.MathUtils.mapLinear(naturalDistToCam, MIN_CAMERA_DISTANCE, PROXIMITY_SCALE_FAR_DISTANCE, 0, 1),
         0,
@@ -624,6 +635,30 @@ export function buildSatelliteGlobes({ worlds }) {
         (beadPx * referenceCamDist * naturalDistToCam) / (globeDistToCam * PROJECTION_PX * SATELLITE_RADIUS);
 
       sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
+
+      // Dissolvenza quando copre la vista (troppo vicino alla camera o sulla
+      // linea camera → globo). Mai per il satellite verso cui si sta
+      // facendo il warp: la camera ci vola incontro apposta.
+      const isWarpTarget = ud.worldId === warpState.targetWorldId && warpState.startMs !== null;
+      const satRadius = SATELLITE_RADIUS * slotScale * warpScale * proximityScale;
+      const blocksView =
+        !isWarpTarget &&
+        (naturalDistToCam < MIN_CAMERA_DISTANCE || distFromViewSegment(basePos, camPos) < satRadius * COVER_SEGMENT_RADIUS_MUL);
+      const fadeStep = Math.min(1, Math.max(0, deltaSec) / COVER_FADE_S);
+      ud.coverFade = blocksView ? Math.max(0, ud.coverFade - fadeStep) : Math.min(1, ud.coverFade + fadeStep);
+      const coverFade = ud.coverFade;
+      // Il nucleo è opaco (occlude davvero, vedi sopra): durante la
+      // dissolvenza diventa trasparente, altrimenti resterebbe una macchia
+      // nera piena fino all'ultimo. OPAQUE è un define dello shader, quindi
+      // il cambio di transparent vuole needsUpdate (solo al passaggio).
+      const coreMaterial = ud.coreMaterial;
+      const coreTransparent = coverFade < 1;
+      if (coreMaterial.transparent !== coreTransparent) {
+        coreMaterial.transparent = coreTransparent;
+        coreMaterial.depthWrite = !coreTransparent;
+        coreMaterial.needsUpdate = true;
+      }
+      coreMaterial.opacity = coverFade;
 
       // Buco nero di un mondo disattivato (vedi setDisabledWorlds).
       const phase = ud.holeState === 'none' ? null : holePhase(ud, nowMs, reduceMotion);
@@ -664,7 +699,7 @@ export function buildSatelliteGlobes({ worlds }) {
           hole.billboard.quaternion.copy(camera.quaternion);
           _toCam.copy(camPos).sub(sat.position).normalize().multiplyScalar(SATELLITE_RADIUS * 1.05);
           hole.billboard.position.copy(_toCam);
-          const fade = spawnT * depthFactor;
+          const fade = spawnT * depthFactor * coverFade;
           hole.update(ud.holeT, phase, fade, sat.scale.x);
           hole.dimLabel.material.opacity = phase.newLabel * 0.9 * fade;
           hole.tag.material.opacity = phase.newLabel * fade;
@@ -673,13 +708,27 @@ export function buildSatelliteGlobes({ worlds }) {
 
       ud.opacityMeshes.forEach(({ mesh, baseOpacity, part }) => {
         const mul = part === 'body' ? bodyMul : part === 'label' ? labelMul : 1;
-        mesh.material.opacity = baseOpacity * spawnT * depthFactor * mul;
+        mesh.material.opacity = baseOpacity * spawnT * depthFactor * mul * coverFade;
       });
+
+      // Del tutto dissolto: non si disegna proprio (niente draw call).
+      // sat.visible resta di setActiveWorld (quali mondi sono satelliti),
+      // qui si spengono solo i figli.
+      if (coverFade <= 0) {
+        ud.body.visible = false;
+        label.visible = false;
+        if (hole) {
+          hole.billboard.visible = false;
+          hole.dimLabel.visible = false;
+          hole.tag.visible = false;
+        }
+      }
     }
   }
 
+  // Un satellite dissolto (vedi coverFade in update) non si può cliccare.
   function getHitMeshes() {
-    return satellites.filter((s) => s.visible).map((s) => s.userData.hitMesh);
+    return satellites.filter((s) => s.visible && s.userData.coverFade > 0).map((s) => s.userData.hitMesh);
   }
 
   function dispose() {
