@@ -22,6 +22,18 @@
   box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #d4f634) 18%, transparent);
 }
 
+/* Pannello del tavolo a partita in corso (vedi RoomView in
+   GiochiTavoloColumn.jsx). Stesso guscio della lobby, quindi anche lo
+   stesso pointer-events: auto: senza, i tavoli (radici .rb-burraco-table,
+   .rb-scopa-table usata anche dal 31, .rb-cosmo-table) ereditavano il
+   pointer-events: none di .rb-arte-explorer e ogni clic passava al
+   mappamondo sotto — mazzo, scarti, mano e "Abbandona" non rispondevano.
+   Più largo della lobby: il tavolo occupa quasi tutto lo schermo. */
+.rb-giochi-tavolo--game {
+  width: min(1040px, 96vw);
+  pointer-events: auto;
+}
+
 @media (max-width: 480px) {
   .rb-giochi-tavolo {
     top: 168px;

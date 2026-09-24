@@ -331,7 +331,13 @@ function RoomView({ roomId, user, onExit }) {
     },
   });
 
-  if (!room) return <Skeleton lines={4} />;
+  if (!room) {
+    return (
+      <div className="rb-giochi-tavolo">
+        <Skeleton lines={4} />
+      </div>
+    );
+  }
 
   if (room.stato === 'conclusa') {
     const vincitore = room.giocatori.find((g) => g.userId === room.vincitoreId);
@@ -360,9 +366,15 @@ function RoomView({ roomId, user, onExit }) {
 
   if (room.stato === 'in_corso') {
     const Table = TABLES[room.gioco];
+    // Il tavolo sta nello stesso pannello della lobby (.rb-giochi-tavolo):
+    // senza, restava figlio diretto di .rb-arte-explorer, che ha
+    // pointer-events: none, e ogni clic su mazzo/scarti/mano finiva sul
+    // mappamondo sotto (vedi giochiTavolo.css).
     return (
       <>
-        <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />
+        <div className="rb-giochi-tavolo rb-giochi-tavolo--game">
+          <Table roomId={roomId} room={room} user={user} eventTick={eventTick} onLeave={handleLeave} />
+        </div>
         {confirmLeave && (
           <ModalOverlay onClose={() => setConfirmLeave(false)}>
             <div className="rb-modal-unsaved-confirm" onClick={(e) => e.stopPropagation()}>
