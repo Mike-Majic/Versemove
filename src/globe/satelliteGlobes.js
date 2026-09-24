@@ -51,17 +51,17 @@ const RING_START_DEG = 90;
 // Taglia apparente voluta di OGNI satellite, in pixel, ALL'ALTITUDINE DI
 // DEFAULT — stessa per tutti (richiesta esplicita: tutti come "Vetrina",
 // nessuno più grande/piccolo degli altri). Il raggio 3D vero che la
-// produce si ricava dalla distanza REALE dalla camera, ricalcolata ad ogni
-// fotogramma in update() (non più una volta sola qui, su una distanza
-// camera solo indovinata): altrimenti, appena l'utente ruota la vista,
-// ogni satellite si sbilancia in modo diverso dagli altri in base alla sua
+// produce si ricava in update() dalla distanza fra il satellite e la
+// camera "di riferimento": stessa direzione della camera vera, ma alla
+// distanza di default (referenceCamDist). Così ruotando la vista ogni
+// satellite resta della stessa taglia degli altri qualunque sia la sua
 // profondità nell'anello (bug segnalato dal vivo — "Incontri" enorme e
-// "Vetrina" minuscola nello stesso schermo). Zoomando avanti/indietro
-// invece l'intero anello scala insieme al globo, prospettiva normale (vedi
-// referenceCamDist in update()) — beadPx NON è quindi una taglia fissa in
-// pixel a qualunque zoom, solo il punto di calibrazione alla distanza di
-// default. Il testo dell'etichetta scala insieme alla sfera (stesso
-// gruppo, stessa scala), quindi si sistema da sé.
+// "Vetrina" minuscola nello stesso schermo), mentre zoomando avanti e
+// indietro l'anello cresce e cala con la prospettiva vera, insieme al
+// globo. beadPx NON è quindi una taglia fissa in pixel a qualunque zoom,
+// solo il punto di calibrazione alla distanza di default. Il testo
+// dell'etichetta scala insieme alla sfera (stesso gruppo, stessa scala),
+// quindi si sistema da sé.
 const PROJECTION_PX = 957;
 const BEAD_PX_WIDE = 46;
 const BEAD_PX_TALL = 36;
@@ -88,30 +88,28 @@ function wavePoint(index, total) {
   return { pos };
 }
 
-// Distanza minima dalla camera: un satellite più vicino di così si
-// dissolve (vedi COVER_FADE_S). È l'UNICO caso in cui un satellite sparisce:
-// succede solo zoomando molto (camera a meno di ~550 unità dal centro),
-// mai nell'inquadratura del sistema solare, dove la camera sta a 700
-// (altitudine 6, telefono 850) e l'anello a 330 (250): il satellite più
-// vicino resta a più di 350. Serve a non avere un oggetto enorme incollato
-// all'obiettivo (prima veniva respinto lungo la stessa direzione, restava
-// davanti alla camera e il mappamondo "diventava nero").
-// Un satellite che passa fra la camera e il globo NON si dissolve più:
-// resta pieno e opaco e copre il pezzo di globo dietro di sé, come deve
-// (ci pensa il depth buffer). La vecchia regola sul segmento camera → globo
-// (71dad50) lo faceva sparire a turno mentre l'anello girava.
-const MIN_CAMERA_DISTANCE = 220;
-// Durata della dissolvenza in uscita e in entrata (secondi).
-const COVER_FADE_S = 0.3;
-
-// Zona di rimpicciolimento morbido quando un satellite è molto vicino
-// alla camera: la scala scende con continuità (mai a scatti) man mano che
-// la distanza dalla camera scende da PROXIMITY_SCALE_FAR_DISTANCE fino a
-// MIN_CAMERA_DISTANCE (dove ormai è sparito in dissolvenza), fino
-// a un massimo di PROXIMITY_SCALE_MIN (-30%). Puramente estetico — non
-// c'entra con l'occlusione, che resta solo del depth buffer (vedi sotto).
-const PROXIMITY_SCALE_FAR_DISTANCE = MIN_CAMERA_DISTANCE * 2;
-const PROXIMITY_SCALE_MIN = 0.7;
+// Dissolvenza legata allo ZOOM, non a una distanza fissa: conta quanto è
+// grande il satellite rispetto alla sua distanza dalla camera, cioè
+// ratio = distanza / raggio vero. A piena opacità finché ratio > 5,5 (il
+// satellite occupa già circa metà dell'altezza dello schermo), poi la
+// dissolvenza comincia subito e finisce a 3,5. Dipende solo dalla distanza,
+// non dal tempo: segue la rotella in tutte e due le direzioni. Nella vista
+// del sistema solare ratio sta attorno a 20, quindi nessun satellite sfuma
+// mai; un satellite che passa fra la camera e il globo resta pieno e opaco
+// e copre il pezzo di globo dietro di sé (ci pensa il depth buffer).
+// Niente più rimpicciolimento di prossimità: il satellite davanti al globo
+// era il più vicino alla camera e perdeva fino al 30%.
+const COVER_FADE_FULL_RATIO = 5.5;
+const COVER_FADE_GONE_RATIO = 3.5;
+// L'etichetta sfuma quando il satellite è grande sullo schermo: raggio a
+// schermo (frazione di metà altezza) da 0,3 a 0,55. Nella vista normale
+// sta attorno a 0,1, quindi resta piena.
+const LABEL_FADE_START_FRAC = 0.3;
+const LABEL_FADE_END_FRAC = 0.55;
+// Nodi in proporzione alla sfera: PointsMaterial.size è in unità di scena e
+// ignora la scala dell'oggetto, quindi va riscalata a mano a ogni
+// fotogramma (solo un uniform, nessuna ricompilazione).
+const NODE_SIZE = SATELLITE_RADIUS * 0.22;
 
 // Distanza dalla camera oltre la quale un satellite comincia a sbiadire
 // (profondità atmosferica, come una foschia leggera) e a cui arriva alla
@@ -192,10 +190,35 @@ function easeOutCubic(t) {
 const SIDE_LIT_DARK = new THREE.Color().setRGB(0.1, 0.1, 0.12, THREE.SRGBColorSpace);
 const SIDE_LIT_LIGHT = new THREE.Color().setRGB(0.93, 0.93, 0.96, THREE.SRGBColorSpace);
 
+// Ogni puntino viene avvicinato alla camera di mezzo diametro (in spazio
+// vista, dopo la proiezione): altrimenti, ingrandendo un satellite con lo
+// zoom, la sfera che sporge verso la camera taglia gli sprite e i nodi
+// fuori centro diventano mezzelune. Si aggiunge una volta alla compilazione
+// dello shader, a ogni fotogramma cambia solo l'uniform size.
+function nudgeNodesTowardCamera(material) {
+  const previous = material.onBeforeCompile;
+  // Chiave di cache del programma presa PRIMA del wrapper: il testo del
+  // wrapper è uguale per tutti i materiali, e senza una chiave propria
+  // three.js darebbe lo stesso shader ai nodi normali e a quelli a luce
+  // laterale.
+  const previousKey = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    previous?.call(material, shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace(
+      'gl_PointSize = size;',
+      `mvPosition.xyz += normalize( - mvPosition.xyz ) * size * 0.5;
+  gl_Position = projectionMatrix * mvPosition;
+  gl_PointSize = size;`
+    );
+  };
+  material.customProgramCacheKey = () => `${previousKey}|rb-nudge`;
+  return material;
+}
+
 function buildSideLitNodeMaterial() {
   const material = new THREE.PointsMaterial({
     color: 0xffffff,
-    size: SATELLITE_RADIUS * 0.22,
+    size: NODE_SIZE,
     map: getDotTexture(),
     transparent: true,
     depthWrite: false,
@@ -265,13 +288,14 @@ function buildSatelliteMesh(world) {
       ? buildSideLitNodeMaterial()
       : new THREE.PointsMaterial({
           color: world.color,
-          size: SATELLITE_RADIUS * 0.22,
+          size: NODE_SIZE,
           map: getDotTexture(),
           transparent: true,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
           sizeAttenuation: true,
         });
+  nudgeNodesTowardCamera(nodeMaterial);
   const nodes = new THREE.Points(buildShellNodeGeometry(coreGeometry), nodeMaterial);
   nodes.renderOrder = 2;
   body.add(nodes);
@@ -303,7 +327,8 @@ function buildSatelliteMesh(world) {
   group.userData.holeT = 0;
   group.userData.hitMesh = core;
   group.userData.coreMaterial = core.material;
-  // 1 = visibile, 0 = dissolto perché copriva la vista (vedi update).
+  group.userData.nodeMaterial = nodeMaterial;
+  // 1 = visibile, 0 = dissolto perché troppo grande sullo schermo (vedi update).
   group.userData.coverFade = 1;
   group.userData.continentGroup = continentGroup;
   // Il nucleo NON è più in questa lista: è opaco, la sua opacity è sempre
@@ -546,17 +571,17 @@ export function buildSatelliteGlobes({ worlds }) {
   // le due animazioni temporanee (materializzazione e crescita durante il
   // warp). Niente più galleggiamento né orbita: la posizione è FISSA
   // (vedi basePosRef, impostato da setActiveWorld sopra), anche quando la
-  // camera si avvicina. Solo un satellite troppo vicino alla camera
-  // (MIN_CAMERA_DISTANCE) si dissolve in COVER_FADE_S e torna in
-  // dissolvenza quando la camera si allontana; davanti al globo resta
-  // sempre pieno (vedi MIN_CAMERA_DISTANCE). In più la
-  // scala scende con continuità (mai a scatti, fino a -30%) quando un
-  // satellite è vicino alla camera, solo per non farlo sembrare
-  // sproporzionato — l'occlusione vera resta sempre quella del depth
-  // buffer (vedi sopra), non dipende da questo. elapsedSec/deltaSec
-  // vengono da WorldGlobe.jsx, agganciati allo stesso giro di rendering
-  // del globo grande (si fermano quando lui si ferma per risparmiare CPU).
+  // camera si avvicina. La taglia si calcola dalla camera "di riferimento"
+  // (stessa direzione di quella vera, alla distanza di default): tutti i
+  // satelliti hanno la stessa taglia a schermo qualunque sia la rotazione
+  // della vista, e zoomando crescono e calano con la prospettiva vera,
+  // come il globo. Un satellite troppo grande sullo schermo sfuma (vedi
+  // COVER_FADE_FULL_RATIO); l'occlusione vera resta sempre quella del
+  // depth buffer (vedi sopra). elapsedSec/deltaSec vengono da
+  // WorldGlobe.jsx, agganciati allo stesso giro di rendering del globo
+  // grande (si fermano quando lui si ferma per risparmiare CPU).
   const _toCam = new THREE.Vector3();
+  const _camRef = new THREE.Vector3();
 
   function update(elapsedSec, deltaSec, camera, idleFactor = 0, reduceMotion = false) {
     const nowMs = performance.now();
@@ -564,6 +589,9 @@ export function buildSatelliteGlobes({ worlds }) {
     const globeDistToCam = camPos.length();
     const beadPx = targetBeadPx();
     if (referenceCamDist === null) referenceCamDist = globeDistToCam;
+    // Camera di riferimento: stessa direzione, distanza di default.
+    _camRef.copy(camPos).normalize().multiplyScalar(referenceCamDist);
+    const halfFovTan = Math.tan((camera.fov ?? 50) * DEG2RAD * 0.5);
 
     for (const sat of satellites) {
       if (!sat.visible) continue;
@@ -598,38 +626,29 @@ export function buildSatelliteGlobes({ worlds }) {
         warpScale = 1 + (WARP_GROW_SCALE - 1) * easeOutCubic(wt);
       }
 
-      // Rimpicciolimento morbido in prossimità della camera.
-      const proximityT = THREE.MathUtils.clamp(
-        THREE.MathUtils.mapLinear(naturalDistToCam, MIN_CAMERA_DISTANCE, PROXIMITY_SCALE_FAR_DISTANCE, 0, 1),
-        0,
-        1
-      );
-      const proximityScale = PROXIMITY_SCALE_MIN + (1 - PROXIMITY_SCALE_MIN) * proximityT;
+      // Taglia dalla camera di riferimento, non da quella attuale: alla
+      // distanza di default è identica a prima (stessa taglia per tutti,
+      // qualunque sia il loro posto nell'anello o la rotazione della vista),
+      // ma zoomando non si ricalcola più, quindi il satellite si ingrandisce
+      // e rimpicciolisce con la prospettiva vera (prima restava della
+      // stessa taglia a schermo anche avvicinandosi).
+      const naturalDistRef = _camRef.distanceTo(basePos);
+      const slotScale = (beadPx * naturalDistRef) / (PROJECTION_PX * SATELLITE_RADIUS);
 
-      // Raggio 3D vero calcolato sulla distanza REALE dalla camera in
-      // questo fotogramma (mai una distanza indovinata una tantum): il
-      // fattore (naturalDistToCam / globeDistToCam) annulla SOLO la
-      // variazione dovuta alla profondità del satellite nell'anello (dà a
-      // tutti i satelliti la stessa taglia apparente TRA LORO, qualunque
-      // sia il loro posto/profondità o quanto l'utente abbia ruotato la
-      // vista), mentre (referenceCamDist / globeDistToCam) lascia intatta
-      // la prospettiva normale sullo ZOOM generale: allontanandosi tutto
-      // l'anello rimpicciolisce insieme al globo invece di restare fissato
-      // a una taglia in pixel costante (bug segnalato dal vivo — l'anello
-      // sembrava "fondersi" zoomando indietro).
-      const slotScale =
-        (beadPx * referenceCamDist * naturalDistToCam) / (globeDistToCam * PROJECTION_PX * SATELLITE_RADIUS);
+      sat.scale.setScalar(slotScale * spawnT * warpScale);
+      ud.nodeMaterial.size = NODE_SIZE * sat.scale.x;
 
-      sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
-
-      // Dissolvenza solo se è troppo vicino alla camera (zoom molto
-      // ravvicinato). Mai per il satellite verso cui si sta facendo il
-      // warp: la camera ci vola incontro apposta.
+      // Dissolvenza legata allo zoom (vedi COVER_FADE_FULL_RATIO). Mai per
+      // il satellite verso cui si sta facendo il warp: la camera ci vola
+      // incontro apposta.
       const isWarpTarget = ud.worldId === warpState.targetWorldId && warpState.startMs !== null;
-      const blocksView = !isWarpTarget && naturalDistToCam < MIN_CAMERA_DISTANCE;
-      const fadeStep = Math.min(1, Math.max(0, deltaSec) / COVER_FADE_S);
-      ud.coverFade = blocksView ? Math.max(0, ud.coverFade - fadeStep) : Math.min(1, ud.coverFade + fadeStep);
+      const realRadius = SATELLITE_RADIUS * sat.scale.x;
+      const ratio = realRadius > 0 ? naturalDistToCam / realRadius : Infinity;
+      ud.coverFade = isWarpTarget ? 1 : THREE.MathUtils.smoothstep(ratio, COVER_FADE_GONE_RATIO, COVER_FADE_FULL_RATIO);
       const coverFade = ud.coverFade;
+      // Etichetta: sfuma quando il satellite è grande sullo schermo.
+      const screenFrac = realRadius / (naturalDistToCam * halfFovTan);
+      const labelZoomMul = 1 - THREE.MathUtils.smoothstep(screenFrac, LABEL_FADE_START_FRAC, LABEL_FADE_END_FRAC);
       // Il nucleo è opaco (occlude davvero, vedi sopra): durante la
       // dissolvenza diventa trasparente, altrimenti resterebbe una macchia
       // nera piena fino all'ultimo. OPAQUE è un define dello shader, quindi
@@ -667,6 +686,7 @@ export function buildSatelliteGlobes({ worlds }) {
         label.material.rotation = 0;
         label.scale.set(base.sx, base.sy, 1);
       }
+      labelMul *= labelZoomMul;
       label.visible = labelMul > 0.001;
 
       const hole = ud.hole;
