@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { WORLDS } from '../data/worlds';
 import { loadLandDots } from '../globe/landDots';
 import { loadLandGeo } from '../globe/landGeo';
+import { buildLandMesh } from '../globe/landMesh';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
@@ -603,6 +604,39 @@ export default function WorldGlobe({
     };
   }, []);
 
+  // I contorni appena arrivati diventano due soli oggetti (calotte unite +
+  // contorni uniti, vedi globe/landMesh.js) dentro l'oggetto del globo, dove
+  // stava il layer polygonsData di react-globe.gl. L'oggetto si cerca qui,
+  // non da globeRootRef: quello viene cercato al mount, quando react-globe.gl
+  // non l'ha ancora messo nella scena, e resta null.
+  const landMeshRef = useRef(null);
+  useEffect(() => {
+    const g = globeRef.current;
+    const root = g && findGlobeRootObject(g.scene());
+    if (!USE_REALISTIC_CONTINENTS || !root || landPolygons.length === 0) return undefined;
+    const land = buildLandMesh(landPolygons);
+    root.add(land.group);
+    landMeshRef.current = land;
+    return () => {
+      root.remove(land.group);
+      land.dispose();
+      landMeshRef.current = null;
+    };
+  }, [landPolygons]);
+
+  // Riempimento: di default stesso colore del mondo ma molto trasparente
+  // (0.1), così i contorni restano il segno principale. Un mondo può
+  // chiedere un riempimento più pieno/diverso con world.landFillOpacity /
+  // world.landFillColor (vedi Lavoro in data/worlds.js: col bianco al 10%
+  // sul globo quasi nero i continenti sembravano grigio scuro).
+  useEffect(() => {
+    landMeshRef.current?.setColors({
+      fillColor: world.landFillColor ?? world.atmosphereColor,
+      fillOpacity: world.landFillOpacity,
+      strokeColor: world.atmosphereColor,
+    });
+  }, [landPolygons, world.landFillColor, world.landFillOpacity, world.atmosphereColor]);
+
   useEffect(() => {
     if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
   }, [world.atmosphereColor, world.lineColor]);
@@ -1004,11 +1038,6 @@ export default function WorldGlobe({
         showAtmosphere={quality.atmosphere}
         atmosphereColor={world.atmosphereColor}
         atmosphereAltitude={0.3}
-        polygonsData={USE_REALISTIC_CONTINENTS ? landPolygons : []}
-        polygonCapColor={() => polygonFillColor(world.landFillColor ?? world.atmosphereColor, world.landFillOpacity)}
-        polygonSideColor={() => 'rgba(0,0,0,0)'}
-        polygonStrokeColor={() => world.atmosphereColor}
-        polygonAltitude={0.006}
         htmlElementsData={displayItems}
         htmlLat="lat"
         htmlLng="lng"
@@ -1026,23 +1055,6 @@ export default function WorldGlobe({
       <div className="rb-globe-warp-flash" ref={warpFlashRef} aria-hidden="true" />
     </div>
   );
-}
-
-// Colore del "riempimento" dei continenti: di default stesso colore del mondo
-// ma molto trasparente (0.1), così i contorni (lo stroke) restano il segno
-// principale. Un mondo può chiedere un riempimento più pieno/diverso con
-// world.landFillOpacity / world.landFillColor (vedi Lavoro in data/worlds.js:
-// col bianco al 10% sul globo quasi nero i continenti sembravano grigio scuro).
-const capColorCache = new Map();
-function polygonFillColor(hexColor, opacity = 0.1) {
-  const key = `${hexColor}|${opacity}`;
-  let cached = capColorCache.get(key);
-  if (!cached) {
-    const c = new THREE.Color(hexColor);
-    cached = `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${opacity})`;
-    capColorCache.set(key, cached);
-  }
-  return cached;
 }
 
 // Di solito un solo colore vale per tutto (linee + puntini), ma un mondo può

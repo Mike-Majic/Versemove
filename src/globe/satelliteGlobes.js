@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import GeoJsonGeometry from 'three-geojson-geometry';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getDotTexture } from './dotTexture';
 import { buildShellNodeGeometry } from './networkOverlay';
 import { makeLabelSprite } from './categoryShell';
@@ -408,26 +409,29 @@ export function buildSatelliteGlobes({ worlds }) {
   // calcolo sbagliava riferimento e sceglieva contorni scuri, invisibili sul
   // nucleo nero sotto. Resta comunque possibile forzare un altro colore per
   // un singolo mondo con world.satelliteContinentColor, se mai servisse.
-  let continentGeometries = null;
+  // Tutte le feature in UNA geometria (mergeGeometries): una sola
+  // LineSegments, cioè una draw call, per satellite, qualunque sia il numero
+  // di feature del GeoJSON.
+  let continentGeometry = null;
   function setContinentMap(features) {
-    if (continentGeometries || !features?.length) return;
-    continentGeometries = features.map(
+    if (continentGeometry || !features?.length) return;
+    const parts = features.map(
       (feature) => new GeoJsonGeometry(feature.geometry, SATELLITE_RADIUS * CONTINENT_RADIUS_SCALE, CONTINENT_RESOLUTION_DEG)
     );
+    continentGeometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
+    if (parts.length > 1) parts.forEach((part) => part.dispose());
 
     satellites.forEach((sat) => {
       const world = worlds.find((w) => w.id === sat.userData.worldId);
       const color = world?.satelliteContinentColor ?? '#ffffff';
       const continentGroup = sat.userData.continentGroup;
 
-      continentGeometries.forEach((geometry) => {
-        const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
-        addSuckWarp(material, sat.userData.suck);
-        const lines = new THREE.LineSegments(geometry, material);
-        lines.renderOrder = 2;
-        continentGroup.add(lines);
-        sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85, part: 'body' });
-      });
+      const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
+      addSuckWarp(material, sat.userData.suck);
+      const lines = new THREE.LineSegments(continentGeometry, material);
+      lines.renderOrder = 2;
+      continentGroup.add(lines);
+      sat.userData.opacityMeshes.push({ mesh: lines, baseOpacity: 0.85, part: 'body' });
 
       continentGroup.visible = true;
     });
