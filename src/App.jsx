@@ -55,6 +55,7 @@ import { getMyNotifications, subscribeToOwnNotifications } from './data/notifica
 import { fetchProfilesMap } from './data/posts';
 import { supabase } from './data/supabaseClient';
 import PageLoading from './components/PageLoading';
+import { useGlobeCover } from './fx/globeCover';
 import './App.css';
 
 // Componenti pesanti o aperti solo su richiesta, caricati al bisogno invece
@@ -923,6 +924,8 @@ export default function App() {
   };
   useBackLayer(world.id === 'wip', leaveWipWorld, 'world:wip');
   useBackLayer(Boolean(activeArteCategory) && !closingCategoryId, () => toggleArteCategory(activeArteCategory), 'world:category');
+  // Colonna/categoria aperta sopra al mappamondo: il globo scende a ~10 fps.
+  useGlobeCover(activeArteCategory ? 'covered' : null);
 
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
   // su Incontri/Lavoro) serve essere maggiorenni, solo dopo conta se

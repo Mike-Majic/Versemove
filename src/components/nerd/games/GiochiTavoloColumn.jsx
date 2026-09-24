@@ -27,6 +27,7 @@ import Skeleton from '../../Skeleton';
 import ModalOverlay from '../../ModalOverlay';
 import { useBackLayer } from '../../../hooks/useBackLayer';
 import { useCardTable } from './cardTheme';
+import { useGlobeCover } from '../../../fx/globeCover';
 import './giochiTavolo.css';
 
 const GAMES = [
@@ -508,6 +509,10 @@ function RoomView({ roomId, user, onExit }) {
       return false;
     },
   });
+
+  // Partita in corso: il mappamondo dietro si ferma del tutto (torna a
+  // girare appena la partita finisce o si esce dalla stanza).
+  useGlobeCover(room?.stato === 'in_corso' ? 'paused' : null);
 
   if (!room) {
     return (

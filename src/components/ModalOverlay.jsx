@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UnsavedChangesContext, useUnsavedChangesRegistry } from '../hooks/useUnsavedChanges';
 import { nextLayerOrder, useBackLayer } from '../hooks/useBackLayer';
+import { useGlobeCover } from '../fx/globeCover';
 
 // Sfondo condiviso da tutti i pannelli a comparsa.
 //
@@ -83,6 +84,9 @@ export default function ModalOverlay({ className = 'rb-modal-overlay', children,
       return requestClose();
     },
   });
+
+  // Il pannello copre il mappamondo: dietro basta ~10 fps.
+  useGlobeCover('covered');
 
   useEffect(() => {
     openOverlays.add(seq);

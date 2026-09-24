@@ -9,7 +9,8 @@ import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
-import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor } from '../fx/quality';
+import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor, createAdaptiveFrameCap } from '../fx/quality';
+import { getGlobeCover, subscribeGlobeCover } from '../fx/globeCover';
 import './WorldGlobe.css';
 
 const DEG2RAD = Math.PI / 180;
@@ -167,6 +168,10 @@ const CAMERA_FAR = 5000;
 const IDLE_MS = 3000;
 // Senza interazioni da IDLE_MS: un fotogramma ogni ~33 ms (~30 fps).
 const FRAME_MS_IDLE = 33;
+// Con una colonna/categoria o un ModalOverlay aperti sopra (vedi
+// fx/globeCover.js): ~10 fps. 6 giri del rAF da 16,7 ms = 100 ms; la soglia
+// resta un po' sotto per non saltarne uno in più per le piccole oscillazioni.
+const FRAME_MS_COVERED = 95;
 
 // Durate del warp fra mondi (Fase 2b, vedi runWarp più sotto): volo della
 // camera + crescita del satellite, poi il flash che copre lo scambio.
@@ -334,7 +339,8 @@ export default function WorldGlobe({
   const isHoveringRef = useRef(false);
 
   // Regola del ciclo di disegno: MAI fermo mentre è visibile, 30 fps quando
-  // nessuno interagisce, pausa solo a scheda nascosta.
+  // nessuno interagisce, 10 fps con un pannello sopra, pausa solo a scheda
+  // nascosta o con una partita in corso a un tavolo (fx/globeCover.js).
   //
   // Prima il disegno si metteva in pausa (pauseAnimation) dopo pochi
   // secondi senza eventi del mouse: col mouse fermo sopra il mappamondo
@@ -346,8 +352,9 @@ export default function WorldGlobe({
   //   un fotogramma ogni volta che dall'ultimo disegno sono passati meno di
   //   FRAME_MS_IDLE (~30 fps invece di 60). wake() riporta subito al pieno
   //   (movimento, clic, rotellina, tocco, voli della camera, dati nuovi);
-  // - pauseAnimation solo con la scheda nascosta (visibilitychange), e
-  //   resumeAnimation appena torna visibile.
+  // - pauseAnimation solo con la scheda nascosta (visibilitychange) o con
+  //   una partita in corso (copertura 'paused'), e resumeAnimation appena
+  //   nessuna delle due vale più.
   //
   // I nomi startAutoRotate/stopAutoRotate sono rimasti (li chiamano molti
   // punti sotto: mount, hover, warp, fly-to) ma NON toccano più
@@ -361,27 +368,41 @@ export default function WorldGlobe({
   // secondi, e viceversa in IDLE_EASE_OUT_S. Su telefono il globo centrale
   // non gira mai da solo, ma i satelliti sì, con la stessa regola dei 30 fps.
   const fullFpsUntilRef = useRef(0);
+  const globeCoverRef = useRef(getGlobeCover());
   const globeActivity = useMemo(() => {
-    let hiddenPaused = false;
+    let hidden = false;
+    let coverPaused = false;
+    let paused = false;
 
     // Pieno regime di fotogrammi per almeno `ms` da adesso.
     const wake = (ms = IDLE_MS) => {
       fullFpsUntilRef.current = Math.max(fullFpsUntilRef.current, performance.now() + ms);
     };
 
-    const onVisibilityChange = () => {
+    const syncPause = () => {
       const g = globeRef.current;
       if (!g) return;
-      if (document.visibilityState === 'hidden') {
-        if (!hiddenPaused) g.pauseAnimation();
-        hiddenPaused = true;
-      } else if (hiddenPaused) {
-        hiddenPaused = false;
+      const shouldPause = hidden || coverPaused;
+      if (shouldPause === paused) return;
+      paused = shouldPause;
+      if (paused) {
+        g.pauseAnimation();
+      } else {
         wake();
         g.resumeAnimation();
       }
     };
+
+    const onVisibilityChange = () => {
+      hidden = document.visibilityState === 'hidden';
+      syncPause();
+    };
     document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const setCoverPaused = (value) => {
+      coverPaused = value;
+      syncPause();
+    };
 
     const setIdleTarget = (target, durationMs) => {
       const now = performance.now();
@@ -411,11 +432,22 @@ export default function WorldGlobe({
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
 
-    return { wake, startAutoRotate, stopAutoRotate, dispose };
+    return { wake, startAutoRotate, stopAutoRotate, setCoverPaused, dispose };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => globeActivity.dispose, [globeActivity]);
+
+  // Pannelli sopra al globo: 'covered' abbassa il tetto (letto dal wrapper
+  // di renderer.render tramite globeCoverRef), 'paused' ferma tutto.
+  useEffect(() => {
+    const apply = (level) => {
+      globeCoverRef.current = level;
+      globeActivity.setCoverPaused(level === 'paused');
+    };
+    apply(getGlobeCover());
+    return subscribeGlobeCover(apply);
+  }, [globeActivity]);
 
   // Qualsiasi interazione dentro al globo (anche sui marker HTML, che stanno
   // sopra al canvas) riporta il disegno a pieno regime per IDLE_MS.
@@ -721,7 +753,10 @@ export default function WorldGlobe({
   // parte) così si fermano da soli solo a scheda nascosta (vedi
   // globeActivity). Qui anche il risparmio: senza interazioni da IDLE_MS
   // un fotogramma viene saltato se dall'ultimo disegno sono passati meno di
-  // FRAME_MS_IDLE (~30 fps). elapsed/deltaSec sono sempre tempo reale
+  // FRAME_MS_IDLE (~30 fps), o FRAME_MS_COVERED (~10 fps) con un pannello
+  // sopra. In più il tetto adattivo di fx/quality.js (createAdaptiveFrameCap):
+  // se il ciclo resta lento per qualche secondo, ~15 fps anche durante le
+  // interazioni, finché non torna leggero. elapsed/deltaSec sono sempre tempo reale
   // misurato fra un disegno vero e il successivo (lastElapsed si aggiorna
   // solo quando si disegna), quindi a 30 fps satelliti e globo girano alla
   // stessa velocità, solo con meno fotogrammi. idleFactor (0..1, calcolato al volo da
@@ -741,9 +776,13 @@ export default function WorldGlobe({
     const startedAt = performance.now();
     let lastElapsed = 0;
     let lastDrawAt = 0;
+    const frameCap = createAdaptiveFrameCap();
     renderer.render = (scene, camera) => {
       const now = performance.now();
-      if (now > fullFpsUntilRef.current && now - lastDrawAt < FRAME_MS_IDLE) return;
+      frameCap.tick(now);
+      const idleFrameMs = globeCoverRef.current ? FRAME_MS_COVERED : FRAME_MS_IDLE;
+      const minFrameMs = Math.max(now > fullFpsUntilRef.current ? idleFrameMs : 0, frameCap.frameMs());
+      if (now - lastDrawAt < minFrameMs) return;
       lastDrawAt = now;
       const elapsed = (now - startedAt) / 1000;
       const deltaSec = elapsed - lastElapsed;

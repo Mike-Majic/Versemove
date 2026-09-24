@@ -124,3 +124,61 @@ export function startAutoQualityMonitor() {
     if (rafId !== null) cancelAnimationFrame(rafId);
   };
 }
+
+// Tetto adattivo dei fotogrammi del globo (letto dal wrapper di
+// renderer.render in WorldGlobe): se il ciclo di disegno resta lento
+// (media > SLOW_ENTER_MS per SLOW_ENTER_HOLD_MS) il tetto scende a ~15 fps,
+// e torna libero quando la media scende sotto SLOW_EXIT_MS.
+//
+// La media è fra due GIRI del ciclo (ogni chiamata a renderer.render, anche
+// quelle saltate), non fra due disegni: col tetto a 15 fps i disegni sono
+// per forza a >= 66 ms l'uno dall'altro e la media non potrebbe mai tornare
+// sotto 30 ms. I giri invece restano a ~16 ms se il disegno costa poco, e si
+// allungano quando il disegno (CPU o GPU) non sta dietro al monitor.
+const SLOW_ENTER_MS = 50;
+const SLOW_ENTER_HOLD_MS = 3000;
+const SLOW_EXIT_MS = 30;
+const SLOW_EXIT_HOLD_MS = 1000;
+// ~15 fps: 4 giri da 16,7 ms = 66,7 ms. La soglia resta un po' sotto,
+// altrimenti con le piccole oscillazioni del rAF si salterebbe un giro in più.
+const SLOW_FRAME_MS = 62;
+// Una pausa lunga (scheda nascosta, pauseAnimation) non è lentezza.
+const GAP_RESET_MS = 1000;
+
+export function createAdaptiveFrameCap() {
+  let lastTick = 0;
+  let avg = 16;
+  let slow = false;
+  let conditionSince = 0;
+
+  return {
+    tick(now) {
+      const dt = now - lastTick;
+      lastTick = now;
+      if (dt <= 0 || dt > GAP_RESET_MS) {
+        conditionSince = 0;
+        return;
+      }
+      // Media mobile esponenziale su ~mezzo secondo, indipendente dal
+      // numero di giri al secondo.
+      avg += (dt - avg) * (1 - Math.exp(-dt / 500));
+      const wantsChange = slow ? avg < SLOW_EXIT_MS : avg > SLOW_ENTER_MS;
+      if (!wantsChange) {
+        conditionSince = 0;
+        return;
+      }
+      if (!conditionSince) conditionSince = now;
+      if (now - conditionSince >= (slow ? SLOW_EXIT_HOLD_MS : SLOW_ENTER_HOLD_MS)) {
+        slow = !slow;
+        conditionSince = 0;
+      }
+    },
+    // Intervallo minimo fra due disegni imposto dal tetto (0 = nessuno).
+    frameMs() {
+      return slow ? SLOW_FRAME_MS : 0;
+    },
+    isSlow() {
+      return slow;
+    },
+  };
+}
