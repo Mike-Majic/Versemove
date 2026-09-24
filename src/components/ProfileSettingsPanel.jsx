@@ -25,6 +25,15 @@ import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
 import { updateOwnDatingProfile } from '../data/incontri';
+import {
+  listEsperienze,
+  addEsperienza,
+  removeEsperienza,
+  listIstruzione,
+  addIstruzione,
+  removeIstruzione,
+  updateLavoroContatti,
+} from '../data/lavoroProfile';
 import { zodiacSign } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
@@ -892,12 +901,350 @@ function SocialProfileSection({ user, onUpdateUser }) {
   );
 }
 
+const ISTRUZIONE_TIPO_OPTIONS = [
+  { value: 'universita', label: 'Università' },
+  { value: 'superiore', label: 'Scuola superiore' },
+];
+
+// Esperienze lavorative: elenco + modulo di aggiunta, niente edit (si
+// toglie e si aggiunge di nuovo, come Album/Documenti). "Attualmente
+// lavoro qui" nasconde il campo "A" invece di lasciarlo compilabile:
+// l'RPC lo ignora comunque se attuale è true, qui solo per l'interfaccia.
+function LavoroEsperienzeCard() {
+  const [list, setList] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const reload = () => listEsperienze().then(setList);
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const handleRemove = async (id) => {
+    setBusy(true);
+    setError('');
+    const { error: err } = await removeEsperienza(id);
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    reload();
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Lavoro</strong></div>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {list === null ? (
+        <p className="rb-profile-link-hint">Caricamento...</p>
+      ) : list.length === 0 ? (
+        <p className="rb-profile-link-hint">Nessuna esperienza lavorativa aggiunta ancora.</p>
+      ) : (
+        <ul className="rb-lavoro-list">
+          {list.map((e) => (
+            <li key={e.id} className="rb-lavoro-list-item">
+              <div>
+                <strong>{e.posizione} · {e.azienda}</strong>
+                <span>
+                  {e.annoDa ?? '?'} – {e.attuale ? 'presente' : e.annoA ?? '?'}
+                  {e.citta ? ` · ${e.citta}` : ''}
+                </span>
+                {e.descrizione && <p>{e.descrizione}</p>}
+              </div>
+              <button type="button" className="rb-lavoro-remove-btn" onClick={() => handleRemove(e.id)} disabled={busy} aria-label="Rimuovi esperienza">
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {adding ? (
+        <AddEsperienzaForm
+          onDone={() => {
+            setAdding(false);
+            reload();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <button type="button" className="rb-profile-save-btn" onClick={() => setAdding(true)}>
+          + Aggiungi esperienza
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AddEsperienzaForm({ onDone, onCancel }) {
+  const [azienda, setAzienda] = useState('');
+  const [posizione, setPosizione] = useState('');
+  const [citta, setCitta] = useState('');
+  const [descrizione, setDescrizione] = useState('');
+  const [annoDa, setAnnoDa] = useState('');
+  const [annoA, setAnnoA] = useState('');
+  const [attuale, setAttuale] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError('');
+    setBusy(true);
+    const { error: err } = await addEsperienza({
+      azienda,
+      posizione,
+      citta,
+      descrizione,
+      annoDa: annoDa ? Number(annoDa) : null,
+      annoA: annoA ? Number(annoA) : null,
+      attuale,
+    });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div className="rb-family-add-form">
+      <label className="rb-field">
+        <span>Azienda</span>
+        <input type="text" value={azienda} onChange={(e) => setAzienda(e.target.value)} />
+        <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>Obbligatorio</span>
+      </label>
+      <label className="rb-field">
+        <span>Posizione</span>
+        <input type="text" value={posizione} onChange={(e) => setPosizione(e.target.value)} />
+        <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>Obbligatorio</span>
+      </label>
+      <div className="rb-lavoro-period-row">
+        <label className="rb-field">
+          <span>Da (anno)</span>
+          <input type="number" value={annoDa} onChange={(e) => setAnnoDa(e.target.value)} />
+        </label>
+        {!attuale && (
+          <label className="rb-field">
+            <span>A (anno)</span>
+            <input type="number" value={annoA} onChange={(e) => setAnnoA(e.target.value)} />
+          </label>
+        )}
+      </div>
+      <label className="rb-field rb-social-birthday-toggle">
+        <input type="checkbox" checked={attuale} onChange={(e) => setAttuale(e.target.checked)} />
+        <span>Attualmente lavoro qui</span>
+      </label>
+      <label className="rb-field">
+        <span>Città</span>
+        <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Descrizione</span>
+        <textarea rows={2} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} />
+      </label>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      <div className="rb-family-add-actions">
+        <button type="button" className="rb-family-secondary-btn" onClick={onCancel}>Annulla</button>
+        <button type="button" className="rb-profile-save-btn" onClick={submit} disabled={busy || !azienda.trim() || !posizione.trim()}>
+          {busy ? 'Un attimo…' : 'Salva'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LavoroIstruzioneCard() {
+  const [list, setList] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const reload = () => listIstruzione().then(setList);
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const handleRemove = async (id) => {
+    setBusy(true);
+    setError('');
+    const { error: err } = await removeIstruzione(id);
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    reload();
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Istruzione</strong></div>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {list === null ? (
+        <p className="rb-profile-link-hint">Caricamento...</p>
+      ) : list.length === 0 ? (
+        <p className="rb-profile-link-hint">Nessun titolo di studio aggiunto ancora.</p>
+      ) : (
+        <ul className="rb-lavoro-list">
+          {list.map((i) => (
+            <li key={i.id} className="rb-lavoro-list-item">
+              <div>
+                <strong>{i.istituto}</strong>
+                <span>
+                  {ISTRUZIONE_TIPO_OPTIONS.find((t) => t.value === i.tipo)?.label}
+                  {i.corsoDiStudi ? ` · ${i.corsoDiStudi}` : ''}
+                  {i.annoDa ? ` · ${i.annoDa}${i.annoA ? `–${i.annoA}` : ''}` : ''}
+                </span>
+              </div>
+              <button type="button" className="rb-lavoro-remove-btn" onClick={() => handleRemove(i.id)} disabled={busy} aria-label="Rimuovi titolo di studio">
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {adding ? (
+        <AddIstruzioneForm
+          onDone={() => {
+            setAdding(false);
+            reload();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <button type="button" className="rb-profile-save-btn" onClick={() => setAdding(true)}>
+          + Aggiungi istruzione
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AddIstruzioneForm({ onDone, onCancel }) {
+  const [tipo, setTipo] = useState('universita');
+  const [istituto, setIstituto] = useState('');
+  const [corsoDiStudi, setCorsoDiStudi] = useState('');
+  const [citta, setCitta] = useState('');
+  const [annoDa, setAnnoDa] = useState('');
+  const [annoA, setAnnoA] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError('');
+    setBusy(true);
+    const { error: err } = await addIstruzione({
+      tipo,
+      istituto,
+      corsoDiStudi,
+      citta,
+      annoDa: annoDa ? Number(annoDa) : null,
+      annoA: annoA ? Number(annoA) : null,
+    });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div className="rb-family-add-form">
+      <label className="rb-field">
+        <span>Tipo</span>
+        <CustomSelect ariaLabel="Tipo istruzione" value={tipo} onChange={setTipo} options={ISTRUZIONE_TIPO_OPTIONS} />
+      </label>
+      <label className="rb-field">
+        <span>Istituto</span>
+        <input type="text" value={istituto} onChange={(e) => setIstituto(e.target.value)} />
+        <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>Obbligatorio</span>
+      </label>
+      <label className="rb-field">
+        <span>Corso di studi</span>
+        <input type="text" value={corsoDiStudi} onChange={(e) => setCorsoDiStudi(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Città</span>
+        <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
+      </label>
+      <div className="rb-lavoro-period-row">
+        <label className="rb-field">
+          <span>Da (anno)</span>
+          <input type="number" value={annoDa} onChange={(e) => setAnnoDa(e.target.value)} />
+        </label>
+        <label className="rb-field">
+          <span>A (anno)</span>
+          <input type="number" value={annoA} onChange={(e) => setAnnoA(e.target.value)} />
+        </label>
+      </div>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      <div className="rb-family-add-actions">
+        <button type="button" className="rb-family-secondary-btn" onClick={onCancel}>Annulla</button>
+        <button type="button" className="rb-profile-save-btn" onClick={submit} disabled={busy || !istituto.trim()}>
+          {busy ? 'Un attimo…' : 'Salva'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LavoroContattiCard({ user, onUpdateUser }) {
+  const [socialMedia, setSocialMedia] = useState(user?.lavoroSocialMedia ?? '');
+  const [telefono, setTelefono] = useState(user?.lavoroTelefono ?? '');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setError('');
+    setSuccess('');
+    setBusy(true);
+    const { error: err } = await updateLavoroContatti(socialMedia.trim(), telefono.trim());
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSuccess('Contatti aggiornati.');
+    onUpdateUser?.({ ...user, lavoroSocialMedia: socialMedia.trim(), lavoroTelefono: telefono.trim() });
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title"><strong>Contatti</strong></div>
+      <label className="rb-field">
+        <span>Indirizzo e-mail</span>
+        <input type="email" value={user?.email ?? ''} disabled />
+        <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>L'e-mail del tuo account, non modificabile qui.</span>
+      </label>
+      <label className="rb-field">
+        <span>Telefono</span>
+        <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+      </label>
+      <label className="rb-field">
+        <span>Social media</span>
+        <input type="url" placeholder="https://..." value={socialMedia} onChange={(e) => setSocialMedia(e.target.value)} />
+      </label>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {success && <p className="rb-profile-field-success">{success}</p>}
+      <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
+        {busy ? 'Un attimo…' : 'Salva'}
+      </button>
+    </div>
+  );
+}
+
 function LavoroProfileSection({ user, onUpdateUser }) {
   const [open, setOpen] = useState(false);
   return (
     <CollapsibleSection
       title="Profilo di Lavoro"
-      infoText="Città e bio pensate per il mondo Lavoro, visibili solo da lì. Il mondo Lavoro non ha ancora una schermata che le mostra ad altri: per ora restano salvate, pronte per quando ci sarà."
+      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Il mondo Lavoro non ha ancora una schermata che li mostra ad altri: per ora restano salvati, pronti per quando ci sarà."
       open={open}
       onToggle={() => setOpen((v) => !v)}
     >
@@ -911,6 +1258,9 @@ function LavoroProfileSection({ user, onUpdateUser }) {
           return { error };
         }}
       />
+      <LavoroEsperienzeCard />
+      <LavoroIstruzioneCard />
+      <LavoroContattiCard user={user} onUpdateUser={onUpdateUser} />
     </CollapsibleSection>
   );
 }

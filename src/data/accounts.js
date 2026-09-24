@@ -53,6 +53,8 @@ function mapProfile(row) {
     statoRelazionale: row.stato_relazionale ?? '',
     lingueParlate: row.lingue_parlate ?? [],
     mostraDataNascitaSocial: row.mostra_data_nascita_social ?? false,
+    lavoroSocialMedia: row.lavoro_social_media ?? '',
+    lavoroTelefono: row.lavoro_telefono ?? '',
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],

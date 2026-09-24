@@ -106,6 +106,68 @@
   gap: 6px;
 }
 
+.rb-lavoro-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb-lavoro-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.rb-lavoro-list-item > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-lavoro-list-item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.rb-lavoro-list-item span {
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-lavoro-list-item p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.75);
+  line-height: 1.4;
+}
+
+.rb-lavoro-remove-btn {
+  flex-shrink: 0;
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  color: #ff8080;
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.rb-lavoro-period-row {
+  display: flex;
+  gap: 10px;
+}
+
+.rb-lavoro-period-row .rb-field {
+  flex: 1;
+}
+
 .rb-social-lingue-list {
   display: flex;
   flex-wrap: wrap;
