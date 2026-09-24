@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { translateWorld } from '../i18n/worldLabels';
 import Icon from './shared/Icon';
 import CollapsibleSection from './shared/CollapsibleSection';
+import CustomSelect from './shared/CustomSelect';
 import {
   updateNickname,
   updateName,
@@ -18,15 +19,19 @@ import {
   loginAccount,
   updateOwnSocialProfile,
   updateOwnLavoroProfile,
+  updateOwnSocialExtra,
 } from '../data/accounts';
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
 import { updateOwnDatingProfile } from '../data/incontri';
+import { zodiacSign } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
+import { SUPPORTED_LANGUAGES } from '../i18n';
 import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
+import FamilySection from './social/FamilySection';
 import './ProfileSettingsPanel.css';
 
 const CITTA_MAX = 80;
@@ -468,20 +473,27 @@ function AccountTab({ user, onUpdateUser }) {
 
       <label className="rb-field">
         <span>Genere</span>
-        <select value={genere} onChange={(e) => setGenere(e.target.value)}>
-          <option value="" disabled>Seleziona...</option>
-          <option value="uomo">Uomo</option>
-          <option value="donna">Donna</option>
-        </select>
+        <CustomSelect
+          ariaLabel="Genere"
+          value={genere}
+          onChange={setGenere}
+          options={[
+            { value: '', label: 'Seleziona...' },
+            { value: 'uomo', label: 'Uomo' },
+            { value: 'donna', label: 'Donna' },
+            { value: 'non_binario', label: 'Non binario' },
+          ]}
+        />
       </label>
 
       <label className="rb-field">
         <span>Pronomi</span>
-        <select value={pronomiPreset} onChange={(e) => setPronomiPreset(e.target.value)}>
-          {PRONOMI_PRESETS.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
+        <CustomSelect
+          ariaLabel="Pronomi"
+          value={pronomiPreset}
+          onChange={setPronomiPreset}
+          options={PRONOMI_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
+        />
         {pronomiPreset === 'altro' && (
           <input type="text" placeholder="Scrivi i tuoi pronomi" value={pronomiCustom} onChange={(e) => setPronomiCustom(e.target.value)} />
         )}
@@ -735,6 +747,106 @@ function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMes
   );
 }
 
+const STATO_RELAZIONALE_OPTIONS = [
+  { value: '', label: 'Preferisco non dire' },
+  { value: 'single', label: 'Single' },
+  { value: 'fidanzato_a', label: 'Fidanzato/a' },
+  { value: 'sposato_a', label: 'Sposato/a' },
+  { value: 'unione_civile', label: 'Unione civile' },
+  { value: 'convivente', label: 'Convivente' },
+  { value: 'complicato', label: "È complicato" },
+];
+
+const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
+
+// Città di origine, stato, lingue parlate e l'interruttore che mostra
+// giorno+mese di nascita (mai l'anno). Il campo "citta"/"bio" di base resta
+// in CittaBioCard sopra: qui gli altri dati richiesti per il Profilo Social.
+function SocialExtraCard({ user, onUpdateUser }) {
+  const [cittaOrigine, setCittaOrigine] = useState(user?.cittaOrigine ?? '');
+  const [statoRelazionale, setStatoRelazionale] = useState(user?.statoRelazionale ?? '');
+  const [lingue, setLingue] = useState(user?.lingueParlate ?? []);
+  const [mostraData, setMostraData] = useState(user?.mostraDataNascitaSocial ?? false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const toggleLingua = (code) => {
+    setLingue((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
+  };
+
+  const save = async () => {
+    setError('');
+    setSuccess('');
+    setBusy(true);
+    const { error: err } = await updateOwnSocialExtra(cittaOrigine.trim(), statoRelazionale, lingue, mostraData);
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSuccess('Informazioni aggiornate.');
+    onUpdateUser?.({ ...user, cittaOrigine: cittaOrigine.trim(), statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
+  };
+
+  // Anteprima calcolata dal proprio dataNascita (dato privato ma già in
+  // mano al client per sé stessi): mostra cosa vedrebbero gli altri se
+  // l'interruttore è acceso, mai l'anno.
+  const nascitaPreview = (() => {
+    if (!user?.dataNascita) return null;
+    const d = new Date(user.dataNascita);
+    const day = d.getUTCDate();
+    const month = d.getUTCMonth() + 1;
+    const sign = zodiacSign(day, month);
+    const label = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    return sign ? `${label} ${sign.emoji} ${sign.name}` : label;
+  })();
+
+  return (
+    <div className="rb-profile-field-group">
+      <label className="rb-field">
+        <span>Città di origine</span>
+        <input type="text" value={cittaOrigine} maxLength={CITTA_MAX} onChange={(e) => setCittaOrigine(e.target.value)} />
+      </label>
+
+      <label className="rb-field">
+        <span>Stato</span>
+        <CustomSelect ariaLabel="Stato" value={statoRelazionale} onChange={setStatoRelazionale} options={STATO_RELAZIONALE_OPTIONS} />
+      </label>
+
+      <div className="rb-field">
+        <span>Lingue parlate</span>
+        <div className="rb-social-lingue-list">
+          {SUPPORTED_LANGUAGES.map((l) => (
+            <button
+              type="button"
+              key={l.code}
+              className={`rb-social-lingua-chip ${lingue.includes(l.code) ? 'active' : ''}`}
+              onClick={() => toggleLingua(l.code)}
+            >
+              {l.flag} {l.nativeLabel}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="rb-field rb-social-birthday-toggle">
+        <input type="checkbox" checked={mostraData} onChange={(e) => setMostraData(e.target.checked)} />
+        <span>
+          Mostra giorno e mese di nascita nel Profilo Social{nascitaPreview ? ` — ${nascitaPreview}` : ''}
+          <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>L'anno resta sempre privato.</span>
+        </span>
+      </label>
+
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {success && <p className="rb-profile-field-success">{success}</p>}
+      <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
+        {busy ? 'Un attimo…' : 'Salva'}
+      </button>
+    </div>
+  );
+}
+
 // Tre profili distinti, ognuno visibile solo dal suo contesto — chiusi di
 // default (richiesta esplicita: prima occupavano spazio sempre aperti).
 // Social è la base, mostrata ovunque tranne Lavoro e Incontri (letta da
@@ -749,7 +861,7 @@ function SocialProfileSection({ user, onUpdateUser }) {
   return (
     <CollapsibleSection
       title="Profilo Social"
-      infoText="Città e bio mostrate agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
+      infoText="Mostrato agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
       open={open}
       onToggle={() => setOpen((v) => !v)}
     >
@@ -763,6 +875,19 @@ function SocialProfileSection({ user, onUpdateUser }) {
           return { error };
         }}
       />
+      <SocialExtraCard user={user} onUpdateUser={onUpdateUser} />
+      {(user?.genere || user?.pronomi) && (
+        <div className="rb-profile-field-group">
+          <div className="rb-profile-field-title"><strong>Genere e pronomi</strong></div>
+          <p className="rb-profile-link-hint" style={{ marginBottom: 0 }}>
+            {GENDER_LABELS[user?.genere] ?? user?.genere}{user?.pronomi ? ` · ${user.pronomi}` : ''} — modificabile nella scheda Account.
+          </p>
+        </div>
+      )}
+      <div className="rb-profile-field-group">
+        <div className="rb-profile-field-title"><strong>Familiari</strong></div>
+        <FamilySection userId={user.id} />
+      </div>
     </CollapsibleSection>
   );
 }
