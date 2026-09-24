@@ -1,4 +1,5 @@
 import { Suspense, useState } from 'react';
+import ShareSheet from '../shared/ShareSheet';
 import './MiniGameShell.css';
 
 const DIFFICULTIES = [
@@ -11,17 +12,18 @@ const DIFFICULTIES = [
 // scelta del livello: facile/medio/difficile, passato al gioco come prop
 // "difficulty" — ogni gioco decide da solo cosa cambiare, qui c'è solo la
 // selezione), schermata di fine partita con "gioca ancora" e "condividi
-// risultato". Ogni gioco riceve solo onFinish (score, extra?) e difficulty,
+// risultato" (vedi shared/ShareSheet.jsx: prima la propria bacheca, poi i
+// social). Ogni gioco riceve solo onFinish (score, extra?) e difficulty,
 // non deve preoccuparsi d'altro.
-export default function MiniGameShell({ game }) {
+export default function MiniGameShell({ game, user, onOpenAuth }) {
   const [phase, setPhase] = useState('intro'); // 'intro' | 'playing' | 'ended'
   const [difficulty, setDifficulty] = useState('medio');
   const [result, setResult] = useState(null);
-  const [shareMsg, setShareMsg] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
 
   const start = () => {
     setResult(null);
-    setShareMsg('');
+    setShareOpen(false);
     setPhase('playing');
   };
 
@@ -30,23 +32,7 @@ export default function MiniGameShell({ game }) {
     setPhase('ended');
   };
 
-  const shareResult = async () => {
-    const text = `Ho fatto ${result?.score ?? 0} punti a "${game.nome}" su Versemove!`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-      } catch {
-        // annullato dall'utente: nessun errore da mostrare
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setShareMsg('Risultato copiato negli appunti!');
-    } catch {
-      setShareMsg(text);
-    }
-  };
+  const shareText = `Ho fatto ${result?.score ?? 0} punti a "${game.nome}" su Versemove!`;
 
   const Component = game.Component;
 
@@ -96,11 +82,19 @@ export default function MiniGameShell({ game }) {
             <button type="button" className="rb-minigame-btn-primary" onClick={start}>
               🔁 Gioca ancora
             </button>
-            <button type="button" className="rb-minigame-btn-secondary" onClick={shareResult}>
+            <button type="button" className="rb-minigame-btn-secondary" onClick={() => setShareOpen(true)}>
               📤 Condividi risultato
             </button>
           </div>
-          {shareMsg && <p className="rb-minigame-share-msg">{shareMsg}</p>}
+          {shareOpen && (
+            <ShareSheet
+              title="Condividi risultato"
+              text={shareText}
+              user={user}
+              onOpenAuth={onOpenAuth}
+              onClose={() => setShareOpen(false)}
+            />
+          )}
         </div>
       )}
     </div>

@@ -86,7 +86,7 @@ export default function BambiniGameExplorer({
           </div>
 
           <div className="rb-bambini-game-panel">
-            <MiniGameShell key={game.id} game={game} />
+            <MiniGameShell key={game.id} game={game} user={user} onOpenAuth={onOpenAuth} />
           </div>
         </>
       )}

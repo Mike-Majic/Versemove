@@ -1,0 +1,112 @@
+/* Pannello "Condividi" (vedi ShareSheet.jsx). */
+.rb-share-card {
+  position: relative;
+  width: min(380px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #131318;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 20px 18px 18px;
+  color: #f5f5f7;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+.rb-share-card .rb-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.rb-share-card h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.rb-share-preview {
+  margin: 0 44px 14px 0;
+  font-size: 13px;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rb-share-feed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--accent, #1d9bf0);
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 14%, transparent);
+  color: #f5f5f7;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-share-feed:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.rb-share-feed-icon {
+  font-size: 24px;
+}
+
+.rb-share-feed strong {
+  display: block;
+  font-size: 14.5px;
+}
+
+.rb-share-feed small {
+  display: block;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.65);
+  margin-top: 2px;
+}
+
+.rb-share-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 6px;
+  margin-top: 16px;
+}
+
+.rb-share-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: #e6e6ec;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.rb-share-glyph {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.rb-share-glyph-more {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rb-share-option:hover .rb-share-glyph {
+  filter: brightness(1.15);
+}
+
+.rb-share-status {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: #b8f5c8;
+  word-break: break-word;
+}
