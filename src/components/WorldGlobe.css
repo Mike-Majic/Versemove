@@ -147,3 +147,128 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Nomi di città, regioni, stati e mari (globe/placeLabels.js): livello
+   sopra il canvas e sotto i marker, mai cliccabile. I colori arrivano dal
+   mondo (setTheme): testo scuro con alone chiaro sulle terre chiare, il
+   contrario sulle terre scure. */
+.rb-place-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  --pl-text: #f3f4f6;
+  --pl-halo: rgba(0, 0, 0, 0.85);
+  --pl-muted: rgba(243, 244, 246, 0.55);
+  --pl-faint: rgba(243, 244, 246, 0.26);
+  /* I mari stanno sempre sul mare, cioè sul globo quasi nero. */
+  --pl-sea: rgba(214, 219, 229, 0.55);
+}
+
+.rb-pl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  white-space: nowrap;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.25;
+}
+
+.rb-pl-text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  color: var(--pl-muted);
+}
+
+/* Città: pallino sul punto, nome in grassetto a destra con alone. */
+.rb-pl--city::before {
+  content: '';
+  position: absolute;
+  left: -2.5px;
+  top: -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pl-text);
+  box-shadow: 0 0 0 1.5px var(--pl-halo);
+}
+
+.rb-pl--city .rb-pl-text {
+  left: 8px;
+  top: -2px;
+  transform: translateY(-50%);
+  color: var(--pl-text);
+  font-weight: 700;
+  text-shadow: 0 0 2px var(--pl-halo), 0 0 2px var(--pl-halo), 0 0 3px var(--pl-halo);
+}
+
+.rb-pl--cityS .rb-pl-text { font-size: 11px; }
+.rb-pl--cityL .rb-pl-text { font-size: 13px; }
+.rb-pl--cityXL .rb-pl-text { font-size: 16px; }
+
+/* Città di prima fascia: anello intorno al pallino. */
+.rb-pl--cityXL::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--pl-text);
+  box-shadow: 0 0 0 1px var(--pl-halo);
+}
+
+.rb-pl--state .rb-pl-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 2px var(--pl-halo);
+}
+
+.rb-pl--region .rb-pl-text {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 2px var(--pl-halo);
+}
+
+/* Regione in grande a zoom ravvicinato (come "LAZIO" nel mockup). */
+.rb-pl--regionBig .rb-pl-text {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.45em;
+  color: var(--pl-faint);
+  text-shadow: none;
+}
+
+.rb-pl--sea .rb-pl-text {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--pl-sea);
+}
+
+/* Nome della città a sinistra, sopra o sotto il pallino quando a destra
+   era occupato (vedi CITY_POSITIONS in placeLabels.js). */
+.rb-pl--city.rb-pl--pos-l .rb-pl-text {
+  left: auto;
+  right: 8px;
+}
+
+.rb-pl--city.rb-pl--pos-t .rb-pl-text {
+  top: -6px;
+  left: 0;
+  transform: translate(-50%, -100%);
+}
+
+.rb-pl--city.rb-pl--pos-b .rb-pl-text {
+  top: 6px;
+  left: 0;
+  transform: translate(-50%, 0);
+}

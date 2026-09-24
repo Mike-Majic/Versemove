@@ -5,6 +5,7 @@ import { WORLDS } from '../data/worlds';
 import { loadLandDots } from '../globe/landDots';
 import { loadLandGeo } from '../globe/landGeo';
 import { createLandLod } from '../globe/landLod';
+import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
@@ -256,6 +257,8 @@ export default function WorldGlobe({
   const globeRootRef = useRef(null);
   // Continenti a più livelli di dettaglio (globe/landLod.js), vedi più giù.
   const landLodRef = useRef(null);
+  // Nomi di città/regioni/stati/mari (globe/placeLabels.js).
+  const placeLabelsRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
   const idleTargetRef = useRef(0);
   const idleRampFromRef = useRef(0);
@@ -643,6 +646,33 @@ export default function WorldGlobe({
     if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
   }, [world.atmosphereColor, world.lineColor]);
 
+  // Nomi dei luoghi: livello HTML sopra il canvas (vedi globe/placeLabels.js).
+  // Si aggiornano dal giro di disegno (render wrapper sopra), solo quando la
+  // camera si muove; l'oggetto del globo si cerca al momento (vedi il
+  // commento sui continenti più giù).
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g) return undefined;
+    let root = null;
+    const labels = createPlaceLabels({
+      canvas: g.renderer().domElement,
+      getRoot: () => root ?? (root = findGlobeRootObject(g.scene())),
+    });
+    placeLabelsRef.current = labels;
+    return () => {
+      labels.dispose();
+      placeLabelsRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    placeLabelsRef.current?.setTheme({
+      landFillColor: world.landFillColor ?? world.atmosphereColor,
+      landFillOpacity: world.landFillOpacity ?? 0.1,
+      accentColor: world.color,
+    });
+  }, [world.landFillColor, world.landFillOpacity, world.atmosphereColor, world.color]);
+
   // Categorie "incastonate" nel guscio (solo dove servono, es. mondo Arte & Musica):
   // ogni categoria riempie il triangolo più vicino alla sua posizione lat/lng, con
   // un'etichetta sempre rivolta verso la camera (quindi sempre dritta e leggibile).
@@ -850,6 +880,7 @@ export default function WorldGlobe({
       }
       satellitesRef.current?.update(elapsed, deltaSec, camera, reduceMotion ? 0 : idleFactor, reduceMotion);
       originalRender(scene, camera);
+      placeLabelsRef.current?.update(camera, camera.position.length() / 100 - 1, now);
     };
     return () => {
       renderer.render = originalRender;
