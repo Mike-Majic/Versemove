@@ -46,15 +46,20 @@ const RING_SWING_TALL = 95;
 // così il posto 6 finisce esattamente dietro al globo.
 const RING_START_DEG = 90;
 
-// Taglia apparente voluta di OGNI satellite, in pixel — stessa per tutti
-// (richiesta esplicita: tutti come "Vetrina", nessuno più grande/piccolo
-// degli altri). Il raggio 3D vero che la produce si ricava dalla distanza
-// REALE dalla camera, ricalcolata ad ogni fotogramma in update() (non più
-// una volta sola qui, su una distanza camera solo indovinata): altrimenti,
-// appena l'utente zooma o ruota la vista, ogni satellite si sbilancia in
-// modo diverso dagli altri (bug segnalato dal vivo — "Incontri" enorme e
-// "Vetrina" minuscola nello stesso schermo). Il testo dell'etichetta scala
-// insieme alla sfera (stesso gruppo, stessa scala), quindi si sistema da sé.
+// Taglia apparente voluta di OGNI satellite, in pixel, ALL'ALTITUDINE DI
+// DEFAULT — stessa per tutti (richiesta esplicita: tutti come "Vetrina",
+// nessuno più grande/piccolo degli altri). Il raggio 3D vero che la
+// produce si ricava dalla distanza REALE dalla camera, ricalcolata ad ogni
+// fotogramma in update() (non più una volta sola qui, su una distanza
+// camera solo indovinata): altrimenti, appena l'utente ruota la vista,
+// ogni satellite si sbilancia in modo diverso dagli altri in base alla sua
+// profondità nell'anello (bug segnalato dal vivo — "Incontri" enorme e
+// "Vetrina" minuscola nello stesso schermo). Zoomando avanti/indietro
+// invece l'intero anello scala insieme al globo, prospettiva normale (vedi
+// referenceCamDist in update()) — beadPx NON è quindi una taglia fissa in
+// pixel a qualunque zoom, solo il punto di calibrazione alla distanza di
+// default. Il testo dell'etichetta scala insieme alla sfera (stesso
+// gruppo, stessa scala), quindi si sistema da sé.
 const PROJECTION_PX = 957;
 const BEAD_PX_WIDE = 46;
 const BEAD_PX_TALL = 36;
@@ -301,6 +306,14 @@ export function buildSatelliteGlobes({ worlds }) {
   let slotOf = null;
   let previousActiveId = null;
 
+  // Distanza camera-globo catturata al primo fotogramma utile: la scala dei
+  // satelliti (vedi update() più sotto) la usa come riferimento "punto zero"
+  // — qualunque sia la distanza di default reale (dipende dall'altitudine
+  // iniziale e dalla formula interna di react-globe.gl, che non si vuole
+  // indovinare qui), la calibrazione visiva già scelta con beadPx resta
+  // quella, e lo zoom dell'utente scala naturalmente sopra/sotto da lì.
+  let referenceCamDist = null;
+
   function setWarpTarget(worldId, durationMs = 0) {
     warpState.targetWorldId = worldId;
     warpState.startMs = worldId ? performance.now() : null;
@@ -413,6 +426,7 @@ export function buildSatelliteGlobes({ worlds }) {
     const camPos = camera.position;
     const globeDistToCam = camPos.length();
     const beadPx = targetBeadPx();
+    if (referenceCamDist === null) referenceCamDist = globeDistToCam;
 
     for (const sat of satellites) {
       if (!sat.visible) continue;
@@ -466,11 +480,18 @@ export function buildSatelliteGlobes({ worlds }) {
       const proximityScale = PROXIMITY_SCALE_MIN + (1 - PROXIMITY_SCALE_MIN) * proximityT;
 
       // Raggio 3D vero calcolato sulla distanza REALE dalla camera in
-      // questo fotogramma (mai una distanza indovinata una tantum): dà a
-      // tutti i satelliti la stessa taglia apparente sullo schermo
-      // (beadPx), qualunque sia la loro profondità o quanto l'utente abbia
-      // zoomato/ruotato la vista.
-      const slotScale = (beadPx * naturalDistToCam) / (PROJECTION_PX * SATELLITE_RADIUS);
+      // questo fotogramma (mai una distanza indovinata una tantum): il
+      // fattore (naturalDistToCam / globeDistToCam) annulla SOLO la
+      // variazione dovuta alla profondità del satellite nell'anello (dà a
+      // tutti i satelliti la stessa taglia apparente TRA LORO, qualunque
+      // sia il loro posto/profondità o quanto l'utente abbia ruotato la
+      // vista), mentre (referenceCamDist / globeDistToCam) lascia intatta
+      // la prospettiva normale sullo ZOOM generale: allontanandosi tutto
+      // l'anello rimpicciolisce insieme al globo invece di restare fissato
+      // a una taglia in pixel costante (bug segnalato dal vivo — l'anello
+      // sembrava "fondersi" zoomando indietro).
+      const slotScale =
+        (beadPx * referenceCamDist * naturalDistToCam) / (globeDistToCam * PROJECTION_PX * SATELLITE_RADIUS);
 
       sat.scale.setScalar(slotScale * spawnT * warpScale * proximityScale);
       ud.opacityMeshes.forEach(({ mesh, baseOpacity }) => {
