@@ -12,7 +12,19 @@ import {
   addComment as addCommentApi,
 } from '../../data/posts';
 import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
+import { getFamily, familyRelationLabel } from '../../data/family';
+import { SUPPORTED_LANGUAGES } from '../../i18n';
 import './SocialProfileModal.css';
+
+const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
+const STATO_LABELS = {
+  single: 'Single',
+  fidanzato_a: 'Fidanzato/a',
+  sposato_a: 'Sposato/a',
+  unione_civile: 'Unione civile',
+  convivente: 'Convivente',
+  complicato: "È complicato",
+};
 
 // Profilo pubblico di un altro utente: avatar/nickname + i suoi post nel
 // mondo Social (stessa PostCard del feed principale, per coerenza visiva e
@@ -24,14 +36,17 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState(null);
   const [comments, setComments] = useState([]);
+  const [family, setFamily] = useState([]);
   const [error, setError] = useState('');
 
   const reload = async () => {
-    const [profilesMap, feedRes] = await Promise.all([
+    const [profilesMap, feedRes, familyList] = await Promise.all([
       fetchProfilesMap([userId]),
       fetchFeed({ mondo: 'social', authorId: userId }),
+      getFamily(userId),
     ]);
     setProfile(profilesMap.get(userId) ?? null);
+    setFamily(familyList);
     const list = feedRes.posts ?? [];
     setPosts(list);
     const { comments: c } = await fetchComments(list.map((p) => p.id));
@@ -113,6 +128,39 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
             </div>
 
             {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}
+
+            {(profile.cittaOrigine || profile.statoRelazionale || profile.genere || profile.pronomi || profile.zodiaco || profile.lingueParlate?.length > 0) && (
+              <ul className="rb-social-profile-info-list">
+                {profile.cittaOrigine && <li>🏠 Di {profile.cittaOrigine}</li>}
+                {profile.zodiaco && <li>{profile.zodiaco.emoji} {profile.zodiaco.name}</li>}
+                {profile.statoRelazionale && <li>💞 {STATO_LABELS[profile.statoRelazionale] ?? profile.statoRelazionale}</li>}
+                {(profile.genere || profile.pronomi) && (
+                  <li>
+                    ⚧ {GENDER_LABELS[profile.genere] ?? profile.genere}{profile.pronomi ? ` · ${profile.pronomi}` : ''}
+                  </li>
+                )}
+                {profile.lingueParlate?.length > 0 && (
+                  <li>
+                    🗣️ {profile.lingueParlate.map((code) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.nativeLabel ?? code).join(', ')}
+                  </li>
+                )}
+              </ul>
+            )}
+
+            {family.length > 0 && (
+              <div className="rb-social-profile-family">
+                <span className="rb-social-profile-family-title">Familiari</span>
+                <ul className="rb-social-profile-family-list">
+                  {family.map((f) => (
+                    <li key={f.linkId}>
+                      <img src={f.other.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                      <span>{f.other.name}</span>
+                      <span className="rb-social-profile-family-relation">{familyRelationLabel(f.relazione)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {error && <p className="rb-giochi-error">{error}</p>}
 
