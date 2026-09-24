@@ -302,10 +302,6 @@ export function buildSatelliteGlobes({ worlds }) {
     'faq',
   ];
 
-  // Posto di ogni mondo nell'anello (worldId -> indice), deciso una volta sola.
-  let slotOf = null;
-  let previousActiveId = null;
-
   // Distanza camera-globo catturata al primo fotogramma utile: la scala dei
   // satelliti (vedi update() più sotto) la usa come riferimento "punto zero"
   // — qualunque sia la distanza di default reale (dipende dall'altitudine
@@ -369,38 +365,35 @@ export function buildSatelliteGlobes({ worlds }) {
     });
   }
 
-  // Mostra come satelliti tutti i mondi tranne quello attivo, ognuno sul
-  // SUO posto fisso nell'anello (vedi RING_ORDER/wavePoint sopra). Quando
-  // entri in un mondo il suo satellite sparisce (diventa il globo centrale)
-  // e il mondo da cui vieni prende il suo posto: i due si SCAMBIANO, tutti
-  // gli altri restano fermi — non un semplice ricalcolo "primi N mondi
-  // rimasti" come nel vecchio sistema a slot, altrimenti ogni cambio di
-  // mondo avrebbe rimescolato tutti i satelliti.
+  // Mostra come satelliti tutti i mondi tranne quello attivo. Ogni mondo
+  // dell'anello (RING_ORDER) sta SEMPRE sul suo stesso posto fisso, in
+  // qualunque momento — non si sposta mai. Il mondo Social (l'unico escluso
+  // da RING_ORDER, non ha un posto fisso tutto suo, essendo il mondo di
+  // casa dell'app) prende invece il posto lasciato libero dal mondo attivo
+  // in quel momento — l'unico posto del ring sempre vuoto, visto che il
+  // mondo attivo non è mai un satellite. Così solo Social "si sposta"
+  // seguendo il mondo attivo, tutti gli altri restano fissi.
+  //
+  // Calcolo puro (nessuno stato salvato tra una chiamata e l'altra, solo
+  // RING_ORDER.indexOf): la versione precedente teneva uno storico di
+  // "scambi" (chi ha preso il posto di chi) che poteva disallinearsi dopo
+  // molte chiamate, con due satelliti diversi che finivano sullo stesso
+  // punto (bug segnalato dal vivo con screenshot, dopo diversi cambi
+  // mondo). Un calcolo che riparte sempre da zero da un dato fisso non può
+  // desincronizzarsi, qualunque sequenza di cambi mondo preceda la chiamata.
   function setActiveWorld(activeWorldId, { animateSpawn = true } = {}) {
     const nowMs = performance.now();
-
-    if (!slotOf) {
-      slotOf = new Map();
-      RING_ORDER.forEach((id, i) => slotOf.set(id, i));
-      // Mondi non elencati (aggiunti in futuro): in coda, sui posti liberi.
-      let next = RING_ORDER.length;
-      worlds.forEach((w) => {
-        if (!slotOf.has(w.id)) slotOf.set(w.id, next++);
-      });
-    } else if (previousActiveId && previousActiveId !== activeWorldId) {
-      const freed = slotOf.get(activeWorldId);
-      if (freed !== undefined) slotOf.set(previousActiveId, freed);
-    }
-    previousActiveId = activeWorldId;
-
     const totalSlots = worlds.length - 1; // tutti i mondi tranne quello attivo
+    const activeRingIndex = RING_ORDER.indexOf(activeWorldId);
 
     satellites.forEach((sat) => {
       const id = sat.userData.worldId;
       sat.visible = id !== activeWorldId;
       if (!sat.visible) return;
-      const slotIndex = slotOf.get(id);
-      if (slotIndex === undefined) return;
+
+      const slotIndex = id === 'social' ? (activeRingIndex !== -1 ? activeRingIndex : 0) : RING_ORDER.indexOf(id);
+      if (slotIndex === -1) return;
+
       sat.userData.basePosRef = wavePoint(slotIndex, totalSlots).pos;
       if (animateSpawn) sat.userData.createdAtMs = nowMs;
     });
