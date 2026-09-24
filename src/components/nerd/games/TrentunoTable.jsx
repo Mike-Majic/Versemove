@@ -8,7 +8,8 @@ import {
   knock,
   discardCard,
 } from '../../../data/trentuno';
-import { setRoomReady } from '../../../data/gameRooms';
+import { setRoomReady, firstHumanHostId } from '../../../data/gameRooms';
+import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
@@ -56,6 +57,8 @@ export default function TrentunoTable({ roomId, room, user, eventTick, onLeave }
   const isMyTurn = state?.turnoUserId === user.id;
   const opponentEntry = room.giocatori.find((g) => g.userId !== user.id);
   const meEntry = room.giocatori.find((g) => g.userId === user.id);
+  const iAmHost = firstHumanHostId(room.giocatori) === user.id;
+  const { isBotTurn, botName } = useBotDriver({ roomId, room, turnUserId: state?.turnoUserId, user, eventTick });
   const canDraw = isMyTurn && state?.fase === 'pesca';
   const canDiscard = isMyTurn && state?.fase === 'scarta';
   const canKnock = canDraw && !state?.bussatoDa;
@@ -95,15 +98,15 @@ export default function TrentunoTable({ roomId, room, user, eventTick, onLeave }
     await refreshAfterMove();
   };
 
-  const bothReady = room.giocatori.length === 2 && room.giocatori.every((g) => g.pronto);
+  const bothReady = room.giocatori.length === room.maxGiocatori && room.giocatori.every((g) => g.pronto);
   useEffect(() => {
-    if (state === null && bothReady && meEntry?.posizione === 0 && !startAttemptedRef.current) {
+    if (state === null && bothReady && iAmHost && !startAttemptedRef.current) {
       startAttemptedRef.current = true;
       startTrentunoHand(roomId);
     }
     if (!bothReady) startAttemptedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, bothReady, meEntry?.posizione]);
+  }, [state, bothReady, iAmHost]);
 
   const toggleReady = () => setRoomReady(roomId, !meEntry?.pronto);
 
@@ -147,7 +150,7 @@ export default function TrentunoTable({ roomId, room, user, eventTick, onLeave }
         <div className={`rb-scopa-turn-banner ${isMyTurn ? 'mine' : ''}`}>
           {isMyTurn
             ? state.fase === 'pesca' ? 'Tocca a te — pesca o bussa' : 'Tocca a te — scarta una carta'
-            : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
+            : isBotTurn ? `🤖 ${botName ?? 'Il computer'} sta pensando…` : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
         </div>
 
         {state.bussatoDa && (
@@ -225,7 +228,11 @@ function TrentunoPlayerBadge({ entry, me = false }) {
   if (!entry) return <div className="rb-scopa-player-badge empty">In attesa…</div>;
   return (
     <div className={`rb-scopa-player-badge ${me ? 'me' : ''}`}>
-      <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+      {entry.isBot ? (
+        <span className="rb-scopa-bot-avatar">🤖</span>
+      ) : (
+        <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+      )}
       <div>
         <strong>{entry.profilo.name}{me ? ' (tu)' : ''}</strong>
         <LivesPips count={entry.punteggio} />

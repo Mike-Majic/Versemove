@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchScopaState, fetchMyHand, fetchCaptures, fetchHandResults, playCard, startScopaHand, cardValue, cardSuit, SUITS, findCaptureCombinations } from '../../../data/scopa';
-import { setRoomReady } from '../../../data/gameRooms';
+import { setRoomReady, firstHumanHostId } from '../../../data/gameRooms';
+import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
@@ -68,6 +69,8 @@ export default function ScopaTable({ roomId, room, user, eventTick, onLeave }) {
   const isMyTurn = state?.turnoUserId === user.id;
   const opponentEntry = room.giocatori.find((g) => g.userId !== user.id);
   const meEntry = room.giocatori.find((g) => g.userId === user.id);
+  const iAmHost = firstHumanHostId(room.giocatori) === user.id;
+  const { isBotTurn, botName } = useBotDriver({ roomId, room, turnUserId: state?.turnoUserId, user, eventTick });
 
   const toggleTableCard = (card) => {
     if (!selectedCard) return;
@@ -102,15 +105,15 @@ export default function ScopaTable({ roomId, room, user, eventTick, onLeave }) {
 
   // Fra una mano e l'altra (tavolo azzerato ma partita non ancora vinta):
   // stessa logica "pronto + parte da sola" della sala d'attesa.
-  const bothReady = room.giocatori.length === 2 && room.giocatori.every((g) => g.pronto);
+  const bothReady = room.giocatori.length === room.maxGiocatori && room.giocatori.every((g) => g.pronto);
   useEffect(() => {
-    if (state === null && bothReady && meEntry?.posizione === 0 && !startAttemptedRef.current) {
+    if (state === null && bothReady && iAmHost && !startAttemptedRef.current) {
       startAttemptedRef.current = true;
       startScopaHand(roomId);
     }
     if (!bothReady) startAttemptedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, bothReady, meEntry?.posizione]);
+  }, [state, bothReady, iAmHost]);
 
   const toggleReady = () => setRoomReady(roomId, !meEntry?.pronto);
 
@@ -151,7 +154,7 @@ export default function ScopaTable({ roomId, room, user, eventTick, onLeave }) {
 
       <div className="rb-scopa-felt">
         <div className={`rb-scopa-turn-banner ${isMyTurn ? 'mine' : ''}`}>
-          {isMyTurn ? 'Tocca a te' : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
+          {isMyTurn ? 'Tocca a te' : isBotTurn ? `🤖 ${botName ?? 'Il computer'} sta pensando…` : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
         </div>
 
         <div className="rb-scopa-deck-and-table">
@@ -222,7 +225,11 @@ function PlayerBadge({ entry, me = false, captureCount = 0 }) {
   if (!entry) return <div className="rb-scopa-player-badge empty">In attesa…</div>;
   return (
     <div className={`rb-scopa-player-badge ${me ? 'me' : ''}`}>
-      <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+      {entry.isBot ? (
+        <span className="rb-scopa-bot-avatar">🤖</span>
+      ) : (
+        <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+      )}
       <div>
         <strong>{entry.profilo.name}{me ? ' (tu)' : ''}</strong>
         <span>{entry.punteggio} punti · {captureCount} prese</span>
