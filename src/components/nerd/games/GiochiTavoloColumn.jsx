@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  listOpenRooms,
+  listLobbyRooms,
   createRoom,
   joinRoom,
   leaveRoom,
@@ -26,6 +26,7 @@ import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import ModalOverlay from '../../ModalOverlay';
 import { useBackLayer } from '../../../hooks/useBackLayer';
+import { useCardTable } from './cardTheme';
 import './giochiTavolo.css';
 
 const GAMES = [
@@ -62,21 +63,221 @@ export default function GiochiTavoloColumn({ user, onOpenAuth }) {
   return <LobbyView user={user} onOpenAuth={onOpenAuth} onEnterRoom={setRoomId} />;
 }
 
+// Modalità di una stanza, per il riquadro e per i filtri a chip.
+function roomMode(r) {
+  if (r.maxGiocatori === 2) return '1v1';
+  if (r.gioco === 'burraco' && r.modalita === 'coppie' && r.maxGiocatori === 4) return '2v2';
+  return 'tutti';
+}
+const MODE_LABEL = { '1v1': '1 vs 1', '2v2': '2 vs 2', tutti: 'Tutti contro tutti' };
+
+// Posti intorno al tavolino: 0 in basso, 1 a sinistra, 2 in alto, 3 a
+// destra — così a coppie 0/2 e 1/3 sono uno di fronte all'altro. Con due
+// giocatori i posti sono a sinistra e a destra.
+function seatSide(posizione, maxGiocatori) {
+  if (maxGiocatori === 2) return posizione === 0 ? 'left' : 'right';
+  return ['bot', 'left', 'top', 'right'][posizione] ?? 'bot';
+}
+
+const LOBBY_REFRESH_MS = 10000;
+
+// Lobby "a tavolini" (vedi docs/mockup/mockup_lobby_tavoli.html): un
+// riquadro per stanza aperta con il tavolino visto dall'alto e le sedie;
+// una sedia libera "＋ Siediti" fa entrare esattamente su quel posto. In
+// cima i filtri a chip e i pulsanti per creare un tavolo (il modulo di
+// sempre: gioco, giocatori, modalità, difficoltà dei bot).
 function LobbyView({ user, onOpenAuth, onEnterRoom }) {
   const [rooms, setRooms] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [gameFilter, setGameFilter] = useState('all');
+  const [modeFilter, setModeFilter] = useState(null);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [myTable] = useCardTable();
+
+  const refresh = (silent = false) => {
+    if (!silent) setRooms(null);
+    listLobbyRooms().then(setRooms);
+  };
+  useEffect(() => {
+    refresh();
+    // Ricarica da sola ogni 10 s, ma solo mentre la scheda è visibile.
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh(true);
+    }, LOBBY_REFRESH_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sedersi su un posto preciso: joinRoom mette nel primo posto libero,
+  // poi moveSeat sposta su quello scelto. Se intanto qualcuno l'ha preso,
+  // si esce di nuovo dalla stanza (per non restare seduti altrove senza
+  // volerlo), si mostra l'errore e si ricarica la lista.
+  const handleSit = async (room, posizione) => {
+    if (!user) return onOpenAuth?.();
+    setBusy(true);
+    setError('');
+    const alreadyIn = room.giocatori.some((g) => g.userId === user.id);
+    if (!alreadyIn) {
+      const { error: joinErr } = await joinRoom(room.id);
+      if (joinErr) {
+        setBusy(false);
+        setError(joinErr);
+        refresh(true);
+        return;
+      }
+    }
+    const taken = new Set(room.giocatori.map((g) => g.posizione));
+    const firstFree = Array.from({ length: room.maxGiocatori }, (_, i) => i).find((i) => !taken.has(i));
+    const needsMove = alreadyIn || posizione !== firstFree;
+    if (needsMove) {
+      const { error: moveErr } = await moveSeat(room.id, posizione);
+      if (moveErr) {
+        if (!alreadyIn) await leaveRoom(room.id);
+        setBusy(false);
+        setError(moveErr === 'Posto occupato' ? 'Quel posto è appena stato preso: scegline un altro.' : moveErr);
+        refresh(true);
+        return;
+      }
+    }
+    setBusy(false);
+    onEnterRoom(room.id);
+  };
+
+  const visibleRooms = (rooms ?? []).filter((r) => {
+    if (gameFilter !== 'all' && r.gioco !== gameFilter) return false;
+    if (modeFilter && roomMode(r) !== modeFilter) return false;
+    if (freeOnly && (r.stato !== 'in_attesa' || r.postiLiberi === 0)) return false;
+    return true;
+  });
+
+  return (
+    <div className="rb-giochi-tavolo rb-giochi-tavolo--lobby">
+      <div className="rb-lobby-head">
+        <h3>Giochi da tavolo & carte</h3>
+        <span className="rb-lobby-head-spacer" />
+        <button type="button" className="rb-lobby-btn" onClick={() => (user ? setCreateOpen('bots') : onOpenAuth?.())}>
+          🤖 Gioca col computer
+        </button>
+        <button type="button" className="rb-lobby-btn primary" onClick={() => (user ? setCreateOpen('humans') : onOpenAuth?.())}>
+          ＋ Crea tavolo
+        </button>
+      </div>
+
+      <div className="rb-lobby-chips">
+        <button type="button" className={`rb-lobby-chip ${gameFilter === 'all' ? 'on' : ''}`} onClick={() => setGameFilter('all')}>Tutti</button>
+        {GAMES.map((g) => (
+          <button key={g.id} type="button" className={`rb-lobby-chip ${gameFilter === g.id ? 'on' : ''}`} onClick={() => setGameFilter(g.id)}>
+            {g.icon} {g.label}
+          </button>
+        ))}
+        <span className="rb-lobby-sep" />
+        {Object.entries(MODE_LABEL).map(([id, label]) => (
+          <button key={id} type="button" className={`rb-lobby-chip ${modeFilter === id ? 'on' : ''}`} onClick={() => setModeFilter((m) => (m === id ? null : id))}>
+            {label}
+          </button>
+        ))}
+        <span className="rb-lobby-sep" />
+        <button type="button" className={`rb-lobby-chip ${freeOnly ? 'on' : ''}`} onClick={() => setFreeOnly((v) => !v)}>Solo con posti liberi</button>
+        <button type="button" className="rb-lobby-chip rb-lobby-refresh" onClick={() => refresh()} disabled={busy}>↻ Aggiorna</button>
+      </div>
+
+      {error && <p className="rb-giochi-error">{error}</p>}
+
+      {rooms === null ? (
+        <Skeleton lines={3} />
+      ) : visibleRooms.length === 0 ? (
+        <EmptyState
+          icon="🃏"
+          title={rooms.length === 0 ? 'Nessun tavolo aperto' : 'Nessun tavolo con questi filtri'}
+          subtitle="Creane uno tu: chi passa di qui potrà sedersi."
+        />
+      ) : (
+        <div className="rb-lobby-grid">
+          {visibleRooms.map((r) => (
+            <LobbyTile key={r.id} room={r} user={user} busy={busy} tableColor={r.creatoDa === user?.id ? myTable : 'verde'} onSit={handleSit} onEnter={() => onEnterRoom(r.id)} />
+          ))}
+        </div>
+      )}
+
+      <p className="rb-lobby-foot">Clicca una sedia libera ＋ per sederti a quel posto. A coppie: chi ti siede di fronte è il tuo compagno.</p>
+
+      {createOpen && (
+        <CreateTableModal
+          withBotsFirst={createOpen === 'bots'}
+          user={user}
+          onOpenAuth={onOpenAuth}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => {
+            setCreateOpen(false);
+            onEnterRoom(id);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Riquadro di una stanza: gioco · modalità, badge In attesa / In corso, e il
+// tavolino con le sedie (occupate: avatar + nome; libere: "＋ Siediti").
+function LobbyTile({ room, user, busy, tableColor, onSit, onEnter }) {
+  const game = GAMES.find((g) => g.id === room.gioco);
+  const mode = roomMode(room);
+  const inCorso = room.stato === 'in_corso';
+  const iAmIn = room.giocatori.some((g) => g.userId === user?.id);
+  const seats = Array.from({ length: room.maxGiocatori }, (_, i) => ({ posizione: i, player: room.giocatori.find((g) => g.posizione === i) ?? null }));
+
+  return (
+    <div className={`rb-lobby-tile ${iAmIn ? 'mine' : ''}`}>
+      <div className="rb-lobby-tile-top">
+        <span className="rb-lobby-tile-game">
+          {game?.icon} {game?.label ?? 'Partita'} <span className="rb-lobby-tile-mode">· {MODE_LABEL[mode]}{mode === 'tutti' ? ` · ${room.maxGiocatori}` : ''}</span>
+        </span>
+        <span className={`rb-lobby-badge ${inCorso ? 'live' : 'wait'}`}>{inCorso ? 'In corso' : 'In attesa'}</span>
+      </div>
+      <div className="rb-lobby-scene">
+        <div className={`rb-lobby-tbl t-${tableColor} ${room.maxGiocatori === 2 ? 'small' : ''}`}><i /></div>
+        {mode === '2v2' && <span className="rb-lobby-team">A · B</span>}
+        {seats.map(({ posizione, player }) => {
+          const side = seatSide(posizione, room.maxGiocatori);
+          if (player) {
+            const me = player.userId === user?.id;
+            return (
+              <div key={posizione} className={`rb-lobby-seat s-${side} ${me ? 'me' : ''}`}>
+                <span className="rb-lobby-seat-c">
+                  {player.isBot ? '🤖' : player.profilo.avatar ? <img src={player.profilo.avatar} alt="" /> : '🙂'}
+                </span>
+                <span className="rb-lobby-seat-name">{me ? 'Tu' : player.profilo.name}</span>
+              </div>
+            );
+          }
+          if (inCorso) return null;
+          return (
+            <button key={posizione} type="button" className={`rb-lobby-seat free s-${side}`} onClick={() => onSit(room, posizione)} disabled={busy}>
+              <span className="rb-lobby-seat-c">＋</span>
+              <span className="rb-lobby-seat-name">Siediti</span>
+            </button>
+          );
+        })}
+      </div>
+      {iAmIn && (
+        <button type="button" className="rb-lobby-enter" onClick={onEnter}>
+          {inCorso ? 'Rientra al tavolo' : 'Vai al tavolo'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// "Crea tavolo" / "Gioca col computer": il modulo di sempre (gioco,
+// giocatori, modalità, difficoltà dei bot) in un pannello a comparsa.
+function CreateTableModal({ withBotsFirst, user, onOpenAuth, onClose, onCreated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [difficulties, setDifficulties] = useState({ scopa: 'medio', burraco: 'medio', trentuno: 'medio', cosmopoli: 'medio' });
   const [playerCounts, setPlayerCounts] = useState({ burraco: 4, cosmopoli: 4 });
   const [burracoModalita, setBurracoModalita] = useState('coppie');
-
-  const refresh = () => {
-    setRooms(null);
-    Promise.all(GAMES.map((g) => listOpenRooms(g.id))).then((lists) => {
-      setRooms(lists.flat().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-    });
-  };
-  useEffect(refresh, []);
 
   const maxGiocatoriOf = (game) => (game.playerCounts.length > 1 ? (playerCounts[game.id] ?? game.playerCounts[game.playerCounts.length - 1]) : game.playerCounts[0]);
 
@@ -117,119 +318,96 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
     }
 
     setBusy(false);
-    onEnterRoom(id);
-  };
-
-  const handleJoin = async (id) => {
-    if (!user) return onOpenAuth?.();
-    setBusy(true);
-    setError('');
-    const { error: err } = await joinRoom(id);
-    setBusy(false);
-    if (err) return setError(err);
-    onEnterRoom(id);
+    onCreated(id);
   };
 
   return (
-    <div className="rb-giochi-tavolo">
-      <div className="rb-giochi-header">
-        <h3>Giochi da tavolo & carte</h3>
-        <p className="rb-giochi-hint">Trova un avversario, gioca col computer o crea una partita: le regole sono controllate dal server, nessuno può barare.</p>
-      </div>
-
-      <div className="rb-giochi-catalogo">
-        {GAMES.map((g) => {
-          const maxGiocatori = maxGiocatoriOf(g);
-          return (
-            <div key={g.id} className="rb-giochi-catalogo-card">
-              <div className="rb-giochi-catalogo-card-head">
-                <span className="rb-giochi-catalogo-icon">{g.icon}</span>
-                <div>
-                  <strong>{g.label}</strong>
-                  <p>{g.tagline}</p>
+    <ModalOverlay onClose={onClose}>
+      <div className="rb-lobby-create-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <h3>{withBotsFirst ? '🤖 Gioca col computer' : '＋ Crea tavolo'}</h3>
+        <p className="rb-giochi-hint">
+          {withBotsFirst
+            ? 'Scegli il gioco e la difficoltà: i posti liberi si riempiono di bot e la partita parte subito.'
+            : 'Il tavolo compare nella lobby: chi passa può sedersi, e i posti vuoti si possono dare ai bot dalla sala d\'attesa.'}
+        </p>
+        {error && <p className="rb-giochi-error">{error}</p>}
+        <div className="rb-giochi-catalogo">
+          {GAMES.map((g) => {
+            const maxGiocatori = maxGiocatoriOf(g);
+            return (
+              <div key={g.id} className="rb-giochi-catalogo-card">
+                <div className="rb-giochi-catalogo-card-head">
+                  <span className="rb-giochi-catalogo-icon">{g.icon}</span>
+                  <div>
+                    <strong>{g.label}</strong>
+                    <p>{g.tagline}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="rb-giochi-catalogo-options">
-                {g.playerCounts.length > 1 && (
-                  <select
-                    className="rb-giochi-player-count"
-                    value={maxGiocatori}
-                    onChange={(e) => setPlayerCounts((prev) => ({ ...prev, [g.id]: Number(e.target.value) }))}
-                    disabled={busy}
-                  >
-                    {g.playerCounts.map((n) => <option key={n} value={n}>{n} giocatori</option>)}
-                  </select>
-                )}
-                {g.id === 'burraco' && maxGiocatori === 4 && (
-                  <select
-                    className="rb-giochi-player-count"
-                    value={burracoModalita}
-                    onChange={(e) => setBurracoModalita(e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="coppie">A coppie</option>
-                    <option value="tutti">Tutti contro tutti</option>
-                  </select>
-                )}
-                <div className="rb-minigame-difficulty-row rb-giochi-difficulty-row">
-                  {DIFFICULTIES.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      className={`rb-minigame-difficulty-btn ${difficulties[g.id] === d.id ? 'active' : ''}`}
-                      onClick={() => setDifficulties((prev) => ({ ...prev, [g.id]: d.id }))}
+                <div className="rb-giochi-catalogo-options">
+                  {g.playerCounts.length > 1 && (
+                    <select
+                      className="rb-giochi-player-count"
+                      value={maxGiocatori}
+                      onChange={(e) => setPlayerCounts((prev) => ({ ...prev, [g.id]: Number(e.target.value) }))}
+                      disabled={busy}
                     >
-                      {d.label}
-                    </button>
-                  ))}
+                      {g.playerCounts.map((n) => <option key={n} value={n}>{n} giocatori</option>)}
+                    </select>
+                  )}
+                  {g.id === 'burraco' && maxGiocatori === 4 && (
+                    <select
+                      className="rb-giochi-player-count"
+                      value={burracoModalita}
+                      onChange={(e) => setBurracoModalita(e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="coppie">A coppie</option>
+                      <option value="tutti">Tutti contro tutti</option>
+                    </select>
+                  )}
+                  <div className="rb-minigame-difficulty-row rb-giochi-difficulty-row">
+                    {DIFFICULTIES.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        className={`rb-minigame-difficulty-btn ${difficulties[g.id] === d.id ? 'active' : ''}`}
+                        onClick={() => setDifficulties((prev) => ({ ...prev, [g.id]: d.id }))}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rb-giochi-catalogo-actions">
+                  {withBotsFirst ? (
+                    <>
+                      <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id, true)} disabled={busy}>
+                        🤖 Gioca col computer
+                      </button>
+                      <button type="button" className="rb-reset-filters-btn" onClick={() => handleCreate(g.id, false)} disabled={busy}>
+                        ＋ Crea tavolo
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id, false)} disabled={busy}>
+                        ＋ Crea tavolo
+                      </button>
+                      <button type="button" className="rb-reset-filters-btn" onClick={() => handleCreate(g.id, true)} disabled={busy}>
+                        🤖 Col computer
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-
-              <div className="rb-giochi-catalogo-actions">
-                <button type="button" className="rb-reset-filters-btn" onClick={() => handleCreate(g.id, false)} disabled={busy}>
-                  + Nuova partita
-                </button>
-                <button type="button" className="rb-btn-primary" onClick={() => handleCreate(g.id, true)} disabled={busy}>
-                  🤖 Gioca col computer
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-
-      {error && <p className="rb-giochi-error">{error}</p>}
-
-      <div className="rb-giochi-lobby-header">
-        <h4>Partite aperte</h4>
-        <button type="button" className="rb-reset-filters-btn" onClick={refresh}>Aggiorna</button>
-      </div>
-
-      {rooms === null ? (
-        <Skeleton lines={3} />
-      ) : rooms.length === 0 ? (
-        <EmptyState icon="🃏" title="Nessuna partita aperta" subtitle="Creane una tu: chi passa di qui potrà unirsi." />
-      ) : (
-        <ul className="rb-giochi-room-list">
-          {rooms.map((r) => (
-            <li key={r.id} className="rb-giochi-room-item">
-              <span className="rb-giochi-room-game">{GAMES.find((g) => g.id === r.gioco)?.icon ?? '🎲'}</span>
-              <div className="rb-giochi-room-info">
-                <strong>{GAMES.find((g) => g.id === r.gioco)?.label ?? 'Partita'} · {r.creatore?.name ?? 'Utente'}</strong>
-                <span>
-                  {r.postiLiberi} post{r.postiLiberi === 1 ? 'o libero' : 'i liberi'}
-                  {r.modalita === 'coppie' ? ' · a coppie' : r.modalita === 'tutti' ? ' · tutti contro tutti' : ''}
-                </span>
-              </div>
-              <button type="button" className="rb-btn-primary" onClick={() => handleJoin(r.id)} disabled={busy}>
-                Entra
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    </ModalOverlay>
   );
 }
 

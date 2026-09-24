@@ -45,33 +45,54 @@ async function fetchBotsMap() {
   return botsCache;
 }
 
-// Elenco stanze aperte per un gioco, con chi le ha create già risolto e i
-// posti ancora liberi (max_giocatori meno quanti ci sono già dentro) — la
-// lista NON si aggiorna da sola in tempo reale (richiede un refresh
-// manuale, vedi commento in AppNerd/GiochiTavoloColumn): evita di dover
-// mettere le stanze in pubblicazione realtime solo per la lobby pubblica.
-export async function listOpenRooms(gioco) {
+// Stanze della lobby "a tavolini" (vedi LobbyView in
+// GiochiTavoloColumn.jsx): tutte quelle in attesa, di qualunque gioco, più
+// quelle già in corso in cui si è seduti (per rientrare). Non serve filtrare
+// a mano le partite in corso degli altri: la RLS di game_rooms le mostra
+// solo a chi ne fa parte. Ogni stanza arriva con i giocatori già risolti
+// (posizione, nome, avatar, bot) — stessa logica di fetchRoom — così la
+// lobby può disegnare le sedie occupate e quelle libere. La lista non si
+// aggiorna in tempo reale: la lobby la rilegge da sola ogni 10 secondi.
+export async function listLobbyRooms() {
   const { data, error } = await supabase
     .from('game_rooms')
     .select('*')
-    .eq('gioco', gioco)
-    .eq('stato', 'in_attesa')
+    .in('stato', ['in_attesa', 'in_corso'])
     .order('created_at', { ascending: false });
   if (error || !data || !data.length) return [];
 
   const roomIds = data.map((r) => r.id);
-  const [profilesMap, { data: playerRows }] = await Promise.all([
-    fetchProfilesMap(data.map((r) => r.creato_da)),
-    supabase.from('game_room_players').select('room_id').in('room_id', roomIds),
-  ]);
-  const countByRoom = new Map();
-  for (const p of playerRows ?? []) countByRoom.set(p.room_id, (countByRoom.get(p.room_id) ?? 0) + 1);
+  const { data: playerRows } = await supabase
+    .from('game_room_players')
+    .select('room_id, user_id, posizione, is_bot, bot_difficolta')
+    .in('room_id', roomIds);
+  const humanIds = [...new Set([...(playerRows ?? []).filter((p) => !p.is_bot).map((p) => p.user_id), ...data.map((r) => r.creato_da)])];
+  const [profilesMap, botsMap] = await Promise.all([fetchProfilesMap(humanIds), fetchBotsMap()]);
 
-  return data.map((row) => ({
-    ...mapRoom(row),
-    creatore: profilesMap.get(row.creato_da) ?? null,
-    postiLiberi: Math.max(row.max_giocatori - (countByRoom.get(row.id) ?? 0), 0),
-  }));
+  const playersByRoom = new Map();
+  for (const p of playerRows ?? []) {
+    const list = playersByRoom.get(p.room_id) ?? [];
+    list.push({
+      userId: p.user_id,
+      posizione: p.posizione,
+      isBot: p.is_bot,
+      botDifficolta: p.bot_difficolta,
+      profilo: p.is_bot
+        ? botsMap.get(p.user_id) ?? { id: p.user_id, name: 'CPU', avatar: '', isBot: true }
+        : profilesMap.get(p.user_id) ?? { id: p.user_id, name: 'Utente', avatar: '' },
+    });
+    playersByRoom.set(p.room_id, list);
+  }
+
+  return data.map((row) => {
+    const giocatori = (playersByRoom.get(row.id) ?? []).sort((a, b) => a.posizione - b.posizione);
+    return {
+      ...mapRoom(row),
+      creatore: profilesMap.get(row.creato_da) ?? null,
+      giocatori,
+      postiLiberi: Math.max(row.max_giocatori - giocatori.length, 0),
+    };
+  });
 }
 
 export async function createRoom(gioco, maxGiocatori = 2, modalita = null) {
