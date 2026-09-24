@@ -30,8 +30,19 @@ const INFALL_TRAIL = 12;
 const INFALL_TRAIL_CALM = 6;
 const DOT_VISIBLE = 0.7; // frazione del quadrato della dotTexture che si vede davvero
 const CREAM = new THREE.Color().setRGB(1, 0.96, 0.9, THREE.SRGBColorSpace);
-const GLOW_GAIN = 0.3;
+const GLOW_GAIN = 0.5;
 const FLASH_GAIN = 0.6;
+// Solo l'anello più interno del disco resta crema, il resto prende il
+// colore del mondo.
+const CREAM_HEAT = 0.92;
+
+// Colore del mondo più acceso per disco, alone e puntini che cadono:
+// saturazione +25% e luminosità +10% (in HSL, sRGB), entro i limiti.
+function accentOf(color) {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  return new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s * 1.25), Math.min(1, hsl.l * 1.1), THREE.SRGBColorSpace);
+}
 
 // Durate (in secondi) della disattivazione e della riattivazione.
 export const COLLAPSE_S = 7;
@@ -43,8 +54,8 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 // Fasi della disattivazione, t in secondi dall'inizio (Infinity = buco nero
 // già stabile, per i mondi disattivati prima di aprire l'app):
 // 0-1,5 nasce il buco, 1,5-4,5 il globo viene risucchiato, 4,5-5,4 lampo,
-// da 4,8 buco nero stabile che poi si "calma" (meno puntini e meno luce,
-// ma la stessa grandezza).
+// da 4,8 buco nero stabile che poi si "calma" (meno puntini, un po' meno
+// luce e metà velocità di rotazione, ma la stessa grandezza).
 //
 // Grandezza finale: l'anello di luce intorno al nero ha lo stesso raggio
 // del satellite che c'era prima (richiesta esplicita: nel prototipo il
@@ -59,8 +70,8 @@ export function collapsePhase(t) {
   const stable = clamp01((t - 4.8) / 1.2);
   const calm = clamp01((t - 5.7) / 1.3);
   const sizePx = 3 + (FINAL_SIZE_PX - 3) * (0.6 * ease(born) + 0.4 * ease(suck));
-  const strength = clamp01(born * 0.8 + suck * 0.2 + stable * 0.2) * (1 - 0.4 * calm);
-  const infall = strength * (0.4 + 0.6 * stable + 0.4 * suck) * (1 - 0.45 * calm);
+  const strength = clamp01(born * 0.8 + suck * 0.2 + stable * 0.2) * (1 - 0.15 * calm);
+  const infall = strength * (0.4 + 0.6 * stable + 0.4 * suck) * (1 - 0.25 * calm);
   return { born, suck, flash, stable, calm, sizePx, strength, infall, oldLabel: 1 - clamp01(suck / 0.85), newLabel: stable };
 }
 
@@ -210,6 +221,10 @@ function seededRandom(seed) {
 
 export function buildBlackHole(world, seed = 7) {
   const color = new THREE.Color(world.color);
+  const accent = accentOf(color);
+  // Crema e colore del mondo a metà, per l'arco di luce: il bordo prende il
+  // colore del mondo invece di restare solo crema.
+  const arcMid = new THREE.Color(1, 236 / 255, 210 / 255).convertSRGBToLinear().lerp(accent, 0.5);
   const rnd = seededRandom(seed);
   const disk = Array.from({ length: DISK_COUNT }, () => ({
     a: rnd() * Math.PI * 2,
@@ -233,8 +248,8 @@ export function buildBlackHole(world, seed = 7) {
     canvasTexture(128, (ctx, size) => {
       const c = size / 2;
       const g = ctx.createRadialGradient(c, c, c * (0.9 / 4.2), c, c, c);
-      g.addColorStop(0, rgba(color, 0.2));
-      g.addColorStop(0.4, rgba(color, 0.06));
+      g.addColorStop(0, rgba(accent, 0.32));
+      g.addColorStop(0.4, rgba(accent, 0.12));
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size);
@@ -250,9 +265,9 @@ export function buildBlackHole(world, seed = 7) {
       const h = size / 3.2;
       ctx.lineWidth = h * 0.22;
       const arc = ctx.createLinearGradient(c - h * 1.6, 0, c + h * 1.6, 0);
-      arc.addColorStop(0, rgba(color, 0));
-      arc.addColorStop(0.5, 'rgba(255,236,210,0.55)');
-      arc.addColorStop(1, rgba(color, 0));
+      arc.addColorStop(0, rgba(accent, 0));
+      arc.addColorStop(0.5, rgba(arcMid, 0.55));
+      arc.addColorStop(1, rgba(accent, 0));
       ctx.strokeStyle = arc;
       ctx.beginPath();
       ctx.ellipse(c, c, h * 1.35, h * 1.35, 0, Math.PI * 1.05, Math.PI * 1.95);
@@ -307,12 +322,21 @@ export function buildBlackHole(world, seed = 7) {
   const sprites = [glow, ring, core, flash];
   const allPoints = [diskBack, diskFront, infallPoints];
 
+  // Tempo di rotazione accumulato: avanza come t, ma a buco nero "calmo"
+  // a metà velocità (segue phase.calm da 0 a 1, quindi senza scatti).
+  // Con t assoluto cambiare la velocità farebbe saltare i puntini.
+  let spinT = 0;
+  let lastT = null;
+
   // t: tempo delle particelle (s, fermo con "Riduci animazioni");
   // phase: collapsePhase/revivePhase; fade: foschia/comparsa del satellite;
   // pointScale: scala del satellite (la grandezza dei punti in pixel non
   // segue la scala del gruppo da sola).
   function update(t, phase, fade, pointScale) {
     const size = phase.sizePx * PX;
+    const delta = lastT === null ? 0 : Math.max(0, t - lastT);
+    lastT = t;
+    spinT += delta * (1 - 0.5 * phase.calm);
     const visible = phase.sizePx > 0.5 && fade > 0.001 && (phase.strength > 0.001 || phase.flash > 0.001);
     group.visible = visible;
     if (!visible) return;
@@ -334,7 +358,7 @@ export function buildBlackHole(world, seed = 7) {
     let back = 0;
     let front = 0;
     for (const p of disk) {
-      const a = p.a + t * p.sp * (2.6 / p.rr);
+      const a = p.a + spinT * p.sp * (2.6 / p.rr);
       const sa = Math.sin(a);
       const R = size * p.rr;
       const isFront = sa >= 0;
@@ -345,7 +369,7 @@ export function buildBlackHole(world, seed = 7) {
       const x = Math.cos(a) * R;
       const y = -sa * R * TILT;
       const z = sa * R * 0.3;
-      const c = heat > 0.75 ? CREAM : color;
+      const c = heat > CREAM_HEAT ? CREAM : accent;
       if (isFront) writeParticle(diskFront, front++, x, y, z, c, alpha, sizeUnits);
       else writeParticle(diskBack, back++, x, y, z, c, alpha, sizeUnits);
     }
@@ -361,7 +385,7 @@ export function buildBlackHole(world, seed = 7) {
       const tail = calm > 0.5 ? INFALL_TRAIL_CALM : INFALL_TRAIL;
       infall.forEach((p, idx) => {
         if (calm > 0.5 && idx % 3 !== 0) return;
-        const k = (t * p.sp + p.ph) % 1;
+        const k = (spinT * p.sp + p.ph) % 1;
         const r0Px = phase.sizePx + (p.r0 - phase.sizePx) * reach;
         for (let s = 0; s < tail; s++) {
           const kk = Math.max(0, k - s * 0.01);
@@ -369,7 +393,7 @@ export function buildBlackHole(world, seed = 7) {
           const as = p.a + kk * 7;
           const alpha = phase.infall * (0.8 - s * 0.055) * Math.min(1, k * 3) * fade;
           const radiusPx = Math.max(0.3, 1.6 - s * 0.1);
-          writeParticle(infallPoints, n++, Math.cos(as) * rs, -Math.sin(as) * rs * 0.8, 0, color, Math.max(0, alpha), ((radiusPx * 2 * PX) / DOT_VISIBLE) * pointScale);
+          writeParticle(infallPoints, n++, Math.cos(as) * rs, -Math.sin(as) * rs * 0.8, 0, accent, Math.max(0, alpha), ((radiusPx * 2 * PX) / DOT_VISIBLE) * pointScale);
         }
       });
     }
