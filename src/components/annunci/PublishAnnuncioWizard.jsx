@@ -113,8 +113,20 @@ function DetailField({ field, value, onChange }) {
 // trascinabili per l'ordine, la prima è la copertina) -> prezzo -> posizione
 // -> anteprima -> pubblica. Bozza salvata in locale ad ogni passo, così
 // uscendo a metà la si ritrova (findLoadDraft al montaggio).
+//
+// Categoria: parte SEMPRE da quella in cui ci si trova (initialCategoria,
+// es. Moto se il form si apre dalla colonna Moto). Una bozza lasciata a
+// metà si riprende da sola solo se è della stessa categoria; se è di
+// un'altra (es. un'Auto iniziata prima) non la sovrascrive più
+// silenziosamente, ma viene proposta con "Riprendi bozza". La categoria
+// si può comunque cambiare: l'annuncio finisce in quella scelta qui (es.
+// un'Auto pubblicata dalla colonna Moto compare in Auto, non in Moto) e
+// l'avviso sotto al menu lo dice prima di pubblicare.
 export default function PublishAnnuncioWizard({ initialCategoria, user, onClose, onPublished }) {
-  const draft = loadDraft();
+  const [savedDraft] = useState(() => loadDraft());
+  const draftMatches = !!savedDraft && (!initialCategoria || savedDraft.categoria === initialCategoria);
+  const draft = draftMatches ? savedDraft : null;
+  const [otherDraft, setOtherDraft] = useState(() => (savedDraft && !draftMatches ? savedDraft : null));
   const [step, setStep] = useState(1);
   const [categoria, setCategoria] = useState(draft?.categoria ?? initialCategoria ?? 'auto');
   const [tipo, setTipo] = useState(draft?.tipo ?? 'vendita');
@@ -133,9 +145,46 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
   const [sending, setSending] = useState(false);
   const dragIndexRef = useRef(null);
 
+  // Il primo giro (montaggio) non salva: aprire e richiudere il form senza
+  // toccare nulla non deve cancellare una bozza di un'altra categoria.
+  const skipFirstSaveRef = useRef(true);
   useEffect(() => {
+    if (skipFirstSaveRef.current) {
+      skipFirstSaveRef.current = false;
+      return;
+    }
     saveDraft({ categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, lat, lng });
   }, [categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, lat, lng]);
+
+  const resumeOtherDraft = () => {
+    const d = otherDraft;
+    if (!d) return;
+    setCategoria(d.categoria ?? categoria);
+    setTipo(d.tipo ?? 'vendita');
+    setTitolo(d.titolo ?? '');
+    setDescrizione(d.descrizione ?? '');
+    setDettagli(d.dettagli ?? {});
+    setFoto(d.foto ?? []);
+    setPrezzo(d.prezzo ?? '');
+    setTrattabile(d.trattabile ?? false);
+    setPeriodoAffitto(d.periodoAffitto ?? 'mese');
+    setCitta(d.citta ?? '');
+    setLat(d.lat ?? null);
+    setLng(d.lng ?? null);
+    setOtherDraft(null);
+  };
+
+  // Cambiando categoria i dettagli specifici (marca, cilindrata, mq...)
+  // della precedente non valgono più: si svuotano.
+  const changeCategoria = (next) => {
+    if (next === categoria) return;
+    setCategoria(next);
+    setDettagli({});
+  };
+
+  const categoriaMeta = ANNUNCI_CATEGORIES_META[categoria];
+  const initialMeta = initialCategoria ? ANNUNCI_CATEGORIES_META[initialCategoria] : null;
+  const otherDraftMeta = otherDraft ? ANNUNCI_CATEGORIES_META[otherDraft.categoria] : null;
 
   const fields = fieldsForCategory(categoria, tipo);
   const updateDettaglio = (key, value) => setDettagli((prev) => ({ ...prev, [key]: value }));
@@ -200,7 +249,7 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
       return;
     }
     clearDraft();
-    onPublished?.();
+    onPublished?.({ categoria, tipo });
   };
 
   return (
@@ -217,10 +266,27 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
 
         {step === 1 && (
           <div className="rb-faq-form">
+            {otherDraft && otherDraftMeta && (
+              <div className="rb-annunci-draft-hint">
+                <span>
+                  Hai una bozza non finita in {otherDraftMeta.icon} {otherDraftMeta.label}
+                  {otherDraft.titolo ? ` ("${otherDraft.titolo}")` : ''}.
+                </span>
+                <button type="button" onClick={resumeOtherDraft}>
+                  Riprendi bozza
+                </button>
+              </div>
+            )}
             <label className="rb-field">
               <span>Categoria</span>
-              <CustomSelect value={categoria} options={CATEGORIA_OPTIONS} onChange={setCategoria} ariaLabel="Categoria" />
+              <CustomSelect value={categoria} options={CATEGORIA_OPTIONS} onChange={changeCategoria} ariaLabel="Categoria" />
             </label>
+            {initialMeta && categoriaMeta && categoria !== initialCategoria && (
+              <p className="rb-annunci-category-note">
+                L'annuncio verrà pubblicato in {categoriaMeta.icon} <strong>{categoriaMeta.label}</strong>, non in{' '}
+                {initialMeta.icon} {initialMeta.label}. Lo ritrovi anche in «I miei annunci».
+              </p>
+            )}
             <div className="rb-annunci-online-toggle">
               <label>
                 <input type="radio" checked={tipo === 'vendita'} onChange={() => setTipo('vendita')} /> Vendita

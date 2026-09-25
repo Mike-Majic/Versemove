@@ -327,7 +327,88 @@
   object-fit: cover;
 }
 
-/* --- I miei annunci --- */
+/* --- I miei annunci (seconda colonna, scheda accanto a Filtri) --- */
+
+.rb-annunci-side-tabs {
+  margin-bottom: 4px;
+}
+
+.rb-annunci-mie-count {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-annunci-mie-nophoto {
+  width: 56px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rb-annunci-mie-meta {
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.65);
+}
+
+.rb-annunci-mie-item {
+  flex-wrap: wrap;
+}
+
+.rb-annunci-mie-item .rb-annunci-mie-actions {
+  flex-basis: 100%;
+}
+
+/* Avvisi del form/colonna: bozza di un'altra categoria, annuncio finito
+   in un'altra categoria. */
+.rb-annunci-draft-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #ff8a1f) 45%, transparent);
+  font-size: 12.5px;
+  color: #f5f5f7;
+}
+
+.rb-annunci-draft-hint span {
+  flex: 1 1 180px;
+}
+
+.rb-annunci-draft-hint button {
+  border: 1px solid color-mix(in srgb, var(--accent, #ff8a1f) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 28%, transparent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-annunci-draft-hint button.ghost {
+  background: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  padding: 5px 9px;
+}
+
+.rb-annunci-category-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(245, 245, 247, 0.8);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
 
 .rb-annunci-mie-list {
   list-style: none;

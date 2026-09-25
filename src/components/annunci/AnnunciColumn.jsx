@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { listListings, listMyListings, renewListing, setListingStatus, deleteListing } from '../../data/annunci';
 import { isAdult } from '../../data/age';
+import { ANNUNCI_CATEGORIES_META } from '../../data/annunciSchema';
 import AnnuncioCard from './AnnuncioCard';
 import SponsorCard from '../ads/SponsorCard';
 import AnnunciFilters from './AnnunciFilters';
@@ -20,13 +21,18 @@ import '../faq/faq.css';
 const DEFAULT_FILTERS = { prezzoMin: null, prezzoMax: null, citta: '', soloConFoto: false, ordinamento: 'recenti', fieldFilters: {} };
 
 // Colonna principale di una categoria di Annunci: schede Vendita/Affitto,
-// vista Lista/Griglia/Mappa, filtri professionali (generati dallo stesso
-// schema del form di pubblicazione), + una scheda "I miei annunci" per
-// gestire i propri (rinnova/riservato/venduto/elimina).
-export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, closing = false }) {
+// vista Lista/Griglia/Mappa. La seconda colonna ha due schede, come "I
+// miei post" del mondo Social: "Filtri" (generati dallo stesso schema del
+// form di pubblicazione) e "I miei annunci", dove chi pubblica ritrova
+// TUTTI i propri annunci di qualsiasi categoria (un'Auto pubblicata dalla
+// colonna Moto compare qui e in Auto, non in Moto) e li gestisce
+// (rinnova/riservato/venduto/elimina, "Vai" alla categoria).
+export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, onGoToCategory, closing = false }) {
   const [tipo, setTipo] = useState('vendita');
   const [view, setView] = useState('list'); // list | grid | map
-  const [tab, setTab] = useState('annunci'); // annunci | mie
+  const [sideTab, setSideTab] = useState('filtri'); // filtri | mie
+  // Avviso dopo una pubblicazione finita in un'altra categoria.
+  const [publishedElsewhere, setPublishedElsewhere] = useState(null); // { categoria }
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   // Vista mobile del TwoColumnSwitcher: 'primary' = annunci, 'secondary' = filtri.
   const [mobileView, setMobileView] = useState('primary');
@@ -43,9 +49,20 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
 
   useEffect(refresh, [category.id, tipo, filters]);
 
+  const refreshMine = () => listMyListings().then(setMyListings);
+
   useEffect(() => {
-    if (tab === 'mie' && user) listMyListings().then(setMyListings);
-  }, [tab, user]);
+    if (sideTab === 'mie' && user) refreshMine();
+  }, [sideTab, user]);
+
+  const openMine = () => {
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+    setSideTab('mie');
+    if (!isDesktop) setMobileView('secondary');
+  };
 
   const openPublish = () => {
     if (!user) {
@@ -78,21 +95,24 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
         <p className="rb-faq-hint">Solo i maggiorenni possono pubblicare annunci. Puoi comunque guardarli tutti.</p>
       )}
 
-      <div className="rb-annunci-tabs">
-        <button type="button" className={tab === 'annunci' ? 'active' : ''} onClick={() => setTab('annunci')}>
-          Annunci
-        </button>
-        <button
-          type="button"
-          className={tab === 'mie' ? 'active' : ''}
-          onClick={() => (user ? setTab('mie') : onOpenAuth?.())}
-        >
-          I miei annunci
-        </button>
-      </div>
+      {publishedElsewhere && ANNUNCI_CATEGORIES_META[publishedElsewhere.categoria] && (
+        <div className="rb-annunci-draft-hint">
+          <span>
+            Pubblicato in {ANNUNCI_CATEGORIES_META[publishedElsewhere.categoria].icon}{' '}
+            {ANNUNCI_CATEGORIES_META[publishedElsewhere.categoria].label}: qui in {category.label} non compare.
+          </span>
+          {onGoToCategory && (
+            <button type="button" onClick={() => onGoToCategory(publishedElsewhere.categoria)}>
+              Vai a {ANNUNCI_CATEGORIES_META[publishedElsewhere.categoria].label}
+            </button>
+          )}
+          <button type="button" className="ghost" onClick={() => setPublishedElsewhere(null)} aria-label="Chiudi avviso">
+            ✕
+          </button>
+        </div>
+      )}
 
-      {tab === 'annunci' ? (
-        <>
+      <>
           <div className="rb-annunci-online-toggle">
             <label>
               <input type="radio" checked={tipo === 'vendita'} onChange={() => setTipo('vendita')} /> Vendita
@@ -158,52 +178,118 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
             )}
           </div>
         </>
-      ) : myListings === null ? (
-        <Skeleton lines={4} />
-      ) : myListings.length === 0 ? (
-        <EmptyState icon={category.icon} title="Non hai ancora pubblicato annunci qui" />
-      ) : (
+    </div>
+  );
+
+  // Seconda colonna, scheda "I miei annunci": tutti gli annunci
+  // dell'utente, di qualsiasi categoria.
+  const myListingsSection =
+    !user ? (
+      <EmptyState
+        icon="🔒"
+        title="Accedi per vedere i tuoi annunci"
+        subtitle="Serve un account per pubblicare e gestire i tuoi annunci."
+        actions={[{ label: 'Accedi', primary: true, onClick: onOpenAuth }]}
+      />
+    ) : myListings === null ? (
+      <Skeleton lines={4} />
+    ) : myListings.length === 0 ? (
+      <EmptyState icon="📝" title="Non hai ancora pubblicato annunci" subtitle="Usa «+ Pubblica annuncio» per il primo." />
+    ) : (
+      <>
+        <p className="rb-annunci-mie-count">{myListings.length} pubblicati, in tutte le categorie</p>
         <ul className="rb-annunci-mie-list">
-          {myListings
-            .filter((l) => l.categoria === category.id)
-            .map((l) => (
+          {myListings.map((l) => {
+            const meta = ANNUNCI_CATEGORIES_META[l.categoria];
+            const elsewhere = l.categoria !== category.id;
+            return (
               <li key={l.id} className="rb-annunci-mie-item">
-                <img src={l.foto[0] || ''} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                {l.foto[0] ? (
+                  <img src={l.foto[0]} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                ) : (
+                  <span className="rb-annunci-mie-nophoto" aria-hidden="true">
+                    {meta?.icon ?? '📦'}
+                  </span>
+                )}
                 <div className="rb-annunci-mie-info">
                   <strong>{l.titolo}</strong>
+                  <span className="rb-annunci-mie-meta">
+                    {meta ? `${meta.icon} ${meta.label}` : l.categoria} · {l.tipo === 'affitto' ? 'Affitto' : 'Vendita'}
+                  </span>
                   <span className={`rb-faq-stato-badge rb-annunci-stato-${l.stato}`}>{l.stato}</span>
                 </div>
                 <div className="rb-annunci-mie-actions">
+                  {elsewhere && onGoToCategory && (
+                    <button type="button" onClick={() => onGoToCategory(l.categoria)}>
+                      Vai a {meta?.label ?? l.categoria}
+                    </button>
+                  )}
+                  {!elsewhere && (
+                    <button type="button" onClick={() => setSelected(l)}>
+                      Apri
+                    </button>
+                  )}
                   {l.stato === 'attivo' && (
                     <>
-                      <button type="button" onClick={() => setListingStatus(l.id, 'riservato').then(() => listMyListings().then(setMyListings))}>
+                      <button type="button" onClick={() => setListingStatus(l.id, 'riservato').then(refreshMine)}>
                         Riservato
                       </button>
-                      <button type="button" onClick={() => setListingStatus(l.id, 'venduto').then(() => listMyListings().then(setMyListings))}>
+                      <button type="button" onClick={() => setListingStatus(l.id, 'venduto').then(refreshMine)}>
                         Venduto/Affittato
                       </button>
                     </>
                   )}
-                  <button type="button" onClick={() => renewListing(l.id).then(() => listMyListings().then(setMyListings))}>
+                  <button type="button" onClick={() => renewListing(l.id).then(refreshMine)}>
                     Rinnova
                   </button>
-                  <button type="button" onClick={() => deleteListing(l.id).then(() => listMyListings().then(setMyListings))}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      deleteListing(l.id).then(() => {
+                        refreshMine();
+                        refresh();
+                      })
+                    }
+                  >
                     Elimina
                   </button>
                 </div>
               </li>
-            ))}
+            );
+          })}
         </ul>
-      )}
-    </div>
-  );
+      </>
+    );
 
-  // Pannello destro (su mobile la seconda schermata): Vendita/Affitto e
-  // filtri professionali sempre visibili, come nei portali di annunci.
+  // Pannello destro (su mobile la seconda schermata): schede Filtri e I
+  // miei annunci, come nei portali di annunci.
   const filtersPanel = (
     <div className="rb-annunci-column">
-      <h3 className="rb-annunci-panel-title">Filtri</h3>
-      <AnnunciFilters categoria={category.id} tipo={tipo} filters={filters} setFilters={setFilters} />
+      <div className="rb-annunci-tabs rb-annunci-side-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideTab === 'filtri'}
+          className={sideTab === 'filtri' ? 'active' : ''}
+          onClick={() => setSideTab('filtri')}
+        >
+          Filtri
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideTab === 'mie'}
+          className={sideTab === 'mie' ? 'active' : ''}
+          onClick={openMine}
+        >
+          I miei annunci
+        </button>
+      </div>
+      {sideTab === 'filtri' ? (
+        <AnnunciFilters categoria={category.id} tipo={tipo} filters={filters} setFilters={setFilters} />
+      ) : (
+        myListingsSection
+      )}
       {!isDesktop && (
         <button type="button" className="rb-btn-primary rb-annunci-show-results" onClick={() => setMobileView('primary')}>
           Mostra annunci
@@ -218,7 +304,7 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
         primary={resultsPanel}
         secondary={filtersPanel}
         primaryLabel="Annunci"
-        secondaryLabel="Filtri"
+        secondaryLabel={sideTab === 'mie' ? 'I miei annunci' : 'Filtri'}
         mobileView={mobileView}
         onMobileViewChange={setMobileView}
         closing={closing}
@@ -240,9 +326,14 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
           initialCategoria={category.id}
           user={user}
           onClose={() => setPublishOpen(false)}
-          onPublished={() => {
+          onPublished={(published) => {
             setPublishOpen(false);
             refresh();
+            // Appena pubblicato: si apre "I miei annunci", dove lo si vede
+            // subito qualunque sia la categoria scelta nel form.
+            setSideTab('mie');
+            if (user) refreshMine();
+            setPublishedElsewhere(published?.categoria && published.categoria !== category.id ? published : null);
           }}
         />
       )}

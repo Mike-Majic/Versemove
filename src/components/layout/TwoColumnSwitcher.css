@@ -103,6 +103,18 @@
   }
 }
 
+/* Sotto ~1340px le due colonne arrivano abbastanza vicine al centro da
+   finire sotto alla barra "Cerca" centrata in alto (.rb-arte-top-controls,
+   vedi categoryExplorerShell.css: X/stellina + campo di ricerca, fino a
+   ~106px dall'alto): qui le colonne partono subito sotto, invece di farsi
+   coprire il bordo in alto. Più larghe di così la barra sta tutta nello
+   spazio vuoto fra le due colonne e non serve. */
+@media (max-width: 1340px) {
+  .rb-2col-panel {
+    top: 118px;
+  }
+}
+
 /* Layout mobile (verticale, o orizzontale ma sotto i 700px): una sola colonna
    a piena larghezza per volta (di default "primary"), con una maniglia
    fissa sul bordo destro che fa scorrere dentro l'altra colonna. */
