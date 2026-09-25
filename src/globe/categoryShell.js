@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -470,7 +473,54 @@ const KIDS_SHAPES = [
   () => buildRegularPolygonShape(5),
   () => buildRegularPolygonShape(6),
 ];
-const KIDS_PALETTE = ['#ff5252', '#ffab40', '#ffd740', '#40c4ff', '#e040fb', '#69f0ae'];
+// Colori pieni e saturi (fragola, arancio, limone, menta, azzurro, viola,
+// rosa): sul fondo nero del globo i vecchi toni semitrasparenti risultavano
+// spenti, questi si vedono bene anche sul lato in ombra (vedi il materiale
+// "vivace" in buildCategoryShell).
+const KIDS_PALETTE = ['#FF4D6D', '#FF9F1C', '#FFD60A', '#2EE59D', '#3A86FF', '#9D4EDD', '#FF5DCF'];
+
+// Alone morbido dietro ogni forma del mondo Bambini: una sola texture
+// radiale condivisa da tutti gli sprite (il colore lo dà il materiale).
+let glowTextureCache;
+function getGlowTexture() {
+  if (glowTextureCache) return glowTextureCache;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
+  gradient.addColorStop(0.3, 'rgba(255,255,255,0.45)');
+  gradient.addColorStop(0.65, 'rgba(255,255,255,0.12)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  glowTextureCache = new THREE.CanvasTexture(canvas);
+  glowTextureCache.minFilter = THREE.LinearFilter;
+  return glowTextureCache;
+}
+
+// Parametri di "vita" delle forme del mondo Bambini: pulsazione di scala
+// 1 -> 1.06 -> 1 ogni ~2.5 s (sfasata per forma), leggero galleggiamento
+// lungo la normale, e all'hover/selezione scala 1.15 con alone più forte.
+const VIVID_PULSE_AMOUNT = 0.06;
+const VIVID_PULSE_PERIOD_S = 2.5;
+const VIVID_FLOAT_AMOUNT = 0.9;
+const VIVID_FLOAT_PERIOD_S = 3.4;
+const VIVID_HOVER_SCALE = 1.15;
+const VIVID_OPACITY = 0.95;
+const VIVID_GLOW_OPACITY = 0.55;
+const VIVID_GLOW_OPACITY_HOVER = 0.95;
+const VIVID_GLOW_SIZE = 3.2;
+const VIVID_EDGE_WIDTH_PX = 2.5;
+// Le forme vivaci stanno sopra al guscio a rete del globo (raggio 128, vedi
+// networkOverlay.js buildNetworkShell), non sotto come i triangoli storici
+// (122.6): le linee della rete, disegnate prima e con il depth test, si
+// stampavano come righe scure sopra alle forme piene. Con il galleggiamento
+// (±VIVID_FLOAT_AMOUNT) il minimo resta comunque sopra i 128.
+const VIVID_SURFACE_LIFT = 8;
+const VIVID_RENDER_ORDER = 1;
 
 // Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
 // all'indice della categoria dentro il proprio mondo — un unico punto da
@@ -581,7 +631,14 @@ function wrapLabelLines(ctx, text, singleLineMax) {
 // etichette corte): niente viene mai tagliato ai bordi.
 // textColor: colore del testo (default bianco); il satellite di un mondo
 // disattivato usa un grigio spento (vedi satelliteGlobes.js).
-export function makeLabelSprite(text, spriteScale, textColor = '#ffffff') {
+// options.pill: sfondo a pillola chiaro (bianco) con testo scuro e un
+// sottile bordo del colore della forma, al posto del riquadro grigio scuro
+// — usato dal mondo Bambini per restare leggibile accanto a forme accese.
+export function makeLabelSprite(text, spriteScale, textColor = '#ffffff', options = {}) {
+  const pill = Boolean(options.pill);
+  const pillColor = options.pillColor ?? '#ffffff';
+  const pillBorder = options.pillBorder ?? null;
+  const resolvedTextColor = pill ? (options.pillTextColor ?? '#1b1233') : textColor;
   const canvasScale = 4;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -610,7 +667,7 @@ export function makeLabelSprite(text, spriteScale, textColor = '#ffffff') {
   const boxH = lines.length * lineHeight + padY * 2;
   const boxX = centerX - boxW / 2;
   const boxY = canvasH / 2 - boxH / 2;
-  const radius = 10;
+  const radius = pill ? boxH / 2 : 10;
 
   ctx.beginPath();
   ctx.moveTo(boxX + radius, boxY);
@@ -619,12 +676,17 @@ export function makeLabelSprite(text, spriteScale, textColor = '#ffffff') {
   ctx.arcTo(boxX, boxY + boxH, boxX, boxY, radius);
   ctx.arcTo(boxX, boxY, boxX + boxW, boxY, radius);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(6, 4, 12, 0.78)';
+  ctx.fillStyle = pill ? pillColor : 'rgba(6, 4, 12, 0.78)';
   ctx.fill();
+  if (pill && pillBorder) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = pillBorder;
+    ctx.stroke();
+  }
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = textColor;
+  ctx.fillStyle = resolvedTextColor;
   const startY = canvasH / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, i) => ctx.fillText(line, centerX, startY + i * lineHeight));
 
@@ -717,6 +779,22 @@ export function buildCategoryShell(
   const positions = {};
   const labelSprites = [];
   const disposables = [geo];
+  // Solo mondo Bambini ("vivace"): forme piene e luminose, bordo bianco,
+  // alone e animazione. Gli altri mondi restano sul materiale storico.
+  const vivid = shapeType === 'kids';
+  const vividItems = [];
+  // Un solo materiale per tutti i bordi bianchi (la larghezza in pixel
+  // richiede la risoluzione del canvas: la aggiorna update(), vedi sotto).
+  const edgeMaterial = vivid
+    ? new LineMaterial({
+        color: 0xffffff,
+        linewidth: VIVID_EDGE_WIDTH_PX,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+      })
+    : null;
+  if (edgeMaterial) disposables.push(edgeMaterial);
   const usedFaces = new Set();
   const blockedFaces = new Set();
 
@@ -774,32 +852,109 @@ export function buildCategoryShell(
 
     const face = buildCategoryFaceShape(shapeType, index, cat.id);
     let faceGeo;
+    let shapeCenter = null;
+    let shapeScale = 0;
     if (face) {
-      const shapeCenter = normal.clone().multiplyScalar(radius);
-      const scale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
+      shapeCenter = normal.clone().multiplyScalar(radius);
+      shapeScale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
-      placeShapeOnSphere(faceGeo, normal, shapeCenter, scale);
+      if (vivid) {
+        // Geometria lasciata LOCALE (piana, centrata nell'origine): la
+        // posizione/orientamento sulla sfera li porta il perno (pivot)
+        // sotto, così scala (pulsazione) e spostamento (galleggiamento)
+        // si applicano attorno al centro della forma e non al centro del
+        // globo. Stesso risultato di placeShapeOnSphere a riposo.
+        faceGeo.scale(shapeScale, shapeScale, 1);
+      } else {
+        placeShapeOnSphere(faceGeo, normal, shapeCenter, shapeScale);
+      }
     } else {
       faceGeo = new THREE.BufferGeometry();
       faceGeo.setAttribute('position', new THREE.Float32BufferAttribute([sa.x, sa.y, sa.z, sb.x, sb.y, sb.z, sc.x, sc.y, sc.z], 3));
       faceGeo.computeVertexNormals();
     }
 
+    const faceColor = face?.color ?? color;
     const material = new THREE.MeshBasicMaterial({
-      color: face?.color ?? color,
+      color: faceColor,
       transparent: true,
-      opacity: 0.2,
+      // Vivace: colore pieno (niente "vetro scuro"); MeshBasicMaterial non
+      // risente delle luci, quindi resta acceso anche sul lato in ombra.
+      opacity: vivid ? VIVID_OPACITY : 0.2,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
     const mesh = new THREE.Mesh(faceGeo, material);
     mesh.userData.categoryId = cat.id;
-    group.add(mesh);
     faceMeshes.push(mesh);
     disposables.push(faceGeo, material);
 
-    const { sprite, material: labelMat, texture } = makeLabelSprite(cat.label, labelScale);
-    sprite.position.copy(normal).multiplyScalar(radius + 3);
+    if (vivid && shapeCenter) {
+      const pivot = new THREE.Group();
+      const worldUp = Math.abs(normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+      const right = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+      const up = new THREE.Vector3().crossVectors(normal, right).normalize();
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, normal));
+      const restPosition = shapeCenter.clone().addScaledVector(normal, SHAPE_SURFACE_OFFSET + VIVID_SURFACE_LIFT);
+      pivot.position.copy(restPosition);
+      // Ordine di disegno fisso, dopo le linee della rete (renderOrder 0):
+      // il depth test resta attivo, quindi il globo continua a nasconderle
+      // sul retro come sempre.
+      mesh.renderOrder = VIVID_RENDER_ORDER;
+      pivot.add(mesh);
+
+      // Bordo bianco luminoso (2-3 px reali a schermo: LineBasicMaterial
+      // in WebGL resta sempre a 1 px, per questo le "fat lines").
+      const edges = new THREE.EdgesGeometry(faceGeo);
+      const edgeGeo = new LineSegmentsGeometry().fromEdgesGeometry(edges);
+      edges.dispose();
+      const edgeLines = new LineSegments2(edgeGeo, edgeMaterial);
+      edgeLines.position.z = 0.15;
+      edgeLines.renderOrder = VIVID_RENDER_ORDER;
+      edgeLines.computeLineDistances();
+      pivot.add(edgeLines);
+      disposables.push(edgeGeo);
+
+      // Alone: sprite radiale additivo del colore della forma, dietro di lei.
+      const glowMaterial = new THREE.SpriteMaterial({
+        map: getGlowTexture(),
+        color: faceColor,
+        transparent: true,
+        opacity: VIVID_GLOW_OPACITY,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMaterial);
+      glow.position.z = -0.3;
+      glow.renderOrder = VIVID_RENDER_ORDER;
+      glow.scale.setScalar(shapeScale * VIVID_GLOW_SIZE);
+      pivot.add(glow);
+      disposables.push(glowMaterial);
+
+      group.add(pivot);
+      vividItems.push({
+        id: cat.id,
+        pivot,
+        glowMaterial,
+        normal: normal.clone(),
+        restPosition,
+        phase: (index * Math.PI * 2 * 0.37) % (Math.PI * 2),
+        emphasis: 0, // 0 = riposo, 1 = hover/attiva (interpolato in update)
+        hovered: false,
+        active: false,
+      });
+    } else {
+      group.add(mesh);
+    }
+
+    const { sprite, material: labelMat, texture } = makeLabelSprite(
+      cat.label,
+      labelScale,
+      '#ffffff',
+      vivid ? { pill: true, pillBorder: faceColor } : {}
+    );
+    sprite.position.copy(normal).multiplyScalar(radius + 3 + (vivid ? VIVID_SURFACE_LIFT : 0));
+    if (vivid) sprite.renderOrder = VIVID_RENDER_ORDER + 1;
     sprite.userData.categoryId = cat.id;
     group.add(sprite);
     labelSprites.push(sprite);
@@ -807,14 +962,88 @@ export function buildCategoryShell(
   });
 
   function setActive(activeId) {
+    if (vivid) {
+      vividItems.forEach((item) => {
+        item.active = item.id === activeId;
+      });
+      return;
+    }
     faceMeshes.forEach((mesh) => {
       mesh.material.opacity = mesh.userData.categoryId === activeId ? 0.45 : 0.2;
     });
+  }
+
+  // Hover del mouse su una forma (solo mondo vivace; altrove non fa nulla):
+  // la forma cresce a 1.15 e l'alone si accende di più, vedi update().
+  function setHovered(hoveredId) {
+    if (!vivid) return;
+    vividItems.forEach((item) => {
+      item.hovered = item.id === hoveredId;
+    });
+  }
+
+  // Un passo di animazione, chiamato dal giro di disegno del globo (mai un
+  // requestAnimationFrame a parte). reduceMotion: niente pulsazione né
+  // galleggiamento (colori, bordo e alone restano). A scheda nascosta non
+  // si fa nulla. viewportSize (larghezza/altezza del canvas in px CSS)
+  // serve alla larghezza in pixel del bordo bianco.
+  const lastViewport = new THREE.Vector2(-1, -1);
+  const worldPos = new THREE.Vector3();
+  const toCamera = new THREE.Vector3();
+  const worldNormal = new THREE.Vector3();
+  function update(elapsed, deltaSec, { reduceMotion = false, viewportSize = null, camera = null } = {}) {
+    if (!vivid || document.hidden) return;
+    if (viewportSize && !lastViewport.equals(viewportSize)) {
+      lastViewport.copy(viewportSize);
+      edgeMaterial.resolution.copy(viewportSize);
+    }
+    // Interpolazione morbida verso lo stato hover/attivo (~150 ms).
+    const easeStep = Math.min(1, deltaSec * 8);
+    for (let i = 0; i < vividItems.length; i++) {
+      const item = vividItems[i];
+      // Sul retro del globo rispetto alla camera la forma si spegne del
+      // tutto (pivot.visible): stando sopra al guscio, vicino al bordo
+      // spunterebbe altrimenti come una lamella bianca vista di taglio.
+      if (camera) {
+        item.pivot.getWorldPosition(worldPos);
+        worldNormal.copy(worldPos).normalize();
+        toCamera.copy(camera.position).sub(worldPos).normalize();
+        const facing = worldNormal.dot(toCamera) > 0.03;
+        if (item.pivot.visible !== facing) item.pivot.visible = facing;
+        if (!facing) continue;
+      }
+      const target = item.hovered || item.active ? 1 : 0;
+      item.emphasis += (target - item.emphasis) * easeStep;
+      if (Math.abs(target - item.emphasis) < 0.002) item.emphasis = target;
+
+      let pulse = 1;
+      let lift = 0;
+      if (!reduceMotion) {
+        const pulseT = (elapsed / VIVID_PULSE_PERIOD_S) * Math.PI * 2 + item.phase;
+        pulse = 1 + VIVID_PULSE_AMOUNT * (0.5 - 0.5 * Math.cos(pulseT));
+        lift = VIVID_FLOAT_AMOUNT * Math.sin((elapsed / VIVID_FLOAT_PERIOD_S) * Math.PI * 2 + item.phase * 1.7);
+      }
+      const scale = pulse * (1 + (VIVID_HOVER_SCALE - 1) * item.emphasis);
+      item.pivot.scale.setScalar(scale);
+      item.pivot.position.copy(item.restPosition).addScaledVector(item.normal, lift);
+      item.glowMaterial.opacity = VIVID_GLOW_OPACITY + (VIVID_GLOW_OPACITY_HOVER - VIVID_GLOW_OPACITY) * item.emphasis;
+    }
   }
 
   function dispose() {
     disposables.forEach((d) => d.dispose && d.dispose());
   }
 
-  return { group, faceMeshes, triangles, positions, labelSprites, setActive, dispose };
+  return {
+    group,
+    faceMeshes,
+    triangles,
+    positions,
+    labelSprites,
+    setActive,
+    setHovered,
+    update,
+    supportsHover: vivid,
+    dispose,
+  };
 }
