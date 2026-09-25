@@ -1,14 +1,11 @@
 import { useState } from 'react';
+import { apiProxy } from '../../data/apiProxy';
 import './GifPicker.css';
 
 // Le GIF arrivano SOLO da GIPHY con il filtro contenuti più severo attivo
 // (rating=g, "General audiences") e non è mai disattivabile da qui: nessuna
-// ricerca gif senza filtro. Chiave propria dell'app (Web SDK, creata sul
-// portale sviluppatori GIPHY), non più quella pubblica di prova condivisa:
-// così le ricerche non dipendono più dal rate limit di migliaia di altre
-// app demo nel mondo.
-const GIPHY_API_KEY = 'hm5LPni1NFdC5eNfStQ5bj7R9DiHH7om';
-const SAFE_RATING = 'g';
+// ricerca gif senza filtro (fissato nell'edge function api-proxy, che
+// tiene anche la chiave GIPHY lontana dal sito).
 
 export default function GifPicker({ onSelect, onClose }) {
   const [query, setQuery] = useState('');
@@ -23,15 +20,14 @@ export default function GifPicker({ onSelect, onClose }) {
     setError('');
     setSearched(true);
     try {
-      const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query.trim())}&limit=12&rating=${SAFE_RATING}&lang=it`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
-      setResults(data.data ?? []);
+      const data = await apiProxy('giphy', { q: query.trim() });
+      setResults(data?.data ?? []);
     } catch (err) {
       setError(
-        err.message === '429'
-          ? 'Troppe ricerche in poco tempo, GIPHY ha messo in pausa le richieste. Riprova tra qualche minuto.'
+        err.message === 'quota'
+          ? 'Troppe ricerche in poco tempo, le GIF sono in pausa. Riprova tra qualche minuto.'
+          : err.message === 'login'
+          ? 'Accedi per cercare le GIF.'
           : 'Impossibile cercare le GIF ora. Riprova più tardi.'
       );
       setResults([]);
