@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import '../kit/gameKit.css';
 import './ForzaQuattro.css';
+import { KIT_COLORS } from '../kit/palette';
+import { useTrayTilt } from '../kit/useTrayTilt';
+import Button3D from '../kit/Button3D';
+import Hud from '../kit/Hud';
+import SparkBurst from '../kit/SparkBurst';
 
 const ROWS = 6;
 const COLS = 7;
@@ -50,6 +56,26 @@ function checkWinnerAt(board, row, col, symbol) {
     if (count >= 4) return true;
   }
   return false;
+}
+
+// Come checkWinnerAt, ma restituisce le (almeno) 4 celle in fila che
+// contengono l'ultima pedina, per evidenziarle; null se non c'è vittoria.
+function winningCellsAt(board, row, col, symbol) {
+  const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const [dr, dc] of directions) {
+    const cells = [[row, col]];
+    for (const sign of [1, -1]) {
+      let r = row + dr * sign;
+      let c = col + dc * sign;
+      while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === symbol) {
+        cells.push([r, c]);
+        r += dr * sign;
+        c += dc * sign;
+      }
+    }
+    if (cells.length >= 4) return cells;
+  }
+  return null;
 }
 
 function isFull(board) {
@@ -168,31 +194,59 @@ function cpuColumn(board, cpuSymbol, humanSymbol, difficulty) {
 // Famiglia 2 (logica a turni), pensato per essere un gradino più
 // impegnativo del Tris: griglia più grande, e sul livello difficile la CPU
 // gioca con un vero minimax (a profondità limitata, non a colpo d'occhio).
+//
+// Grafica (kit comune, vedi ../kit/gameKit.css): vassoio azzurro con fori
+// veri (ogni cella del piatto è un gradiente radiale trasparente al centro,
+// con un'ombra interna sul bordo del foro), le pedine sono dischi lucidi
+// con bordo zigrinato che cadono nello strato SOTTO al piatto con gravità
+// e due rimbalzi; le 4 vincenti pulsano con un alone e le altre si
+// spengono. Fatto in DOM/CSS, non in three.js: un canvas 3D dedicato
+// costerebbe un secondo renderer sul telefono per un guadagno modesto.
+
+const R_COLOR = KIT_COLORS.fragola;
+const Y_COLOR = KIT_COLORS.limone;
+
 export default function ForzaQuattro({ onFinish, difficulty = 'medio' }) {
   const [mode, setMode] = useState(null); // null | '2p' | 'cpu'
   const [board, setBoard] = useState(emptyBoard);
   const [turn, setTurn] = useState('R');
   const [winner, setWinner] = useState(null); // 'R' | 'Y' | 'draw' | null
   const [thinking, setThinking] = useState(false);
+  // Pedine nell'ordine in cui sono cadute (ognuna con la propria animazione
+  // di caduta, mai riavviata dalle mosse successive: la lista cresce e basta).
+  const [discs, setDiscs] = useState([]); // { key, row, col, symbol }
+  const [winCells, setWinCells] = useState(null); // [[r,c],...]
+  const [burst, setBurst] = useState(null); // { x, y, key }
+  const trayRef = useTrayTilt(4);
+  const boardRef = useRef(null);
 
   const dropIn = (col, symbol) => {
     const move = applyMove(board, col, symbol);
     if (!move) return null;
     setBoard(move.board);
-    if (checkWinnerAt(move.board, move.row, col, symbol)) {
+    setDiscs((d) => [...d, { key: d.length, row: move.row, col, symbol }]);
+    const cells = winningCellsAt(move.board, move.row, col, symbol);
+    if (cells) {
       setWinner(symbol);
+      setWinCells(cells);
+      // Scintille sulla pedina appena caduta, dopo che è atterrata.
+      const el = boardRef.current;
+      if (el) {
+        const cell = el.getBoundingClientRect().width / COLS;
+        setBurst({ x: (col + 0.5) * cell, y: (ROWS - 1 - move.row + 0.5) * cell, key: discs.length });
+      }
       setTimeout(() => {
         if (mode === 'cpu') {
           const score = symbol === 'R' ? 100 : 0;
           const detail = symbol === 'R' ? 'Hai vinto tu!' : 'Ha vinto il computer.';
           onFinish(score, { detail });
         } else {
-          onFinish(100, { detail: `Ha vinto il giocatore ${symbol === 'R' ? '1 (rosso)' : '2 (giallo)'}!` });
+          onFinish(100, { detail: `Ha vinto il giocatore ${symbol === 'R' ? '1 (fragola)' : '2 (limone)'}!` });
         }
-      }, 1000);
+      }, 2000);
     } else if (isFull(move.board)) {
       setWinner('draw');
-      setTimeout(() => onFinish(50, { detail: 'Pareggio, griglia piena!' }), 1000);
+      setTimeout(() => onFinish(50, { detail: 'Pareggio, griglia piena!' }), 1200);
     } else {
       setTurn(symbol === 'R' ? 'Y' : 'R');
     }
@@ -215,7 +269,7 @@ export default function ForzaQuattro({ onFinish, difficulty = 'medio' }) {
       const col = cpuColumn(board, 'Y', 'R', difficulty);
       setThinking(false);
       if (col !== null && col !== undefined) dropIn(col, 'Y');
-    }, 450);
+    }, 650);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, turn, board, winner]);
@@ -223,49 +277,102 @@ export default function ForzaQuattro({ onFinish, difficulty = 'medio' }) {
   const startGame = (m) => {
     setMode(m);
     setBoard(emptyBoard());
+    setDiscs([]);
+    setWinCells(null);
+    setBurst(null);
     setTurn('R');
     setWinner(null);
   };
 
   if (!mode) {
     return (
-      <div className="rb-forza4-setup">
+      <div className="gk-mode-setup">
         <p>Scegli come giocare:</p>
-        <button type="button" className="rb-forza4-mode-btn" onClick={() => startGame('2p')}>
-          2 giocatori locali
-        </button>
-        <button type="button" className="rb-forza4-mode-btn" onClick={() => startGame('cpu')}>
-          Contro il computer
-        </button>
+        <Button3D className="wide" color={R_COLOR} onClick={() => startGame('2p')}>
+          👫 2 giocatori locali
+        </Button3D>
+        <Button3D className="wide" color={Y_COLOR} onClick={() => startGame('cpu')}>
+          🤖 Contro il computer
+        </Button3D>
       </div>
     );
   }
 
+  const players = [
+    { id: 'R', color: R_COLOR, label: mode === 'cpu' ? 'Tu' : 'Giocatore 1', icon: '', active: !winner && turn === 'R' },
+    { id: 'Y', color: Y_COLOR, label: mode === 'cpu' ? 'Computer' : 'Giocatore 2', icon: '', active: !winner && turn === 'Y' },
+  ];
+  const status = winner
+    ? winner === 'draw'
+      ? 'Pareggio, griglia piena!'
+      : mode === 'cpu'
+      ? winner === 'R'
+        ? 'Hai vinto tu! 🎉'
+        : 'Ha vinto il computer.'
+      : `Vince il giocatore ${winner === 'R' ? '1' : '2'}! 🎉`
+    : thinking
+    ? 'Il computer sta pensando…'
+    : mode === 'cpu'
+    ? 'Tocca a te: scegli una colonna'
+    : `Tocca al giocatore ${turn === 'R' ? '1' : '2'}`;
+  const isWinCell = (r, c) => winCells?.some(([wr, wc]) => wr === r && wc === c);
+
   return (
-    <div className="rb-forza4">
-      <p className="rb-forza4-status">
-        {winner
-          ? winner === 'draw'
-            ? 'Pareggio!'
-            : `Vince ${winner === 'R' ? '🔴' : '🟡'}!`
-          : thinking
-          ? 'Il computer sta pensando…'
-          : `Turno: ${turn === 'R' ? '🔴' : '🟡'}`}
-      </p>
-      <div className="rb-forza4-board">
-        {Array.from({ length: COLS }, (_, c) => (
-          <button
-            key={c}
-            type="button"
-            className="rb-forza4-col"
-            onClick={() => playCol(c)}
-            disabled={!!winner || thinking || board[ROWS - 1][c] !== null}
-          >
-            {Array.from({ length: ROWS }, (_, r) => ROWS - 1 - r).map((r) => (
-              <span key={r} className={`rb-forza4-cell ${board[r][c] ? `filled-${board[r][c]}` : ''}`} />
-            ))}
-          </button>
-        ))}
+    <div className="rb-f4">
+      <Hud players={players} status={status} />
+      <div className="gk-stage">
+        <div
+          ref={trayRef}
+          className="gk-tray rb-f4-tray"
+          style={{ '--turn': turn === 'R' ? R_COLOR : Y_COLOR }}
+        >
+          <div ref={boardRef} className={`rb-f4-board ${winner === 'draw' ? 'gk-shake' : ''}`}>
+            {/* Strato 1: le pedine, sotto al piatto. */}
+            <div className="rb-f4-discs" aria-hidden="true">
+              {discs.map((d) => {
+                const win = winCells ? isWinCell(d.row, d.col) : false;
+                return (
+                  <span
+                    key={d.key}
+                    className={`rb-f4-drop ${win ? 'on-top' : ''}`}
+                    style={{
+                      gridColumn: d.col + 1,
+                      gridRow: ROWS - d.row,
+                      '--drop-rows': ROWS - d.row,
+                      '--drop-ms': `${260 + 75 * (ROWS - d.row)}ms`,
+                    }}
+                  >
+                    <span
+                      className={`rb-f4-disc gk-candy ${d.symbol === 'R' ? 'r' : 'y'} ${
+                        winCells ? (win ? 'win' : 'dim') : ''
+                      }`}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+            {/* Strato 2: il piatto azzurro con i fori. */}
+            <div className="rb-f4-plate" aria-hidden="true">
+              {Array.from({ length: ROWS * COLS }, (_, i) => (
+                <span key={i} className="rb-f4-hole" />
+              ))}
+            </div>
+            {/* Strato 3: le colonne cliccabili (trasparenti, sopra a tutto). */}
+            <div className="rb-f4-cols">
+              {Array.from({ length: COLS }, (_, c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="rb-f4-col"
+                  onClick={() => playCol(c)}
+                  disabled={!!winner || thinking || board[ROWS - 1][c] !== null || (mode === 'cpu' && turn !== 'R')}
+                  aria-label={`Colonna ${c + 1}`}
+                />
+              ))}
+            </div>
+            {burst && <SparkBurst x={burst.x} y={burst.y} burstKey={burst.key} count={40} />}
+          </div>
+        </div>
       </div>
     </div>
   );
