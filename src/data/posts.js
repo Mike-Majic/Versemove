@@ -156,6 +156,64 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
 
 // Commenti (non cancellati) di uno o più post, più vecchi prima, con
 // l'autore già risolto.
+// Reazioni emoji ai commenti (tabella comment_reactions): per ogni
+// commento i conteggi per emoji e quelle messe da me.
+export const COMMENT_REACTION_EMOJIS = ['❤️', '😂', '👍'];
+
+async function fetchCommentReactions(commentIds) {
+  const out = new Map();
+  if (!commentIds?.length) return out;
+  try {
+    const [{ data: auth }, { data }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('comment_reactions').select('comment_id, user_id, emoji').in('comment_id', commentIds),
+    ]);
+    const me = auth?.user?.id ?? null;
+    for (const r of data ?? []) {
+      const entry = out.get(r.comment_id) ?? { counts: {}, mine: [] };
+      entry.counts[r.emoji] = (entry.counts[r.emoji] ?? 0) + 1;
+      if (me && r.user_id === me) entry.mine.push(r.emoji);
+      out.set(r.comment_id, entry);
+    }
+  } catch {
+    // Senza reazioni i commenti si mostrano lo stesso.
+  }
+  return out;
+}
+
+// Mette o toglie la mia reazione `emoji` al commento. -> {} | { error }
+export async function toggleCommentReaction(commentId, emoji, alreadyMine) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    if (alreadyMine) {
+      const { error } = await supabase.from('comment_reactions').delete().eq('comment_id', commentId).eq('user_id', auth.user.id).eq('emoji', emoji);
+      return error ? { error: error.message } : {};
+    }
+    const { error } = await supabase.from('comment_reactions').insert({ comment_id: commentId, user_id: auth.user.id, emoji });
+    if (error && error.code !== '23505') return { error: translateInteractionError(error) };
+    return {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// Aggiornamento ottimistico della lista commenti dopo un tocco su una
+// reazione (stesso calcolo per tutti i feed).
+export function applyCommentReaction(comments, commentId, emoji) {
+  return comments.map((c) => {
+    if (c.id !== commentId) return c;
+    const mine = c.mieReazioni ?? [];
+    const had = mine.includes(emoji);
+    const count = Math.max(0, (c.reazioni?.[emoji] ?? 0) + (had ? -1 : 1));
+    return {
+      ...c,
+      reazioni: { ...c.reazioni, [emoji]: count },
+      mieReazioni: had ? mine.filter((e) => e !== emoji) : [...mine, emoji],
+    };
+  });
+}
+
 export async function fetchComments(postIds) {
   try {
     if (!postIds?.length) return { comments: [] };
@@ -168,7 +226,10 @@ export async function fetchComments(postIds) {
     if (error) return { error: error.message };
     if (!data) return { comments: [] };
 
-    const profilesMap = await fetchProfilesMap(data.map((c) => c.author_id));
+    const [profilesMap, reactions] = await Promise.all([
+      fetchProfilesMap(data.map((c) => c.author_id)),
+      fetchCommentReactions(data.map((c) => c.id)),
+    ]);
     const comments = data.map((row) => {
       const media = Array.isArray(row.media) ? row.media : [];
       const gifItem = media.find((m) => m.kind === 'gif');
@@ -181,7 +242,8 @@ export async function fetchComments(postIds) {
         menzioni: row.menzioni ?? [],
         data: row.created_at,
         gif: gifItem?.url ?? null,
-        reazioni: {},
+        reazioni: reactions.get(row.id)?.counts ?? {},
+        mieReazioni: reactions.get(row.id)?.mine ?? [],
       };
     });
     return { comments };

@@ -26,6 +26,8 @@ import {
   addComment as addCommentApi,
   deleteComment as deleteCommentApi,
   displayName,
+  applyCommentReaction,
+  toggleCommentReaction,
 } from '../../data/posts';
 import { listGroups, getMyGroupIds, createGroup as createGroupApi, joinGroup, leaveGroup } from '../../data/groups';
 import { isStaff } from '../../data/roles';
@@ -408,18 +410,20 @@ export default function SocialFeed({
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   };
 
-  // Le reazioni emoji ai commenti restano solo un contatore locale a questa
-  // sessione (non c'è una tabella per salvarle condivise tra utenti/
-  // dispositivi): si azzerano ricaricando la pagina, invariato rispetto a
-  // prima per il resto dell'interazione.
-  const reactToComment = (commentId, emoji) => {
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c.id !== commentId) return c;
-        const current = c.reazioni?.[emoji] ?? 0;
-        return { ...c, reazioni: { ...c.reazioni, [emoji]: current + 1 } };
-      })
-    );
+  // Reazioni ai commenti: salvate in comment_reactions (una per emoji per
+  // utente), aggiornamento ottimistico e ritorno indietro se il server dice no.
+  const reactToComment = async (commentId, emoji) => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    const had = (comments.find((c) => c.id === commentId)?.mieReazioni ?? []).includes(emoji);
+    setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+    const { error: reactErr } = await toggleCommentReaction(commentId, emoji, had);
+    if (reactErr) {
+      setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+      setFeedError(reactErr);
+    }
   };
 
   const toggleFollow = async (userId) => {

@@ -1016,7 +1016,10 @@ export default function App() {
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
   // su Incontri/Lavoro) serve essere maggiorenni, solo dopo conta se
   // l'utente ha scelto di disattivare questo mondo dalle Impostazioni.
-  const needsAuthForWorld = !user;
+  // Il mondo FAQ (Informazioni, Termini e Privacy, Segnalazioni) si apre
+  // anche senza account: è il posto dove chi non è registrato capisce cos'è
+  // Versemove e legge l'informativa (il banner dei cookie rimanda lì).
+  const needsAuthForWorld = !user && world.id !== 'faq';
   const ageBlockedForWorld = isAgeGatedWorld && !needsAuthForWorld && !isAdult(user?.dataNascita);
   // FAQ resta sempre attivo (è il posto dove si chiede aiuto): non lo si
   // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui. Work in
@@ -1182,7 +1185,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {world.id === 'faq' && user && (
+      {world.id === 'faq' && (
         <Suspense fallback={<PageLoading />}>
           <FaqWorldExplorer
             world={world}

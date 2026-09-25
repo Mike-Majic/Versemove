@@ -10,6 +10,8 @@ import {
   togglePostLike as togglePostLikeApi,
   toggleSavedPost as toggleSavedPostApi,
   addComment as addCommentApi,
+  applyCommentReaction,
+  toggleCommentReaction,
 } from '../../data/posts';
 import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
 import { getFamily, familyRelationLabel } from '../../data/family';
@@ -98,16 +100,19 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
     reload();
   };
 
-  // Reazioni emoji ai commenti: solo un contatore locale, stessa scelta del
-  // feed principale (nessuna tabella per salvarle condivise).
-  const handleReactToComment = (commentId, emoji) => {
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c.id !== commentId) return c;
-        const current = c.reazioni?.[emoji] ?? 0;
-        return { ...c, reazioni: { ...c.reazioni, [emoji]: current + 1 } };
-      })
-    );
+  // Reazioni ai commenti: salvate in comment_reactions.
+  const handleReactToComment = async (commentId, emoji) => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    const had = (comments.find((c) => c.id === commentId)?.mieReazioni ?? []).includes(emoji);
+    setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+    const { error: reactErr } = await toggleCommentReaction(commentId, emoji, had);
+    if (reactErr) {
+      setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+      setError(reactErr);
+    }
   };
 
   return (

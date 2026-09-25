@@ -3,6 +3,7 @@ import { listFaqArticles, createFaqArticle, updateFaqArticle, setFaqArticleVisib
 import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import Skeleton from '../Skeleton';
+import TermsModal from '../TermsModal';
 
 function ArticleEditForm({ initial, onCancel, onSave }) {
   const [sezione, setSezione] = useState(initial?.sezione ?? '');
@@ -47,6 +48,7 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const refresh = () => listFaqArticles({ includeUnpublished: staff }).then(setArticles);
   useEffect(refresh, [staff]);
@@ -81,6 +83,13 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
           </button>
         )}
       </div>
+
+      {/* Termini e Privacy sempre in cima, anche per chi non ha un account
+          (il banner dei cookie porta qui). */}
+      <button type="button" className="rb-faq-terms-btn" onClick={() => setTermsOpen(true)}>
+        📄 Termini di servizio e Privacy
+      </button>
+      {termsOpen && <TermsModal open onClose={() => setTermsOpen(false)} />}
 
       {creating && (
         <ArticleEditForm

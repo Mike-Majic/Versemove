@@ -9,6 +9,8 @@ import {
   togglePostLike as togglePostLikeApi,
   toggleSavedPost as toggleSavedPostApi,
   updatePostText as updatePostTextApi,
+  applyCommentReaction,
+  toggleCommentReaction,
 } from '../../../data/posts';
 import { toggleContentLike as toggleContentLikeApi } from '../../../data/contents';
 import { COMMUNITY_TOPICS, COSPLAY_CATEGORY_ID, COSPLAY_POST_TAGS, FONTE_SERIE, fetchEventiVicini } from '../../../data/cosplay';
@@ -141,8 +143,18 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
   const handleDeleteComment = withReload((commentId) => deleteCommentApi(commentId));
   const handleEditPost = withReload((postId, testo) => updatePostTextApi(postId, testo));
   const handleDeletePost = withReload((postId) => softDeletePostApi(postId));
-  const handleReactToComment = (commentId, emoji) => {
-    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, reazioni: { ...c.reazioni, [emoji]: (c.reazioni?.[emoji] ?? 0) + 1 } } : c)));
+  const handleReactToComment = async (commentId, emoji) => {
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+    const had = (comments.find((c) => c.id === commentId)?.mieReazioni ?? []).includes(emoji);
+    setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+    const { error: reactErr } = await toggleCommentReaction(commentId, emoji, had);
+    if (reactErr) {
+      setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+      setError(reactErr);
+    }
   };
 
   const fieldsNode = useMemo(() => {

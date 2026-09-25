@@ -5,6 +5,7 @@ import CustomSelect from '../shared/CustomSelect';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
+import { safeFileName } from '../../data/storagePath';
 
 const CATEGORIE = [
   { value: 'Bug', label: 'Bug' },
@@ -53,7 +54,7 @@ export default function SegnalazioniColumn({ user, onOpenAuth, closing = false }
     setError('');
     let dettagli = descrizione.trim();
     if (screenshot) {
-      const path = `${user.id}/report-${Date.now()}-${screenshot.name}`;
+      const path = `${user.id}/report-${Date.now()}-${safeFileName(screenshot.name)}`;
       const { error: uploadError } = await supabase.storage.from('content-media').upload(path, screenshot);
       if (!uploadError) {
         const { data } = supabase.storage.from('content-media').getPublicUrl(path);

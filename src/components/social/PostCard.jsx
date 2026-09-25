@@ -7,13 +7,15 @@ import TranslateHint from '../shared/TranslateHint';
 import MentionText from '../shared/MentionText';
 import { isStaff } from '../../data/roles';
 import { NERD_CATEGORIES } from '../../data/nerdCategories';
+import { COMMENT_REACTION_EMOJIS } from '../../data/posts';
 import { POST_TAGS } from '../../data/gaming';
 import GamingPostExtra from '../nerd/gaming/GamingPostExtra';
 import CosplayPostExtra from '../nerd/cosplay/CosplayPostExtra';
 import { COSPLAY_POST_TAGS } from '../../data/cosplay';
 import './PostCard.css';
 
-const REACTION_EMOJIS = ['❤️', '😂', '👍'];
+// Stesse emoji ammesse dal server (comment_reactions).
+const REACTION_EMOJIS = COMMENT_REACTION_EMOJIS;
 
 // GIF salvate come URL (niente vero upload su server per le GIF): se quel
 // link smette di funzionare (CDN, scadenza, rete) l'utente deve vedere un
@@ -46,7 +48,13 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
           {REACTION_EMOJIS.map((emoji) => {
             const count = comment.reazioni?.[emoji] ?? 0;
             return (
-              <button key={emoji} type="button" className="rb-comment-react-btn" onClick={() => onReact(comment.id, emoji)}>
+              <button
+                key={emoji}
+                type="button"
+                className={`rb-comment-react-btn ${comment.mieReazioni?.includes(emoji) ? 'is-mine' : ''}`}
+                aria-pressed={Boolean(comment.mieReazioni?.includes(emoji))}
+                onClick={() => onReact(comment.id, emoji)}
+              >
                 {emoji} {count > 0 ? count : ''}
               </button>
             );
