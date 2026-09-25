@@ -7,17 +7,18 @@ import GamingFeed from './GamingFeed';
 import '../videoRooms.css';
 import './gaming.css';
 
-// Colonna unica per le categorie Gaming PC / PS / Xbox del mondo Nerd
-// (montata da ArteExplorer per i tre id, con key = categoria, quindi
+// Colonna unica per le categorie Gaming PC / PS / Xbox / Nintendo del mondo
+// Nerd (montata da ArteExplorer per i quattro id, con key = categoria, quindi
 // cambiando categoria riparte da capo): la piattaforma della categoria è
 // il contesto di tutto. Schede in alto (stessa barra della Live): Cerco
 // compagni · Giochi · Clip · Community più quella propria della
-// piattaforma (Build / Trofei / Game Pass).
+// piattaforma (Build / Trofei / Game Pass; Nintendo non ne ha).
 // focus: { lfgId, seq } da una notifica di "Cerco compagni": apre quella
 // scheda con l'annuncio evidenziato.
 export default function GamingColumn({ category, user, onOpenAuth, focus = null }) {
   const platform = PLATFORM_BY_CATEGORY[category.id];
-  const tabs = [...GAMING_TABS, PLATFORM_TAB[platform]];
+  const platformTab = PLATFORM_TAB[platform] ?? null;
+  const tabs = [...GAMING_TABS, ...(platformTab ? [platformTab] : [])];
   const [tab, setTab] = useState(focus ? 'lfg' : 'giochi');
   // Gioco scelto da "Cerco compagni per questo gioco": precompila il form
   // della scheda Cerco compagni.
@@ -93,8 +94,8 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
         )}
         {tab === 'clip' && <GamingFeed key="clip" category={category} platform={platform} tag="clip" user={user} onOpenAuth={onOpenAuth} layout="grid" />}
         {tab === 'community' && <GamingFeed key="community" category={category} platform={platform} tag="discussione" user={user} onOpenAuth={onOpenAuth} />}
-        {tab === PLATFORM_TAB[platform].id && (
-          <GamingFeed key={PLATFORM_TAB[platform].tag} category={category} platform={platform} tag={PLATFORM_TAB[platform].tag} user={user} onOpenAuth={onOpenAuth} />
+        {platformTab && tab === platformTab.id && (
+          <GamingFeed key={platformTab.tag} category={category} platform={platform} tag={platformTab.tag} user={user} onOpenAuth={onOpenAuth} />
         )}
       </div>
     </>

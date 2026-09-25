@@ -46,6 +46,14 @@ export const NERD_CATEGORIES = [
     subfamilies: ['Esclusive Xbox', 'Game Pass', 'Sparatutto', 'Sportivi', 'Co-op'],
   },
   {
+    id: 'gaming-nintendo',
+    label: 'Gaming Nintendo',
+    icon: '🔴',
+    anchor: { lat: 30, lng: -45 },
+    aliases: ['nintendo', 'switch', 'switch 2', 'mario', 'zelda', 'pokemon', 'pokémon', 'eshop'],
+    subfamilies: ['Switch', 'Giochi Nintendo', 'Multiplayer locale', 'Amiibo e collezionismo', 'Retro Nintendo'],
+  },
+  {
     id: 'cosplay',
     label: 'Cosplay',
     icon: '🦸',
@@ -83,6 +91,7 @@ export function resolveCategoryQuery(query) {
 }
 
 export const FEATURED_SEARCHES = {
+  'gaming-nintendo': ['Zelda', 'Mario Kart', 'Pokémon', 'Animal Crossing', 'Switch 2'],
   bacheca: ['Ultime build', 'Trofei rari', 'Novità Game Pass', 'Clip della settimana'],
   'giochi-tavolo': ['Giochi cooperativi', 'Party game per gruppi grandi', 'Carte collezionabili rare', 'Giochi di ruolo per principianti', 'Strategici tedeschi', 'Giochi per due'],
   'gaming-pc': ['Build economiche', 'RPG open world', 'Indie da scoprire', 'FPS competitivi', 'Simulatori realistici'],
