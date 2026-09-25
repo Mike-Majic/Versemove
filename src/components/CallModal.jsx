@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { openCallChannel, ICE_SERVERS, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS, RING_REPEAT_MS, ringCall, setRingState, answerLatestRing, playRingtone } from '../data/calls';
+import { openCallChannel, getIceServers, logIceRoute, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS, RING_REPEAT_MS, ringCall, setRingState, answerLatestRing, playRingtone } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
 import { displayName } from '../data/posts';
 import './CallModal.css';
@@ -31,6 +31,17 @@ export default function CallModal({ conversationId, user, friend, registerStart,
   const ringTimeoutRef = useRef(null);
   const connectTimeoutRef = useRef(null);
   const pendingIceRef = useRef([]);
+  // Offerta arrivata mentre chi risponde prepara ancora media e server ICE:
+  // si tiene da parte e si usa appena la connessione esiste.
+  const pendingOfferRef = useRef(null);
+  // Server ICE chiesti in anticipo (a "Chiama" o allo squillo): la stessa
+  // richiesta vale per tutta la chiamata, anche quando non va in cache
+  // (risposta solo STUN o errore).
+  const icePromiseRef = useRef(null);
+  const preloadIce = () => {
+    if (!icePromiseRef.current) icePromiseRef.current = getIceServers();
+    return icePromiseRef.current;
+  };
   // Chi chiama ripete "ring" ogni 3 s (chi apre la chat in ritardo lo
   // riceve comunque) e tiene l'id dello squillo per segnarne l'esito.
   const ringRepeatRef = useRef(null);
@@ -71,6 +82,8 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     remoteStreamRef.current = null;
     pendingIceRef.current = [];
+    pendingOfferRef.current = null;
+    icePromiseRef.current = null;
     roleRef.current = null;
     setMuted(false);
     setCameraOff(false);
@@ -91,8 +104,8 @@ export default function CallModal({ conversationId, user, friend, registerStart,
   // invia ogni candidato ICE non appena pronto, riceve le tracce audio/
   // video dell'altra parte, e segue lo stato della connessione per il
   // timeout dei 20 secondi e per accorgersi se la chiamata cade.
-  const createPeerConnection = () => {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const createPeerConnection = (iceServers) => {
+    const pc = new RTCPeerConnection({ iceServers });
     pc.onicecandidate = (e) => {
       if (e.candidate) send('ice', { candidate: e.candidate });
     };
@@ -104,6 +117,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
       if (pc.connectionState === 'connected') {
         clearTimeout(connectTimeoutRef.current);
         setPhase('active');
+        logIceRoute(pc, 'chiamata 1:1');
       } else if (pc.connectionState === 'failed' && phaseRef.current !== 'idle' && phaseRef.current !== 'ended') {
         endWithMessage('Connessione persa.');
       }
@@ -122,9 +136,12 @@ export default function CallModal({ conversationId, user, friend, registerStart,
   // Chi risponde e chi chiama fanno la stessa cosa una volta accettata la
   // chiamata: media locale, peer connection, tracce aggiunte; cambia solo
   // chi crea l'offerta (chi ha chiamato) e chi la riceve.
+  // I server ICE (credenziali TURN temporanee, vedi data/calls.js) si
+  // chiedono insieme a fotocamera/microfono, così non aggiungono attesa;
+  // una volta per chiamata, prima di creare la connessione.
   const setupMediaAndPeer = async () => {
-    const stream = await getLocalStream();
-    const pc = createPeerConnection();
+    const [stream, iceServers] = await Promise.all([getLocalStream(), preloadIce()]);
+    const pc = createPeerConnection(iceServers);
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     connectTimeoutRef.current = setTimeout(() => {
       if (phaseRef.current === 'connecting') {
@@ -146,10 +163,19 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     pendingIceRef.current = [];
   };
 
+  const answerOffer = async (pc, sdp) => {
+    await pc.setRemoteDescription(sdp);
+    await flushPendingIce(pc);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    send('answer', { sdp: answer });
+  };
+
   const startCall = async () => {
     if (phaseRef.current !== 'idle') return;
     roleRef.current = 'caller';
     setPhase('calling');
+    preloadIce(); // precarica mentre squilla
     const ringPayload = { fromName: displayName(user), fromAvatar: user.avatar || '' };
     send('ring', ringPayload);
     ringRepeatRef.current = setInterval(() => {
@@ -181,12 +207,17 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     setPhase('connecting');
     send('accept');
     answerLatestRing(conversationId, user.id, 'accettata');
+    let pc;
     try {
-      await setupMediaAndPeer();
+      pc = await setupMediaAndPeer();
     } catch {
       send('hangup');
       endWithMessage('Non riesco ad accedere a fotocamera/microfono.');
+      return;
     }
+    const early = pendingOfferRef.current;
+    pendingOfferRef.current = null;
+    if (early) await answerOffer(pc, early);
   };
 
   const declineCall = () => {
@@ -215,6 +246,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
       if (phaseRef.current !== 'idle') return; // già in chiamata: ignora (l'altro riceverà "nessuna risposta")
       if (Date.now() < declinedUntilRef.current) return;
       roleRef.current = 'callee';
+      preloadIce(); // precarica mentre squilla
       setIncomingFrom({ name: payload?.fromName || friend?.name || 'Utente', avatar: payload?.fromAvatar || friend?.avatar || '' });
       if (autoAnswerRef.current) {
         // "Rispondi" già toccato nell'avviso globale.
@@ -242,13 +274,12 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     });
 
     channel.on('broadcast', { event: 'offer' }, async ({ payload }) => {
-      const pc = pcRef.current;
-      if (roleRef.current !== 'callee' || !pc || !payload?.sdp) return;
-      await pc.setRemoteDescription(payload.sdp);
-      await flushPendingIce(pc);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      send('answer', { sdp: answer });
+      if (roleRef.current !== 'callee' || !payload?.sdp) return;
+      if (!pcRef.current) {
+        pendingOfferRef.current = payload.sdp;
+        return;
+      }
+      await answerOffer(pcRef.current, payload.sdp);
     });
 
     channel.on('broadcast', { event: 'answer' }, async ({ payload }) => {
@@ -260,14 +291,14 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
     channel.on('broadcast', { event: 'ice' }, async ({ payload }) => {
       const pc = pcRef.current;
-      if (!pc || !payload?.candidate) return;
-      if (pc.remoteDescription) {
+      if (!payload?.candidate) return;
+      if (pc?.remoteDescription) {
         try {
           await pc.addIceCandidate(payload.candidate);
         } catch {
           // ignorato: un candidato ICE arrivato in ritardo non è fatale.
         }
-      } else {
+      } else if (phaseRef.current === 'connecting' || phaseRef.current === 'active') {
         pendingIceRef.current.push(payload.candidate);
       }
     });

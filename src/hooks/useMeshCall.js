@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { openPrivateChannel, iceServers, PEER_CONNECT_TIMEOUT_MS } from '../data/calls';
+import { openPrivateChannel, getIceServers, logIceRoute, PEER_CONNECT_TIMEOUT_MS } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
 
 // Videochiamata di gruppo "mesh" WebRTC: una RTCPeerConnection per ogni
@@ -38,6 +38,9 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
   const joinedRef = useRef(false);
   const peersRef = useRef(new Map()); // userId -> { pc, name, avatar, stream, failed, pendingIce, timer }
   const localStreamRef = useRef(null);
+  // Server ICE della chiamata (credenziali TURN temporanee): chiesti una
+  // volta all'ingresso, insieme a fotocamera/microfono, e usati per tutti.
+  const iceServersRef = useRef(null);
   const handlersRef = useRef(new Map()); // event -> Set(handler)
   const allowedRef = useRef(allowedUserIds);
   const mutedRef = useRef(mutedUserIds);
@@ -117,7 +120,7 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
       if (meta?.avatar !== undefined) entry.avatar = meta.avatar;
       return entry;
     }
-    const pc = new RTCPeerConnection({ iceServers: iceServers() });
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef.current ?? [{ urls: 'stun:stun.l.google.com:19302' }] });
     entry = { pc, name: meta?.name || 'Utente', avatar: meta?.avatar || '', stream: null, failed: false, pendingIce: [], timer: null };
     pc.onicecandidate = (e) => {
       if (e.candidate) sendRaw('ice', { to: id, from: userId, candidate: e.candidate });
@@ -130,6 +133,7 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
         clearTimeout(entry.timer);
+        logIceRoute(pc, `stanza, con ${entry.name}`);
         if (entry.failed) {
           entry.failed = false;
           refreshTiles();
@@ -285,10 +289,14 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
       if (joinedRef.current || !channelRef.current) return false;
       setJoining(true);
       setError('');
+      // Server ICE in parallelo alla richiesta di fotocamera/microfono:
+      // getIceServers non fallisce mai (al peggio solo STUN).
+      const icePromise = getIceServers();
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
         localStreamRef.current = stream;
         setLocalStream(stream);
+        iceServersRef.current = await icePromise;
       } catch {
         setError('Non riesco ad accedere a fotocamera/microfono.');
         setJoining(false);

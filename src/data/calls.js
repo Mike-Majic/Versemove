@@ -29,27 +29,78 @@ export function openPrivateChannel(topic) {
   });
 }
 
-// Server ICE: STUN pubblico di Google sempre; un TURN solo se configurato
-// con VITE_TURN_URLS (separati da virgola), VITE_TURN_USERNAME e
-// VITE_TURN_CREDENTIAL. Senza TURN, con alcune reti (4G, reti aziendali)
-// il collegamento diretto fra due persone può non riuscire.
-export function iceServers() {
-  const servers = [{ urls: 'stun:stun.l.google.com:19302' }];
-  const turnUrls = (import.meta.env.VITE_TURN_URLS ?? '')
-    .split(',')
-    .map((u) => u.trim())
-    .filter(Boolean);
-  if (turnUrls.length) {
-    servers.push({
-      urls: turnUrls,
-      username: import.meta.env.VITE_TURN_USERNAME ?? '',
-      credential: import.meta.env.VITE_TURN_CREDENTIAL ?? '',
-    });
+// Server ICE (STUN/TURN) da usare per una chiamata. Le credenziali TURN
+// sono temporanee (4 ore) e le genera l'edge function turn-credentials
+// con la chiave Cloudflare nel Vault: mai nel sito né in variabili
+// d'ambiente. Qui si tengono in memoria e si riusano finché mancano più di
+// 10 minuti alla scadenza; se la funzione risponde solo STUN (TURN non
+// configurato o Cloudflare giù) non si mette in cache e si riprova alla
+// chiamata dopo. Errore o 6 secondi senza risposta: STUN pubblico e la
+// chiamata parte lo stesso. Senza TURN, con alcune reti (4G, reti
+// aziendali) il collegamento diretto fra due persone può non riuscire.
+const STUN_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
+const ICE_TIMEOUT_MS = 6000;
+const ICE_REFRESH_MARGIN_MS = 10 * 60 * 1000;
+let iceCache = null; // { servers, source, expiresAt }
+let iceInflight = null;
+let lastIceSource = 'stun';
+
+export const getIceSource = () => lastIceSource;
+
+export function getIceServers() {
+  if (iceCache && Date.now() < iceCache.expiresAt - ICE_REFRESH_MARGIN_MS) {
+    lastIceSource = iceCache.source;
+    return Promise.resolve(iceCache.servers);
   }
-  return servers;
+  if (iceInflight) return iceInflight;
+  iceInflight = (async () => {
+    let timer;
+    try {
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timeout')), ICE_TIMEOUT_MS);
+      });
+      const { data, error } = await Promise.race([supabase.functions.invoke('turn-credentials', { body: {} }), timeout]);
+      if (error || !Array.isArray(data?.iceServers) || !data.iceServers.length) throw error ?? new Error('risposta vuota');
+      lastIceSource = data.source === 'cloudflare' ? 'cloudflare' : 'stun';
+      if (import.meta.env.DEV) console.info(`[ice] server da turn-credentials: ${lastIceSource}`);
+      if (lastIceSource === 'cloudflare' && Number(data.ttl) > 0) {
+        iceCache = { servers: data.iceServers, source: lastIceSource, expiresAt: Date.now() + Number(data.ttl) * 1000 };
+      } else {
+        iceCache = null;
+      }
+      return data.iceServers;
+    } catch {
+      lastIceSource = 'stun';
+      return STUN_FALLBACK;
+    } finally {
+      clearTimeout(timer);
+      iceInflight = null;
+    }
+  })();
+  return iceInflight;
 }
 
-export const ICE_SERVERS = iceServers();
+// Diagnostica (solo in sviluppo): da dove arrivano i server ICE e, a
+// collegamento avvenuto, che strada ha preso la chiamata. "relay" = passa
+// dal TURN; "srflx"/"host" = diretta.
+export async function logIceRoute(pc, label = 'chiamata') {
+  if (!import.meta.env.DEV) return;
+  try {
+    const stats = await pc.getStats();
+    let pair = null;
+    stats.forEach((r) => {
+      if (r.type === 'transport' && r.selectedCandidatePairId) pair = stats.get(r.selectedCandidatePairId);
+    });
+    if (!pair) stats.forEach((r) => {
+      if (!pair && r.type === 'candidate-pair' && r.state === 'succeeded' && (r.nominated || r.selected)) pair = r;
+    });
+    const local = pair ? stats.get(pair.localCandidateId) : null;
+    const remote = pair ? stats.get(pair.remoteCandidateId) : null;
+    console.info(`[ice] ${label}: server ${lastIceSource}, candidato locale ${local?.candidateType ?? '?'}, remoto ${remote?.candidateType ?? '?'}`);
+  } catch {
+    // statistiche non disponibili: niente diagnostica.
+  }
+}
 // Oltre questo tempo senza collegamento con una persona, il suo riquadro
 // dice "Connessione non riuscita" (vedi useMeshCall).
 export const PEER_CONNECT_TIMEOUT_MS = 15000;
