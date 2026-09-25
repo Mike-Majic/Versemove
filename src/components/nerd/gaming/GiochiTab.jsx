@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LIBRARY_STATES, fetchMyLibrary, fetchTitleStats, formatVote, hasRawg, searchTitles } from '../../../data/gaming';
+import { LIBRARY_STATES, fetchMyLibrary, fetchTitleStats, formatVote, searchTitles } from '../../../data/gaming';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import GameCard, { StatsLine } from './GameCard';
@@ -128,7 +128,6 @@ export default function GiochiTab({ platform, user, onOpenAuth, onLfgFor, initia
         </>
       )}
 
-      {hasRawg() && <p className="rb-gaming-footer-note">Dati giochi: RAWG</p>}
     </>
   );
 }

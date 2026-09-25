@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 
-// Gaming PC / PS / Xbox del mondo Nerd (components/nerd/gaming/): catalogo
+// Gaming PC / PS / Xbox / Nintendo del mondo Nerd (components/nerd/gaming/): catalogo
 // giochi condiviso (gaming_titles), libreria personale (gaming_library),
 // "Cerco compagni" (gaming_lfg + gaming_lfg_members) e gamertag nel
 // profilo (profiles.gamertags). Regole, fasce d'età, posti e doppioni li
@@ -9,10 +9,10 @@ import { fetchProfilesMap } from './posts';
 // RPC sono già frasi in italiano ("Il gruppo è al completo"...): si
 // mostrano così come arrivano.
 
-export const GAMING_CATEGORY_IDS = ['gaming-pc', 'gaming-ps', 'gaming-xbox'];
+export const GAMING_CATEGORY_IDS = ['gaming-pc', 'gaming-ps', 'gaming-xbox', 'gaming-nintendo'];
 
-export const PLATFORM_BY_CATEGORY = { 'gaming-pc': 'pc', 'gaming-ps': 'ps', 'gaming-xbox': 'xbox' };
-export const CATEGORY_BY_PLATFORM = { pc: 'gaming-pc', ps: 'gaming-ps', xbox: 'gaming-xbox' };
+export const PLATFORM_BY_CATEGORY = { 'gaming-pc': 'pc', 'gaming-ps': 'ps', 'gaming-xbox': 'xbox', 'gaming-nintendo': 'switch' };
+export const CATEGORY_BY_PLATFORM = { pc: 'gaming-pc', ps: 'gaming-ps', xbox: 'gaming-xbox', switch: 'gaming-nintendo' };
 
 export const PLATFORMS = [
   { id: 'pc', label: 'PC', icon: '🖥️' },
@@ -24,7 +24,8 @@ export const PLATFORMS = [
 export const PLATFORM_BY_ID = Object.fromEntries(PLATFORMS.map((p) => [p.id, p]));
 export const platformLabel = (id) => PLATFORM_BY_ID[id]?.label ?? id;
 
-// Schede della colonna: quattro comuni più una propria per piattaforma.
+// Schede della colonna: quattro comuni più una propria per piattaforma
+// (Nintendo non ne ha una sua).
 export const GAMING_TABS = [
   { id: 'lfg', label: 'Cerco compagni' },
   { id: 'giochi', label: 'Giochi' },
@@ -165,146 +166,86 @@ export async function fetchTitleStats(ids) {
 }
 
 // ---------------------------------------------------------------------------
-// RAWG (facoltativo): senza chiave la ricerca resta solo sul catalogo.
-
-export const RAWG_KEY = import.meta.env.VITE_RAWG_KEY || '';
-export const hasRawg = () => Boolean(RAWG_KEY);
-
-const RAWG_PLATFORM = { pc: 'pc', playstation: 'ps', xbox: 'xbox', nintendo: 'switch', ios: 'mobile', android: 'mobile' };
-
-function mapRawg(g) {
-  const piattaforme = Array.from(
-    new Set((g.parent_platforms ?? []).map((p) => RAWG_PLATFORM[p.platform?.slug]).filter(Boolean))
-  );
-  return {
-    rawgId: g.id,
-    nome: g.name,
-    anno: g.released ? Number(String(g.released).slice(0, 4)) || null : null,
-    copertina: g.background_image ?? null,
-    piattaforme,
-    generi: (g.genres ?? []).map((x) => x.name).filter(Boolean),
-  };
-}
-
-export async function searchRawg(query, signal) {
-  if (!hasRawg() || !query?.trim()) return [];
-  try {
-    const url = `https://api.rawg.io/api/games?key=${encodeURIComponent(RAWG_KEY)}&search=${encodeURIComponent(query.trim())}&page_size=8`;
-    const res = await fetch(url, { signal });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.results ?? []).map(mapRawg);
-  } catch {
-    return [];
-  }
-}
-
-// Wikipedia (senza chiave, CORS con origin=*): fallback quando manca la
-// chiave RAWG. Due ricerche in parallelo — per prefisso del titolo (le
-// iniziali che uno scrive) e a testo pieno con "video game" — tenendo
-// solo le pagine la cui descrizione breve parla di un videogioco, con la
-// miniatura dell'infobox (di norma la copertina) e l'anno dalla
-// descrizione ("2001 video game").
+// Ricerca esterna: Wikipedia (senza chiave, CORS con origin=*). Una sola
+// chiamata: ricerca a testo pieno limitata alle pagine con il template
+// "Infobox video game", con la miniatura dell'infobox (la copertina).
+// Risultati nell'ordine di Wikipedia (page.index), titolo della pagina
+// come nome. Dal titolo "Doom (2016 video game)" escono nome "Doom" e
+// anno 2016, così due giochi omonimi restano distinti nel catalogo
+// (dedup del server per nome + anno). Cache in memoria per query.
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
-const WIKI_GAME_RE = /video ?game|videogioco|computer game/i;
-const WIKI_SKIP_RE = /\b(franchise|series|character|film|movie|album|soundtrack|company|developer|publisher|list of|console|engine|genre)\b/i;
+export const WIKI_MIN_CHARS = 2;
+export const WIKI_SOURCE_LABEL = 'Dati: Wikipedia';
 
-function wikiUrl(params) {
-  const base = {
+const WIKI_TITLE_SUFFIX_RE = /\s*\((?:(\d{4}) )?(?:video ?game|computer game)\)\s*$/i;
+
+export function wikiUrl(query) {
+  const params = new URLSearchParams({
     action: 'query',
     format: 'json',
-    formatversion: '2',
     origin: '*',
-    prop: 'pageimages|description',
+    redirects: '1',
+    generator: 'search',
+    gsrsearch: `${query} hastemplate:"Infobox video game"`,
+    gsrlimit: '6',
+    prop: 'pageimages',
     piprop: 'thumbnail',
-    pithumbsize: '240',
-  };
-  return `${WIKI_API}?${new URLSearchParams({ ...base, ...params })}`;
+    pithumbsize: '160',
+    pilicense: 'any',
+  });
+  return `${WIKI_API}?${params}`;
 }
 
-function mapWikiPage(pg) {
-  const desc = pg.description ?? '';
-  if (!WIKI_GAME_RE.test(desc) || WIKI_SKIP_RE.test(desc)) return null;
-  const nome = String(pg.title ?? '').replace(/\s*\((?:\d{4} )?(?:video ?game|computer game)\)\s*$/i, '').trim();
-  if (!nome) return null;
-  const year = desc.match(/\b(19|20)\d{2}\b/);
+export function mapWikiPage(pg) {
+  const title = String(pg.title ?? '').trim();
+  if (!title) return null;
+  const m = title.match(WIKI_TITLE_SUFFIX_RE);
+  const nome = title.replace(WIKI_TITLE_SUFFIX_RE, '').trim() || title;
   return {
     source: 'wiki',
     wikiId: pg.pageid,
     nome,
-    anno: year ? Number(year[0]) : null,
+    anno: m?.[1] ? Number(m[1]) : null,
     copertina: pg.thumbnail?.source ?? null,
     piattaforme: [],
     generi: [],
   };
 }
 
-async function wikiQuery(params, signal) {
-  const res = await fetch(wikiUrl(params), { signal });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return (json.query?.pages ?? []).slice().sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-}
+const wikiCache = new Map();
+const WIKI_CACHE_MAX = 200;
 
 export async function searchWikipedia(query, signal) {
-  const clean = query?.trim();
-  if (!clean || clean.length < 2) return [];
+  const clean = String(query ?? '').trim();
+  if (clean.length < WIKI_MIN_CHARS) return [];
+  const key = clean.toLowerCase();
+  if (wikiCache.has(key)) return wikiCache.get(key);
   try {
-    const [prefix, full] = await Promise.all([
-      wikiQuery({ generator: 'prefixsearch', gpssearch: clean, gpslimit: '10' }, signal).catch(() => []),
-      wikiQuery({ generator: 'search', gsrsearch: `${clean} video game`, gsrlimit: '8', gsrnamespace: '0' }, signal).catch(() => []),
-    ]);
-    const seen = new Set();
-    const out = [];
-    for (const pg of [...prefix, ...full]) {
-      if (seen.has(pg.pageid)) continue;
-      seen.add(pg.pageid);
-      const t = mapWikiPage(pg);
-      if (t) out.push(t);
-    }
-    return out.slice(0, 8);
+    const res = await fetch(wikiUrl(clean), { signal });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const pages = Object.values(json.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const out = pages.map(mapWikiPage).filter(Boolean);
+    if (wikiCache.size >= WIKI_CACHE_MAX) wikiCache.delete(wikiCache.keys().next().value);
+    wikiCache.set(key, out);
+    return out;
   } catch {
     return [];
   }
 }
 
-// Ricerca esterna: RAWG se c'è la chiave (piattaforme e generi), altrimenti
-// Wikipedia. Risultati in cache per query (sessione), così tornare
-// indietro con le lettere è immediato.
-const externalCache = new Map();
-const EXTERNAL_CACHE_MAX = 200;
-
-export function externalSourceLabel() {
-  return hasRawg() ? 'RAWG' : 'Wikipedia';
-}
-
-export async function searchExternal(query, signal) {
-  const clean = query?.trim().toLowerCase();
-  if (!clean) return [];
-  if (externalCache.has(clean)) return externalCache.get(clean);
-  const results = hasRawg()
-    ? (await searchRawg(clean, signal)).map((r) => ({ ...r, source: 'rawg' }))
-    : await searchWikipedia(clean, signal);
-  if (signal?.aborted) return results;
-  if (externalCache.size >= EXTERNAL_CACHE_MAX) externalCache.delete(externalCache.keys().next().value);
-  externalCache.set(clean, results);
-  return results;
-}
-
-// Un risultato esterno scelto entra nel catalogo (deduplicato dal server:
-// per rawg_id, altrimenti per nome + anno).
-export async function importExternalTitle(r) {
+// Un risultato Wikipedia scelto entra nel catalogo (dedup del server per
+// nome + anno) con la copertina e la piattaforma della categoria in cui
+// è stato scelto (il server somma le piattaforme, non le sostituisce).
+export async function importWikiTitle(r, platform = null) {
   return upsertTitle({
     nome: r.nome,
     anno: r.anno,
-    piattaforme: r.piattaforme ?? [],
+    piattaforme: platform ? [platform] : [],
     generi: r.generi ?? [],
     copertinaUrl: r.copertina,
-    rawgId: r.rawgId ?? null,
   });
 }
-
-export const importRawgTitle = importExternalTitle;
 
 // ---------------------------------------------------------------------------
 // Libreria personale

@@ -54,6 +54,10 @@
   color: rgba(245, 245, 247, 0.4);
 }
 
+.rb-game-source {
+  padding: 2px 10px 0;
+}
+
 .rb-gaming-error {
   margin: 0;
   padding: 9px 12px;
@@ -608,6 +612,7 @@
 .rb-gaming-panel .rb-gif-picker {
   bottom: auto;
   top: calc(100% + 8px);
+  max-width: calc(100vw - 32px);
 }
 
 .rb-gaming-posts {

@@ -29,7 +29,6 @@ jobs:
           GITHUB_PAGES: true
           # TURN per le videochiamate (vedi src/data/calls.js): facoltativi,
           # senza restano solo gli STUN pubblici.
-          VITE_RAWG_KEY: ${{ secrets.VITE_RAWG_KEY }}
           VITE_TURN_URLS: ${{ secrets.VITE_TURN_URLS }}
           VITE_TURN_USERNAME: ${{ secrets.VITE_TURN_USERNAME }}
           VITE_TURN_CREDENTIAL: ${{ secrets.VITE_TURN_CREDENTIAL }}

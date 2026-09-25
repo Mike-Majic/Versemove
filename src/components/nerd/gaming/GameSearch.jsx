@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { externalSourceLabel, fetchTitle, importExternalTitle, platformLabel, searchExternal, searchTitles, upsertTitle } from '../../../data/gaming';
+import { WIKI_MIN_CHARS, WIKI_SOURCE_LABEL, fetchTitle, importWikiTitle, platformLabel, searchTitles, searchWikipedia, upsertTitle } from '../../../data/gaming';
 import GameCover from './GameCover';
 
-// Ricerca di un gioco (scheda Giochi, form "Cerco compagni", compositori):
-// dalle prime lettere (debounce 180 ms) il catalogo condiviso via
-// search_gaming_titles più una fonte esterna con copertina e nome intero
-// (RAWG con VITE_RAWG_KEY, altrimenti Wikipedia, vedi data/gaming.js);
-// i risultati precedenti restano a schermo mentre arrivano i nuovi, e le
-// query già fatte tornano dalla cache. Scegliere un risultato esterno lo
-// salva nel catalogo (deduplicato dal server) e restituisce il titolo
-// salvato con il nome corretto; solo se non esce nulla, "Aggiungi «nome»"
-// lo crea a mano con la piattaforma della categoria. onPick(title) riceve
-// sempre un titolo del catalogo ({ id, nome, ... }). onQueryChange(q) dice
-// al genitore se il campo è vuoto (per mostrare altro sotto).
-const DEBOUNCE_MS = 180;
+// Ricerca di un gioco, la stessa per chi cerca (scheda Giochi) e per chi
+// crea (form "Cerco compagni", compositori): dopo 2 caratteri, con
+// debounce di 250 ms e la richiesta precedente annullata (AbortController),
+// tendina con copertina + nome da Wikipedia (vedi data/gaming.js: solo
+// pagine con "Infobox video game", cache per query) preceduta dai titoli
+// già nel catalogo condiviso (search_gaming_titles), senza doppioni per
+// nome + anno. Al click il nome completo va nel campo, il titolo viene
+// salvato nel catalogo (dedup del server) e onPick(title) riceve sempre un
+// titolo del catalogo ({ id, nome, ... }). Solo se non esce nulla,
+// "Aggiungi «nome»" lo crea a mano con la piattaforma della categoria.
+// onQueryChange(q) dice al genitore se il campo è vuoto (per mostrare
+// altro sotto). Sotto la tendina: "Dati: Wikipedia".
+const DEBOUNCE_MS = 250;
 
 export function GameRow({ title, badge, trailing, onClick }) {
   const meta = [title.anno, title.piattaforme?.map(platformLabel).join(' · ')].filter(Boolean).join(' · ');
@@ -48,12 +49,15 @@ export default function GameSearch({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Dopo un click il campo mostra il nome scelto e la tendina resta chiusa
+  // finché non si scrive di nuovo.
+  const [pickedName, setPickedName] = useState('');
   const seqRef = useRef(0);
 
   useEffect(() => {
     onQueryChange?.(q);
     const clean = q.trim();
-    if (!clean) {
+    if (clean.length < WIKI_MIN_CHARS || clean === pickedName) {
       setLocal([]);
       setExternal([]);
       setLoading(false);
@@ -64,18 +68,17 @@ export default function GameSearch({
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       // Il catalogo risponde per primo (è nostro): si mostra appena arriva,
-      // la fonte esterna si aggiunge sotto quando è pronta.
+      // Wikipedia si aggiunge sotto quando è pronta.
       const localPromise = searchTitles(clean, platform, 12);
-      const externalPromise = searchExternal(clean, controller.signal);
+      const externalPromise = searchWikipedia(clean, controller.signal);
       const l = await localPromise;
       if (seq !== seqRef.current) return;
       setLocal(l);
       const r = await externalPromise;
       if (seq !== seqRef.current) return;
-      // Un risultato esterno già nel catalogo non si mostra due volte.
-      const knownIds = new Set(l.map((t) => t.rawgId).filter(Boolean));
+      // Un risultato Wikipedia già nel catalogo non si mostra due volte.
       const knownNames = new Set(l.map((t) => `${t.nome.toLowerCase()}|${t.anno ?? ''}`));
-      setExternal(r.filter((x) => !(x.rawgId && knownIds.has(x.rawgId)) && !knownNames.has(`${x.nome.toLowerCase()}|${x.anno ?? ''}`)));
+      setExternal(r.filter((x) => !knownNames.has(`${x.nome.toLowerCase()}|${x.anno ?? ''}`)));
       setLoading(false);
     }, DEBOUNCE_MS);
     return () => {
@@ -83,12 +86,21 @@ export default function GameSearch({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, platform]);
+  }, [q, platform, pickedName]);
 
   const requireAuth = () => {
     if (user) return false;
     onOpenAuth?.();
     return true;
+  };
+
+  // Il nome completo va nel campo e la tendina si chiude.
+  const choose = (title) => {
+    setPickedName(title.nome);
+    setQ(title.nome);
+    setLocal([]);
+    setExternal([]);
+    onPick(title);
   };
 
   const pickSaved = async (promise) => {
@@ -107,13 +119,12 @@ export default function GameSearch({
       setError('Gioco salvato, ma non riesco a rileggerlo. Riprova.');
       return;
     }
-    setQ('');
-    onPick(saved);
+    choose(saved);
   };
 
   const clean = q.trim();
-  const nothing = clean && !loading && local.length === 0 && external.length === 0;
-  const sourceLabel = externalSourceLabel();
+  const open = clean.length >= WIKI_MIN_CHARS && clean !== pickedName;
+  const nothing = open && !loading && local.length === 0 && external.length === 0;
 
   return (
     <div className="rb-game-search">
@@ -123,26 +134,25 @@ export default function GameSearch({
           value={q}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setPickedName('');
+            setQ(e.target.value);
+          }}
           aria-label="Cerca un gioco"
         />
       </div>
       {error && <p className="rb-gaming-error" role="alert">{error}</p>}
-      {clean && (
+      {open && (
         <ul className="rb-game-results">
           {loading && local.length === 0 && external.length === 0 && <li className="rb-gaming-note">Cerco…</li>}
           {local.map((t) => (
             <li key={t.id}>
-              <GameRow title={t} onClick={() => onPick(t)} />
+              <GameRow title={t} onClick={() => choose(t)} />
             </li>
           ))}
           {external.map((r) => (
-            <li key={`ext-${r.rawgId ?? r.wikiId}`}>
-              <GameRow
-                title={r}
-                badge={sourceLabel}
-                onClick={() => pickSaved(() => importExternalTitle(r))}
-              />
+            <li key={`wiki-${r.wikiId}`}>
+              <GameRow title={r} onClick={() => pickSaved(() => importWikiTitle(r, platform))} />
             </li>
           ))}
           {loading && (local.length > 0 || external.length > 0) && <li className="rb-gaming-note rb-gaming-note--soft">Aggiorno…</li>}
@@ -159,6 +169,7 @@ export default function GameSearch({
             </li>
           )}
           {nothing && !allowCreate && <li className="rb-gaming-note">Nessun gioco trovato.</li>}
+          <li className="rb-gaming-note rb-gaming-note--soft rb-game-source">{WIKI_SOURCE_LABEL}</li>
         </ul>
       )}
     </div>
