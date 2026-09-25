@@ -62,11 +62,13 @@ export const NERD_CATEGORIES = [
     subfamilies: ['Live streaming', 'YouTube', 'Editing video', 'Grafica/Overlay', 'Community management'],
   },
   {
+    // L'id resta 'nerd-live' (stanze video già salvate con questa
+    // categoria); cambia solo il nome mostrato.
     id: 'nerd-live',
-    label: 'Live',
-    icon: '🏆',
+    label: 'Videochiamata',
+    icon: '🎥',
     anchor: { lat: 5, lng: 60 },
-    aliases: ['live', 'eventi', 'fiera', 'fiere', 'torneo', 'tornei', 'convention'],
+    aliases: ['videochiamata', 'videochiamate', 'stanze video', 'live', 'eventi', 'fiera', 'fiere', 'torneo', 'tornei', 'convention'],
     subfamilies: ['Fiere ed eventi', 'Tornei eSports', 'Raduni cosplay', 'Incontri con creator', 'Anteprime e presentazioni'],
   },
 ];
