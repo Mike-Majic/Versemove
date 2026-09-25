@@ -28,6 +28,7 @@ import CustomSelect from './shared/CustomSelect';
 import CollapsibleSection from './shared/CollapsibleSection';
 import CityAutocomplete from './shared/CityAutocomplete';
 import { CITY_DATA_CREDIT, locationHasCoords, setMyCittaGeo } from '../data/citta';
+import { disablePush, enablePush, getPushState, needsHomeScreenInstall } from '../data/push';
 import './SettingsPanel.css';
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
@@ -393,6 +394,29 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
     onUpdateUser?.(account);
   };
 
+  // Notifiche push su questo dispositivo (data/push.js): lo stato si legge
+  // dal browser, non dal profilo, perché vale per singolo dispositivo.
+  const [pushState, setPushState] = useState('off');
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    getPushState().then((st) => {
+      if (alive) setPushState(st);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+  const togglePush = async (checked) => {
+    setPushBusy(true);
+    setPushError('');
+    const { error: err } = checked ? await enablePush() : await disablePush();
+    setPushBusy(false);
+    if (err) setPushError(err);
+    setPushState(await getPushState());
+  };
+
   return (
     <>
       <CollapsibleSection
@@ -520,6 +544,48 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
           <button type="button" className="rb-reset-filters-btn" onClick={changePassword} disabled={pwBusy}>
             {pwBusy ? 'Un attimo…' : 'Cambia password'}
           </button>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        level="sub"
+        title="Notifiche"
+        infoText="Avvisi di messaggi, chiamate, match e menzioni anche con Versemove chiuso. Vale solo per questo dispositivo: attivale su ognuno che usi."
+        open={sub === 'notifiche'}
+        onToggle={() => toggleSub('notifiche')}
+      >
+        {!user ? (
+          <button type="button" className="rb-settings-nav-btn" onClick={onOpenAuth}>
+            <span><strong>Accedi per attivare le notifiche</strong></span>
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : pushState === 'unsupported' ? (
+          <p className="rb-settings-hint">
+            {needsHomeScreenInstall()
+              ? 'Su iPhone e iPad le notifiche funzionano aggiungendo Versemove alla schermata Home (Condividi → Aggiungi a Home) e aprendolo da lì.'
+              : 'Questo browser non supporta le notifiche push.'}
+          </p>
+        ) : (
+          <>
+            {pushError && <p className="rb-privacy-error">{pushError}</p>}
+            <label className="rb-toggle-row">
+              <span className="rb-toggle-text-row">
+                <strong>Notifiche su questo dispositivo</strong>
+              </span>
+              <span className="rb-toggle">
+                <input
+                  type="checkbox"
+                  checked={pushState === 'on'}
+                  disabled={pushBusy || pushState === 'denied'}
+                  onChange={(e) => togglePush(e.target.checked)}
+                />
+                <span className="rb-toggle-slider" />
+              </span>
+            </label>
+            {pushState === 'denied' && (
+              <p className="rb-settings-hint">Le notifiche sono bloccate per questo sito: riattivale dalle impostazioni del browser (lucchetto accanto all'indirizzo).</p>
+            )}
+          </>
         )}
       </CollapsibleSection>
 

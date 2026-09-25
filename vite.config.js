@@ -21,6 +21,9 @@ export default defineConfig({
         // globe/landLod.js), come i file di public/geo: niente precache,
         // altrimenti la prima visita scaricherebbe anche lui.
         globIgnores: ['**/landWorker-*.js'],
+        // Gestori delle notifiche push (public/push-sw.js): il resto del
+        // service worker lo genera Workbox.
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // I dati veri (profili, messaggi, eventi, realtime) vivono su
