@@ -83,6 +83,7 @@ const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
 const EventLikersModal = lazyWithRetry(() => import('./components/EventLikersModal'));
 const ReactorsModal = lazyWithRetry(() => import('./components/cultural/ReactorsModal'));
 const FriendChatModal = lazyWithRetry(() => import('./components/FriendChatModal'));
+const IncomingCallToast = lazyWithRetry(() => import('./components/IncomingCallToast'));
 const MentionProfileViewer = lazyWithRetry(() => import('./components/shared/MentionProfileViewer'));
 const DMHub = lazyWithRetry(() => import('./components/DMHub'));
 const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
@@ -323,6 +324,14 @@ export default function App() {
   // reactors } quando aperto, null quando chiuso (vedi ReactorsModal).
   const [culturalReactorsView, setCulturalReactorsView] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
+  // Chat aperta da "Rispondi" su una chiamata in arrivo: la chiamata si
+  // accetta da sola (vedi IncomingCallToast / CallModal autoAnswer).
+  const [answerCallFrom, setAnswerCallFrom] = useState(null);
+  useEffect(() => {
+    if (!answerCallFrom) return undefined;
+    const t = setTimeout(() => setAnswerCallFrom(null), 35000);
+    return () => clearTimeout(t);
+  }, [answerCallFrom]);
   // Notifiche (match/super like): il numero non letto sulla campanella, il
   // pannello, il toast quando ne arriva una nuova in tempo reale, e su
   // quale scheda di Incontri deve aprirsi cliccandola.
@@ -1567,8 +1576,25 @@ export default function App() {
             friendId={activeFriendChatId}
             user={user}
             world={world}
-            onClose={() => setActiveFriendChatId(null)}
+            onClose={() => {
+              setActiveFriendChatId(null);
+              setAnswerCallFrom(null);
+            }}
             onMessagesRead={refreshUnread}
+            autoAnswerCall={answerCallFrom === activeFriendChatId}
+          />
+        </Suspense>
+      )}
+
+      {user && (
+        <Suspense fallback={null}>
+          <IncomingCallToast
+            user={user}
+            openChatWith={activeFriendChatId}
+            onAnswer={(callerId) => {
+              setAnswerCallFrom(callerId);
+              setActiveFriendChatId(callerId);
+            }}
           />
         </Suspense>
       )}

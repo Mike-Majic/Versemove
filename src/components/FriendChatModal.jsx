@@ -61,7 +61,9 @@ function toChatMessage(a) {
 // in cui la chat è aperta: `--a` = world.color sul pannello. Ogni messaggio
 // porta con sé il mondo da cui è stato scritto (`mondo`): se è diverso da
 // quello attuale, sotto la bolla compare "● scritto in <Mondo>".
-export default function FriendChatModal({ friendId, user, world, onClose, onMessagesRead }) {
+// autoAnswerCall: aperta da "Rispondi" nell'avviso di chiamata in arrivo
+// (IncomingCallToast): la chiamata viene accettata appena arriva il ring.
+export default function FriendChatModal({ friendId, user, world, onClose, onMessagesRead, autoAnswerCall = false }) {
   const activeWorld = world ?? DEFAULT_WORLD;
   const [conversationId, setConversationId] = useState(null);
   const [friend, setFriend] = useState(null);
@@ -514,6 +516,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           conversationId={conversationId}
           user={user}
           friend={friend}
+          autoAnswer={autoAnswerCall}
           registerStart={(fn) => {
             startCallRef.current = fn;
           }}

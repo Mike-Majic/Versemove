@@ -1,43 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { openCallChannel, ICE_SERVERS, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS } from '../data/calls';
+import { openCallChannel, ICE_SERVERS, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS, RING_REPEAT_MS, ringCall, setRingState, answerLatestRing, playRingtone } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
 import { displayName } from '../data/posts';
 import './CallModal.css';
-
-// Breve suoneria sintetizzata (stessa tecnica delle melodie del mondo
-// Bambini, Web Audio nativo): niente file audio da scaricare/ospitare.
-function playRingtone() {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const beep = (t) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 660;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.3);
-    };
-    beep(ctx.currentTime);
-    beep(ctx.currentTime + 0.35);
-    setTimeout(() => ctx.close(), 900);
-  } catch {
-    // Web Audio non disponibile: niente suoneria, non blocca la chiamata.
-  }
-}
 
 // Videochiamata 1:1 via WebRTC, senza server proprio: il canale Realtime
 // privato "call:<conversationId>" (autorizzato dal DB ai soli 2
 // partecipanti) porta solo la segnalazione, i video passano diretti
 // (peer-to-peer) una volta stabilita la connessione. Montato sempre
 // insieme a FriendChatModal (non solo mentre si chiama): serve a
-// ricevere una chiamata in arrivo anche se non l'ho avviata io.
-export default function CallModal({ conversationId, user, friend, registerStart }) {
+// ricevere una chiamata in arrivo anche se non l'ho avviata io. Fuori
+// dalla chat la chiamata arriva con lo squillo (call_rings, vedi
+// IncomingCallToast): "Rispondi" apre la chat con autoAnswer, e al primo
+// "ring" ricevuto qui la chiamata viene accettata da sola.
+export default function CallModal({ conversationId, user, friend, registerStart, autoAnswer = false }) {
   const [phase, setPhase] = useState('idle'); // idle | calling | ringing | connecting | active | ended
   const [endMessage, setEndMessage] = useState('');
   const [incomingFrom, setIncomingFrom] = useState(null);
@@ -55,6 +31,17 @@ export default function CallModal({ conversationId, user, friend, registerStart 
   const ringTimeoutRef = useRef(null);
   const connectTimeoutRef = useRef(null);
   const pendingIceRef = useRef([]);
+  // Chi chiama ripete "ring" ogni 3 s (chi apre la chat in ritardo lo
+  // riceve comunque) e tiene l'id dello squillo per segnarne l'esito.
+  const ringRepeatRef = useRef(null);
+  const ringIdRef = useRef(null);
+  // Dopo un "Rifiuta" si ignorano per qualche secondo i ring ripetuti.
+  const declinedUntilRef = useRef(0);
+  // Vale una volta sola: consumato dal primo ring (vedi sotto).
+  const autoAnswerRef = useRef(autoAnswer);
+  useEffect(() => {
+    autoAnswerRef.current = autoAnswer;
+  }, [autoAnswer]);
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -67,6 +54,7 @@ export default function CallModal({ conversationId, user, friend, registerStart 
   const clearTimers = () => {
     clearTimeout(ringTimeoutRef.current);
     clearTimeout(connectTimeoutRef.current);
+    clearInterval(ringRepeatRef.current);
   };
 
   const cleanupPeer = () => {
@@ -162,10 +150,26 @@ export default function CallModal({ conversationId, user, friend, registerStart 
     if (phaseRef.current !== 'idle') return;
     roleRef.current = 'caller';
     setPhase('calling');
-    send('ring', { fromName: displayName(user), fromAvatar: user.avatar || '' });
+    const ringPayload = { fromName: displayName(user), fromAvatar: user.avatar || '' };
+    send('ring', ringPayload);
+    ringRepeatRef.current = setInterval(() => {
+      if (phaseRef.current === 'calling') send('ring', ringPayload);
+    }, RING_REPEAT_MS);
+    ringIdRef.current = null;
+    ringCall(conversationId).then(({ id, error }) => {
+      if (error && phaseRef.current === 'calling') {
+        send('hangup');
+        endWithMessage(error);
+        return;
+      }
+      ringIdRef.current = id ?? null;
+      // Annullata prima che lo squillo fosse registrato.
+      if (id && phaseRef.current !== 'calling' && phaseRef.current !== 'connecting' && phaseRef.current !== 'active') setRingState(id, 'annullata');
+    });
     ringTimeoutRef.current = setTimeout(() => {
       if (phaseRef.current === 'calling') {
         send('hangup');
+        setRingState(ringIdRef.current, 'persa');
         endWithMessage('Nessuna risposta.');
       }
     }, RING_TIMEOUT_MS);
@@ -176,6 +180,7 @@ export default function CallModal({ conversationId, user, friend, registerStart 
     roleRef.current = 'callee';
     setPhase('connecting');
     send('accept');
+    answerLatestRing(conversationId, user.id, 'accettata');
     try {
       await setupMediaAndPeer();
     } catch {
@@ -186,10 +191,13 @@ export default function CallModal({ conversationId, user, friend, registerStart 
 
   const declineCall = () => {
     send('decline');
+    answerLatestRing(conversationId, user.id, 'rifiutata');
+    declinedUntilRef.current = Date.now() + 2 * RING_REPEAT_MS;
     goIdle();
   };
 
   const hangup = () => {
+    if (roleRef.current === 'caller' && phaseRef.current === 'calling') setRingState(ringIdRef.current, 'annullata');
     send('hangup');
     goIdle();
   };
@@ -205,10 +213,17 @@ export default function CallModal({ conversationId, user, friend, registerStart 
 
     channel.on('broadcast', { event: 'ring' }, ({ payload }) => {
       if (phaseRef.current !== 'idle') return; // già in chiamata: ignora (l'altro riceverà "nessuna risposta")
+      if (Date.now() < declinedUntilRef.current) return;
       roleRef.current = 'callee';
       setIncomingFrom({ name: payload?.fromName || friend?.name || 'Utente', avatar: payload?.fromAvatar || friend?.avatar || '' });
+      if (autoAnswerRef.current) {
+        // "Rispondi" già toccato nell'avviso globale.
+        autoAnswerRef.current = false;
+        phaseRef.current = 'ringing';
+        acceptCall();
+        return;
+      }
       setPhase('ringing');
-      playRingtone();
     });
 
     channel.on('broadcast', { event: 'accept' }, async () => {
@@ -284,6 +299,14 @@ export default function CallModal({ conversationId, user, friend, registerStart 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+
+  // Suoneria ripetuta finché squilla.
+  useEffect(() => {
+    if (phase !== 'ringing') return undefined;
+    playRingtone();
+    const t = setInterval(playRingtone, 2500);
+    return () => clearInterval(t);
+  }, [phase]);
 
   useEffect(() => {
     registerStart?.(startCall);
