@@ -28,13 +28,19 @@
   }
 }
 
+/* X, stellina e barra di ricerca su UNA riga, nella fascia della topbar
+   (top 26px, fra il logo a sinistra e le icone a destra, dove c'è spazio).
+   Prima la barra stava sotto ai bottoni (top 70px), cioè nella fascia dei
+   pannelli (top 76px): fra i due pannelli di TwoColumnSwitcher restano
+   ~180-300px su finestre sotto i ~1300px e la barra da 320px ci finiva
+   sopra, in FAQ come in ogni altro mondo a due colonne. */
 .rb-arte-top-controls {
   position: absolute;
   top: 26px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
   pointer-events: auto;
@@ -50,6 +56,9 @@
 @media (max-width: 760px) {
   .rb-arte-top-controls {
     top: 78px;
+    /* Qui i pannelli partono più in basso (.rb-2col-mobile-stage, top
+       168px) apposta per lasciare la barra SOTTO ai bottoni. */
+    flex-direction: column;
   }
 }
 
@@ -97,9 +106,14 @@
   color: #2a1f00;
 }
 
+/* Larghezza limitata dallo spazio libero al centro della topbar: logo e
+   chip del mondo a sinistra, icone/azioni a destra (~270px per lato), più
+   X e stellina sulla stessa riga. Su finestre strette si accorcia fino a
+   150px e il placeholder si tronca coi puntini. */
 .rb-arte-category-search input {
-  width: min(320px, 60vw);
+  width: clamp(150px, calc(100vw - 680px), 320px);
   box-sizing: border-box;
+  text-overflow: ellipsis;
   background: rgba(8, 6, 14, 0.8);
   border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 40%, transparent);
   color: #f5f5f7;
@@ -115,4 +129,10 @@
 
 .rb-arte-category-search input::placeholder {
   color: rgba(245, 245, 247, 0.5);
+}
+
+@media (max-width: 760px) {
+  .rb-arte-category-search input {
+    width: min(320px, 60vw);
+  }
 }
