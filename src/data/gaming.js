@@ -199,17 +199,112 @@ export async function searchRawg(query, signal) {
   }
 }
 
-// Un risultato RAWG scelto entra nel catalogo (deduplicato per rawg_id).
-export async function importRawgTitle(r) {
+// Wikipedia (senza chiave, CORS con origin=*): fallback quando manca la
+// chiave RAWG. Due ricerche in parallelo — per prefisso del titolo (le
+// iniziali che uno scrive) e a testo pieno con "video game" — tenendo
+// solo le pagine la cui descrizione breve parla di un videogioco, con la
+// miniatura dell'infobox (di norma la copertina) e l'anno dalla
+// descrizione ("2001 video game").
+const WIKI_API = 'https://en.wikipedia.org/w/api.php';
+const WIKI_GAME_RE = /video ?game|videogioco|computer game/i;
+const WIKI_SKIP_RE = /\b(franchise|series|character|film|movie|album|soundtrack|company|developer|publisher|list of|console|engine|genre)\b/i;
+
+function wikiUrl(params) {
+  const base = {
+    action: 'query',
+    format: 'json',
+    formatversion: '2',
+    origin: '*',
+    prop: 'pageimages|description',
+    piprop: 'thumbnail',
+    pithumbsize: '240',
+  };
+  return `${WIKI_API}?${new URLSearchParams({ ...base, ...params })}`;
+}
+
+function mapWikiPage(pg) {
+  const desc = pg.description ?? '';
+  if (!WIKI_GAME_RE.test(desc) || WIKI_SKIP_RE.test(desc)) return null;
+  const nome = String(pg.title ?? '').replace(/\s*\((?:\d{4} )?(?:video ?game|computer game)\)\s*$/i, '').trim();
+  if (!nome) return null;
+  const year = desc.match(/\b(19|20)\d{2}\b/);
+  return {
+    source: 'wiki',
+    wikiId: pg.pageid,
+    nome,
+    anno: year ? Number(year[0]) : null,
+    copertina: pg.thumbnail?.source ?? null,
+    piattaforme: [],
+    generi: [],
+  };
+}
+
+async function wikiQuery(params, signal) {
+  const res = await fetch(wikiUrl(params), { signal });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return (json.query?.pages ?? []).slice().sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+}
+
+export async function searchWikipedia(query, signal) {
+  const clean = query?.trim();
+  if (!clean || clean.length < 2) return [];
+  try {
+    const [prefix, full] = await Promise.all([
+      wikiQuery({ generator: 'prefixsearch', gpssearch: clean, gpslimit: '10' }, signal).catch(() => []),
+      wikiQuery({ generator: 'search', gsrsearch: `${clean} video game`, gsrlimit: '8', gsrnamespace: '0' }, signal).catch(() => []),
+    ]);
+    const seen = new Set();
+    const out = [];
+    for (const pg of [...prefix, ...full]) {
+      if (seen.has(pg.pageid)) continue;
+      seen.add(pg.pageid);
+      const t = mapWikiPage(pg);
+      if (t) out.push(t);
+    }
+    return out.slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+// Ricerca esterna: RAWG se c'è la chiave (piattaforme e generi), altrimenti
+// Wikipedia. Risultati in cache per query (sessione), così tornare
+// indietro con le lettere è immediato.
+const externalCache = new Map();
+const EXTERNAL_CACHE_MAX = 200;
+
+export function externalSourceLabel() {
+  return hasRawg() ? 'RAWG' : 'Wikipedia';
+}
+
+export async function searchExternal(query, signal) {
+  const clean = query?.trim().toLowerCase();
+  if (!clean) return [];
+  if (externalCache.has(clean)) return externalCache.get(clean);
+  const results = hasRawg()
+    ? (await searchRawg(clean, signal)).map((r) => ({ ...r, source: 'rawg' }))
+    : await searchWikipedia(clean, signal);
+  if (signal?.aborted) return results;
+  if (externalCache.size >= EXTERNAL_CACHE_MAX) externalCache.delete(externalCache.keys().next().value);
+  externalCache.set(clean, results);
+  return results;
+}
+
+// Un risultato esterno scelto entra nel catalogo (deduplicato dal server:
+// per rawg_id, altrimenti per nome + anno).
+export async function importExternalTitle(r) {
   return upsertTitle({
     nome: r.nome,
     anno: r.anno,
-    piattaforme: r.piattaforme,
-    generi: r.generi,
+    piattaforme: r.piattaforme ?? [],
+    generi: r.generi ?? [],
     copertinaUrl: r.copertina,
-    rawgId: r.rawgId,
+    rawgId: r.rawgId ?? null,
   });
 }
+
+export const importRawgTitle = importExternalTitle;
 
 // ---------------------------------------------------------------------------
 // Libreria personale

@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchTitle, importRawgTitle, platformLabel, searchRawg, searchTitles, upsertTitle } from '../../../data/gaming';
+import { externalSourceLabel, fetchTitle, importExternalTitle, platformLabel, searchExternal, searchTitles, upsertTitle } from '../../../data/gaming';
 import GameCover from './GameCover';
 
 // Ricerca di un gioco (scheda Giochi, form "Cerco compagni", compositori):
-// catalogo condiviso via search_gaming_titles (debounce 250 ms) più, se c'è
-// VITE_RAWG_KEY, i risultati RAWG con copertina. Scegliere un risultato
-// esterno lo salva nel catalogo (deduplicato dal server) e restituisce il
-// titolo salvato; se non c'è nulla, "Aggiungi «nome»" lo crea con la
-// piattaforma della categoria. onPick(title) riceve sempre un titolo del
-// catalogo ({ id, nome, ... }). onQueryChange(q) dice al genitore se il
-// campo è vuoto (per mostrare altro sotto).
-const DEBOUNCE_MS = 250;
+// dalle prime lettere (debounce 180 ms) il catalogo condiviso via
+// search_gaming_titles più una fonte esterna con copertina e nome intero
+// (RAWG con VITE_RAWG_KEY, altrimenti Wikipedia, vedi data/gaming.js);
+// i risultati precedenti restano a schermo mentre arrivano i nuovi, e le
+// query già fatte tornano dalla cache. Scegliere un risultato esterno lo
+// salva nel catalogo (deduplicato dal server) e restituisce il titolo
+// salvato con il nome corretto; solo se non esce nulla, "Aggiungi «nome»"
+// lo crea a mano con la piattaforma della categoria. onPick(title) riceve
+// sempre un titolo del catalogo ({ id, nome, ... }). onQueryChange(q) dice
+// al genitore se il campo è vuoto (per mostrare altro sotto).
+const DEBOUNCE_MS = 180;
 
 export function GameRow({ title, badge, trailing, onClick }) {
   const meta = [title.anno, title.piattaforme?.map(platformLabel).join(' · ')].filter(Boolean).join(' · ');
@@ -41,7 +44,7 @@ export default function GameSearch({
 }) {
   const [q, setQ] = useState('');
   const [local, setLocal] = useState([]);
-  const [rawg, setRawg] = useState([]);
+  const [external, setExternal] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -52,7 +55,7 @@ export default function GameSearch({
     const clean = q.trim();
     if (!clean) {
       setLocal([]);
-      setRawg([]);
+      setExternal([]);
       setLoading(false);
       return undefined;
     }
@@ -60,12 +63,19 @@ export default function GameSearch({
     const seq = ++seqRef.current;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      const [l, r] = await Promise.all([searchTitles(clean, platform, 12), searchRawg(clean, controller.signal)]);
+      // Il catalogo risponde per primo (è nostro): si mostra appena arriva,
+      // la fonte esterna si aggiunge sotto quando è pronta.
+      const localPromise = searchTitles(clean, platform, 12);
+      const externalPromise = searchExternal(clean, controller.signal);
+      const l = await localPromise;
       if (seq !== seqRef.current) return;
-      // Un risultato RAWG già nel catalogo non si mostra due volte.
-      const known = new Set(l.map((t) => t.rawgId).filter(Boolean));
       setLocal(l);
-      setRawg(r.filter((x) => !known.has(x.rawgId)));
+      const r = await externalPromise;
+      if (seq !== seqRef.current) return;
+      // Un risultato esterno già nel catalogo non si mostra due volte.
+      const knownIds = new Set(l.map((t) => t.rawgId).filter(Boolean));
+      const knownNames = new Set(l.map((t) => `${t.nome.toLowerCase()}|${t.anno ?? ''}`));
+      setExternal(r.filter((x) => !(x.rawgId && knownIds.has(x.rawgId)) && !knownNames.has(`${x.nome.toLowerCase()}|${x.anno ?? ''}`)));
       setLoading(false);
     }, DEBOUNCE_MS);
     return () => {
@@ -102,7 +112,8 @@ export default function GameSearch({
   };
 
   const clean = q.trim();
-  const nothing = clean && !loading && local.length === 0 && rawg.length === 0;
+  const nothing = clean && !loading && local.length === 0 && external.length === 0;
+  const sourceLabel = externalSourceLabel();
 
   return (
     <div className="rb-game-search">
@@ -119,21 +130,22 @@ export default function GameSearch({
       {error && <p className="rb-gaming-error" role="alert">{error}</p>}
       {clean && (
         <ul className="rb-game-results">
-          {loading && local.length === 0 && rawg.length === 0 && <li className="rb-gaming-note">Cerco…</li>}
+          {loading && local.length === 0 && external.length === 0 && <li className="rb-gaming-note">Cerco…</li>}
           {local.map((t) => (
             <li key={t.id}>
               <GameRow title={t} onClick={() => onPick(t)} />
             </li>
           ))}
-          {rawg.map((r) => (
-            <li key={`rawg-${r.rawgId}`}>
+          {external.map((r) => (
+            <li key={`ext-${r.rawgId ?? r.wikiId}`}>
               <GameRow
                 title={r}
-                badge="RAWG"
-                onClick={() => pickSaved(() => importRawgTitle(r))}
+                badge={sourceLabel}
+                onClick={() => pickSaved(() => importExternalTitle(r))}
               />
             </li>
           ))}
+          {loading && (local.length > 0 || external.length > 0) && <li className="rb-gaming-note rb-gaming-note--soft">Aggiorno…</li>}
           {nothing && allowCreate && (
             <li>
               <button

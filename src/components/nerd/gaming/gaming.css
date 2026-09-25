@@ -49,6 +49,11 @@
   color: rgba(245, 245, 247, 0.6);
 }
 
+.rb-gaming-note--soft {
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.4);
+}
+
 .rb-gaming-error {
   margin: 0;
   padding: 9px 12px;
