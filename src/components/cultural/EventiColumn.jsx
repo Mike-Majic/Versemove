@@ -22,19 +22,25 @@ const FONTE_LABEL = { bot: 'Aggiornato dal bot', curato: 'Selezionato dallo staf
 export default function EventiColumn({ mondo, categoria, label, user, onOpenAuth, compact = false, emptyHint }) {
   const [periodo, setPeriodo] = useState('prossimi');
   const [tipo, setTipo] = useState(null);
-  const [eventi, setEventi] = useState(null);
+  // { key, list }: la lista vale solo se caricata per gli stessi filtri di
+  // adesso, altrimenti si mostra "Carico..." senza azzerare lo stato dentro
+  // l'effetto.
+  const filtriKey = `${mondo}|${categoria}|${periodo}|${tipo ?? ''}|${user?.id ?? ''}`;
+  const [caricato, setCaricato] = useState({ key: '', list: [] });
   const [busyId, setBusyId] = useState(null);
+  const eventi = caricato.key === filtriKey ? caricato.list : null;
 
   useEffect(() => {
     let cancelled = false;
-    setEventi(null);
     listEventi({ mondo, categoria, periodo, tipo }).then((list) => {
-      if (!cancelled) setEventi(list);
+      if (!cancelled) setCaricato({ key: filtriKey, list });
     });
     return () => {
       cancelled = true;
     };
-  }, [mondo, categoria, periodo, tipo, user?.id]);
+  }, [mondo, categoria, periodo, tipo, filtriKey]);
+
+  const setEventi = (updater) => setCaricato((prev) => ({ ...prev, list: updater(prev.list) }));
 
   const tipiPresenti = Array.from(new Set((eventi ?? []).map((e) => e.tipo).filter(Boolean)));
 
