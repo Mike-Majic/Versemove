@@ -6,6 +6,8 @@ import MusicaApp from './musica/MusicaApp';
 import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
+import EventiColumn from './cultural/EventiColumn';
+import EventiTabsColumn from './cultural/EventiTabsColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
@@ -19,6 +21,7 @@ import './shared/categoryExplorerShell.css';
 
 const COMMUNITY_EVENT_CATEGORIES = new Set(['teatro', 'arti-visive', 'live']);
 const NERD_LIVE_CATEGORY = 'nerd-live';
+const COSPLAY_CATEGORY = 'cosplay';
 
 // Guscio di navigazione categorie, generico per qualunque mondo che abbia un
 // proprio set di categorie (categorySet = { categories, featured, results,
@@ -120,8 +123,23 @@ export default function ArteExplorer({
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
             // Live del mondo Nerd: stanze video di gruppo, più la scheda
-            // "Eventi" con la colonna di prima, identica.
-            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} events={genericColumn} />
+            // "Eventi" (fiere del videogioco, tornei: li aggiorna il bot).
+            <VideoRoomsColumn
+              key={category.id}
+              user={user}
+              onOpenAuth={onOpenAuth}
+              events={
+                <div className="rb-eventi-tabs-panel">
+                  <EventiColumn mondo="nerd" categoria={NERD_LIVE_CATEGORY} label="Eventi" user={user} onOpenAuth={onOpenAuth} />
+                </div>
+              }
+            />
+          ) : world.id === 'nerd' && category.id === COSPLAY_CATEGORY ? (
+            // Cosplay: scheda "Eventi" (fiere, raduni e gare, aggiornati dal
+            // bot) + scheda "Community" con la colonna generica di prima.
+            <EventiTabsColumn key={category.id} community={genericColumn}>
+              <EventiColumn mondo="nerd" categoria={COSPLAY_CATEGORY} label="Eventi cosplay" user={user} onOpenAuth={onOpenAuth} />
+            </EventiTabsColumn>
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}

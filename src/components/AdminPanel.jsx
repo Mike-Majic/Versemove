@@ -6,9 +6,11 @@ import { getReports, updateReportStatus } from '../data/reports';
 import { getAuditLog, logAdminAction, AUDIT_LABELS } from '../data/adminAuditLog';
 import { listAllSponsorships, createSponsorship, updateSponsorship } from '../data/sponsorships';
 import { supabase } from '../data/supabaseClient';
+import { listBotRuns, runEventsBot } from '../data/eventiCatalogo';
 import { computeAge } from '../data/age';
 import { ROLES } from '../data/roles';
 import ModalOverlay from './ModalOverlay';
+import CustomSelect from './shared/CustomSelect';
 import './AdminPanel.css';
 
 const ROLE_LABELS = { [ROLES.OWNER]: 'Owner', [ROLES.MODERATOR]: 'Moderatore', [ROLES.USER]: 'Utente' };
@@ -30,7 +32,106 @@ const ADMIN_TABS = [
   { id: 'moderazione', label: 'Moderazione' },
   { id: 'sponsorizzazioni', label: 'Sponsorizzazioni' },
   { id: 'log', label: 'Log azioni' },
+  { id: 'bot-eventi', label: 'Bot eventi' },
 ];
+
+const BOT_CATEGORIE = [
+  { id: null, label: 'Tutte le categorie' },
+  { id: 'cosplay', label: 'Cosplay' },
+  { id: 'nerd-live', label: 'Nerd · Eventi' },
+  { id: 'teatro', label: 'Teatro' },
+  { id: 'arti-visive', label: 'Arti visive' },
+  { id: 'live', label: 'Live' },
+];
+
+function formatRunDate(iso) {
+  return iso ? new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+// Scheda "Bot eventi": stato dei giri della Edge Function events-bot
+// (registro events_bot_runs, leggibile solo da owner/moderatore) e tasto
+// per lanciarne uno adesso, per tutte le categorie o per una sola. Il giro
+// dura da qualche decina di secondi a un paio di minuti.
+function EventsBotPane() {
+  const [runs, setRuns] = useState(null);
+  const [categoria, setCategoria] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const refresh = () => listBotRuns().then(setRuns);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const launch = async () => {
+    setRunning(true);
+    setNotice('');
+    const { result, error } = await runEventsBot(categoria);
+    setRunning(false);
+    if (error) setNotice(`Errore: ${error}`);
+    else if (result?.skipped) setNotice(result.motivo || result.error || 'Giro saltato.');
+    else setNotice(`Fatto: ${result?.inseriti ?? 0} nuovi, ${result?.aggiornati ?? 0} aggiornati, ${result?.scartati ?? 0} scartati, ${result?.archiviati ?? 0} archiviati.${result?.errore ? ` Avvisi: ${result.errore}` : ''}`);
+    refresh();
+  };
+
+  return (
+    <>
+      <p className="rb-admin-hint">
+        Ogni notte (dalle 4:10 alle 4:50 UTC, una categoria alla volta) il bot cerca sul web con Gemini le fiere, i raduni, gli
+        spettacoli, le mostre e i concerti in programma, li aggiunge alla tabella eventi e aggiorna quelli già presenti. Gli
+        eventi curati a mano e quelli degli utenti non vengono toccati. Da qui puoi lanciare un giro subito.
+      </p>
+      <div className="rb-admin-bot-launch">
+        <CustomSelect
+          value={categoria ?? ''}
+          options={BOT_CATEGORIE.map((c) => ({ value: c.id ?? '', label: c.label }))}
+          onChange={(v) => setCategoria(v || null)}
+          ariaLabel="Categoria del bot"
+        />
+        <button type="button" className="rb-btn-primary" onClick={launch} disabled={running}>
+          {running ? 'Il bot sta cercando…' : 'Aggiorna ora'}
+        </button>
+      </div>
+      {notice && <p className="rb-admin-hint">{notice}</p>}
+      {runs === null ? (
+        <p className="rb-admin-hint">Carico…</p>
+      ) : runs.length === 0 ? (
+        <p className="rb-admin-hint">Nessun giro ancora registrato.</p>
+      ) : (
+        <div className="rb-admin-table-wrap">
+          <table className="rb-admin-table">
+            <thead>
+              <tr>
+                <th>Avviato</th>
+                <th>Da</th>
+                <th>Categoria</th>
+                <th>Nuovi</th>
+                <th>Aggiornati</th>
+                <th>Scartati</th>
+                <th>Archiviati</th>
+                <th>Esito</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => (
+                <tr key={r.id}>
+                  <td>{formatRunDate(r.started_at)}</td>
+                  <td>{r.avviato_da}</td>
+                  <td>{r.categoria ?? 'tutte'}</td>
+                  <td>{r.inseriti}</td>
+                  <td>{r.aggiornati}</td>
+                  <td>{r.scartati}</td>
+                  <td>{r.archiviati}</td>
+                  <td className="rb-admin-bot-esito">{!r.finished_at ? 'In corso…' : r.errore ? `⚠️ ${r.errore}` : '✅ OK'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
 
 const SPONSOR_MONDI = ['social', 'vetrina', 'annunci', 'arte', 'nerd', 'lavoro', 'incontri'];
 const SPONSOR_FORMATI = ['card_feed', 'banner_pannello', 'riga_lista'];
@@ -725,6 +826,7 @@ export default function AdminPanel({ user, onClose }) {
           />
         )}
         {tab === 'log' && <AuditLogPane entries={auditLog} />}
+        {tab === 'bot-eventi' && <EventsBotPane />}
       </div>
 
       {resetSentTo && (

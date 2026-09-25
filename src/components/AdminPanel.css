@@ -477,3 +477,18 @@
   background: color-mix(in srgb, #ff3860 25%, transparent);
   color: #ff3860;
 }
+
+/* Scheda "Bot eventi" */
+.rb-admin-bot-launch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.rb-admin-bot-esito {
+  max-width: 320px;
+  white-space: normal;
+  font-size: 11.5px;
+}

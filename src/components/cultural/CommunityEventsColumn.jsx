@@ -3,6 +3,7 @@ import { listCommunityEvents, createCommunityEvent, deleteCommunityEvent } from 
 import { getCommunityReactionsSummary, toggleCommunityReaction } from '../../data/culturalReactions';
 import { displayName } from '../../data/posts';
 import ReactionButtons from './ReactionButtons';
+import EventiColumn from './EventiColumn';
 import './cultural.css';
 
 function formatEventDate(iso) {
@@ -49,9 +50,10 @@ function NewEventForm({ categoryId, onCreated, onCancel }) {
 }
 
 // Colonna condivisa da Teatro, Arte (musei/mostre) e Live (concerti/festival):
-// niente catalogo esterno affidabile e gratuito per questi tre, quindi gli
-// eventi li aggiungono gli utenti stessi (community_events); stesse due
-// reazioni di Cinema per organizzarsi e vedere chi altro ci va.
+// in cima gli eventi "di catalogo" (tabella events, aggiornati ogni notte
+// dal bot events-bot, vedi EventiColumn), sotto quelli aggiunti dagli
+// utenti stessi (community_events) con le stesse due reazioni di Cinema
+// per organizzarsi e vedere chi altro ci va.
 export default function CommunityEventsColumn({ categoryId, label, user, onOpenAuth, onShowReactors }) {
   const [events, setEvents] = useState(null);
   const [reactions, setReactions] = useState(new Map());
@@ -109,6 +111,8 @@ export default function CommunityEventsColumn({ categoryId, label, user, onOpenA
           <button type="button" className="rb-cultural-add-btn" onClick={() => setShowForm(true)}>+ Aggiungi</button>
         )}
       </div>
+
+      <EventiColumn mondo="arte" categoria={categoryId} user={user} onOpenAuth={onOpenAuth} compact />
 
       {showForm && (
         <NewEventForm
