@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { safeFileName } from './storagePath';
 
 // I bucket di storage accettano solo certi tipi di file e una dimensione
 // massima (vedi accept sugli <input type="file">): un upload respinto per
@@ -28,7 +29,7 @@ export async function publishContent({ file, type, caption, tags, placements }) 
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/${Date.now()}-${file.name}`;
+    const path = `${auth.user.id}/${Date.now()}-${safeFileName(file.name)}`;
     const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
     if (uploadError) return { error: translateUploadError(uploadError) };
 

@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { rememberDeviceSession } from './accountSwitcher';
+import { safeFileName } from './storagePath';
 
 // Il bucket "attachments" accetta solo certi tipi di file e una dimensione
 // massima (vedi accept sull'input allegati in AuthModal): un upload respinto
@@ -425,7 +426,7 @@ export async function deleteOwnAccount(password) {
 // imposto dalle policy di storage) e lo registra nel profilo tramite la
 // funzione add_own_attachment. `file` è un File/Blob del browser.
 export async function uploadAttachment(userId, file) {
-  const path = `${userId}/${Date.now()}-${file.name}`;
+  const path = `${userId}/${Date.now()}-${safeFileName(file.name)}`;
   const { error: uploadError } = await supabase.storage.from('attachments').upload(path, file);
   if (uploadError) return { error: translateUploadError(uploadError) };
   const { error: rpcError } = await supabase.rpc('add_own_attachment', { p_name: file.name, p_path: path });
@@ -505,7 +506,7 @@ export async function uploadAvatar(file) {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/avatar-${Date.now()}-${file.name}`;
+    const path = `${auth.user.id}/avatar-${Date.now()}-${safeFileName(file.name)}`;
     const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
     if (uploadError) return { error: translateUploadError(uploadError) };
 

@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { fetchProfilesMap, displayName } from './posts';
 import { translateUploadError } from './contents';
 import { isAdult } from './age';
+import { safeFileName } from './storagePath';
 
 // Mondo Annunci (arancione): auto/moto/biciclette/barche/case, vendita o
 // affitto. Backend Supabase (tabella annunci_listings + annunci_favorites,
@@ -265,7 +266,7 @@ export async function annunciInBbox({ categoria, tipo, minLat, minLng, maxLat, m
 export async function uploadAnnuncioPhoto(file) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: 'Devi essere loggato.' };
-  const path = `${auth.user.id}/annuncio-${Date.now()}-${file.name}`;
+  const path = `${auth.user.id}/annuncio-${Date.now()}-${safeFileName(file.name)}`;
   const { error } = await supabase.storage.from('content-media').upload(path, file);
   if (error) return { error: translateUploadError(error) };
   const { data } = supabase.storage.from('content-media').getPublicUrl(path);

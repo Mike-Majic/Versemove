@@ -37,6 +37,7 @@ import {
   deleteContent,
   updateContentCaption,
 } from '../../data/contents';
+import { getCityInfo } from '../../data/geo';
 import './SocialFeed.css';
 
 // Ogni tot post "di zona" (tab Per te, con un filtro Dove attivo), si
@@ -48,15 +49,21 @@ const TRENDING_EVERY = 3;
 // Una card sponsorizzata ogni 8 post del feed, mai la prima — richiesta esplicita.
 const SPONSOR_FEED_EVERY = 8;
 
-// Un post è "della zona" se il suo autore ha una città nota che rispetta i
-// filtri Dove di Impostazioni. I profili reali (vedi public_profiles) non
-// hanno un campo città: per ora questo filtro non ha dati da confrontare e
-// il tab "Per te" con zona attiva resta vuoto — limite noto, non introdotto
-// da questa migrazione (era già così quando gli autori erano finti).
+// Un post è "della zona" se il suo autore ha una città nel Profilo Social
+// (public_profiles.citta_social, in author.citta) che rispetta i filtri
+// Dove di Impostazioni: la città per testo (senza accenti né maiuscole),
+// regione e continente dall'anagrafica di data/geo.js quando la città è
+// nota. Autore senza città = non è della zona.
+const fold = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 function matchesLocation(post, locationFilters) {
-  const city = post.author?.city;
+  const city = post.author?.citta || post.author?.city;
   if (!city) return false;
-  if (locationFilters.city && !city.toLowerCase().includes(locationFilters.city.toLowerCase())) return false;
+  if (locationFilters.city && !fold(city).includes(fold(locationFilters.city))) return false;
+  if (locationFilters.region || locationFilters.continent) {
+    const info = getCityInfo(city);
+    if (locationFilters.region && info?.region !== locationFilters.region) return false;
+    if (locationFilters.continent && info?.continent !== locationFilters.continent) return false;
+  }
   return true;
 }
 

@@ -71,16 +71,33 @@ const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2 };
 // mondo, come sempre.
 const LIVE_LOCATION_COLOR = '#22c55e';
 
+// Marker costruiti con le API del DOM, mai con innerHTML: nickname, città,
+// avatar e foto degli eventi sono dati degli utenti (niente HTML iniettato).
+// Gli url passano solo se http(s) o relativi.
+function safeUrl(url) {
+  const s = String(url ?? '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s) || s.startsWith('/') || s.startsWith('./') || s.startsWith('data:image/')) return s;
+  return '';
+}
+
 function makeMarkerEl(user, world, onOpen) {
   const el = document.createElement('div');
   el.className = 'rb-marker';
   const dotColor = user.isLive ? LIVE_LOCATION_COLOR : world.color;
-  el.innerHTML = `
-    <div class="rb-marker-photo" style="border-color:${world.color}">
-      <img src="${user.avatar}" alt="${user.name}" loading="lazy" />
-      <span class="rb-marker-dot ${user.isLive ? 'rb-marker-dot-live' : ''}" style="background:${dotColor}"></span>
-    </div>
-  `;
+  const photo = document.createElement('div');
+  photo.className = 'rb-marker-photo';
+  photo.style.borderColor = world.color;
+  const img = document.createElement('img');
+  const src = safeUrl(user.avatar);
+  if (src) img.src = src;
+  img.alt = String(user.name ?? '');
+  img.loading = 'lazy';
+  const dot = document.createElement('span');
+  dot.className = `rb-marker-dot ${user.isLive ? 'rb-marker-dot-live' : ''}`;
+  dot.style.background = dotColor;
+  photo.append(img, dot);
+  el.append(photo);
   el.title = `${user.name} · ${user.city}`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -98,11 +115,19 @@ function makeEventMarkerEl(event, world, onOpen) {
   const el = document.createElement('div');
   el.className = 'rb-event-marker';
   const likeCount = event.mi_piace.length;
-  const photoStyle = event.fotoUrl ? `background-image:url('${event.fotoUrl}')` : `background:${world.color}`;
-  el.innerHTML = `
-    <div class="rb-event-marker-photo" style="${photoStyle}; border-color:${world.color}"></div>
-    ${likeCount > 0 ? `<span class="rb-event-marker-badge">${likeCount}</span>` : ''}
-  `;
+  const photo = document.createElement('div');
+  photo.className = 'rb-event-marker-photo';
+  const foto = safeUrl(event.fotoUrl);
+  if (foto) photo.style.backgroundImage = `url(${JSON.stringify(foto)})`;
+  else photo.style.background = world.color;
+  photo.style.borderColor = world.color;
+  el.append(photo);
+  if (likeCount > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'rb-event-marker-badge';
+    badge.textContent = String(likeCount);
+    el.append(badge);
+  }
   el.title = `${event.titolo} · ${event.citta}`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -129,7 +154,9 @@ function makeClusterEl(cluster, world, onExpand) {
   el.className = 'rb-marker-cluster';
   el.style.borderColor = world.color;
   el.style.background = `color-mix(in srgb, ${world.color} 28%, rgba(0,0,0,0.55))`;
-  el.innerHTML = `<span>${cluster.count}</span>`;
+  const count = document.createElement('span');
+  count.textContent = String(cluster.count);
+  el.append(count);
   el.title = `${cluster.label} · ${cluster.count} persone`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();

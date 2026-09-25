@@ -192,6 +192,18 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                 </p>
               )}
 
+              {/* Luoghi importati da OpenStreetMap: attribuzione richiesta dalla
+                  licenza ODbL, visibile su ogni scheda. */}
+              {(detail.source ?? place.source) === 'osm' && (
+                <p className="rb-dogsheet-source">
+                  Dati ©{' '}
+                  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+                    OpenStreetMap
+                  </a>{' '}
+                  contributors, licenza ODbL
+                </p>
+              )}
+
               {detail.foto.length > 0 && (
                 <div className="rb-dogsheet-photos">
                   {detail.foto.map((url) => (

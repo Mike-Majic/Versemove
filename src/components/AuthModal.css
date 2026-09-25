@@ -251,3 +251,21 @@
   margin-top: 6px;
   padding: 12px 0;
 }
+
+/* "Password dimenticata?" e "Torna all'accesso": link testuali. */
+.rb-auth-link-btn {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent, #1d9bf0);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rb-auth-forgot-hint {
+  margin-top: 0;
+}

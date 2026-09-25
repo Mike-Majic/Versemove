@@ -278,3 +278,14 @@
   margin: 4px 0 8px;
   color: rgba(245, 245, 247, 0.9);
 }
+
+.rb-dogsheet-source {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-dogsheet-source a {
+  color: inherit;
+  text-decoration: underline;
+}

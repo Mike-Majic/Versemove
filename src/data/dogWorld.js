@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateUploadError } from './contents';
+import { safeFileName } from './storagePath';
 
 // Mondo Vetrina, categoria "Cani": luoghi (aree cani, autogrill, hotel,
 // spiagge, sentieri, rifugi pet-friendly) su una mappa reale, con
@@ -244,7 +245,7 @@ export async function createReview({
 export async function uploadDogPhoto(file) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: 'Devi essere loggato.' };
-  const path = `${auth.user.id}/dogworld-${Date.now()}-${file.name}`;
+  const path = `${auth.user.id}/dogworld-${Date.now()}-${safeFileName(file.name)}`;
   const { error } = await supabase.storage.from('content-media').upload(path, file);
   if (error) return { error: translateUploadError(error) };
   return { path };

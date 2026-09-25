@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
+import { safeFileName } from './storagePath';
 
 // Eventi reali del mondo Social (tabelle events + event_attendees), al posto
 // del vecchio stato locale/localStorage di App.jsx. La foto va nel bucket
@@ -89,7 +90,7 @@ export async function createEvent({ titolo, citta, lat, lng, data, ora, bio, fot
 
     let fotoUrl = null;
     if (fotoFile) {
-      const path = `${auth.user.id}/event-${Date.now()}-${fotoFile.name}`;
+      const path = `${auth.user.id}/event-${Date.now()}-${safeFileName(fotoFile.name)}`;
       const { error: uploadError } = await supabase.storage.from('content-media').upload(path, fotoFile);
       if (uploadError) return { error: 'File non supportato o troppo grande.' };
       fotoUrl = supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl;

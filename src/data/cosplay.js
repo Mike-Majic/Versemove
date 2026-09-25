@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
+import { safeFileName } from './storagePath';
 
 // Categoria Cosplay del mondo Nerd (components/nerd/cosplay/): eventi
 // (events + event_attendees, RPC eventi_vicini), "Cerco gruppo"
@@ -159,7 +160,7 @@ export async function proposeEvent({ titolo, tipo, citta, lat, lng, paese, indir
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     let fotoUrl = null;
     if (fotoFile) {
-      const path = `${auth.user.id}/event-${Date.now()}-${fotoFile.name}`;
+      const path = `${auth.user.id}/event-${Date.now()}-${safeFileName(fotoFile.name)}`;
       const { error: uploadError } = await supabase.storage.from('content-media').upload(path, fotoFile);
       if (uploadError) return { error: 'File non supportato o troppo grande.' };
       fotoUrl = supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl;
