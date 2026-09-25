@@ -9,6 +9,8 @@ import { isStaff } from '../../data/roles';
 import { NERD_CATEGORIES } from '../../data/nerdCategories';
 import { POST_TAGS } from '../../data/gaming';
 import GamingPostExtra from '../nerd/gaming/GamingPostExtra';
+import CosplayPostExtra from '../nerd/cosplay/CosplayPostExtra';
+import { COSPLAY_POST_TAGS } from '../../data/cosplay';
 import './PostCard.css';
 
 const REACTION_EMOJIS = ['❤️', '😂', '👍'];
@@ -115,9 +117,9 @@ export default function PostCard({
   // "🖥️ Gaming PC · Build" (icona e nome da NERD_CATEGORIES), anche in
   // bacheca.
   const nerdCategory = post.categoria ? NERD_CATEGORIES.find((c) => c.id === post.categoria) : null;
-  const categoryChip = nerdCategory
-    ? `${nerdCategory.icon} ${nerdCategory.label}${post.tag && POST_TAGS[post.tag] ? ` · ${POST_TAGS[post.tag].label}` : ''}`
-    : null;
+  const isCosplay = post.categoria === 'cosplay';
+  const tagInfo = post.tag ? (isCosplay ? COSPLAY_POST_TAGS[post.tag] : POST_TAGS[post.tag]) : null;
+  const categoryChip = nerdCategory ? `${nerdCategory.icon} ${nerdCategory.label}${tagInfo ? ` · ${tagInfo.label}` : ''}` : null;
   const likeCount = hasSharedContent ? post.contentLikeCount : post.mi_piace.length;
   const postComments = comments.filter((c) => c.post_id === post.id);
   const group = post.group ?? null;
@@ -238,7 +240,8 @@ export default function PostCard({
           {post.testo && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
         </>
       )}
-      {(post.extra || post.title) && post.tag && <GamingPostExtra post={post} user={user} />}
+      {post.extra && post.tag && isCosplay && <CosplayPostExtra post={post} />}
+      {(post.extra || post.title) && post.tag && !isCosplay && <GamingPostExtra post={post} user={user} />}
       {post.gif && (
         <MediaImage className="rb-post-gif" src={post.gif} alt="GIF" errorText="GIF non disponibile (il link non si è caricato)" />
       )}

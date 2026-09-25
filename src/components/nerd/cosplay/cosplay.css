@@ -211,7 +211,7 @@
 
 /* Dentro il pannello (non a tutto schermo come in Tattoo): un riquadro
    di altezza fissa con gli angoli del pannello. */
-.rb-cevmap {
+.rb-tattoomap-viewport.rb-cevmap {
   position: relative;
   inset: auto;
   height: 420px;
@@ -332,4 +332,79 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* --- Galleria / WIP / Community ------------------------------------- */
+.rb-cgal-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.rb-cgal-grid .rb-clip-tile img {
+  aspect-ratio: 3 / 4;
+}
+
+.rb-cpost {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rb-cpost--wip {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.rb-cpost-chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rb-cpost-materials {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.rb-cpost-materials li {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.rb-cpost-progress {
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.rb-cpost-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent, #d4f634);
+  transition: width 0.3s ease;
+}
+
+.rb-cpost-progress em {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.rb-ccom-topics {
+  margin-bottom: 4px;
 }
