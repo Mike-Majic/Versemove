@@ -1,0 +1,5 @@
+/* Categoria Cosplay (mondo Nerd): stesse basi di gaming.css (schede,
+   pannello, filtri, form) più quello che serve a eventi, gruppi e galleria. */
+.rb-cosplay-panel {
+  min-height: 240px;
+}

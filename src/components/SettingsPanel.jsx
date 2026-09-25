@@ -26,6 +26,8 @@ import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import CustomSelect from './shared/CustomSelect';
 import CollapsibleSection from './shared/CollapsibleSection';
+import CityAutocomplete from './shared/CityAutocomplete';
+import { CITY_DATA_CREDIT, locationHasCoords, setMyCittaGeo } from '../data/citta';
 import './SettingsPanel.css';
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
@@ -695,6 +697,7 @@ export default function SettingsPanel({
   open,
   onClose,
   onApply,
+  initialSection = null,
   user,
   onOpenAuth,
   onUpdateUser,
@@ -729,6 +732,11 @@ export default function SettingsPanel({
     if (!open) return;
     setDraftFilters(filters);
     setDraftLocationFilters(locationFilters);
+    // Aperto da "📍 città · entro N km" (eventi Cosplay): dritto su Luogo.
+    if (initialSection === 'luogo') {
+      setPersonalizzaOpen(true);
+      setPersonalizzaSub('luogo');
+    }
     setDraftVisibility(visibility);
     const sound = isSoundEnabled();
     setDraftSound(sound);
@@ -769,6 +777,10 @@ export default function SettingsPanel({
   const handleApply = async () => {
     setFilters(draftFilters);
     setLocationFilters(draftLocationFilters);
+    // Città del profilo sul server (solo loggati, solo se è cambiata).
+    if (user && (draftLocationFilters.geonameId ?? null) !== (locationFilters.geonameId ?? null)) {
+      setMyCittaGeo(draftLocationFilters.geonameId ?? null);
+    }
     setVisibility(draftVisibility);
     setSoundEnabled(draftSound);
     setQualityMode(draftQuality);
@@ -919,12 +931,31 @@ export default function SettingsPanel({
 
             <label className="rb-field">
               <span>{t('settings.luogo.city')}</span>
-              <input
-                type="text"
-                placeholder={t('settings.luogo.cityPlaceholder')}
+              {/* Città con coordinate (GeoNames): scritta a mano vale solo
+                  come testo, scelta dall'elenco porta lat/lng per la
+                  distanza (eventi e annunci vicini). */}
+              <CityAutocomplete
                 value={draftLocationFilters.city}
-                onChange={(e) => updateLocation('city', e.target.value)}
+                placeholder={t('settings.luogo.cityPlaceholder')}
+                onChange={(text) =>
+                  setDraftLocationFilters((f) => ({ ...f, city: text, lat: null, lng: null, geonameId: null, paese: '', regione: '' }))
+                }
+                onPick={(c) =>
+                  setDraftLocationFilters((f) => ({
+                    ...f,
+                    city: c.nomeMostrato,
+                    lat: c.lat,
+                    lng: c.lng,
+                    geonameId: c.geonameId,
+                    paese: c.paese,
+                    regione: c.regione,
+                  }))
+                }
               />
+              {draftLocationFilters.city && !locationHasCoords(draftLocationFilters) && (
+                <small className="rb-field-note rb-field-note--warn">Scegli la città dall'elenco: senza coordinate la distanza non si può calcolare.</small>
+              )}
+              <small className="rb-field-note">{CITY_DATA_CREDIT}</small>
             </label>
 
             <label className="rb-field">

@@ -11,6 +11,7 @@ import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
 import GamingColumn from './nerd/gaming/GamingColumn';
 import NerdBachecaColumn from './nerd/NerdBachecaColumn';
+import CosplayColumn from './nerd/cosplay/CosplayColumn';
 import VetrinaOfferteColumn from './vetrina/VetrinaOfferteColumn';
 import FavoriteStarButton from './shared/FavoriteStarButton';
 import { VETRINA_OFFERTE_CATEGORY_IDS } from '../data/vetrinaCategories';
@@ -42,6 +43,7 @@ export default function ArteExplorer({
   morphTitleFromCenter = false,
   isClosing = false,
   gamingFocus = null,
+  cosplayFocus = null,
 }) {
   const category = categorySet.categories.find((c) => c.id === activeCategory) ?? null;
   const genericColumn = category && (
@@ -110,6 +112,10 @@ export default function ArteExplorer({
             <TattooColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : category.id === 'giochi-tavolo' ? (
             <GiochiTavoloColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'nerd' && category.id === 'cosplay' ? (
+            // Cosplay: schede Eventi · Cerco gruppo · Galleria · WIP ·
+            // Community (vedi nerd/cosplay/CosplayColumn.jsx).
+            <CosplayColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} focus={cosplayFocus} />
           ) : world.id === 'nerd' && category.id === 'bacheca' ? (
             <NerdBachecaColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (

@@ -232,6 +232,8 @@ export default function App() {
   const [banNotice, setBanNotice] = useState(null); // { motivo, finoAl } | null
   const [authOpen, setAuthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Sezione da aprire subito nelle Impostazioni (evento vm:open-settings).
+  const [settingsInitialSection, setSettingsInitialSection] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
 
   // Mondi disattivati dall'utente (Impostazioni -> Mondi): sul mappamondo il
@@ -331,6 +333,9 @@ export default function App() {
   const [mentionProfileId, setMentionProfileId] = useState(null);
   // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
   const [gamingFocus, setGamingFocus] = useState(null);
+  // Annuncio "Cerco gruppo" Cosplay da evidenziare (notifiche lfg_* con
+  // riferimento cosplay_lfg): { lfgId, seq }.
+  const [cosplayFocus, setCosplayFocus] = useState(null);
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
@@ -492,7 +497,13 @@ export default function App() {
   }, [accountDeletedNotice]);
 
   useEffect(() => localStorage.setItem('rb-filters', JSON.stringify(filters)), [filters]);
-  useEffect(() => localStorage.setItem('rb-location-filters', JSON.stringify(locationFilters)), [locationFilters]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('rb-location-filters', JSON.stringify(locationFilters));
+    } catch {
+      // localStorage pieno o bloccato: il filtro resta in memoria.
+    }
+  }, [locationFilters]);
   useEffect(() => localStorage.setItem('rb-arte-filter', JSON.stringify(arteFilter)), [arteFilter]);
   useEffect(() => localStorage.setItem('rb-visibility', JSON.stringify(visibility)), [visibility]);
   useEffect(() => {
@@ -865,9 +876,15 @@ export default function App() {
     };
     window.addEventListener('vm:open-profile', onOpenProfile);
     window.addEventListener('vm:open-chat', onOpenChat);
+    const onOpenSettings = (e) => {
+      setSettingsInitialSection(e.detail?.section ?? null);
+      setSettingsOpen(true);
+    };
+    window.addEventListener('vm:open-settings', onOpenSettings);
     return () => {
       window.removeEventListener('vm:open-profile', onOpenProfile);
       window.removeEventListener('vm:open-chat', onOpenChat);
+      window.removeEventListener('vm:open-settings', onOpenSettings);
     };
   }, []);
 
@@ -893,10 +910,16 @@ export default function App() {
       return;
     }
     if (tipo === 'lfg_join' || tipo === 'lfg_leave' || tipo === 'lfg_kick') {
+      const lfgId = notif.riferimentoId ?? null;
+      if (notif.riferimentoTipo === 'cosplay_lfg') {
+        // Cerco gruppo (Cosplay): la scheda con l'annuncio evidenziato.
+        setCosplayFocus(lfgId ? { lfgId, seq: Date.now() } : null);
+        navigateToCategory('nerd', 'cosplay');
+        return;
+      }
       // Cerco compagni: la categoria giusta del mondo Nerd con l'annuncio
       // evidenziato. Se l'annuncio non è più leggibile (chiuso, espulso)
       // si apre comunque Gaming PC.
-      const lfgId = notif.riferimentoId ?? null;
       fetchLfg(lfgId).then((lfg) => {
         setGamingFocus(lfgId ? { lfgId, seq: Date.now() } : null);
         navigateToCategory('nerd', lfg?.categoria ?? 'gaming-pc');
@@ -1094,6 +1117,7 @@ export default function App() {
             morphTitleFromCenter={categoryOpenedViaFly}
             isClosing={closingCategoryId !== null}
             gamingFocus={gamingFocus}
+            cosplayFocus={cosplayFocus}
           />
         </Suspense>
       )}
@@ -1302,7 +1326,11 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <SettingsPanel
             open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
+            initialSection={settingsInitialSection}
+            onClose={() => {
+              setSettingsOpen(false);
+              setSettingsInitialSection(null);
+            }}
             onApply={() => {
               applyArteFilter();
               setSettingsOpen(false);

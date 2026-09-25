@@ -463,3 +463,15 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Note sotto un campo (credito GeoNames, avviso città senza coordinate). */
+.rb-field-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.rb-field-note--warn {
+  color: #ffd166;
+}
