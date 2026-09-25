@@ -596,6 +596,15 @@
   margin-bottom: 4px;
 }
 
+/* Il compositore sta in cima a un pannello che scorre (overflow-y: auto):
+   le finestrelle emoji e GIF, che di norma si aprono verso l'alto, qui
+   finirebbero tagliate dal bordo del pannello. Si aprono verso il basso. */
+.rb-gaming-panel .rb-emoji-popover,
+.rb-gaming-panel .rb-gif-picker {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
 .rb-gaming-posts {
   list-style: none;
   margin: 0;
