@@ -72,3 +72,145 @@ export function formatEventDates(startIso, endIso) {
   if (a.getFullYear() === b.getFullYear()) return `${dayFmt.format(a)} – ${dayYearFmt.format(b)}`;
   return `${dayYearFmt.format(a)} – ${dayYearFmt.format(b)}`;
 }
+
+// ---------------------------------------------------------------------------
+// Eventi (RPC eventi_vicini + tabella events / event_attendees)
+
+export const EVENTS_PAGE_SIZE = 30;
+
+function mapEvento(row) {
+  return {
+    id: row.id,
+    autoreId: row.autore_id,
+    mondo: row.mondo,
+    categoria: row.categoria,
+    tipo: row.tipo ?? 'altro',
+    titolo: row.titolo,
+    descrizione: row.descrizione ?? '',
+    citta: row.citta ?? '',
+    indirizzo: row.indirizzo ?? '',
+    paese: (row.paese ?? '').trim(),
+    lat: row.lat,
+    lng: row.lng,
+    dataEvento: row.data_evento,
+    dataFine: row.data_fine ?? null,
+    urlUfficiale: row.url_ufficiale ?? null,
+    fotoUrl: row.foto_url ?? null,
+    fonte: row.fonte,
+    pubblico: Boolean(row.pubblico),
+    stato: row.stato,
+    distanzaKm: row.distanza_km == null ? null : Number(row.distanza_km),
+    inCorso: Boolean(row.in_corso),
+    nPartecipa: Number(row.n_partecipa ?? 0),
+    nInteressati: Number(row.n_interessati ?? 0),
+    mioStato: row.mio_stato ?? null,
+  };
+}
+
+// Eventi Cosplay: vicini (lat/lng/km) o di tutto il mondo (tutti null),
+// prossimi (compresi quelli in corso) o passati, filtro tipo facoltativo,
+// a pagine di 30. -> { events } | { error }
+export async function fetchEventiVicini({ lat = null, lng = null, km = null, periodo = 'prossimi', tipo = null, limit = EVENTS_PAGE_SIZE, offset = 0 } = {}) {
+  try {
+    const { data, error } = await supabase.rpc('eventi_vicini', {
+      p_lat: lat,
+      p_lng: lng,
+      p_km: km,
+      p_mondo: 'nerd',
+      p_categoria: COSPLAY_CATEGORY_ID,
+      p_periodo: periodo,
+      p_tipo: tipo,
+      p_limit: limit,
+      p_offset: offset,
+    });
+    if (error) return { error: error.message };
+    return { events: (data ?? []).map(mapEvento) };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// "Ci vado" / "Mi interessa": upsert su event_attendees; stato null toglie
+// la riga (ritocco sullo stesso pulsante).
+export async function setEventAttendance(eventId, stato) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    if (!stato) {
+      const { error } = await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', auth.user.id);
+      return error ? { error: error.message } : {};
+    }
+    const { error } = await supabase
+      .from('event_attendees')
+      .upsert({ event_id: eventId, user_id: auth.user.id, stato }, { onConflict: 'event_id,user_id' });
+    return error ? { error: translateInteractionError(error) } : {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// "Proponi evento": insert su events con autore, mondo nerd e categoria
+// cosplay; fonte e stato li mette il server (pubblico → in attesa dei
+// moderatori, raduno tra utenti → visibile subito nella propria fascia).
+// La foto va nel bucket content-media come gli eventi del mondo Social.
+export async function proposeEvent({ titolo, tipo, citta, lat, lng, paese, indirizzo, dataInizio, dataFine, urlUfficiale, descrizione, fotoFile, pubblico }) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    let fotoUrl = null;
+    if (fotoFile) {
+      const path = `${auth.user.id}/event-${Date.now()}-${fotoFile.name}`;
+      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, fotoFile);
+      if (uploadError) return { error: 'File non supportato o troppo grande.' };
+      fotoUrl = supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl;
+    }
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        autore_id: auth.user.id,
+        mondo: 'nerd',
+        categoria: COSPLAY_CATEGORY_ID,
+        titolo: String(titolo ?? '').trim(),
+        tipo: tipo || 'altro',
+        descrizione: String(descrizione ?? '').trim(),
+        citta: String(citta ?? '').trim() || null,
+        indirizzo: String(indirizzo ?? '').trim() || null,
+        paese: paese || null,
+        lat: Number.isFinite(lat) ? lat : null,
+        lng: Number.isFinite(lng) ? lng : null,
+        data_evento: dataInizio,
+        data_fine: dataFine || null,
+        url_ufficiale: String(urlUfficiale ?? '').trim() || null,
+        foto_url: fotoUrl,
+        pubblico: Boolean(pubblico),
+      })
+      .select('id, stato')
+      .single();
+    if (error) return { error: translateInteractionError(error) };
+    return { id: data.id, stato: data.stato };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// Stanza MOD: eventi proposti in attesa di approvazione, con l'autore.
+export async function fetchPendingEvents() {
+  try {
+    const { data, error } = await supabase.from('events').select('*').eq('stato', 'in_attesa').is('deleted_at', null).order('created_at', { ascending: true });
+    if (error) return [];
+    const list = (data ?? []).map(mapEvento);
+    const profiles = await fetchProfilesMap(list.map((e) => e.autoreId));
+    return list.map((e) => ({ ...e, author: profiles.get(e.autoreId) ?? { id: e.autoreId, name: 'Utente', avatar: '' } }));
+  } catch {
+    return [];
+  }
+}
+
+export async function setEventStato(eventId, stato) {
+  try {
+    const { error } = await supabase.from('events').update({ stato }).eq('id', eventId);
+    return error ? { error: error.message } : {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}

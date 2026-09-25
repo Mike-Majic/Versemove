@@ -3,3 +3,280 @@
 .rb-cosplay-panel {
   min-height: 240px;
 }
+
+/* --- Scheda Eventi --------------------------------------------------- */
+.rb-cev-where-bar,
+.rb-cev-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rb-cev-where-btn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent, #d4f634) 40%, transparent);
+  background: color-mix(in srgb, var(--accent, #d4f634) 10%, transparent);
+  color: #f5f5f7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rb-cev-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rb-cev-toggle button {
+  padding: 5px 11px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: rgba(245, 245, 247, 0.7);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-cev-toggle button.is-active {
+  background: var(--accent, #d4f634);
+  color: #101010;
+}
+
+.rb-cev-toggle button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rb-cev-inline-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent, #d4f634);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rb-cev-propose {
+  margin-left: auto;
+}
+
+.rb-cev-section + .rb-cev-section {
+  margin-top: 6px;
+}
+
+.rb-cev-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rb-cev {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rb-cev.is-live {
+  border-color: color-mix(in srgb, #ff4d4d 60%, transparent);
+  box-shadow: inset 0 0 24px rgba(255, 77, 77, 0.08);
+}
+
+.rb-cev-photo {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.rb-cev-photo--empty {
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  background: color-mix(in srgb, var(--accent, #d4f634) 18%, transparent);
+}
+
+.rb-cev-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rb-cev-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.rb-cev-type,
+.rb-cev-verified,
+.rb-cev-pending,
+.rb-cev-live {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rb-cev-verified {
+  background: rgba(62, 224, 122, 0.18);
+  color: #b9f5cf;
+}
+
+.rb-cev-pending {
+  background: rgba(255, 209, 102, 0.18);
+  color: #ffd166;
+}
+
+.rb-cev-live {
+  background: #ff4d4d;
+  color: #fff;
+  letter-spacing: 1px;
+  animation: rb-cev-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rb-cev-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 77, 77, 0); }
+}
+
+.rb-cev-title {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.rb-cev-when,
+.rb-cev-where,
+.rb-cev-counts {
+  font-size: 12.5px;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-cev-where em {
+  font-style: normal;
+  color: var(--accent, #d4f634);
+}
+
+.rb-cev-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: rgba(245, 245, 247, 0.85);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rb-cev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rb-cev-link {
+  text-decoration: none;
+}
+
+.rb-cev-sentinel {
+  min-height: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+/* Dentro il pannello (non a tutto schermo come in Tattoo): un riquadro
+   di altezza fissa con gli angoli del pannello. */
+.rb-cevmap {
+  position: relative;
+  inset: auto;
+  height: 420px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.rb-cevmap-pin {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent, #d4f634);
+  font-size: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.rb-cevmap-pin.is-live {
+  outline: 3px solid #ff4d4d;
+}
+
+.rb-cev-form-preview {
+  margin-top: 6px;
+  max-width: 160px;
+  max-height: 120px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.rb-cev-form-kind {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+}
+
+.rb-cev-form-kind legend {
+  padding: 0 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.rb-cev-form-kind .rb-lfg-form-check {
+  flex-wrap: wrap;
+}
+
+.rb-cev-form-kind small {
+  flex-basis: 100%;
+  padding-left: 26px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+@media (max-width: 480px) {
+  .rb-cev {
+    flex-direction: column;
+  }
+
+  .rb-cev-photo {
+    width: 100%;
+    height: 120px;
+  }
+
+  .rb-cev-propose {
+    margin-left: 0;
+    width: 100%;
+  }
+}

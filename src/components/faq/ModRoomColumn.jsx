@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getReports, updateReportStatus } from '../../data/reports';
 import { getMailboxMessages, markMessageRead } from '../../data/modMailbox';
+import { EVENT_TYPES, fetchPendingEvents, formatEventDates, setEventStato } from '../../data/cosplay';
 import {
   listModRoomMessages,
   sendModRoomMessage,
@@ -69,6 +70,8 @@ export default function ModRoomColumn({ user, onOpenCategory }) {
   const [tab, setTab] = useState('chat');
   const [reports, setReports] = useState(null);
   const [mail, setMail] = useState(null);
+  // Eventi proposti dagli utenti (events.stato = 'in_attesa').
+  const [pendingEvents, setPendingEvents] = useState(null);
   const [messages, setMessages] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -82,6 +85,7 @@ export default function ModRoomColumn({ user, onOpenCategory }) {
   const refreshDaGestire = useCallback(() => {
     getReports().then(setReports);
     getMailboxMessages().then(setMail);
+    fetchPendingEvents().then(setPendingEvents);
   }, []);
 
   // Messaggi: prima pagina, poi Realtime (deduplicato per id).
@@ -183,7 +187,7 @@ export default function ModRoomColumn({ user, onOpenCategory }) {
   const openReports = (reports ?? []).filter((r) => r.stato === 'aperto');
   const workingReports = (reports ?? []).filter((r) => r.stato === 'in_lavorazione');
   const unreadMail = (mail ?? []).filter((m) => !m.letto);
-  const pendingCount = openReports.length + unreadMail.length;
+  const pendingCount = openReports.length + unreadMail.length + (pendingEvents?.length ?? 0);
 
   const query = search.trim().toLowerCase();
   const shown = useMemo(() => {
@@ -257,6 +261,27 @@ export default function ModRoomColumn({ user, onOpenCategory }) {
               </div>
             </article>
           ))}
+          {(pendingEvents?.length ?? 0) > 0 && (
+            <>
+              <div className="rb-modroom-side-head sub">Eventi da approvare</div>
+              {pendingEvents.map((ev) => (
+                <article key={ev.id} className="rb-modroom-card" data-event-id={ev.id}>
+                  <h4>{EVENT_TYPES[ev.tipo]?.icon ?? '📌'} {ev.titolo}</h4>
+                  <p>
+                    {EVENT_TYPES[ev.tipo]?.label ?? 'Evento'} · {formatEventDates(ev.dataEvento, ev.dataFine)} · {ev.citta} · proposto da {displayName(ev.author, 'utente')}
+                  </p>
+                  {ev.descrizione && <p className="rb-modroom-card-body">{ev.descrizione}</p>}
+                  {ev.urlUfficiale && (
+                    <p><a href={ev.urlUfficiale} target="_blank" rel="noopener noreferrer">{ev.urlUfficiale}</a></p>
+                  )}
+                  <div className="rb-modroom-card-actions">
+                    <button type="button" className="primary" onClick={() => setEventStato(ev.id, 'approvato').then(refreshDaGestire)}>Approva</button>
+                    <button type="button" onClick={() => setEventStato(ev.id, 'rifiutato').then(refreshDaGestire)}>Rifiuta</button>
+                  </div>
+                </article>
+              ))}
+            </>
+          )}
           {workingReports.length > 0 && (
             <>
               <div className="rb-modroom-side-head sub">In lavorazione</div>
