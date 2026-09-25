@@ -250,3 +250,24 @@
   color: inherit;
   font-size: 12px;
 }
+
+/* Fine della pagina del feed: carica la pagina successiva (anche da sola,
+   quando entra in vista). */
+.rb-feed-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 20px;
+}
+.rb-feed-more-btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rb-feed-more-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

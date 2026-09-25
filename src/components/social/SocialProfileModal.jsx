@@ -7,6 +7,7 @@ import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import {
   fetchFeed,
+  FEED_PAGE_SIZE,
   fetchComments,
   fetchProfilesMap,
   togglePostLike as togglePostLikeApi,
@@ -21,6 +22,7 @@ import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { fetchGamertagsMap } from '../../data/gaming';
 import GamertagChips from '../shared/GamertagChips';
 import './SocialProfileModal.css';
+import LoadMoreButton from '../shared/LoadMoreButton';
 
 const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
 const STATO_LABELS = {
@@ -47,11 +49,21 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
   // pubblica (vedi fetchGamertagsMap).
   const [gamertags, setGamertags] = useState(null);
   const [error, setError] = useState('');
+  // Pagine: si ricaricano le prime pages * FEED_PAGE_SIZE (le azioni sui
+  // post ricaricano l'elenco intero, così restano allineate).
+  const [pages, setPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setPages((n) => n + 1);
+  };
 
   const reload = async () => {
     const [profilesMap, feedRes, familyList, tagsMap] = await Promise.all([
       fetchProfilesMap([userId]),
-      fetchFeed({ mondo: 'social', authorId: userId }),
+      fetchFeed({ mondo: 'social', authorId: userId, limit: pages * FEED_PAGE_SIZE }),
       getFamily(userId),
       user?.id === userId ? Promise.resolve(new Map([[userId, user.gamertags ?? {}]])) : fetchGamertagsMap([userId]),
     ]);
@@ -59,6 +71,8 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
     setFamily(familyList);
     setGamertags(tagsMap.get(userId) ?? null);
     const list = feedRes.posts ?? [];
+    setHasMore(Boolean(feedRes.hasMore));
+    setLoadingMore(false);
     setPosts(list);
     const { comments: c } = await fetchComments(list.map((p) => p.id));
     setComments(c ?? []);
@@ -66,9 +80,15 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
 
   useEffect(() => {
     setPosts(null);
+    setPages(1);
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  useEffect(() => {
+    if (pages > 1) reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages]);
 
   const isFollowing = following.includes(userId);
 
@@ -212,6 +232,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
                 ))}
               </ul>
             )}
+            {posts && hasMore && <LoadMoreButton onLoad={loadMore} loading={loadingMore} label="Carica altri post" loadingLabel="Carico altri post…" />}
           </>
         )}
       </div>

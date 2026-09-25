@@ -204,60 +204,33 @@ export function subscribeToOwnMessages(onInsert) {
 
 // Tutte le mie conversazioni dirette, con l'altro partecipante, l'anteprima
 // dell'ultimo messaggio e i non letti — per l'hub DM stile WhatsApp
-// (components/DMHub.jsx): niente RPC dedicata, si compone da tabelle già
-// esistenti (poche righe per utente, va bene lato client).
+// (components/DMHub.jsx). L'ultimo messaggio di ogni chat lo trova il DB
+// (RPC conversazioni_ultimo_msg): prima si scaricavano tutti i messaggi di
+// tutte le chat per prenderne uno.
 export async function listMyConversations() {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return [];
-    const myId = auth.user.id;
 
-    const { data: myRows, error } = await supabase
-      .from('chat_participants')
-      .select('conversation_id, archived')
-      .eq('user_id', myId);
-    if (error || !myRows?.length) return [];
-
-    const convIds = myRows.map((r) => r.conversation_id);
-    const archivedMap = new Map(myRows.map((r) => [r.conversation_id, r.archived]));
-
-    const { data: allParticipants } = await supabase
-      .from('chat_participants')
-      .select('conversation_id, user_id')
-      .in('conversation_id', convIds);
-    const otherIdByConv = new Map();
-    for (const row of allParticipants ?? []) {
-      if (row.user_id !== myId) otherIdByConv.set(row.conversation_id, row.user_id);
-    }
-
-    const { data: recentMessages } = await supabase
-      .from('chat_messages')
-      .select('conversation_id, testo, tipo, allegato, created_at, mondo')
-      .in('conversation_id', convIds)
-      .order('created_at', { ascending: false });
-    const lastMsgByConv = new Map();
-    for (const m of recentMessages ?? []) {
-      if (!lastMsgByConv.has(m.conversation_id)) lastMsgByConv.set(m.conversation_id, m);
-    }
+    const { data: rows, error } = await supabase.rpc('conversazioni_ultimo_msg');
+    if (error || !rows?.length) return [];
 
     const [unreadCounts, profilesMap] = await Promise.all([
       getUnreadCounts(),
-      fetchProfilesMap([...otherIdByConv.values()]),
+      fetchProfilesMap(rows.map((r) => r.other_id)),
     ]);
 
-    return convIds
-      .filter((convId) => otherIdByConv.has(convId))
-      .map((convId) => {
-        const otherId = otherIdByConv.get(convId);
-        const lastMsg = lastMsgByConv.get(convId) ?? null;
+    return rows
+      .map((r) => {
+        const lastMsg = r.created_at ? { testo: r.testo, tipo: r.tipo, allegato: r.allegato, created_at: r.created_at, mondo: r.mondo } : null;
         return {
-          conversationId: convId,
-          other: profilesMap.get(otherId) ?? { id: otherId, name: 'Utente', avatar: '' },
+          conversationId: r.conversation_id,
+          other: profilesMap.get(r.other_id) ?? { id: r.other_id, name: 'Utente', avatar: '' },
           lastMessage: lastMsg ? messagePreviewText(lastMsg) : null,
           lastMessageAt: lastMsg?.created_at ?? null,
           lastMessageMondo: lastMsg?.mondo ?? null,
-          unread: unreadCounts.get(convId) ?? 0,
-          archived: archivedMap.get(convId) ?? false,
+          unread: unreadCounts.get(r.conversation_id) ?? 0,
+          archived: Boolean(r.archived),
         };
       })
       .sort((a, b) => new Date(b.lastMessageAt ?? 0) - new Date(a.lastMessageAt ?? 0));
@@ -287,17 +260,9 @@ export async function setConversationArchived(conversationId, archived) {
 // alla riga giusta nella lista amici, che è per friendId).
 export async function getDirectConversationsMap() {
   try {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user) return new Map();
-    const myId = auth.user.id;
-    const { data, error } = await supabase.from('chat_participants').select('conversation_id, user_id');
+    const { data, error } = await supabase.rpc('conversazioni_ultimo_msg');
     if (error || !data) return new Map();
-    const myConvIds = new Set(data.filter((r) => r.user_id === myId).map((r) => r.conversation_id));
-    const map = new Map();
-    for (const row of data) {
-      if (row.user_id !== myId && myConvIds.has(row.conversation_id)) map.set(row.user_id, row.conversation_id);
-    }
-    return map;
+    return new Map(data.map((r) => [r.other_id, r.conversation_id]));
   } catch {
     return new Map();
   }

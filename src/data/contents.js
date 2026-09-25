@@ -68,7 +68,10 @@ export function getContentUrl(storagePath) {
 
 // Contenuti posizionati in un mondo (ed eventualmente una categoria
 // specifica), più recenti prima, con conteggio like e se piace già a me.
-export async function listContentsForPlacement({ world, category }) {
+// Al massimo `limit` (i più recenti): prima si leggevano tutti.
+export const CONTENTS_PAGE_SIZE = 100;
+
+export async function listContentsForPlacement({ world, category, limit = CONTENTS_PAGE_SIZE }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
@@ -77,7 +80,8 @@ export async function listContentsForPlacement({ world, category }) {
       .from('content_placements')
       .select('subfamily, contents(id, owner_id, type, storage_path, caption, tags, created_at)')
       .eq('world_id', world)
-      .order('created_at', { referencedTable: 'contents', ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
     query = category ? query.eq('category_id', category) : query.is('category_id', null);
 
     const { data, error } = await query;

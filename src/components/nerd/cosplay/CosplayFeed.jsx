@@ -5,6 +5,7 @@ import {
   deleteComment as deleteCommentApi,
   fetchComments,
   fetchFeed,
+  FEED_PAGE_SIZE,
   softDeletePost as softDeletePostApi,
   togglePostLike as togglePostLikeApi,
   toggleSavedPost as toggleSavedPostApi,
@@ -23,6 +24,7 @@ import Skeleton from '../../Skeleton';
 import Lightbox from '../../shared/chat/Lightbox';
 import { GalleriaFields, WipFields } from './CosplayComposers';
 import { emptyFields, fieldsToPost } from './cosplayPost';
+import LoadMoreButton from '../../shared/LoadMoreButton';
 
 // Galleria / WIP / Community della categoria Cosplay: posts con mondo
 // nerd, categoria cosplay e tag galleria / wip / discussione, come le
@@ -69,19 +71,31 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
   const [topic, setTopic] = useState(null);
   const [search, setSearch] = useState('');
   const [events, setEvents] = useState([]);
+  // Pagine: si ricaricano le prime pages * FEED_PAGE_SIZE (le azioni sui
+  // post ricaricano l'elenco intero, così restano allineate).
+  const [pages, setPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setPages((n) => n + 1);
+  };
 
   const reload = useCallback(async () => {
-    const res = await fetchFeed({ mondo: 'nerd', categoria: COSPLAY_CATEGORY_ID, tag });
+    const res = await fetchFeed({ mondo: 'nerd', categoria: COSPLAY_CATEGORY_ID, tag, limit: pages * FEED_PAGE_SIZE });
+    setLoadingMore(false);
     if (res.error) {
       setError(res.error);
       setPosts([]);
       return;
     }
+    setHasMore(Boolean(res.hasMore));
     const list = res.posts ?? [];
     setPosts(list);
     const { comments: c } = await fetchComments(list.map((p) => p.id));
     setComments(c ?? []);
-  }, [tag]);
+  }, [tag, pages]);
 
   useEffect(() => {
     reload();
@@ -247,6 +261,7 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
           ))}
         </ul>
       )}
+      {posts && hasMore && <LoadMoreButton onLoad={loadMore} loading={loadingMore} label="Carica altri post" loadingLabel="Carico altri post…" />}
 
       {viewer && (
         <Lightbox

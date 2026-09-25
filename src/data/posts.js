@@ -92,8 +92,13 @@ async function fetchGroupsMap(ids) {
 // tutto il mondo.
 // categoria/tag: post di categoria del mondo Nerd (Gaming PC/PS/Xbox, vedi
 // data/gaming.js): posts.categoria, posts.tag, posts.title_id, posts.extra.
+// Post a pagine: FEED_PAGE_SIZE alla volta, i più recenti prima; before
+// (data ISO dell'ultimo post già mostrato) chiede la pagina successiva.
 // ids: solo quei post (link condiviso a un post fuori dal feed caricato).
-export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null, ids = null } = {}) {
+// -> { posts, hasMore } | { error }
+export const FEED_PAGE_SIZE = 30;
+
+export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null, ids = null, before = null, limit = FEED_PAGE_SIZE } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
@@ -103,9 +108,13 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
     if (categoria) query = query.eq('categoria', categoria);
     if (tag) query = query.eq('tag', tag);
     if (ids?.length) query = query.in('id', ids);
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(200);
+    if (before) query = query.lt('created_at', before);
+    // Uno in più del necessario: dice se c'è un'altra pagina.
+    const { data: rows, error } = await query.order('created_at', { ascending: false }).limit(limit + 1);
     if (error) return { error: error.message };
-    if (!data) return { posts: [] };
+    if (!rows) return { posts: [], hasMore: false };
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
 
     const postIds = data.map((p) => p.id);
     const authorIds = data.map((p) => p.author_id);
@@ -114,18 +123,21 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
     const [profilesMap, groupsMap, likesRes, savedRes] = await Promise.all([
       fetchProfilesMap(authorIds),
       fetchGroupsMap(groupIds),
-      postIds.length
-        ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-        : Promise.resolve({ data: [] }),
+      // Conteggio e "l'ho messo io" calcolati dal DB (post_like_stats),
+      // non tutte le righe di post_likes.
+      postIds.length ? supabase.rpc('post_like_stats', { p_ids: postIds }) : Promise.resolve({ data: [] }),
       myId && postIds.length
         ? supabase.from('saved_posts').select('post_id').eq('user_id', myId).in('post_id', postIds)
         : Promise.resolve({ data: [] }),
     ]);
 
+    // mi_piace resta un array (chi lo usa guarda solo length e includes
+    // del mio id): il mio id se c'è, poi segnaposto null per gli altri.
     const likesByPost = new Map();
     for (const l of likesRes.data ?? []) {
-      if (!likesByPost.has(l.post_id)) likesByPost.set(l.post_id, []);
-      likesByPost.get(l.post_id).push(l.user_id);
+      const n = Number(l.n) || 0;
+      const mine = Boolean(l.mine) && myId;
+      likesByPost.set(l.post_id, [...(mine ? [myId] : []), ...Array(Math.max(0, n - (mine ? 1 : 0))).fill(null)]);
     }
     const savedSet = new Set((savedRes.data ?? []).map((r) => r.post_id));
 
@@ -151,7 +163,7 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
       extra: row.extra ?? null,
       ...fieldsFromMedia(row.media),
     }));
-    return { posts };
+    return { posts, hasMore };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }

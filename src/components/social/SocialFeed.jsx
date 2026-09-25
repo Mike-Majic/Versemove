@@ -145,6 +145,14 @@ export default function SocialFeed({
     window.setTimeout(() => setActionError(''), 4000);
   };
 
+  // Pagine del feed (fetchFeed a FEED_PAGE_SIZE): cursore = data
+  // dell'ultimo post della pagina più vecchia già caricata (non del post
+  // più vecchio in lista: uno aperto da un link salterebbe le pagine in mezzo).
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorRef = useRef(null);
+  const sentinelRef = useRef(null);
+
   const [feedTab, setFeedTab] = useState('foryou');
   const [activeGroupId, setActiveGroupId] = useState(null);
   const [mobileView, setMobileView] = useState('primary');
@@ -167,6 +175,8 @@ export default function SocialFeed({
     }
 
     let feedPosts = feedRes.posts ?? [];
+    setHasMore(Boolean(feedRes.hasMore));
+    cursorRef.current = feedPosts.length ? feedPosts[feedPosts.length - 1].data : null;
 
     // Contenuti condivisi ripubblicati anche nel mondo Social da un altro
     // punto dell'app (senza una riga in posts): recuperati a parte e uniti.
@@ -228,6 +238,46 @@ export default function SocialFeed({
     loadFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Pagina successiva: post, salvati e commenti dei soli post nuovi.
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || !cursorRef.current) return;
+    setLoadingMore(true);
+    const res = await fetchFeed({ mondo: 'social', before: cursorRef.current });
+    setLoadingMore(false);
+    if (res.error) {
+      showActionError(res.error);
+      return;
+    }
+    const fresh = res.posts ?? [];
+    setHasMore(Boolean(res.hasMore));
+    if (fresh.length) cursorRef.current = fresh[fresh.length - 1].data;
+    setPosts((prev) => {
+      const known = new Set(prev.map((p) => p.id));
+      return [...prev, ...fresh.filter((p) => !known.has(p.id))];
+    });
+    setSavedPosts((prev) => [...new Set([...prev, ...fresh.filter((p) => p.savedByMe).map((p) => p.id)])]);
+    if (fresh.length) {
+      const { comments: more } = await fetchComments(fresh.map((p) => p.id));
+      if (more?.length) {
+        setComments((prev) => {
+          const known = new Set(prev.map((c) => c.id));
+          return [...prev, ...more.filter((c) => !known.has(c.id))];
+        });
+      }
+    }
+  };
+
+  // Scorrimento infinito: la pagina dopo arriva quando si vede la fine.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) loadMore();
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  });
 
   const authorFromUser = () => ({ id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' });
 
@@ -815,6 +865,13 @@ export default function SocialFeed({
               </Fragment>
             ))}
           </ul>
+          {hasMore && !loading && !isGroupView && (feedTab === 'foryou' || feedTab === 'following') && (
+            <div ref={sentinelRef} className="rb-feed-more">
+              <button type="button" className="rb-feed-more-btn" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Carico altri post…' : 'Carica altri post'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </>

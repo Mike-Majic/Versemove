@@ -5,6 +5,7 @@ import {
   deleteComment as deleteCommentApi,
   fetchComments,
   fetchFeed,
+  FEED_PAGE_SIZE,
   softDeletePost as softDeletePostApi,
   togglePostLike as togglePostLikeApi,
   toggleSavedPost as toggleSavedPostApi,
@@ -21,6 +22,7 @@ import Skeleton from '../../Skeleton';
 import Lightbox from '../../shared/chat/Lightbox';
 import { BuildFields, ClipFields, GamePassFields, TrofeoFields } from './GamingComposers';
 import { GAMEPASS_ACTIONS, emptyFields, fieldsToPost, formatDay } from './gamingPost';
+import LoadMoreButton from '../../shared/LoadMoreButton';
 
 // Feed di posts filtrati per categoria + tag (Clip, Community, Build,
 // Trofei, Game Pass), o di tutto il mondo Nerd se categoria e tag sono
@@ -113,21 +115,33 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
   const [fields, setFields] = useState(() => emptyFields(tag));
   const [fieldsError, setFieldsError] = useState('');
   const [viewer, setViewer] = useState(null);
+  // Pagine: si ricaricano le prime pages * FEED_PAGE_SIZE (le azioni sui
+  // post ricaricano l'elenco intero, così restano allineate).
+  const [pages, setPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setPages((n) => n + 1);
+  };
 
   const reload = useCallback(async () => {
-    const res = await fetchFeed({ mondo: 'nerd', categoria: category?.id ?? null, tag: tag ?? null });
+    const res = await fetchFeed({ mondo: 'nerd', categoria: category?.id ?? null, tag: tag ?? null, limit: pages * FEED_PAGE_SIZE });
+    setLoadingMore(false);
     if (res.error) {
       setError(res.error);
       setPosts([]);
       return;
     }
+    setHasMore(Boolean(res.hasMore));
     const list = res.posts ?? [];
     const titles = await fetchTitles(list.map((p) => p.titleId));
     const withTitles = list.map((p) => ({ ...p, title: p.titleId ? titles.get(p.titleId) ?? null : null }));
     setPosts(withTitles);
     const { comments: c } = await fetchComments(withTitles.map((p) => p.id));
     setComments(c ?? []);
-  }, [category?.id, tag]);
+  }, [category?.id, tag, pages]);
 
   useEffect(() => {
     reload();
@@ -265,6 +279,7 @@ export default function GamingFeed({ category, platform, tag, user, onOpenAuth, 
               ))}
             </ul>
           )}
+          {posts && hasMore && <LoadMoreButton onLoad={loadMore} loading={loadingMore} label="Carica altri post" loadingLabel="Carico altri post…" />}
         </>
       )}
 
