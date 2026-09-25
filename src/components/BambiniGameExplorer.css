@@ -26,6 +26,9 @@
     top: 168px;
     bottom: 26px;
     width: calc(100vw - 28px);
+    /* Meno margine attorno al gioco: i tabelloni larghi (es. Forza 4 a 7
+       colonne) devono starci tutti a 360 px di larghezza. */
+    padding: 12px;
   }
 }
 

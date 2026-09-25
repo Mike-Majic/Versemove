@@ -1,0 +1,323 @@
+/* Kit comune dei minigiochi del mondo Bambini: vassoio inclinato con
+   parallasse, caselle "incassate", pezzi "caramella", pulsanti 3D, HUD a
+   pillole e scintille. Ogni gioco importa questo file e compone le classi
+   gk-* con le proprie. Regole: si animano solo transform e opacity; con
+   "riduci animazioni" restano volume, luci e ombre ma spariscono tilt,
+   scosse e particelle. */
+
+/* --- Vassoio ------------------------------------------------------------ */
+
+.gk-stage {
+  perspective: 900px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  /* Spazio per l'ombra lunga sotto al vassoio. */
+  padding-bottom: 18px;
+}
+
+.gk-tray {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --tray-a: #2b1a52;
+  --tray-b: #160c33;
+  --tray-c: #0d0722;
+  position: relative;
+  transform: rotateX(calc(8deg + var(--tilt-x))) rotateY(var(--tilt-y));
+  /* Niente preserve-3d: con quello Chrome fa l'hit-test dei figli in 3D e
+     i click sugli strati assoluti (es. le colonne di Forza 4) finivano al
+     tabellone sotto. Nessun figlio usa la profondità, il tilt basta. */
+  transform-style: flat;
+  transition: transform 0.18s ease-out;
+  will-change: transform;
+  border-radius: 20px;
+  padding: 14px;
+  background: linear-gradient(160deg, var(--tray-a) 0%, var(--tray-b) 55%, var(--tray-c) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    0 34px 44px -20px rgba(0, 0, 0, 0.85),
+    0 14px 26px rgba(0, 0, 0, 0.4);
+}
+
+/* Riflesso morbido in alto sul vassoio. */
+.gk-tray::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 38%);
+  pointer-events: none;
+}
+
+/* --- Caselle incassate ---------------------------------------------------- */
+
+.gk-slot {
+  position: relative;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.18));
+  box-shadow:
+    inset 0 4px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.gk-slot:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.gk-slot:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.gk-slot:disabled {
+  cursor: default;
+}
+
+/* --- Pezzi caramella ------------------------------------------------------ */
+
+.gk-candy {
+  --c: #ff4d6d;
+  position: relative;
+  background:
+    radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--c) 45%, #fff) 0%, var(--c) 42%, color-mix(in srgb, var(--c) 68%, #000) 100%);
+  border: 2px solid color-mix(in srgb, var(--c) 60%, #000);
+  box-shadow:
+    0 6px 10px rgba(0, 0, 0, 0.45),
+    inset 0 -4px 6px rgba(0, 0, 0, 0.28),
+    inset 0 2px 2px rgba(255, 255, 255, 0.25);
+}
+
+/* Riflesso bianco semitrasparente in alto a sinistra. */
+.gk-candy::after {
+  content: '';
+  position: absolute;
+  left: 14%;
+  top: 7%;
+  width: 46%;
+  height: 30%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+/* --- Pulsanti 3D ---------------------------------------------------------- */
+
+.gk-btn3d {
+  --c: #3a86ff;
+  position: relative;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 88%, #000));
+  color: #1b1233;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow:
+    0 6px 0 color-mix(in srgb, var(--c) 62%, #000),
+    0 10px 18px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.08s ease;
+  transform: translateY(0);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gk-btn3d:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.gk-btn3d:active:not(:disabled),
+.gk-btn3d.pressed {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 color-mix(in srgb, var(--c) 62%, #000),
+    0 4px 10px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.gk-btn3d:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.gk-btn3d.wide {
+  width: min(260px, 100%);
+}
+
+/* --- HUD ------------------------------------------------------------------ */
+
+.gk-hud {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.gk-hud-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.gk-pill {
+  --c: #3a86ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: rgba(245, 245, 247, 0.7);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+  opacity: 0.72;
+}
+
+.gk-pill.active {
+  color: #fff;
+  opacity: 1;
+  transform: scale(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 2px color-mix(in srgb, var(--c) 70%, transparent),
+    0 0 18px color-mix(in srgb, var(--c) 55%, transparent),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.gk-pill-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #1b1233;
+}
+
+.gk-hud-status {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(245, 245, 247, 0.85);
+  min-height: 1.3em;
+}
+
+/* --- Scintille ------------------------------------------------------------ */
+
+.gk-sparks {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.gk-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 2px;
+  opacity: 0;
+  animation: gk-spark-fly 700ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.gk-spark.round {
+  border-radius: 50%;
+}
+
+@keyframes gk-spark-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 30px)) rotate(var(--rot)) scale(0.3);
+  }
+}
+
+/* --- Animazioni fisiche riusabili ---------------------------------------- */
+
+.gk-spring-in {
+  animation: gk-spring-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes gk-spring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.gk-shake {
+  animation: gk-shake 0.4s ease-in-out both;
+}
+
+@keyframes gk-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+/* Schermata di scelta modalità comune (2 giocatori / computer). */
+.gk-mode-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  width: 100%;
+}
+
+.gk-mode-setup p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(245, 245, 247, 0.8);
+}
+
+/* --- Riduci animazioni ---------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .gk-tray {
+    transform: rotateX(8deg);
+    transition: none;
+  }
+  .gk-sparks {
+    display: none;
+  }
+  .gk-shake,
+  .gk-spring-in {
+    animation: none;
+  }
+  .gk-slot,
+  .gk-btn3d,
+  .gk-pill {
+    transition: none;
+  }
+}

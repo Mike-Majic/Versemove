@@ -1,94 +1,219 @@
-.rb-forza4-setup {
+/* Forza 4 — grafica sul kit comune (../kit/gameKit.css). */
+
+.rb-f4 {
+  --cell: clamp(36px, 10.5vw, 50px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 20px 0;
+  width: 100%;
 }
 
-.rb-forza4-setup p {
-  margin: 0;
-  font-size: 14px;
-  color: rgba(245, 245, 247, 0.75);
+/* Vassoio azzurro (variante di .gk-tray). */
+.rb-f4-tray {
+  --tray-a: #4d94ff;
+  --tray-b: #2a63d9;
+  --tray-c: #1a3f9e;
+  padding: 10px;
+  border-radius: 18px;
 }
 
-.rb-forza4-mode-btn {
-  width: 220px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #f5f5f7;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px;
-  border-radius: 12px;
-  cursor: pointer;
+.rb-f4-board {
+  position: relative;
+  width: calc(var(--cell) * 7);
+  height: calc(var(--cell) * 6);
+  border-radius: 10px;
 }
 
-.rb-forza4-mode-btn:hover {
-  border-color: var(--accent, #22c55e);
-  background: color-mix(in srgb, var(--accent, #22c55e) 14%, transparent);
+/* Strato 1: pedine, stessa griglia del piatto. Due elementi per pedina:
+   l'esterno (.rb-f4-drop) fa solo la caduta, l'interno (.rb-f4-disc) è il
+   disco e riceve le classi win/dim a fine partita — così l'alone pulsante
+   non riavvia mai la caduta. */
+.rb-f4-discs {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, var(--cell));
+  grid-template-rows: repeat(6, var(--cell));
 }
 
-.rb-forza4 {
+.rb-f4-drop {
+  --drop-from: calc(var(--cell) * -1 * var(--drop-rows, 6) - var(--cell) * 0.4);
+  width: calc(var(--cell) * 0.82);
+  height: calc(var(--cell) * 0.82);
+  align-self: center;
+  justify-self: center;
+  animation: rb-f4-drop var(--drop-ms, 600ms) linear both;
+}
+
+.rb-f4-disc {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  transition: opacity 0.4s ease;
+}
+
+.rb-f4-disc.r { --c: #ff4d6d; }
+.rb-f4-disc.y { --c: #ffd60a; }
+
+/* Bordo zigrinato: anello di tacche a raggiera, solo sul contorno (mask). */
+.rb-f4-disc::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(0, 0, 0, 0.26) 0 4deg, transparent 4deg 9deg);
+  -webkit-mask: radial-gradient(circle, transparent 70%, #000 72%);
+  mask: radial-gradient(circle, transparent 70%, #000 72%);
+  pointer-events: none;
+}
+
+/* Caduta con gravità e due rimbalzi (tempi per tratto dentro ai keyframe). */
+@keyframes rb-f4-drop {
+  0% {
+    transform: translateY(var(--drop-from));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.45);
+  }
+  58% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.1, 0.6, 0.4, 1);
+  }
+  72% {
+    transform: translateY(calc(var(--cell) * -0.3));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.45);
+  }
+  84% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.1, 0.6, 0.4, 1);
+  }
+  92% {
+    transform: translateY(calc(var(--cell) * -0.1));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.45);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.rb-f4-disc.dim {
+  opacity: 0.45;
+}
+
+/* Le 4 vincenti: alone fisso e pulsazione (solo transform). */
+.rb-f4-drop.on-top {
+  z-index: 1;
+}
+
+.rb-f4-disc.win {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.85),
+    0 0 16px #fff,
+    0 0 28px var(--c),
+    0 6px 10px rgba(0, 0, 0, 0.45),
+    inset 0 -4px 6px rgba(0, 0, 0, 0.28);
+  animation: rb-f4-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes rb-f4-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+/* Strato 2: il piatto. Ogni cella è opaca fuori dal cerchio e trasparente
+   dentro (foro vero: sotto si vede la pedina), con un'ombra interna sul
+   bordo del foro e un filo di luce in basso. */
+.rb-f4-plate {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, var(--cell));
+  grid-template-rows: repeat(6, var(--cell));
+  pointer-events: none;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rb-f4-hole {
+  --plate: #3a86ff;
+  width: var(--cell);
+  height: var(--cell);
+  background:
+    radial-gradient(circle at 50% 50%,
+      transparent 0 39%,
+      rgba(0, 0, 0, 0.5) 40%,
+      rgba(0, 0, 0, 0.18) 43%,
+      transparent 44%),
+    radial-gradient(circle at 50% 56%,
+      transparent 0 43.5%,
+      rgba(255, 255, 255, 0.25) 44.5% 45.5%,
+      var(--plate) 46.5%);
+}
+
+/* Luce sul piatto: dall'alto, con una lieve venatura. */
+.rb-f4-plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.18));
+  pointer-events: none;
+}
+
+/* Strato 3: colonne cliccabili. */
+.rb-f4-cols {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-.rb-forza4-status {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.rb-forza4-board {
-  display: flex;
-  gap: 4px;
-  background: #0b1a2b;
-  border-radius: 12px;
-  padding: 6px;
-}
-
-.rb-forza4-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.rb-f4-col {
+  position: relative;
+  flex: 1;
   background: transparent;
-  border: none;
+  border: 0;
   padding: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.rb-forza4-col:disabled {
+.rb-f4-col:disabled {
   cursor: default;
 }
 
-.rb-forza4-col:not(:disabled):hover .rb-forza4-cell:not(.filled-R):not(.filled-Y) {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.rb-forza4-cell {
-  width: 30px;
-  height: 30px;
+/* Sopra alla colonna sotto al mouse spunta la pedina del turno. */
+.rb-f4-col::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(var(--cell) * 0.5);
+  height: calc(var(--cell) * 0.5);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  display: block;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--turn, #fff) 55%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -30%) scale(0);
+  opacity: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  pointer-events: none;
 }
 
-.rb-forza4-cell.filled-R {
-  background: #ef4444;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+.rb-f4-col:not(:disabled):hover::before {
+  transform: translate(-50%, 4px) scale(1);
+  opacity: 1;
 }
 
-.rb-forza4-cell.filled-Y {
-  background: #facc15;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+.rb-f4-col:not(:disabled):hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
 }
 
-@media (max-width: 380px) {
-  .rb-forza4-cell {
-    width: 24px;
-    height: 24px;
+@media (prefers-reduced-motion: reduce) {
+  .rb-f4-drop,
+  .rb-f4-disc.win {
+    animation: none;
+  }
+  .rb-f4-col::before {
+    transition: none;
   }
 }

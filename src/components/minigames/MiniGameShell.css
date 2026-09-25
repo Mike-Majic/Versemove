@@ -164,3 +164,11 @@
   align-items: stretch;
   justify-content: flex-start;
 }
+
+/* Su telefono il pannello di gioco stringe i margini laterali (vedi anche
+   .rb-bambini-game-panel): serve ai tabelloni larghi come Forza 4. */
+@media (max-width: 480px) {
+  .rb-minigame-play {
+    padding: 14px 8px;
+  }
+}

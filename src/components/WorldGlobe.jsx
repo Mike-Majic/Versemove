@@ -740,7 +740,10 @@ export default function WorldGlobe({
     // (richiesta esplicita, dopo la prova con l'UFO sul mondo Nerd): stesso
     // colore/trasparenza di sempre (vedi categoryShell.js), cambia solo la
     // forma — tranne il mondo Bambini, dove ogni categoria ha una forma E
-    // un colore diversi dalle altre (vedi buildCategoryFaceShape 'kids').
+    // un colore diversi dalle altre (vedi buildCategoryFaceShape 'kids'),
+    // con forme piene e luminose, bordo bianco, alone, pulsazione e hover
+    // (il guscio "vivace", vedi buildCategoryShell e l'update nel giro di
+    // disegno più giù).
     // Vetrina non ha ancora una sagoma decisa: resta il triangolo.
     const shell = buildCategoryShell(categories, {
       radius: 122,
@@ -817,6 +820,50 @@ export default function WorldGlobe({
       canvas.removeEventListener('pointerup', onPointerUp);
     };
   }, [categories, onCategorySelect]);
+
+  // Hover del mouse sulle forme del mondo Bambini (solo desktop, e solo se il
+  // guscio lo supporta — negli altri mondi non si aggiunge nemmeno
+  // l'ascoltatore): la forma sotto il puntatore cresce e si accende di più
+  // (vedi categoryShell.js setHovered). Il raycast è su una decina di mesh
+  // piatte, si fa per evento senza bisogno di limitarne la frequenza.
+  useEffect(() => {
+    if (isTouchDevice) return undefined;
+    const g = globeRef.current;
+    const shell = categoryShellRef.current;
+    if (!g || !shell?.supportsHover) return undefined;
+
+    const canvas = g.renderer().domElement;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let hoveredId = null;
+    const setHovered = (id) => {
+      if (id === hoveredId) return;
+      hoveredId = id;
+      shell.setHovered(id);
+      canvas.style.cursor = id ? 'pointer' : '';
+      globeActivity.wake();
+    };
+
+    const onPointerMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, g.camera());
+      const hits = raycaster.intersectObjects(shell.faceMeshes);
+      setHovered(hits.length > 0 ? hits[0].object.userData.categoryId : null);
+    };
+    const onPointerLeave = () => setHovered(null);
+
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    return () => {
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.style.cursor = '';
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, world.color]);
 
   // I 5 globi satellite (i mondi non attivi) vivono nella STESSA scena/
   // renderer del globo grande — mai un secondo <Globe>, che vorrebbe dire un
@@ -898,6 +945,11 @@ export default function WorldGlobe({
     let lastElapsed = 0;
     let lastDrawAt = 0;
     const frameCap = createAdaptiveFrameCap();
+    const shellViewportSize = new THREE.Vector2();
+    // reduceMotionActiveRef si aggiorna solo da startAutoRotate (desktop):
+    // per le forme vivaci si legge anche la preferenza di sistema diretta,
+    // così vale pure su telefono.
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     // Il salto dei fotogrammi sta sul composer, non su renderer.render:
     // three-render-objects disegna sempre passando dall'EffectComposer, il
     // cui RenderPass chiama renderer.clear() PRIMA di renderer.render. Se si
@@ -931,6 +983,16 @@ export default function WorldGlobe({
         if (categoryShellRef.current) categoryShellRef.current.group.rotation.y = angle;
       }
       satellitesRef.current?.update(elapsed, deltaSec, camera, reduceMotion ? 0 : idleFactor, reduceMotion);
+      // Forme "vivaci" del mondo Bambini (pulsazione, galleggiamento, hover):
+      // stesso giro di disegno, niente ciclo a parte (vedi categoryShell.js
+      // update). Negli altri mondi è un no-op immediato.
+      if (categoryShellRef.current?.supportsHover) {
+        categoryShellRef.current.update(elapsed, deltaSec, {
+          reduceMotion: reduceMotion || reducedMotionQuery.matches,
+          viewportSize: renderer.getSize(shellViewportSize),
+          camera,
+        });
+      }
       originalRender(scene, camera);
       placeLabelsRef.current?.update(camera, camera.position.length() / 100 - 1, now);
     };

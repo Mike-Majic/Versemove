@@ -1,72 +1,203 @@
-.rb-tris-setup {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 0;
-}
-
-.rb-tris-setup p {
-  margin: 0;
-  font-size: 14px;
-  color: rgba(245, 245, 247, 0.75);
-}
-
-.rb-tris-mode-btn {
-  width: 220px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #f5f5f7;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px;
-  border-radius: 12px;
-  cursor: pointer;
-}
-
-.rb-tris-mode-btn:hover {
-  border-color: var(--accent, #22c55e);
-  background: color-mix(in srgb, var(--accent, #22c55e) 14%, transparent);
-}
+/* Tris — grafica sul kit comune (../kit/gameKit.css). */
 
 .rb-tris {
+  --cell: clamp(58px, 18vw, 84px);
+  --gap: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-}
-
-.rb-tris-status {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
+  width: 100%;
 }
 
 .rb-tris-grid {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 76px);
-  grid-template-rows: repeat(3, 76px);
-  gap: 6px;
+  grid-template-columns: repeat(3, var(--cell));
+  grid-template-rows: repeat(3, var(--cell));
+  gap: var(--gap);
 }
 
 .rb-tris-cell {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  font-size: 32px;
-  font-weight: 800;
-  color: #f5f5f7;
-  cursor: pointer;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, opacity 0.35s ease;
 }
 
 .rb-tris-cell:not(:disabled):hover {
-  border-color: var(--accent, #22c55e);
+  box-shadow:
+    inset 0 4px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    0 0 0 2px color-mix(in srgb, var(--accent, #22c55e) 55%, transparent);
 }
 
-.rb-tris-cell.filled-X {
-  color: var(--accent, #22c55e);
+.rb-tris-cell.dim {
+  opacity: 0.38;
 }
 
-.rb-tris-cell.filled-O {
-  color: #60a5fa;
+/* Contenitore del pezzo: entra con il rimbalzo dopo il tratto. */
+.rb-tris-piece {
+  position: relative;
+  display: block;
+  width: 72%;
+  height: 72%;
+  animation: rb-tris-bounce 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+}
+
+@keyframes rb-tris-bounce {
+  from { transform: scale(0.82); }
+  to { transform: scale(1); }
+}
+
+/* X: due barre caramella fragola tracciate una dopo l'altra. Il contenitore
+   (wrap) è ruotato di ±45° attorno al centro, la barra dentro cresce da
+   sinistra (scaleX 0 -> 1): il "tratto" parte da un'estremità. */
+.rb-tris-bar-wrap {
+  position: absolute;
+  left: -16%;
+  top: 50%;
+  width: 132%;
+  height: 24%;
+  margin-top: -12%;
+  transform-origin: 50% 50%;
+}
+
+.rb-tris-bar-wrap.a {
+  transform: rotate(45deg);
+}
+
+.rb-tris-bar-wrap.b {
+  transform: rotate(-45deg);
+}
+
+.rb-tris-bar {
+  --c: #ff4d6d;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: rb-tris-draw-x 0.22s ease-out both;
+}
+
+.rb-tris-bar-wrap.b .rb-tris-bar {
+  animation-delay: 0.14s;
+}
+
+@keyframes rb-tris-draw-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Le barre hanno il riflesso del kit ma più allungato. */
+.rb-tris-bar::after {
+  left: 10%;
+  top: 12%;
+  width: 60%;
+  height: 32%;
+}
+
+/* O: ciambella SVG azzurra. */
+.rb-tris-o svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.rb-tris-o-shadow {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 17;
+}
+
+.rb-tris-o-ring {
+  fill: none;
+  stroke: url(#rb-tris-o-grad);
+  stroke-width: 17;
+  stroke-linecap: round;
+  stroke-dasharray: 189;
+  stroke-dashoffset: 189;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  animation: rb-tris-draw-o 0.34s ease-out forwards;
+}
+
+@keyframes rb-tris-draw-o {
+  to { stroke-dashoffset: 0; }
+}
+
+.rb-tris-o-shine {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 46 143;
+  transform: rotate(-160deg);
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: rb-tris-shine-in 0.3s ease-out 0.3s forwards;
+}
+
+@keyframes rb-tris-shine-in {
+  to { opacity: 1; }
+}
+
+/* Linea luminosa che attraversa il tris vincente: l'elemento è posizionato
+   sul centro della prima casella e ruotato verso la terza; la barra vera
+   (::before) cresce da sinistra a destra. */
+.rb-tris-winline {
+  --c: #2ee59d;
+  position: absolute;
+  height: 10px;
+  margin-top: -5px;
+  transform-origin: left center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.rb-tris-winline::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fff, color-mix(in srgb, var(--c) 60%, #fff), #fff);
+  box-shadow:
+    0 0 10px #fff,
+    0 0 22px var(--c),
+    0 0 40px var(--c);
+  transform-origin: left center;
+  animation: rb-tris-winline 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes rb-tris-winline {
+  from { opacity: 0; transform: scaleX(0); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+.rb-tris-cell.win {
+  box-shadow:
+    inset 0 4px 8px rgba(0, 0, 0, 0.4),
+    0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-tris-piece,
+  .rb-tris-bar,
+  .rb-tris-o-ring,
+  .rb-tris-o-shine,
+  .rb-tris-winline::before {
+    animation: none;
+  }
+  .rb-tris-o-ring {
+    stroke-dashoffset: 0;
+  }
+  .rb-tris-o-shine {
+    opacity: 1;
+  }
 }
