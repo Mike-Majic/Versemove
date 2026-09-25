@@ -12,16 +12,17 @@ import './cosplay.css';
 // destra resta com'è): Eventi · Cerco gruppo · Galleria · WIP · Community,
 // scheda iniziale Eventi. locationFilters è il filtro "Dove" delle
 // Impostazioni (città con coordinate e distanza), usato da Eventi e Cerco
-// gruppo. focus: { lfgId, seq } da una notifica di "Cerco gruppo".
+// gruppo. focus: { lfgId, seq } da una notifica di "Cerco gruppo", oppure
+// { eventId, seq } da un link condiviso di un evento.
 export default function CosplayColumn({ category, user, onOpenAuth, locationFilters, focus = null }) {
-  const [tab, setTab] = useState(focus ? 'gruppo' : 'eventi');
+  const [tab, setTab] = useState(focus?.lfgId ? 'gruppo' : 'eventi');
   // Evento scelto da "Cerca gruppo per questo evento": precompila il form.
   const [lfgPrefillEvent, setLfgPrefillEvent] = useState(null);
 
   const focusSeqRef = useRef(focus?.seq ?? null);
   if ((focus?.seq ?? null) !== focusSeqRef.current) {
     focusSeqRef.current = focus?.seq ?? null;
-    if (focus) setTab('gruppo');
+    if (focus) setTab(focus.lfgId ? 'gruppo' : 'eventi');
   }
 
   const openLfgFor = (event) => {
@@ -39,7 +40,7 @@ export default function CosplayColumn({ category, user, onOpenAuth, locationFilt
         ))}
       </div>
       <div className="rb-vroom-panel rb-gaming-panel rb-cosplay-panel" key={tab}>
-        {tab === 'eventi' && <CosplayEventsTab user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} onLfgFor={openLfgFor} />}
+        {tab === 'eventi' && <CosplayEventsTab user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} onLfgFor={openLfgFor} focusEvent={focus?.eventId ? focus : null} />}
         {tab === 'gruppo' && (
           <CosplayLfgTab
             user={user}

@@ -5,6 +5,8 @@ import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
 import MentionText from '../shared/MentionText';
+import ShareLinkButton from '../shared/ShareLinkButton';
+import { linkToPost } from '../../data/deepLinks';
 import { isStaff } from '../../data/roles';
 import { NERD_CATEGORIES } from '../../data/nerdCategories';
 import { COMMENT_REACTION_EMOJIS } from '../../data/posts';
@@ -271,6 +273,17 @@ export default function PostCard({
         <button type="button" className="rb-post-action-btn" onClick={() => setExpanded((v) => !v)}>
           💬 {postComments.length}
         </button>
+        {post.fromPostsTable && !post.categoria && (
+          <ShareLinkButton
+            className="rb-post-action-btn"
+            url={() => linkToPost(post.id)}
+            title={`Post di ${author.name}`}
+            text={post.testo ? post.testo.slice(0, 120) : undefined}
+            label="🔗"
+            copiedLabel="✓ Copiato"
+            ariaLabel="Condividi il link del post"
+          />
+        )}
         {onToggleSave && (
           <button type="button" className={`rb-post-action-btn rb-post-save-btn ${saved ? 'active' : ''}`} onClick={handleSave}>
             {saved ? '🔖 Salvato' : '🔖 Salva'}

@@ -1,11 +1,14 @@
 import { EVENT_TYPES, formatEventDates } from '../../../data/cosplay';
 import { countryFlag } from '../../../data/citta';
+import { linkToCosplayEvent } from '../../../data/deepLinks';
+import ShareLinkButton from '../../shared/ShareLinkButton';
 
 // Card di un evento Cosplay: titolo, badge tipo, date "28 ott – 1 nov
 // 2026", città + bandierina, "a 27 km", conteggi, badge Verificato
 // (fonte curato) e "In attesa di approvazione" (solo l'autore lo vede: il
 // server non mostra agli altri gli eventi in attesa), pulsanti Ci vado /
-// Mi interessa (ritocco = toglie), Sito ufficiale, Cerca gruppo.
+// Mi interessa (ritocco = toglie), Sito ufficiale, Cerca gruppo, Condividi
+// (link #/nerd/cosplay/evento/<id>).
 export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor, compact = false }) {
   const type = EVENT_TYPES[event.tipo] ?? EVENT_TYPES.altro;
   const mine = Boolean(user) && event.autoreId === user.id;
@@ -40,6 +43,9 @@ export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor
           </button>
           {event.urlUfficiale && (
             <a className="rb-vroom-btn rb-cev-link" href={event.urlUfficiale} target="_blank" rel="noopener noreferrer">🔗 Sito ufficiale</a>
+          )}
+          {event.stato === 'approvato' && (
+            <ShareLinkButton className="rb-vroom-btn" url={() => linkToCosplayEvent(event.id)} title={event.titolo} text={`${event.titolo} · ${formatEventDates(event.dataEvento, event.dataFine)}`} />
           )}
           {onLfgFor && !event.inCorso && (
             <button type="button" className="rb-vroom-btn" onClick={() => onLfgFor(event)}>👥 Cerca gruppo per questo evento</button>

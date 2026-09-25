@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import ShareLinkButton from '../shared/ShareLinkButton';
+import { linkToProfile } from '../../data/deepLinks';
 import ModalOverlay from '../ModalOverlay';
 import PostCard from './PostCard';
 import EmptyState from '../EmptyState';
@@ -137,6 +139,16 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
               >
                 {isFollowing ? 'Segui già' : '+ Segui'}
               </button>
+              {profile.nickname && (
+                <ShareLinkButton
+                  className="rb-social-profile-follow-btn"
+                  url={() => linkToProfile(profile.nickname)}
+                  title={`${profile.name} su Versemove`}
+                  label="🔗"
+                  copiedLabel="✓"
+                  ariaLabel="Condividi il link del profilo"
+                />
+              )}
             </div>
 
             {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}

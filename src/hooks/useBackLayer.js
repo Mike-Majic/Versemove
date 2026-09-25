@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isDeepLinkHash } from '../data/deepLinks';
 
 // Tasto/gesto "Indietro" del telefono (e del browser) = un passo indietro
 // nell'app, un livello alla volta, invece di chiudere la PWA.
@@ -140,6 +141,12 @@ function showExitToast() {
 function onPopState(e) {
   const newIdx = e.state?.vmIdx ?? 0;
   debugLog('popstate', { newIdx });
+  // Link condiviso incollato con l'app aperta (#/…, vedi data/deepLinks.js):
+  // è una voce nuova senza stato, non un Indietro. Lo apre App.jsx.
+  if (e.state === null && isDeepLinkHash()) {
+    debugLog('link condiviso');
+    return;
+  }
   if (ignorePops > 0) {
     ignorePops -= 1;
     currentIdx = newIdx;

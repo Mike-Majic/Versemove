@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import PostComposer from './PostComposer';
 import PostCard from './PostCard';
@@ -215,7 +215,10 @@ export default function SocialFeed({
     const realPostIds = feedPosts.filter((p) => p.fromPostsTable).map((p) => p.id);
     if (realPostIds.length) {
       const { comments: fetchedComments, error } = await fetchComments(realPostIds);
-      if (!error) setComments(fetchedComments);
+      // Si tengono i commenti di un post aggiunto a parte (link condiviso)
+      // arrivati prima di questi.
+      const loaded = new Set(realPostIds);
+      if (!error) setComments((prev) => [...fetchedComments, ...prev.filter((c) => !loaded.has(c.post_id))]);
     } else {
       setComments([]);
     }
@@ -488,14 +491,36 @@ export default function SocialFeed({
     setMobileView('primary');
   };
 
-  // Notifica di menzione: apre il gruppo del post se serve (altrimenti il
-  // tab "Per te"), lo porta in vista e lo evidenzia per qualche secondo.
+  // Notifica di menzione o link condiviso: apre il gruppo del post se
+  // serve (altrimenti il tab "Per te"), lo porta in vista e lo evidenzia
+  // per qualche secondo. Se il post non è tra quelli caricati (più vecchio,
+  // o di un link) lo si chiede da solo e lo si aggiunge al feed: l'effect
+  // riparte appena arriva (focusFetchRef evita un secondo tentativo).
+  const focusFetchRef = useRef(null);
+  const [focusFetched, setFocusFetched] = useState(0);
   useEffect(() => {
     if (!focusPost || loading) return undefined;
     const target = posts.find((p) => p.id === focusPost.postId);
     if (!target) {
-      showActionError('Questo post non è più disponibile.');
-      return undefined;
+      if (focusFetchRef.current === focusPost.seq) {
+        showActionError('Questo post non è più disponibile.');
+        return undefined;
+      }
+      focusFetchRef.current = focusPost.seq;
+      let cancelled = false;
+      fetchFeed({ mondo: 'social', ids: [focusPost.postId] }).then(async (res) => {
+        if (cancelled) return;
+        const found = res.posts?.[0];
+        if (found) {
+          setPosts((prev) => (prev.some((p) => p.id === found.id) ? prev : [...prev, found].sort((a, b) => new Date(b.data) - new Date(a.data))));
+          const { comments: extra } = await fetchComments([found.id]);
+          if (extra?.length) setComments((prev) => [...prev.filter((c) => c.post_id !== found.id), ...extra]);
+        }
+        setFocusFetched((n) => n + 1);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     setMobileView('primary');
     if (target.gruppo_id) setActiveGroupId(target.gruppo_id);
@@ -520,7 +545,7 @@ export default function SocialFeed({
     timer = window.setTimeout(reveal, 100);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusPost?.seq, loading]);
+  }, [focusPost?.seq, loading, focusFetched]);
 
   const isGroupView = Boolean(activeGroupId);
   const activeGroup = isGroupView ? groupsList.find((g) => g.id === activeGroupId) ?? null : null;

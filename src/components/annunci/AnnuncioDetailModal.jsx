@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fieldsForCategory } from '../../data/annunciSchema';
 import { getSellerInfo, toggleFavorite } from '../../data/annunci';
+import { linkToListing, shareLink } from '../../data/deepLinks';
 import ModalOverlay from '../ModalOverlay';
 import ReportModal from '../shared/ReportModal';
 
@@ -44,13 +45,12 @@ export default function AnnuncioDetailModal({ listing, user, onOpenAuth, onOpenC
   };
 
   const share = async () => {
-    const url = `${window.location.origin}${window.location.pathname}#annuncio-${listing.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
+    // Link #/annunci/<id> (data/deepLinks.js): foglio di condivisione sul
+    // telefono, altrimenti copiato negli appunti.
+    const res = await shareLink({ title: listing.titolo, text: `${listing.titolo} · ${formatPrice(listing)}`, url: linkToListing(listing.id) });
+    if (res === 'copied') {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
-    } catch {
-      // Clipboard non disponibile: nessun problema, il link resta comunque nella barra degli indirizzi.
     }
   };
 

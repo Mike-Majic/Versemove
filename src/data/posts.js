@@ -59,6 +59,7 @@ export async function fetchProfilesMap(ids) {
     map.set(p.id, {
       id: p.id,
       name: displayName(p),
+      nickname: p.nickname || '',
       avatar: p.avatar_url || '',
       citta: p.citta_social || '',
       bio: p.bio_social || '',
@@ -91,7 +92,8 @@ async function fetchGroupsMap(ids) {
 // tutto il mondo.
 // categoria/tag: post di categoria del mondo Nerd (Gaming PC/PS/Xbox, vedi
 // data/gaming.js): posts.categoria, posts.tag, posts.title_id, posts.extra.
-export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null } = {}) {
+// ids: solo quei post (link condiviso a un post fuori dal feed caricato).
+export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null, ids = null } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
@@ -100,6 +102,7 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
     if (authorId) query = query.eq('author_id', authorId);
     if (categoria) query = query.eq('categoria', categoria);
     if (tag) query = query.eq('tag', tag);
+    if (ids?.length) query = query.in('id', ids);
     const { data, error } = await query.order('created_at', { ascending: false }).limit(200);
     if (error) return { error: error.message };
     if (!data) return { posts: [] };

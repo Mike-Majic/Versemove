@@ -408,3 +408,24 @@
 .rb-ccom-topics {
   margin-bottom: 4px;
 }
+
+/* Evento aperto da un link condiviso: in cima, bordo in evidenza. */
+.rb-cev-shared {
+  margin: 10px 0;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 60%, transparent);
+}
+.rb-cev-shared .rb-gaming-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.rb-cev-shared-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}

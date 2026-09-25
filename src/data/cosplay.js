@@ -131,6 +131,43 @@ export async function fetchEventiVicini({ lat = null, lng = null, km = null, per
   }
 }
 
+// Un solo evento Cosplay (link condiviso #/nerd/cosplay/evento/<id>), con
+// conteggi, "in corso" e stato mio calcolati come in eventi_vicini (fine
+// effettiva = data_fine o un giorno dopo l'inizio; eventi non approvati
+// solo per il loro autore). Se non si può vedere torna null.
+export async function fetchCosplayEvent(id) {
+  try {
+    const { data: row, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .eq('mondo', 'nerd')
+      .eq('categoria', COSPLAY_CATEGORY_ID)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !row) return null;
+    const [{ data: auth }, { data: att }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('event_attendees').select('user_id, stato').eq('event_id', id),
+    ]);
+    const myId = auth?.user?.id ?? null;
+    if (row.stato !== 'approvato' && row.autore_id !== myId) return null;
+    const list = att ?? [];
+    const now = Date.now();
+    const start = new Date(row.data_evento).getTime();
+    const end = row.data_fine ? new Date(row.data_fine).getTime() : start + 24 * 3600 * 1000;
+    return mapEvento({
+      ...row,
+      in_corso: start <= now && end >= now,
+      n_partecipa: list.filter((a) => a.stato === 'partecipa').length,
+      n_interessati: list.filter((a) => a.stato === 'interessato').length,
+      mio_stato: list.find((a) => a.user_id === myId)?.stato ?? null,
+    });
+  } catch {
+    return null;
+  }
+}
+
 // "Ci vado" / "Mi interessa": upsert su event_attendees; stato null toglie
 // la riga (ritocco sullo stesso pulsante).
 export async function setEventAttendance(eventId, stato) {

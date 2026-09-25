@@ -10,6 +10,8 @@ import DisabledWorldPopover from './components/DisabledWorldPopover';
 import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
 import { fetchLfg } from './data/gaming';
+import { getListing } from './data/annunci';
+import { clearDeepLinkHash, parseDeepLink, profileIdByNickname } from './data/deepLinks';
 import { usersForWorld } from './data/mockUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
@@ -334,8 +336,22 @@ export default function App() {
   // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
   const [gamingFocus, setGamingFocus] = useState(null);
   // Annuncio "Cerco gruppo" Cosplay da evidenziare (notifiche lfg_* con
-  // riferimento cosplay_lfg): { lfgId, seq }.
+  // riferimento cosplay_lfg): { lfgId, seq }, oppure evento Cosplay da un
+  // link condiviso: { eventId, seq }.
   const [cosplayFocus, setCosplayFocus] = useState(null);
+  // Annuncio aperto da un link condiviso: { listing, seq }.
+  const [annunciFocus, setAnnunciFocus] = useState(null);
+  // Link condiviso (#/social/post/<id>, #/u/<nickname>, #/annunci/<id>,
+  // #/nerd/cosplay/evento/<id>, vedi data/deepLinks.js) in attesa di
+  // sessione: si apre appena l'accesso è pronto.
+  const [pendingLink, setPendingLink] = useState(() => parseDeepLink());
+  // Avviso breve quando il contenuto di un link non c'è più.
+  const [linkNotice, setLinkNotice] = useState('');
+  useEffect(() => {
+    if (!linkNotice) return undefined;
+    const t = setTimeout(() => setLinkNotice(''), 4000);
+    return () => clearTimeout(t);
+  }, [linkNotice]);
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
@@ -888,6 +904,55 @@ export default function App() {
     };
   }, []);
 
+  // Link condiviso incollato con l'app già aperta: stesso percorso di quello
+  // letto all'avvio.
+  useEffect(() => {
+    const onHash = () => {
+      const link = parseDeepLink();
+      if (link) setPendingLink(link);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // Tutti i mondi tranne FAQ chiedono l'accesso: senza sessione il link
+  // resta in attesa e si apre il modulo di accesso; dopo il login si apre.
+  useEffect(() => {
+    if (!pendingLink || !authReady) return;
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    const link = pendingLink;
+    setPendingLink(null);
+    clearDeepLinkHash();
+    openDeepLink(link);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLink, authReady, user?.id]);
+
+  const openDeepLink = async (link) => {
+    const seq = Date.now();
+    if (link.type === 'post') {
+      setFocusPost({ postId: link.id, seq });
+      navigateToCategory('social', 'world');
+    } else if (link.type === 'profile') {
+      const id = await profileIdByNickname(link.nickname);
+      if (id) setMentionProfileId(id);
+      else setLinkNotice(`Nessun profilo "${link.nickname}".`);
+    } else if (link.type === 'listing') {
+      const listing = await getListing(link.id);
+      if (!listing) {
+        setLinkNotice('Questo annuncio non esiste più o non è visibile.');
+        return;
+      }
+      setAnnunciFocus({ listing, seq });
+      navigateToCategory('annunci', listing.categoria);
+    } else if (link.type === 'cosplayEvent') {
+      setCosplayFocus({ eventId: link.id, seq });
+      navigateToCategory('nerd', 'cosplay');
+    }
+  };
+
   // n: la notifica (oggetto), o solo il tipo per le chiamate vecchie.
   const openNotificationTarget = (n) => {
     const notif = typeof n === 'string' ? { tipo: n } : n ?? {};
@@ -1214,6 +1279,7 @@ export default function App() {
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            focusListing={annunciFocus}
           />
         </Suspense>
       )}
@@ -1415,6 +1481,12 @@ export default function App() {
       {exitToastVisible && (
         <div className="rb-back-exit-toast" role="status">
           Premi di nuovo Indietro per uscire
+        </div>
+      )}
+
+      {linkNotice && (
+        <div className="rb-notif-toast rb-link-notice" role="status" onClick={() => setLinkNotice('')}>
+          {linkNotice}
         </div>
       )}
 

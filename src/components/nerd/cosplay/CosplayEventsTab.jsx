@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EVENTS_PAGE_SIZE, EVENT_TYPES, EVENT_TYPE_CHIPS, fetchEventiVicini, setEventAttendance } from '../../../data/cosplay';
+import { EVENTS_PAGE_SIZE, EVENT_TYPES, EVENT_TYPE_CHIPS, fetchCosplayEvent, fetchEventiVicini, setEventAttendance } from '../../../data/cosplay';
 import { CITY_DATA_CREDIT, locationHasCoords } from '../../../data/citta';
 import { isUnlimitedDistance } from '../../../data/geo';
 import EmptyState from '../../EmptyState';
@@ -14,7 +14,9 @@ import ProposeEventForm from './ProposeEventForm';
 // Vicino a me / Tutto il mondo; chip per tipo; Prossimi | Passati; in
 // Prossimi le sezioni "In corso ora" (LIVE) e "In arrivo"; scorrimento
 // infinito a pagine di 30; Lista / Mappa; "+ Proponi evento".
-export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor }) {
+// focusEvent: { eventId, seq } da un link condiviso: l'evento compare in
+// cima ("Evento condiviso") qualunque siano i filtri.
+export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor, focusEvent = null }) {
   const hasCoords = locationHasCoords(locationFilters);
   const unlimited = isUnlimitedDistance(locationFilters?.distance ?? 150);
   const canNearby = hasCoords && !unlimited;
@@ -30,6 +32,19 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState('');
   const seqRef = useRef(0);
+  // Evento aperto da un link: undefined = nessuno, null = non trovato.
+  const [shared, setShared] = useState(undefined);
+
+  useEffect(() => {
+    if (!focusEvent?.eventId) return undefined;
+    let cancelled = false;
+    fetchCosplayEvent(focusEvent.eventId).then((ev) => {
+      if (!cancelled) setShared(ev);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusEvent?.eventId, focusEvent?.seq]);
   const sentinelRef = useRef(null);
 
   // Se il filtro Dove cambia (Impostazioni), l'interruttore segue.
@@ -100,18 +115,18 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       return;
     }
     // Aggiornamento locale: stato mio e conteggi.
-    setEvents((prev) =>
-      (prev ?? []).map((e) => {
-        if (e.id !== ev.id) return e;
-        const dec = (k) => Math.max(0, e[k] - 1);
-        let { nPartecipa, nInteressati } = e;
-        if (e.mioStato === 'partecipa') nPartecipa = dec('nPartecipa');
-        if (e.mioStato === 'interessato') nInteressati = dec('nInteressati');
-        if (stato === 'partecipa') nPartecipa += 1;
-        if (stato === 'interessato') nInteressati += 1;
-        return { ...e, mioStato: stato, nPartecipa, nInteressati };
-      })
-    );
+    const update = (e) => {
+      if (e.id !== ev.id) return e;
+      const dec = (k) => Math.max(0, e[k] - 1);
+      let { nPartecipa, nInteressati } = e;
+      if (e.mioStato === 'partecipa') nPartecipa = dec('nPartecipa');
+      if (e.mioStato === 'interessato') nInteressati = dec('nInteressati');
+      if (stato === 'partecipa') nPartecipa += 1;
+      if (stato === 'interessato') nInteressati += 1;
+      return { ...e, mioStato: stato, nPartecipa, nInteressati };
+    };
+    setEvents((prev) => (prev ?? []).map(update));
+    setShared((prev) => (prev ? update(prev) : prev));
   };
 
   const openDove = () => window.dispatchEvent(new CustomEvent('vm:open-settings', { detail: { section: 'luogo' } }));
@@ -190,6 +205,20 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
         </p>
       )}
       {error && <p className="rb-gaming-error" role="alert">{error}</p>}
+
+      {shared !== undefined && (
+        <section className="rb-cev-section rb-cev-shared">
+          <div className="rb-gaming-section-title">
+            🔗 Evento condiviso
+            <button type="button" className="rb-cev-shared-close" onClick={() => setShared(undefined)} aria-label="Nascondi evento condiviso">✕</button>
+          </div>
+          {shared ? (
+            <ul className="rb-cev-list">{renderCards([shared])}</ul>
+          ) : (
+            <p className="rb-gaming-note">Questo evento non esiste più o non è visibile per il tuo account.</p>
+          )}
+        </section>
+      )}
 
       {events === null ? (
         <Skeleton lines={4} />

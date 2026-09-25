@@ -234,3 +234,19 @@
 *::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--accent, #8b5cf6) 75%, transparent);
 }
+
+/* Link da copiare a mano quando né la condivisione né gli appunti sono
+   disponibili (ShareLinkButton). */
+.rb-share-link-fallback {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font-size: 12px;
+}
