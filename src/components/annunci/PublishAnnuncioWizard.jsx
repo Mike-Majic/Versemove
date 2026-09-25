@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ANNUNCI_CATEGORIES_META } from '../../data/annunciSchema';
 import { fieldsForCategory } from '../../data/annunciSchema';
-import { createListing, uploadAnnuncioPhoto, saveDraft, loadDraft, clearDraft } from '../../data/annunci';
+import { createListing, uploadAnnuncioPhoto, saveDraft, loadDraft, clearDraft, reverseGeocode } from '../../data/annunci';
+import { suggestMakes, suggestModels } from '../../data/annunciBrands';
 import ModalOverlay from '../ModalOverlay';
 import CustomSelect from '../shared/CustomSelect';
+import { MonthYearSelect, NumberInput, SuggestInput, YearSelect } from './AnnunciFieldInputs';
 import './annunci.css';
 import '../faq/faq.css';
 
 const STEP_LABELS = ['Categoria', 'Dettagli', 'Foto', 'Prezzo', 'Posizione'];
-const MAX_FOTO = 20;
+const MAX_FOTO = 10;
 const ITALY_CENTER = [42.3, 12.6];
 const ITALY_ZOOM = 5;
 
@@ -26,10 +28,28 @@ const RENT_PERIOD_OPTIONS = [
 
 // Passo 5: scelta della posizione (città + punto sulla mappa) — stesso
 // mini-picker Leaflet già usato per lo studio in TattooSubmitModal.jsx.
-function LocationPicker({ lat, lng, onPick }) {
+// Il segnaposto è la copertina dell'annuncio (stesso .rb-annuncio-pin
+// della vista Mappa), non l'icona predefinita di Leaflet: quella cerca
+// le sue immagini png in un percorso relativo al css che Vite non
+// serve, e appariva come immagine rotta con la scritta "Mark".
+function pinIcon(L, coverUrl) {
+  return L.divIcon({
+    html: `<span class="rb-annuncio-pin">${coverUrl ? `<img src="${coverUrl}" alt="" />` : '📍'}</span>`,
+    className: 'rb-annuncio-pin-wrap',
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+  });
+}
+
+function LocationPicker({ lat, lng, coverUrl, onPick }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const leafletRef = useRef(null);
+  const onPickRef = useRef(onPick);
+  useEffect(() => {
+    onPickRef.current = onPick;
+  }, [onPick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,17 +69,23 @@ function LocationPicker({ lat, lng, onPick }) {
         attribution: '&copy; OpenStreetMap',
       }).addTo(map);
       mapRef.current = map;
-      if (lat != null) markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map);
-      const place = (latlng) => {
-        if (markerRef.current) markerRef.current.setLatLng(latlng);
-        else markerRef.current = L.marker(latlng, { draggable: true }).addTo(map);
+      leafletRef.current = L;
+      const ensureMarker = (latlng) => {
+        if (markerRef.current) {
+          markerRef.current.setLatLng(latlng);
+          return;
+        }
+        markerRef.current = L.marker(latlng, { draggable: true, icon: pinIcon(L, coverUrl) }).addTo(map);
         markerRef.current.on('dragend', () => {
           const p = markerRef.current.getLatLng();
-          onPick(p.lat, p.lng);
+          onPickRef.current(p.lat, p.lng);
         });
-        onPick(latlng.lat, latlng.lng);
       };
-      map.on('click', (e) => place(e.latlng));
+      if (lat != null) ensureMarker([lat, lng]);
+      map.on('click', (e) => {
+        ensureMarker(e.latlng);
+        onPickRef.current(e.latlng.lat, e.latlng.lng);
+      });
     })();
     return () => {
       cancelled = true;
@@ -69,10 +95,21 @@ function LocationPicker({ lat, lng, onPick }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Copertina cambiata (o caricata dopo): aggiorna il segnaposto già posato.
+  useEffect(() => {
+    if (markerRef.current && leafletRef.current) markerRef.current.setIcon(pinIcon(leafletRef.current, coverUrl));
+  }, [coverUrl]);
+
   return <div className="rb-annunci-location-map" ref={mapElRef} />;
 }
 
-function DetailField({ field, value, onChange }) {
+function DetailField({ field, value, onChange, categoria, dettagli }) {
+  const make = dettagli.make ?? dettagli.brand ?? '';
+  const getSuggestions = useCallback(
+    (text, signal) => (field.suggest === 'model' ? suggestModels(categoria, make, text, signal) : suggestMakes(categoria, text)),
+    [field.suggest, categoria, make],
+  );
+
   if (field.type === 'boolean') {
     return (
       <label className="rb-field rb-annunci-filter-chip">
@@ -81,10 +118,15 @@ function DetailField({ field, value, onChange }) {
       </label>
     );
   }
+  const label = (
+    <span>
+      {field.label} {field.unit ? `(${field.unit})` : ''}
+    </span>
+  );
   if (field.type === 'select') {
     return (
       <label className="rb-field">
-        <span>{field.label}</span>
+        {label}
         <CustomSelect
           value={value ?? ''}
           options={[{ value: '', label: '—' }, ...field.options]}
@@ -94,22 +136,57 @@ function DetailField({ field, value, onChange }) {
       </label>
     );
   }
+  // Tendine e suggerimenti hanno pulsanti propri: un <label> che li
+  // avvolge farebbe scattare il primo pulsante a ogni clic sul testo,
+  // quindi qui il contenitore è un <div> con la stessa classe.
+  if (field.type === 'year') {
+    return (
+      <div className="rb-field">
+        {label}
+        <YearSelect value={value} onChange={onChange} ariaLabel={field.label} />
+      </div>
+    );
+  }
+  if (field.type === 'date') {
+    return (
+      <div className="rb-field">
+        {label}
+        <MonthYearSelect value={value} onChange={onChange} ariaLabel={field.label} />
+      </div>
+    );
+  }
+  if (field.type === 'number') {
+    return (
+      <label className="rb-field">
+        {label}
+        <NumberInput value={value} onChange={(v) => onChange(v === '' ? '' : Number(v))} ariaLabel={field.label} />
+      </label>
+    );
+  }
+  if (field.suggest) {
+    return (
+      <div className="rb-field">
+        {label}
+        <SuggestInput
+          value={value ?? ''}
+          onChange={onChange}
+          getSuggestions={getSuggestions}
+          ariaLabel={field.label}
+          placeholder={field.suggest === 'model' && !make ? 'Prima scegli la marca' : ''}
+        />
+      </div>
+    );
+  }
   return (
     <label className="rb-field">
-      <span>
-        {field.label} {field.unit ? `(${field.unit})` : ''}
-      </span>
-      <input
-        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-        value={value ?? ''}
-        onChange={(e) => onChange(field.type === 'number' ? (e.target.value ? Number(e.target.value) : '') : e.target.value)}
-      />
+      {label}
+      <input type="text" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }
 
 // Procedura a passi per pubblicare un annuncio: categoria/vendita-affitto
-// -> dettagli (dallo stesso schema dei filtri) -> foto (max 20,
+// -> dettagli (dallo stesso schema dei filtri) -> foto (max 10,
 // trascinabili per l'ordine, la prima è la copertina) -> prezzo -> posizione
 // -> anteprima -> pubblica. Bozza salvata in locale ad ogni passo, così
 // uscendo a metà la si ritrova (findLoadDraft al montaggio).
@@ -127,15 +204,37 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
   const [trattabile, setTrattabile] = useState(draft?.trattabile ?? false);
   const [periodoAffitto, setPeriodoAffitto] = useState(draft?.periodoAffitto ?? 'mese');
   const [citta, setCitta] = useState(draft?.citta ?? '');
+  const [provincia, setProvincia] = useState(draft?.provincia ?? '');
+  const [nazione, setNazione] = useState(draft?.nazione ?? '');
   const [lat, setLat] = useState(draft?.lat ?? null);
   const [lng, setLng] = useState(draft?.lng ?? null);
+  const cittaTypedRef = useRef(!!draft?.citta);
+  const geocodeAbortRef = useRef(null);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const dragIndexRef = useRef(null);
 
   useEffect(() => {
-    saveDraft({ categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, lat, lng });
-  }, [categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, lat, lng]);
+    saveDraft({ categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, provincia, nazione, lat, lng });
+  }, [categoria, tipo, titolo, descrizione, dettagli, foto, prezzo, trattabile, periodoAffitto, citta, provincia, nazione, lat, lng]);
+
+  // Punto toccato sulla mappa: coordinate subito, poi città/provincia/
+  // nazione da Nominatim; la città si compila da sola solo se l'utente
+  // non l'ha già scritta a mano.
+  const onPickLocation = useCallback((la, ln) => {
+    setLat(la);
+    setLng(ln);
+    geocodeAbortRef.current?.abort();
+    const controller = new AbortController();
+    geocodeAbortRef.current = controller;
+    reverseGeocode(la, ln, controller.signal).then((geo) => {
+      if (controller.signal.aborted) return;
+      if (geo.nazione) setNazione(geo.nazione);
+      if (geo.provincia) setProvincia(geo.provincia);
+      if (geo.citta && !cittaTypedRef.current) setCitta(geo.citta);
+    });
+  }, []);
+  useEffect(() => () => geocodeAbortRef.current?.abort(), []);
 
   const fields = fieldsForCategory(categoria, tipo);
   const updateDettaglio = (key, value) => setDettagli((prev) => ({ ...prev, [key]: value }));
@@ -192,6 +291,8 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
       lat,
       lng,
       citta,
+      provincia,
+      nazione,
       dataNascita: user?.dataNascita,
     });
     setSending(false);
@@ -248,6 +349,8 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
                 field={field}
                 value={dettagli[field.key]}
                 onChange={(v) => updateDettaglio(field.key, v)}
+                categoria={categoria}
+                dettagli={dettagli}
               />
             ))}
           </div>
@@ -255,7 +358,9 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
 
         {step === 3 && (
           <div className="rb-faq-form">
-            <p className="rb-faq-hint">Fino a 20 foto. Trascinale per cambiarne l'ordine: la prima è la copertina.</p>
+            <p className="rb-faq-hint">
+              Fino a {MAX_FOTO} foto ({foto.length}/{MAX_FOTO}). Trascinale per cambiarne l'ordine: la prima è la copertina.
+            </p>
             <input type="file" accept="image/*" multiple onChange={onFilesChosen} disabled={foto.length >= MAX_FOTO || uploading} />
             {uploading && <p className="rb-faq-hint">Caricamento…</p>}
             <div className="rb-annunci-photo-grid">
@@ -281,7 +386,7 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
           <div className="rb-faq-form">
             <label className="rb-field">
               <span>Prezzo (€)</span>
-              <input type="number" min="0" value={prezzo} onChange={(e) => setPrezzo(e.target.value)} />
+              <NumberInput value={prezzo} onChange={setPrezzo} decimal ariaLabel="Prezzo" placeholder="0" />
             </label>
             <label className="rb-field rb-annunci-filter-chip">
               <input type="checkbox" checked={trattabile} onChange={(e) => setTrattabile(e.target.checked)} />
@@ -300,10 +405,17 @@ export default function PublishAnnuncioWizard({ initialCategoria, user, onClose,
           <div className="rb-faq-form">
             <label className="rb-field">
               <span>Città</span>
-              <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
+              <input
+                type="text"
+                value={citta}
+                onChange={(e) => {
+                  cittaTypedRef.current = e.target.value.trim().length > 0;
+                  setCitta(e.target.value);
+                }}
+              />
             </label>
             <p className="rb-faq-hint">Tocca la mappa per indicare la posizione (approssimata, mai l'indirizzo esatto agli altri).</p>
-            <LocationPicker lat={lat} lng={lng} onPick={(la, ln) => { setLat(la); setLng(ln); }} />
+            <LocationPicker lat={lat} lng={lng} coverUrl={foto[0] ?? null} onPick={onPickLocation} />
 
             <div className="rb-annunci-preview">
               <strong>{titolo || 'Titolo annuncio'}</strong>

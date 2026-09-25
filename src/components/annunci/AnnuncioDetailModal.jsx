@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fieldsForCategory } from '../../data/annunciSchema';
+import { fieldsForCategory, formatMonthYear } from '../../data/annunciSchema';
 import { getSellerInfo, toggleFavorite } from '../../data/annunci';
 import ModalOverlay from '../ModalOverlay';
 import ReportModal from '../shared/ReportModal';
@@ -107,7 +107,7 @@ export default function AnnuncioDetailModal({ listing, user, onOpenAuth, onOpenC
                   .map((f) => {
                     const raw = listing.dettagli[f.key];
                     const opt = f.options?.find((o) => o.value === raw);
-                    const display = typeof raw === 'boolean' ? (raw ? 'Sì' : 'No') : (opt?.label ?? raw);
+                    const display = typeof raw === 'boolean' ? (raw ? 'Sì' : 'No') : f.type === 'date' ? formatMonthYear(raw) : (opt?.label ?? raw);
                     return (
                       <tr key={f.key}>
                         <td>{f.label}</td>

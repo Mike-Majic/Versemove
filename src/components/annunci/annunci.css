@@ -733,3 +733,96 @@
   font-size: 12px !important;
   font-weight: 700 !important;
 }
+
+/* --- Wizard: campi con suggerimenti, tendine mese/anno, numeri ---
+   (vedi AnnunciFieldInputs.jsx). Gli input di testo del wizard prendono
+   qui lo stesso stile scuro degli altri campi, senza dipendere dal css
+   del pannello Impostazioni (che potrebbe non essere ancora caricato). */
+
+.rb-annunci-wizard-card .rb-field input[type='text'],
+.rb-annunci-wizard-card .rb-field textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #f5f5f7;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.rb-annunci-wizard-card .rb-field input[type='text']:focus,
+.rb-annunci-wizard-card .rb-field textarea:focus {
+  outline: none;
+  border-color: var(--accent, #ff8a1f);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #ff8a1f) 22%, transparent);
+}
+
+.rb-annunci-wizard-card .rb-field input::placeholder {
+  color: rgba(245, 245, 247, 0.35);
+}
+
+.rb-annunci-monthyear {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-annunci-monthyear .rb-select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.rb-annunci-monthyear .rb-select-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.rb-annunci-suggest {
+  position: relative;
+}
+
+.rb-annunci-suggest-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 5px;
+  background: rgba(10, 8, 18, 0.97);
+  border: 1px solid color-mix(in srgb, var(--accent, #ff8a1f) 45%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  z-index: 30;
+  max-height: min(240px, 40vh);
+  overflow-y: auto;
+}
+
+.rb-annunci-suggest-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #f5f5f7;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rb-annunci-suggest-list button:hover,
+.rb-annunci-suggest-list button.active {
+  background: color-mix(in srgb, var(--accent, #ff8a1f) 25%, transparent);
+}
+
+/* Il segnaposto sulla mini-mappa del wizard sta sopra i tile ma sotto le
+   tendine aperte del form. */
+.rb-annunci-location-map .rb-annuncio-pin {
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}

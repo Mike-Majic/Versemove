@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { fetchProfilesMap, displayName } from './posts';
 import { translateUploadError } from './contents';
 import { isAdult } from './age';
+import { distanceKm } from './geo';
 
 // Mondo Annunci (arancione): auto/moto/biciclette/barche/case, vendita o
 // affitto. Backend Supabase (tabella annunci_listings + annunci_favorites,
@@ -11,7 +12,55 @@ import { isAdult } from './age';
 // c'è le funzioni sotto restituiscono liste vuote/errori gestiti, mai
 // un'eccezione.
 
+// La colonna location è una geography PostGIS: con select * arriva come
+// stringa esadecimale EWKB (es. "0101000020E6100000..."), non come
+// oggetto {lat,lng}. Qui si decodifica il punto (little/big endian, con o
+// senza SRID); accettati anche GeoJSON, WKT e il vecchio oggetto {lat,lng}
+// per le righe della RPC annunci_nearby (che restituisce lat/lng a parte).
+export function parseGeoPoint(loc) {
+  if (loc == null) return null;
+  if (typeof loc === 'object') {
+    if (typeof loc.lat === 'number' && typeof loc.lng === 'number') return { lat: loc.lat, lng: loc.lng };
+    if (loc.type === 'Point' && Array.isArray(loc.coordinates)) return { lat: Number(loc.coordinates[1]), lng: Number(loc.coordinates[0]) };
+    return null;
+  }
+  if (typeof loc !== 'string') return null;
+  const str = loc.trim();
+  if (/^[0-9a-f]+$/i.test(str) && str.length >= 42) {
+    try {
+      const bytes = new Uint8Array(str.length / 2);
+      for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(str.slice(i * 2, i * 2 + 2), 16);
+      const view = new DataView(bytes.buffer);
+      const little = bytes[0] === 1;
+      const type = view.getUint32(1, little);
+      let off = 5;
+      if (type & 0x20000000) off += 4; // SRID presente (EWKB)
+      if ((type & 0xff) !== 1) return null; // solo Point
+      const x = view.getFloat64(off, little);
+      const y = view.getFloat64(off + 8, little);
+      return Number.isFinite(x) && Number.isFinite(y) ? { lat: y, lng: x } : null;
+    } catch {
+      return null;
+    }
+  }
+  const m = str.match(/POINT\s*\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)/i);
+  if (m) return { lat: Number(m[2]), lng: Number(m[1]) };
+  try {
+    return parseGeoPoint(JSON.parse(str));
+  } catch {
+    return null;
+  }
+}
+
+// Valore da inviare alla colonna geography: EWKT, che PostGIS legge
+// direttamente (un oggetto {lat,lng} lo rifiuta).
+function toGeoPoint(lat, lng) {
+  if (lat == null || lng == null || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) return null;
+  return `SRID=4326;POINT(${Number(lng)} ${Number(lat)})`;
+}
+
 function mapListing(row, favoriteIds) {
+  const point = parseGeoPoint(row.location) ?? (row.lat != null && row.lng != null ? { lat: Number(row.lat), lng: Number(row.lng) } : null);
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -25,8 +74,8 @@ function mapListing(row, favoriteIds) {
     trattabile: !!row.trattabile,
     dettagli: row.dettagli || {},
     foto: Array.isArray(row.foto) ? row.foto : [],
-    lat: row.location?.lat ?? row.lat ?? null,
-    lng: row.location?.lng ?? row.lng ?? null,
+    lat: point?.lat ?? null,
+    lng: point?.lng ?? null,
     citta: row.citta,
     provincia: row.provincia,
     nazione: row.nazione,
@@ -198,10 +247,12 @@ export async function createListing({
       trattabile: !!trattabile,
       dettagli: dettagli || {},
       foto: foto || [],
-      location: lat != null && lng != null ? { lat, lng } : null,
+      location: toGeoPoint(lat, lng),
       citta: citta || null,
       provincia: provincia || null,
-      nazione: nazione || null,
+      // nazione è NOT NULL con default 'IT': senza un valore la si omette
+      // (un null esplicito scavalca il default e l'insert fallisce).
+      ...(nazione ? { nazione } : {}),
       stato: 'attivo',
       scade_il: scadeIl,
     })
@@ -244,24 +295,54 @@ export async function toggleFavorite(listingId, currentlyFavorite) {
   return { favorite: true };
 }
 
-// Annunci nella vista mappa (RPC annunci_nearby, già prevista dalla
-// specifica): passa il riquadro visibile, non tutta la categoria.
+// Annunci nella vista mappa: la RPC annunci_nearby (p_lat, p_lng, p_km,
+// p_categoria, p_tipo, p_limit) ragiona per centro + raggio, quindi dal
+// riquadro visibile si passa il suo centro e un raggio che lo copre (metà
+// diagonale; il server lo limita a 500 km). Restituisce solo le colonne
+// essenziali (titolo, prezzo, foto, lat/lng): per aprire la scheda
+// completa vedi getListing.
 export async function annunciInBbox({ categoria, tipo, minLat, minLng, maxLat, maxLng }) {
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
+  const km = Math.max(1, Math.ceil(distanceKm(centerLat, centerLng, maxLat, maxLng)));
   const { data, error } = await supabase.rpc('annunci_nearby', {
+    p_lat: centerLat,
+    p_lng: centerLng,
+    p_km: Math.min(km, 500),
     p_categoria: categoria,
     p_tipo: tipo || null,
-    p_min_lat: minLat,
-    p_min_lng: minLng,
-    p_max_lat: maxLat,
-    p_max_lng: maxLng,
+    p_limit: 300,
   });
   if (error || !data) return [];
   const favoriteIds = await fetchMyFavoriteIds();
-  return data.map((row) => mapListing(row, favoriteIds));
+  return data
+    .map((row) => mapListing(row, favoriteIds))
+    .filter((l) => l.lat != null && l.lng != null && l.lat >= minLat && l.lat <= maxLat && l.lng >= minLng && l.lng <= maxLng);
 }
 
-// Fino a 20 foto per annuncio (vedi wizard di pubblicazione), stesso
-// bucket/percorso degli altri upload dell'app.
+// Dal punto scelto sulla mappa a città/provincia/nazione (Nominatim di
+// OpenStreetMap, senza chiave, uso leggero: una chiamata per ogni tocco
+// sulla mappa). Non lancia mai: in caso di errore restituisce campi vuoti
+// e l'annuncio si salva con la nazione predefinita (IT) del database.
+export async function reverseGeocode(lat, lng, signal) {
+  try {
+    const params = new URLSearchParams({ format: 'jsonv2', lat: String(lat), lon: String(lng), zoom: '10', 'accept-language': 'it' });
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, { signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) return {};
+    const json = await res.json();
+    const a = json?.address ?? {};
+    const citta = a.city || a.town || a.village || a.municipality || a.hamlet || a.county || '';
+    const iso = a['ISO3166-2-lvl6'] || a['ISO3166-2-lvl4'] || '';
+    const provincia = iso.includes('-') ? iso.split('-')[1] : a.county || a.state_district || '';
+    const nazione = a.country_code ? a.country_code.toUpperCase() : '';
+    return { citta, provincia, nazione };
+  } catch {
+    return {};
+  }
+}
+
+// Fino a 10 foto per annuncio (MAX_FOTO nel wizard di pubblicazione),
+// stesso bucket/percorso degli altri upload dell'app.
 export async function uploadAnnuncioPhoto(file) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: 'Devi essere loggato.' };

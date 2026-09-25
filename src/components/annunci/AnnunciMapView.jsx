@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { annunciInBbox } from '../../data/annunci';
+import { annunciInBbox, getListing } from '../../data/annunci';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
 
@@ -52,7 +52,12 @@ export default function AnnunciMapView({ categoria, tipo, onOpen }) {
             iconSize: [38, 38],
           }),
         });
-        marker.on('click', () => onOpen(listingsRef.current.get(listing.id)));
+        // La RPC restituisce solo i campi essenziali: la scheda completa
+        // (descrizione, dettagli, venditore) si scarica al tocco del marker.
+        marker.on('click', () => {
+          const partial = listingsRef.current.get(listing.id);
+          getListing(listing.id).then((full) => onOpen(full ?? partial));
+        });
         cluster.addLayer(marker);
       }
       setCount(listings.length);

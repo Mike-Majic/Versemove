@@ -8,8 +8,13 @@
 // - key: nome della chiave dentro annunci_listings.dettagli (snake_case,
 //   inglese, come richiesto dalla specifica: make, model, year...).
 // - type: 'select' (scelta singola nel form, multi-scelta nei filtri),
-//   'number' (un numero nel form, un min/max nei filtri), 'boolean'.
+//   'number' (un numero nel form, un min/max nei filtri), 'year' (anno
+//   scelto da tendina nel form, min/max nei filtri), 'date' (mese + anno
+//   da tendina, salvato "YYYY-MM"), 'boolean', 'text'.
 // - options: per i campi 'select', { value, label }[].
+// - suggest: per i campi 'text', 'make' (marche della categoria) o
+//   'model' (modelli della marca scritta nel campo make) — suggerimenti
+//   dalle prime due lettere, vedi data/annunciBrands.js.
 // - forRent: se true il campo si applica solo agli annunci di tipo
 //   affitto (es. durata minima, animali ammessi).
 export const ANNUNCI_CATEGORIES_META = {
@@ -17,9 +22,9 @@ export const ANNUNCI_CATEGORIES_META = {
     label: 'Auto',
     icon: '🚗',
     fields: [
-      { key: 'make', label: 'Marca', type: 'text' },
-      { key: 'model', label: 'Modello', type: 'text' },
-      { key: 'year', label: 'Anno', type: 'number' },
+      { key: 'make', label: 'Marca', type: 'text', suggest: 'make' },
+      { key: 'model', label: 'Modello', type: 'text', suggest: 'model' },
+      { key: 'year', label: 'Anno', type: 'year' },
       { key: 'km', label: 'Km', type: 'number', unit: 'km' },
       {
         key: 'fuel',
@@ -68,8 +73,8 @@ export const ANNUNCI_CATEGORIES_META = {
     label: 'Moto',
     icon: '🏍️',
     fields: [
-      { key: 'make', label: 'Marca', type: 'text' },
-      { key: 'model', label: 'Modello', type: 'text' },
+      { key: 'make', label: 'Marca', type: 'text', suggest: 'make' },
+      { key: 'model', label: 'Modello', type: 'text', suggest: 'model' },
       {
         key: 'moto_type',
         label: 'Tipo',
@@ -85,7 +90,7 @@ export const ANNUNCI_CATEGORIES_META = {
         ],
       },
       { key: 'displacement_cc', label: 'Cilindrata', type: 'number', unit: 'cc' },
-      { key: 'year', label: 'Anno', type: 'number' },
+      { key: 'year', label: 'Anno', type: 'year' },
       { key: 'km', label: 'Km', type: 'number', unit: 'km' },
       {
         key: 'license',
@@ -129,7 +134,7 @@ export const ANNUNCI_CATEGORIES_META = {
           { value: 'titanio', label: 'Titanio' },
         ],
       },
-      { key: 'make', label: 'Marca', type: 'text' },
+      { key: 'make', label: 'Marca', type: 'text', suggest: 'make' },
       {
         key: 'gearbox',
         label: 'Cambio',
@@ -160,7 +165,7 @@ export const ANNUNCI_CATEGORIES_META = {
         ],
       },
       { key: 'length_m', label: 'Lunghezza', type: 'number', unit: 'm' },
-      { key: 'year', label: 'Anno', type: 'number' },
+      { key: 'year', label: 'Anno', type: 'year' },
       { key: 'engine_power_hp', label: 'Motore/potenza', type: 'number', unit: 'CV' },
       { key: 'boat_license', label: 'Patente nautica richiesta', type: 'boolean' },
       { key: 'berth_included', label: 'Posto barca incluso', type: 'boolean' },
@@ -221,7 +226,7 @@ export const ANNUNCI_CATEGORIES_META = {
           { value: 'accessori', label: 'Altri accessori' },
         ],
       },
-      { key: 'brand', label: 'Marca', type: 'text' },
+      { key: 'brand', label: 'Marca', type: 'text', suggest: 'make' },
       {
         key: 'gender',
         label: 'Genere',
@@ -253,7 +258,7 @@ export const ANNUNCI_CATEGORIES_META = {
     icon: '📦',
     fields: [
       { key: 'item_category', label: 'Categoria', type: 'text' },
-      { key: 'brand', label: 'Marca (facoltativo)', type: 'text' },
+      { key: 'brand', label: 'Marca (facoltativo)', type: 'text', suggest: 'make' },
       {
         key: 'condition',
         label: 'Condizioni',
@@ -268,6 +273,17 @@ export const ANNUNCI_CATEGORIES_META = {
     ],
   },
 };
+
+// Campi 'date' (mese + anno da tendina, salvati "YYYY-MM"): nomi dei mesi
+// per le tendine e per la scheda dell'annuncio.
+export const MONTHS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+
+export function formatMonthYear(value) {
+  const m = typeof value === 'string' && value.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return value;
+  const month = MONTHS[Number(m[2]) - 1];
+  return month ? `${month} ${m[1]}` : value;
+}
 
 export const ANNUNCI_CATEGORY_IDS = Object.keys(ANNUNCI_CATEGORIES_META);
 

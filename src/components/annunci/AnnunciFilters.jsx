@@ -10,8 +10,8 @@ const ORDER_OPTIONS = [
 
 // Filtri professionali generati dallo stesso file di configurazione usato
 // dal form di pubblicazione (data/annunciSchema.js): un campo 'select'
-// qui diventa una scelta multipla (chip), un campo 'number' diventa un
-// intervallo min/max, un campo 'boolean' una casella "solo se".
+// qui diventa una scelta multipla (chip), un campo 'number' o 'year'
+// diventa un intervallo min/max, un campo 'boolean' una casella "solo se".
 export default function AnnunciFilters({ categoria, tipo, filters, setFilters, compact = false }) {
   const fields = fieldsForCategory(categoria, tipo);
 
@@ -107,7 +107,7 @@ export default function AnnunciFilters({ categoria, tipo, filters, setFilters, c
             </div>
           );
         }
-        if (field.type === 'number') {
+        if (field.type === 'number' || field.type === 'year') {
           const range = filters.fieldFilters[field.key] ?? {};
           return (
             <label key={field.key} className="rb-field">
