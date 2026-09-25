@@ -280,3 +280,56 @@
     width: 100%;
   }
 }
+
+/* --- Scheda Cerco gruppo --------------------------------------------- */
+.rb-clfg-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.rb-clfg-type {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-clfg-type input {
+  margin: 0;
+}
+
+.rb-clfg-type.is-active {
+  border-color: var(--accent, #d4f634);
+  background: color-mix(in srgb, var(--accent, #d4f634) 16%, transparent);
+}
+
+.rb-clfg-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent, #d4f634) 16%, transparent);
+  font-size: 22px;
+}
+
+.rb-clfg-event {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

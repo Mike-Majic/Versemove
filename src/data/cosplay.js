@@ -214,3 +214,109 @@ export async function setEventStato(eventId, stato) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cerco gruppo (cosplay_lfg + cosplay_lfg_members, tutte e due su Realtime).
+// L'autore è anche membro (riga in cosplay_lfg_members): "posti" conta gli
+// altri, i posti occupati sono i membri meno l'autore.
+
+export const LFG_POSTI_MIN = 1;
+export const LFG_POSTI_MAX = 30;
+
+function mapCosplayLfg(row) {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    tipo: row.tipo,
+    serie: row.serie,
+    personaggi: row.personaggi ?? '',
+    eventoId: row.evento_id ?? null,
+    citta: row.citta ?? '',
+    lat: row.lat,
+    lng: row.lng,
+    quando: row.quando,
+    posti: row.posti,
+    note: row.note ?? '',
+    stato: row.stato,
+    createdAt: row.created_at,
+  };
+}
+
+async function fetchEventsByIds(ids) {
+  const clean = Array.from(new Set(ids.filter(Boolean)));
+  if (!clean.length) return new Map();
+  const { data } = await supabase.from('events').select('id, titolo, tipo, citta, paese, lat, lng, data_evento, data_fine').in('id', clean);
+  return new Map((data ?? []).map((e) => [e.id, mapEvento({ ...e, autore_id: null })]));
+}
+
+async function hydrateCosplayLfg(list) {
+  if (!list.length) return [];
+  const ids = list.map((l) => l.id);
+  const { data: memberRows } = await supabase.from('cosplay_lfg_members').select('lfg_id, user_id, joined_at').in('lfg_id', ids).order('joined_at', { ascending: true });
+  const members = memberRows ?? [];
+  const userIds = [...list.map((l) => l.authorId), ...members.map((m) => m.user_id)];
+  const [profiles, events] = await Promise.all([fetchProfilesMap(userIds), fetchEventsByIds(list.map((l) => l.eventoId))]);
+  const profileOf = (id) => profiles.get(id) ?? { id, name: 'Utente', avatar: '' };
+  return list.map((l) => ({
+    ...l,
+    author: profileOf(l.authorId),
+    evento: l.eventoId ? events.get(l.eventoId) ?? null : null,
+    members: members.filter((m) => m.lfg_id === l.id && m.user_id !== l.authorId).map((m) => ({ userId: m.user_id, joinedAt: m.joined_at, profile: profileOf(m.user_id) })),
+  }));
+}
+
+// Annunci aperti (più quelli chiusi di cui si è membri, che la RLS lascia
+// vedere), ordinati per quando, con autore, membri ed evento collegato.
+export async function fetchCosplayLfgList() {
+  const { data, error } = await supabase.from('cosplay_lfg').select('*').eq('stato', 'aperto').order('quando', { ascending: true });
+  if (error || !data) return [];
+  return hydrateCosplayLfg(data.map(mapCosplayLfg));
+}
+
+export async function fetchCosplayLfg(id) {
+  if (!id) return null;
+  const { data } = await supabase.from('cosplay_lfg').select('*').eq('id', id).maybeSingle();
+  if (!data) return null;
+  const [one] = await hydrateCosplayLfg([mapCosplayLfg(data)]);
+  return one ?? null;
+}
+
+const rpcVoid = async (name, args) => {
+  const { error } = await supabase.rpc(name, args);
+  return error ? { error: error.message } : {};
+};
+
+// -> { id } | { error }. Con l'evento scelto città e coordinate le prende
+// il server dall'evento. Massimo 5 annunci aperti, data fra ora e 400
+// giorni: lo dice il server, in italiano.
+export async function createCosplayLfg({ tipo, serie, quando, posti, personaggi = null, eventoId = null, citta = null, lat = null, lng = null, note = null }) {
+  const { data, error } = await supabase.rpc('create_cosplay_lfg', {
+    p_tipo: tipo,
+    p_serie: String(serie ?? '').trim(),
+    p_quando: quando,
+    p_posti: posti,
+    p_personaggi: personaggi?.trim() || null,
+    p_evento_id: eventoId,
+    p_citta: citta?.trim() || null,
+    p_lat: Number.isFinite(lat) ? lat : null,
+    p_lng: Number.isFinite(lng) ? lng : null,
+    p_note: note?.trim() || null,
+  });
+  if (error) return { error: error.message };
+  return { id: data };
+}
+
+export const joinCosplayLfg = (id) => rpcVoid('join_cosplay_lfg', { p_id: id });
+export const leaveCosplayLfg = (id) => rpcVoid('leave_cosplay_lfg', { p_id: id });
+export const kickCosplayLfg = (id, userId) => rpcVoid('kick_cosplay_lfg', { p_id: id, p_user: userId });
+export const closeCosplayLfg = (id) => rpcVoid('close_cosplay_lfg', { p_id: id });
+
+// Un canale: qualunque cambiamento agli annunci o ai membri chiama
+// onChange(). Da rimuovere con supabase.removeChannel.
+export function subscribeCosplayLfg(onChange) {
+  return supabase
+    .channel('cosplay-lfg')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cosplay_lfg' }, () => onChange())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cosplay_lfg_members' }, () => onChange())
+    .subscribe();
+}

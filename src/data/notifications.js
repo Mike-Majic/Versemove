@@ -59,13 +59,14 @@ export function describeNotification(n, relationLabel) {
       return { who, text: 'ha pubblicato qualcosa di nuovo' };
     case 'super_like':
       return { who, text: 'ti ha mandato un Super Like ⭐' };
-    // Cerco compagni (mondo Nerd, gaming): anteprima = nome del gioco.
+    // Cerco compagni (gaming: anteprima = nome del gioco) e Cerco gruppo
+    // (cosplay: anteprima = serie).
     case 'lfg_join':
-      return { who, text: `si è unito al tuo gruppo per ${n.anteprima || 'il gioco'}` };
+      return { who, text: `si è unito al tuo gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
     case 'lfg_leave':
-      return { who, text: `ha lasciato il tuo gruppo per ${n.anteprima || 'il gioco'}` };
+      return { who, text: `ha lasciato il tuo gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
     case 'lfg_kick':
-      return { who: '', text: `Sei stato rimosso dal gruppo per ${n.anteprima || 'il gioco'}` };
+      return { who: '', text: `Sei stato rimosso dal gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
     default:
       return { who: '', text: `È un match con ${who}! 🎉` };
   }
