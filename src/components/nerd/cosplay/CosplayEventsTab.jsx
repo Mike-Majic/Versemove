@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EVENTS_PAGE_SIZE, EVENT_TYPES, EVENT_TYPE_CHIPS, fetchCosplayEvent, fetchEventiVicini, setEventAttendance } from '../../../data/cosplay';
+import { linkToCosplayEvent } from '../../../data/deepLinks';
 import { CITY_DATA_CREDIT, locationHasCoords } from '../../../data/citta';
 import { isUnlimitedDistance } from '../../../data/geo';
 import EmptyState from '../../EmptyState';
@@ -16,7 +17,21 @@ import ProposeEventForm from './ProposeEventForm';
 // infinito a pagine di 30; Lista / Mappa; "+ Proponi evento".
 // focusEvent: { eventId, seq } da un link condiviso: l'evento compare in
 // cima ("Evento condiviso") qualunque siano i filtri.
-export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor, focusEvent = null }) {
+// config: la stessa interfaccia per altre categorie con eventi (es. Teatro
+// del mondo Arte, vedi data/teatroEvents.js): mondo/categoria della RPC,
+// tipi e chip, se si può proporre un evento e il link da condividere.
+export const COSPLAY_EVENTS_CONFIG = {
+  mondo: 'nerd',
+  categoria: 'cosplay',
+  types: EVENT_TYPES,
+  chips: EVENT_TYPE_CHIPS,
+  canPropose: true,
+  shareLink: linkToCosplayEvent,
+  emptyIcon: '🎪',
+};
+
+export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor, focusEvent = null, config = COSPLAY_EVENTS_CONFIG }) {
+  const { mondo, categoria, types, chips, canPropose, shareLink, emptyIcon } = config;
   const hasCoords = locationHasCoords(locationFilters);
   const unlimited = isUnlimitedDistance(locationFilters?.distance ?? 150);
   const canNearby = hasCoords && !unlimited;
@@ -59,8 +74,10 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       km: nearby && canNearby ? locationFilters.distance : null,
       periodo,
       tipo,
+      mondo,
+      categoria,
     }),
-    [nearby, canNearby, locationFilters?.lat, locationFilters?.lng, locationFilters?.distance, periodo, tipo]
+    [nearby, canNearby, locationFilters?.lat, locationFilters?.lng, locationFilters?.distance, periodo, tipo, mondo, categoria]
   );
 
   const load = useCallback(
@@ -137,7 +154,9 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
   const center = canNearby ? [locationFilters.lat, locationFilters.lng] : null;
 
   const renderCards = (arr) =>
-    arr.map((e) => <CosplayEventCard key={e.id} event={e} user={user} busy={busyId === e.id} onAttend={attend} onLfgFor={onLfgFor} />);
+    arr.map((e) => (
+      <CosplayEventCard key={e.id} event={e} user={user} busy={busyId === e.id} onAttend={attend} onLfgFor={onLfgFor} types={types} shareLink={shareLink} />
+    ));
 
   return (
     <>
@@ -169,8 +188,8 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       <div className="rb-gaming-head">
         <div className="rb-gaming-filters rb-cev-chips" role="group" aria-label="Tipo di evento">
           <button type="button" className={tipo === null ? 'is-active' : ''} onClick={() => setTipo(null)}>Tutti</button>
-          {EVENT_TYPE_CHIPS.map((k) => (
-            <button key={k} type="button" className={tipo === k ? 'is-active' : ''} onClick={() => setTipo(k)}>{EVENT_TYPES[k].plural}</button>
+          {chips.map((k) => (
+            <button key={k} type="button" className={tipo === k ? 'is-active' : ''} onClick={() => setTipo(k)}>{types[k].plural}</button>
           ))}
         </div>
       </div>
@@ -183,12 +202,14 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
           <button type="button" className={view === 'lista' ? 'is-active' : ''} onClick={() => setView('lista')}>Lista</button>
           <button type="button" className={view === 'mappa' ? 'is-active' : ''} onClick={() => setView('mappa')}>Mappa</button>
         </div>
-        <button type="button" className="rb-vroom-btn rb-vroom-btn--primary rb-cev-propose" onClick={() => (requireAuth() ? null : setShowForm((v) => !v))}>
-          ＋ Proponi evento
-        </button>
+        {canPropose && (
+          <button type="button" className="rb-vroom-btn rb-vroom-btn--primary rb-cev-propose" onClick={() => (requireAuth() ? null : setShowForm((v) => !v))}>
+            ＋ Proponi evento
+          </button>
+        )}
       </div>
 
-      {showForm && user && (
+      {canPropose && showForm && user && (
         <ProposeEventForm
           onDone={(res, pubblico) => {
             setShowForm(false);
@@ -223,12 +244,12 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       {events === null ? (
         <Skeleton lines={4} />
       ) : view === 'mappa' ? (
-        <CosplayEventsMap events={list} center={center} />
+        <CosplayEventsMap events={list} center={center} types={types} />
       ) : list.length === 0 ? (
         <EmptyState
-          icon="🎪"
+          icon={emptyIcon}
           title={periodo === 'passati' ? 'Nessun evento passato' : nearby && canNearby ? `Nessun evento entro ${locationFilters.distance} km` : 'Nessun evento in programma'}
-          subtitle={nearby && canNearby ? 'Prova "Tutto il mondo" o allarga la distanza in Impostazioni.' : 'Proponi tu il primo.'}
+          subtitle={nearby && canNearby ? 'Prova "Tutto il mondo" o allarga la distanza in Impostazioni.' : canPropose ? 'Proponi tu il primo.' : 'Ne arrivano di nuovi ogni giorno.'}
         />
       ) : (
         <>

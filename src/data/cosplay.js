@@ -108,17 +108,18 @@ function mapEvento(row) {
   };
 }
 
-// Eventi Cosplay: vicini (lat/lng/km) o di tutto il mondo (tutti null),
+// Eventi Cosplay (o di un'altra categoria con mondo/categoria, es. Teatro
+// del mondo Arte): vicini (lat/lng/km) o di tutto il mondo (tutti null),
 // prossimi (compresi quelli in corso) o passati, filtro tipo facoltativo,
 // a pagine di 30. -> { events } | { error }
-export async function fetchEventiVicini({ lat = null, lng = null, km = null, periodo = 'prossimi', tipo = null, limit = EVENTS_PAGE_SIZE, offset = 0 } = {}) {
+export async function fetchEventiVicini({ lat = null, lng = null, km = null, periodo = 'prossimi', tipo = null, limit = EVENTS_PAGE_SIZE, offset = 0, mondo = 'nerd', categoria = COSPLAY_CATEGORY_ID } = {}) {
   try {
     const { data, error } = await supabase.rpc('eventi_vicini', {
       p_lat: lat,
       p_lng: lng,
       p_km: km,
-      p_mondo: 'nerd',
-      p_categoria: COSPLAY_CATEGORY_ID,
+      p_mondo: mondo,
+      p_categoria: categoria,
       p_periodo: periodo,
       p_tipo: tipo,
       p_limit: limit,

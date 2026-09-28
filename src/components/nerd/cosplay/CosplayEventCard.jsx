@@ -9,8 +9,10 @@ import ShareLinkButton from '../../shared/ShareLinkButton';
 // server non mostra agli altri gli eventi in attesa), pulsanti Ci vado /
 // Mi interessa (ritocco = toglie), Sito ufficiale, Cerca gruppo, Condividi
 // (link #/nerd/cosplay/evento/<id>).
-export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor, compact = false }) {
-  const type = EVENT_TYPES[event.tipo] ?? EVENT_TYPES.altro;
+// types/shareLink: per altre categorie con eventi (es. Teatro); shareLink
+// null = niente pulsante Condividi.
+export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor, compact = false, types = EVENT_TYPES, shareLink = linkToCosplayEvent }) {
+  const type = types[event.tipo] ?? types.altro ?? EVENT_TYPES.altro;
   const mine = Boolean(user) && event.autoreId === user.id;
   const going = event.mioStato === 'partecipa';
   const interested = event.mioStato === 'interessato';
@@ -44,8 +46,8 @@ export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor
           {event.urlUfficiale && (
             <a className="rb-vroom-btn rb-cev-link" href={event.urlUfficiale} target="_blank" rel="noopener noreferrer">🔗 Sito ufficiale</a>
           )}
-          {event.stato === 'approvato' && (
-            <ShareLinkButton className="rb-vroom-btn" url={() => linkToCosplayEvent(event.id)} title={event.titolo} text={`${event.titolo} · ${formatEventDates(event.dataEvento, event.dataFine)}`} />
+          {event.stato === 'approvato' && shareLink && (
+            <ShareLinkButton className="rb-vroom-btn" url={() => shareLink(event.id)} title={event.titolo} text={`${event.titolo} · ${formatEventDates(event.dataEvento, event.dataFine)}`} />
           )}
           {onLfgFor && !event.inCorso && (
             <button type="button" className="rb-vroom-btn" onClick={() => onLfgFor(event)}>👥 Cerca gruppo per questo evento</button>
