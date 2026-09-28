@@ -91,6 +91,33 @@ function clamp(pos, w, h) {
   };
 }
 
+// Zone che il mini-monitor non deve coprire (es. il player di Twitch: le
+// regole di Twitch vietano di coprirlo): gli elementi con data-mini-avoid.
+// Chi le mostra lancia l'evento MINI_AVOID_EVENT quando compaiono o si
+// ridimensionano; il mini-monitor, se ci sta sopra, si sposta nel primo
+// angolo libero. Resta comunque trascinabile (lasciato sopra al player,
+// torna in un angolo libero).
+export const MINI_AVOID_EVENT = 'rb:mini-avoid';
+
+function overlaps(a, b) {
+  return a.x < b.right && a.x + a.w > b.left && a.y < b.bottom && a.y + a.h > b.top;
+}
+
+function avoidZones(pos, w, h) {
+  const zones = [...document.querySelectorAll('[data-mini-avoid]')].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+  const hits = (p) => zones.some((z) => overlaps({ ...p, w, h }, z));
+  if (!zones.length || !hits(pos)) return pos;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const corners = [
+    { x: MARGIN, y: H - h - MARGIN },
+    { x: W - w - MARGIN, y: H - h - MARGIN },
+    { x: MARGIN, y: MARGIN + 56 },
+    { x: W - w - MARGIN, y: MARGIN + 56 },
+  ];
+  return corners.find((c) => !hits(c)) ?? corners[0];
+}
+
 // Mini-monitor flottante stile Discord: anteprima di chi parla (o del
 // primo partecipante), Ingrandisci, Muto, Condividi schermo, Chiudi
 // chiamata. Trascinabile (mouse o dito), resta sopra a tutto.
@@ -122,9 +149,18 @@ export function MiniCallMonitor({
       const { width, height } = el.getBoundingClientRect();
       setPos((p) => clamp(p ?? defaultPos(kind, width, height), width, height));
     };
+    const avoid = () => {
+      const { width, height } = el.getBoundingClientRect();
+      setPos((p) => (p ? avoidZones(p, width, height) : p));
+    };
     fit();
+    avoid();
     window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    window.addEventListener(MINI_AVOID_EVENT, avoid);
+    return () => {
+      window.removeEventListener('resize', fit);
+      window.removeEventListener(MINI_AVOID_EVENT, avoid);
+    };
   }, [kind]);
 
   useEffect(() => {
@@ -146,8 +182,12 @@ export function MiniCallMonitor({
   };
   const onPointerUp = () => {
     if (!dragRef.current) return;
+    const { w, h } = dragRef.current;
     dragRef.current = null;
-    if (pos) savePos(kind, pos);
+    if (!pos) return;
+    const next = avoidZones(pos, w, h);
+    if (next !== pos) setPos(next);
+    savePos(kind, next);
   };
 
   const expand = onExpand ?? (() => setView(kind, 'full'));

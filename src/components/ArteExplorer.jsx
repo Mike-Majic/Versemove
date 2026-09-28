@@ -10,6 +10,7 @@ import TeatroColumn from './arte/TeatroColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
+import TwitchColumn from './nerd/twitch/TwitchColumn';
 import GamingColumn from './nerd/gaming/GamingColumn';
 import NerdBachecaColumn from './nerd/NerdBachecaColumn';
 import CosplayColumn from './nerd/cosplay/CosplayColumn';
@@ -125,6 +126,10 @@ export default function ArteExplorer({
             <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
+          ) : world.id === 'nerd' && category.id === 'streaming' ? (
+            // Streaming & Content Creator: Twitch dentro Versemove (dirette,
+            // ricerca, player e chat incorporati).
+            <TwitchColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
             // Live del mondo Nerd: solo stanze video di gruppo (gli eventi
             // restano nelle loro categorie).
