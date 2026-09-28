@@ -4,6 +4,7 @@ import { placeTypeMeta, CONDIZIONE_META, TAGLIA_LABEL } from './dogPlaceMeta';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
 import ReportModal from '../shared/ReportModal';
+import Icon from '../shared/Icon';
 import './DogPlaceSheet.css';
 
 function formatDate(iso) {
@@ -117,6 +118,17 @@ function ReviewForm({ placeId, onDone }) {
   );
 }
 
+// Link "Naviga": apre il navigatore del dispositivo già con la destinazione.
+// iPhone/iPad/Mac -> Apple Mappe; Android e computer -> Google Maps in
+// modalità indicazioni (su Android si apre direttamente l'app, se c'è).
+function navigationUrl(lat, lng) {
+  const dest = `${lat},${lng}`;
+  const ua = navigator.userAgent || '';
+  const apple = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (apple) return `https://maps.apple.com/?daddr=${dest}&dirflg=d`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+}
+
 // Foglio in basso (bottom sheet, pensato per il pollice: si apre sempre
 // dal fondo dello schermo, mai un modale centrato) con il dettaglio di un
 // luogo e le sue recensioni. `place` arriva già con lat/lng/tipo/nome dal
@@ -213,6 +225,18 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
               )}
 
               <div className="rb-dogsheet-actions-row">
+                {Number.isFinite(place.lat) && Number.isFinite(place.lng) && (
+                  <a
+                    className="rb-dogsheet-nav-btn"
+                    href={navigationUrl(place.lat, place.lng)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Apri il navigatore con le indicazioni per arrivare qui"
+                  >
+                    <Icon name="map" size={18} strokeWidth={2} />
+                    Naviga
+                  </a>
+                )}
                 {user ? (
                   <button type="button" className="rb-reset-filters-btn" onClick={() => setShowReviewForm((v) => !v)}>
                     {showReviewForm ? 'Annulla' : '✍️ Scrivi una recensione'}

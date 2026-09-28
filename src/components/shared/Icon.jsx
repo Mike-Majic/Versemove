@@ -127,6 +127,12 @@ const PATHS = {
     </>
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  map: (
+    <>
+      <path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z" />
+      <path d="M9 4.5v12.7M15 6.8v12.7" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 19, strokeWidth = 1.8, className = '', ...rest }) {
