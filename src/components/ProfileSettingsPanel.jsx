@@ -46,6 +46,7 @@ import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
 import { GAMERTAG_FIELDS, GAMERTAG_MAX, cleanGamertags } from '../data/gaming';
 import './ProfileSettingsPanel.css';
+import { ANIMALI_CATEGORIES } from '../data/animaliCategories';
 
 const CITTA_MAX = 80;
 const BIO_MAX = 300;
@@ -537,6 +538,13 @@ function AccountTab({ user, onUpdateUser }) {
 // rosso — lo stesso di data/worlds.js): ogni nome categoria è una pillola
 // con lo sfondo del colore del suo mondo, testo sempre nel colore standard
 // del resto dell'app.
+// Etichetta salvata col preferito, ma se la categoria è stata rinominata
+// (es. Animali: "Cani" -> "Amici a 4 zampe") vince il nome attuale.
+const RENAMED_CATEGORY_LABELS = new Map(ANIMALI_CATEGORIES.map((c) => [`animali:${c.id}`, c.label]));
+function currentCategoryLabel(f) {
+  return RENAMED_CATEGORY_LABELS.get(`${f.worldId}:${f.categoryId}`) ?? f.categoryLabel;
+}
+
 function FavoriteCategoriesList({ favoriteCategories }) {
   const { t } = useTranslation();
   const byWorld = WORLDS.map((w) => ({
@@ -556,7 +564,7 @@ function FavoriteCategoriesList({ favoriteCategories }) {
           <div className="rb-profile-favorites-chips">
             {items.map((f) => (
               <span key={f.categoryId} className="rb-profile-favorites-chip" style={{ backgroundColor: world.color }}>
-                {f.categoryLabel}
+                {currentCategoryLabel(f)}
               </span>
             ))}
           </div>

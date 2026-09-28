@@ -38,8 +38,8 @@ function pickDetailLevel(categoryCount) {
 // solo da questo fattore, e non va confusa con la distanza dalle categorie
 // vicine (quella è gestita a parte, scegliendo facce non adiacenti).
 const TRIANGLE_SHRINK = 0.8;
-function shrinkVertex(v, rawCentroid, radius) {
-  return v.clone().sub(rawCentroid).multiplyScalar(TRIANGLE_SHRINK).add(rawCentroid).normalize().multiplyScalar(radius);
+function shrinkVertex(v, rawCentroid, radius, factor = TRIANGLE_SHRINK) {
+  return v.clone().sub(rawCentroid).multiplyScalar(factor).add(rawCentroid).normalize().multiplyScalar(radius);
 }
 
 // Sagoma di un UFO (disco + cupola), presa "solo la forma" da un'immagine di
@@ -899,9 +899,13 @@ export function buildCategoryShell(
     centroid.copy(a).add(b).add(c).divideScalar(3);
     const normal = centroid.clone().normalize();
 
-    const sa = shrinkVertex(a, centroid, radius);
-    const sb = shrinkVertex(b, centroid, radius);
-    const sc = shrinkVertex(c, centroid, radius);
+    // Triangoli semplici (niente sagoma): sizeFactor li rimpicciolisce
+    // direttamente (es. Vetrina, 14 categorie: più spazio fra l'una e
+    // l'altra). Con una sagoma la grandezza la decide shapeScale sotto.
+    const triFactor = shapeType === 'triangle' ? TRIANGLE_SHRINK * sizeFactor : TRIANGLE_SHRINK;
+    const sa = shrinkVertex(a, centroid, radius, triFactor);
+    const sb = shrinkVertex(b, centroid, radius, triFactor);
+    const sc = shrinkVertex(c, centroid, radius, triFactor);
 
     triangles.push({
       id: cat.id,

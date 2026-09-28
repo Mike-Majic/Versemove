@@ -66,6 +66,8 @@ const CATEGORY_SHAPE_BY_WORLD = {
 // perché col colore del mondo a trasparenza 0.2 si vedevano appena.
 const CATEGORY_LOOK_BY_WORLD = {
   bambini: { sizeFactor: 0.72 },
+  // Mondo Rosa: 14 triangoli, erano ammassati.
+  vetrina: { sizeFactor: 0.7 },
   faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
   animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };

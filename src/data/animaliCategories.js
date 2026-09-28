@@ -1,4 +1,5 @@
-// Categorie del mondo Animali (marrone/verde): per ora solo "Cani" (mappa
+// Categorie del mondo Animali (marrone/verde): per ora solo "Amici a 4
+// zampe" (id interno 'cani', tabelle dog_* invariate) (mappa
 // reale di luoghi pet-friendly + recensioni, componente dedicato
 // DogWorldMap — vedi AnimaliWorldExplorer.jsx), spostata qui dal mondo
 // Vetrina — stessa struttura di LAVORO_CATEGORIES/SOCIAL_CATEGORIES, stesso
@@ -11,10 +12,15 @@
 export const ANIMALI_CATEGORIES = [
   {
     id: 'cani',
-    label: 'Cani',
+    label: 'Amici a 4 zampe',
     icon: '🐕',
-    anchor: { lat: -10, lng: 175 }, // Pacifico, a est della Nuova Zelanda
-    aliases: ['cani', 'cane', 'dog', 'dogs', 'animali', 'pet', 'pet friendly', 'aree cani'],
+    // Vicino al centro della vista d'arrivo (la camera entra nel mondo
+    // puntata su lat 0 / lng 0, vedi WorldGlobe.jsx): la sagoma si aggancia
+    // al triangolo più vicino del guscio, e quello più centrale in mare è
+    // sull'equatore a ~21° O (Atlantico, al largo del Golfo di Guinea).
+    // Prima era nel Pacifico a est della Nuova Zelanda, dietro al globo.
+    anchor: { lat: 0, lng: -18 },
+    aliases: ['amici a 4 zampe', '4 zampe', 'quattro zampe', 'cani', 'cane', 'dog', 'dogs', 'animali', 'pet', 'pet friendly', 'aree cani'],
     subfamilies: [],
   },
 ];
