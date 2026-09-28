@@ -219,7 +219,7 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
 
       <div className="rb-foto-header">
         <div>
-          <h3>Fotografia</h3>
+          <h3>Galleria immagini</h3>
           <p>Scatti della community, taggabili a persone e gruppi del mondo Social.</p>
         </div>
         <div className="rb-foto-upload-btns">
@@ -238,7 +238,7 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
             <p className="rb-foto-form-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>
           )}
           {!analyzing && suggestedSubfamily && (
-            <p className="rb-foto-form-hint">Riconosciuto: Fotografia · {suggestedSubfamily}</p>
+            <p className="rb-foto-form-hint">Riconosciuto: Galleria immagini · {suggestedSubfamily}</p>
           )}
           {!analyzing &&
             extraPlacements.map((p) => {

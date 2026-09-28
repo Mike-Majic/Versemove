@@ -82,7 +82,7 @@ export async function analyzeImageElement(source) {
 
   if (detectSunsetHeuristic(source)) {
     tags.add('tramonto');
-    placements.push({ world: 'arte', category: 'fotografia', subfamily: 'Tramonti', label: 'Arte & Musica · Fotografia · Tramonti' });
+    placements.push({ world: 'arte', category: 'fotografia', subfamily: 'Tramonti', label: 'Intrattenimento · Galleria immagini · Tramonti' });
   }
 
   try {

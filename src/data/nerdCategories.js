@@ -63,7 +63,7 @@ export const NERD_CATEGORIES = [
   },
   {
     id: 'streaming',
-    label: 'Streaming & Content creation',
+    label: 'Streaming & Content Creator',
     icon: '🎥',
     anchor: { lat: -10, lng: -150 },
     aliases: ['streaming', 'content creation', 'content creator', 'twitch', 'youtube'],

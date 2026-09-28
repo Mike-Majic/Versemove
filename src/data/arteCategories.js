@@ -20,10 +20,10 @@ export const ARTE_CATEGORIES = [
   },
   {
     id: 'cinema',
-    label: 'Cinema',
+    label: 'Sala cinema',
     icon: '🎬',
     anchor: { lat: 10, lng: 40 },
-    aliases: ['cinema', 'film', 'filmato', 'movie', 'cortometraggio'],
+    aliases: ['sala cinema', 'cinema', 'film', 'filmato', 'movie', 'cortometraggio'],
     subfamilies: ['Commedia', 'Drammatico', 'Horror', 'Documentario', 'Animazione'],
   },
   {
@@ -52,10 +52,10 @@ export const ARTE_CATEGORIES = [
   },
   {
     id: 'fotografia',
-    label: 'Fotografia',
+    label: 'Galleria immagini',
     icon: '📷',
     anchor: { lat: 5, lng: -100 },
-    aliases: ['fotografia', 'foto', 'fotografico', 'scatto', 'photography'],
+    aliases: ['galleria immagini', 'immagini', 'fotografia', 'foto', 'fotografico', 'scatto', 'photography'],
     subfamilies: ['Ritratto', 'Reportage', 'Analogica', 'Still life', 'Paesaggio', 'Tramonti'],
   },
   {
@@ -68,10 +68,10 @@ export const ARTE_CATEGORIES = [
   },
   {
     id: 'video',
-    label: 'Video',
+    label: 'Galleria Video',
     icon: '🎥',
     anchor: { lat: 25, lng: 105 },
-    aliases: ['video', 'video breve', 'cortometraggio video', 'clip'],
+    aliases: ['galleria video', 'video', 'video breve', 'cortometraggio video', 'clip'],
     subfamilies: [],
   },
   {

@@ -336,7 +336,7 @@ export default function VideoColumn({ user, onOpenAuth }) {
     <div className="rb-video-column">
       <div className="rb-video-header">
         <div>
-          <h3>Video</h3>
+          <h3>Galleria Video</h3>
           <p>Clip brevi della community, oppure video interi cercati su YouTube.</p>
         </div>
         {tab === 'community' && (

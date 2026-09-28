@@ -274,7 +274,7 @@ export default function PostComposer({
           )}
 
           {mediaType === 'foto' && mondo === 'social' && (
-            <p className="rb-composer-media-hint">Questa foto comparirà anche in Fotografia nel mondo Arte.</p>
+            <p className="rb-composer-media-hint">Questa foto comparirà anche in Galleria immagini nel mondo Intrattenimento.</p>
           )}
 
           {!analyzing &&

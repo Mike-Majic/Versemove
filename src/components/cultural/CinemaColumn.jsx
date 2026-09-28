@@ -147,7 +147,7 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
     <div className="rb-cultural-column">
       <div className="rb-cultural-header">
         <div>
-          <h3>Cinema</h3>
+          <h3>Sala cinema</h3>
           <p>Film al cinema ora e in uscita prossimamente — reagisci per organizzarti con chi ci vuole andare.</p>
         </div>
         <label className="rb-cultural-sort">
