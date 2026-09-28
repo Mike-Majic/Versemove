@@ -4,6 +4,7 @@ import { photosNear, getStudioStats } from '../../data/tattoo';
 import TattooPostCard from './TattooPostCard';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
+import Icon from '../shared/Icon';
 
 const PAGE_SIZE = 30;
 
@@ -65,7 +66,7 @@ export default function TattooRaccolta({ point, user, onOpenAuth, stile, parteCo
 
   if (!point) {
     return (
-      <EmptyState icon="📍" title="Scegli un punto sulla mappa" subtitle="Tocca un pallino nella scheda Mappa per vedere le foto di quello studio." />
+      <EmptyState icon={<Icon name="pin" size={30} />} title="Scegli un punto sulla mappa" subtitle="Tocca un pallino nella scheda Mappa per vedere le foto di quello studio." />
     );
   }
 
@@ -78,7 +79,7 @@ export default function TattooRaccolta({ point, user, onOpenAuth, stile, parteCo
           <strong>{photos[0]?.studioNome ?? 'Zona selezionata'}</strong>
           {studioStats?.mediaStelle != null && (
             <span className="rb-tattoo-raccolta-stats">
-              ★ {studioStats.mediaStelle.toFixed(1)} ({studioStats.nRecensioni} recension{studioStats.nRecensioni === 1 ? 'e' : 'i'})
+              <Icon name="star" size={15} className="rb-icon--inline rb-icon--filled" /> {studioStats.mediaStelle.toFixed(1)} ({studioStats.nRecensioni} recension{studioStats.nRecensioni === 1 ? 'e' : 'i'})
             </span>
           )}
         </div>
@@ -88,7 +89,7 @@ export default function TattooRaccolta({ point, user, onOpenAuth, stile, parteCo
       </div>
 
       {photos.length === 0 && !loading ? (
-        <EmptyState icon="🖋️" title="Nessuna foto entro 500m" subtitle="Le posizioni condivise non sono sempre precise: prova un punto vicino." />
+        <EmptyState icon={<Icon name="pen" size={30} />} title="Nessuna foto entro 500m" subtitle="Le posizioni condivise non sono sempre precise: prova un punto vicino." />
       ) : (
         <div className="rb-tattoo-raccolta-grid">
           {photos.map((post) => (

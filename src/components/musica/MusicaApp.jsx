@@ -16,6 +16,7 @@ import MusicaEsplora from './MusicaEsplora';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import './MusicaApp.css';
+import Icon from '../shared/Icon';
 
 const HOME_CHIPS = [
   { id: 'per-te', label: 'Per te' },
@@ -36,14 +37,14 @@ function TrackRow({ track, playingId, onTogglePlay, action }) {
       {track.artworkUrl ? (
         <img className="rb-musica-track-art" src={track.artworkUrl} alt="" />
       ) : (
-        <div className="rb-musica-track-art rb-musica-track-art-empty">🎵</div>
+        <div className="rb-musica-track-art rb-musica-track-art-empty"><Icon name="music" size={20} /></div>
       )}
       <div className="rb-musica-track-info">
         <strong>{track.title}</strong>
         <p>{track.artist}</p>
       </div>
       <button type="button" className="rb-musica-play-btn" onClick={() => onTogglePlay(track)}>
-        {isPlaying ? '⏸' : '▶️'}
+        <Icon name={isPlaying ? 'pause' : 'play'} size={18} />
       </button>
       {action}
     </li>
@@ -89,12 +90,12 @@ function NowPlayingBar({ track, onClose, onEnded, hasNext, hasPrev, onPrev, play
           <p>{track.artist}</p>
         </div>
         <div className="rb-musica-now-playing-controls">
-          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onPrev} disabled={!hasPrev} aria-label="Precedente" title="Precedente">⏮</button>
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onPrev} disabled={!hasPrev} aria-label="Precedente" title="Precedente"><Icon name="skipBack" size={17} /></button>
           <button type="button" className="rb-musica-now-playing-ctrl rb-musica-now-playing-ctrl-main" onClick={togglePlay} aria-label={isPlaying ? 'Pausa' : 'Riproduci'} title={isPlaying ? 'Pausa' : 'Riproduci'}>
-            {isPlaying ? '⏸' : '▶️'}
+            <Icon name={isPlaying ? 'pause' : 'play'} size={18} />
           </button>
-          <button type="button" className="rb-musica-now-playing-ctrl" onClick={stop} aria-label="Stop" title="Stop">⏹</button>
-          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onEnded} disabled={!hasNext} aria-label="Successivo" title="Successivo">⏭</button>
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={stop} aria-label="Stop" title="Stop"><Icon name="stop" size={17} /></button>
+          <button type="button" className="rb-musica-now-playing-ctrl" onClick={onEnded} disabled={!hasNext} aria-label="Successivo" title="Successivo"><Icon name="skipForward" size={17} /></button>
           {playlists && (
             <AddToPlaylistMenu
               compact
@@ -104,7 +105,7 @@ function NowPlayingBar({ track, onClose, onEnded, hasNext, hasPrev, onPrev, play
             />
           )}
         </div>
-        <button type="button" className="rb-musica-now-playing-close" onClick={onClose} aria-label="Ferma">✕</button>
+        <button type="button" className="rb-musica-now-playing-close" onClick={onClose} aria-label="Ferma"><Icon name="close" size={17} /></button>
       </div>
       <div className="rb-musica-now-playing-seek">
         <span className="rb-musica-now-playing-time">{formatPlaybackTime(shownTime)}</span>
@@ -129,7 +130,9 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
   return (
     <div className="rb-musica-playlist-detail">
       <div className="rb-musica-playlist-detail-header">
-        <button type="button" className="rb-musica-back-btn" onClick={onBack}>← Indietro</button>
+        <button type="button" className="rb-musica-back-btn" onClick={onBack}>
+          <Icon name="back" size={16} className="rb-icon--inline" /> Indietro
+        </button>
         <div>
           <strong>{playlist.nome}</strong>
           {playlist.descrizione && <p className="rb-musica-playlist-detail-desc">{playlist.descrizione}</p>}
@@ -143,7 +146,7 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
         <button type="button" className="rb-musica-play-all-btn" onClick={() => onPlayAll(playlist.tracks)}>▶️ Riproduci tutti</button>
       )}
 
-      {playlist.tracks.length === 0 && <EmptyState icon="🎧" title="Nessun brano qui ancora" subtitle="Aggiungi brani da Esplora o dalla ricerca." />}
+      {playlist.tracks.length === 0 && <EmptyState icon={<Icon name="headphones" size={30} />} title="Nessun brano qui ancora" subtitle="Aggiungi brani da Esplora o dalla ricerca." />}
       <ul className="rb-musica-track-list">
         {playlist.tracks.map((t) => (
           <TrackRow
@@ -153,8 +156,8 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
             onTogglePlay={onTogglePlay}
             action={
               onRemoveTrack ? (
-                <button type="button" className="rb-musica-remove-btn" onClick={() => onRemoveTrack(t.id)} title="Rimuovi">
-                  ✕
+                <button type="button" className="rb-musica-remove-btn" onClick={() => onRemoveTrack(t.id)} title="Rimuovi" aria-label="Rimuovi">
+                  <Icon name="close" size={16} />
                 </button>
               ) : null
             }
@@ -167,10 +170,10 @@ function PlaylistDetail({ playlist, onBack, onDelete, canDelete, onRemoveTrack, 
 
 function BottomNav({ tab, onChange }) {
   const items = [
-    { id: 'home', label: 'Home', icon: '🏠' },
-    { id: 'clip', label: 'Clip', icon: '🎬' },
-    { id: 'esplora', label: 'Esplora', icon: '🧭' },
-    { id: 'raccolta', label: 'Raccolta', icon: '📚' },
+    { id: 'home', label: 'Home', icon: 'home' },
+    { id: 'clip', label: 'Clip', icon: 'film' },
+    { id: 'esplora', label: 'Esplora', icon: 'compass' },
+    { id: 'raccolta', label: 'Raccolta', icon: 'book' },
   ];
   return (
     <nav className="rb-musica-bottomnav">
@@ -181,7 +184,7 @@ function BottomNav({ tab, onChange }) {
           className={`rb-musica-bottomnav-btn ${tab === it.id ? 'active' : ''}`}
           onClick={() => onChange(it.id)}
         >
-          <span className="rb-musica-bottomnav-icon">{it.icon}</span>
+          <span className="rb-musica-bottomnav-icon"><Icon name={it.icon} size={20} /></span>
           <span>{it.label}</span>
         </button>
       ))}
@@ -200,7 +203,7 @@ function QuickPickTile({ tile, onOpenPlaylist }) {
               <span key={i} style={arts[i] ? { backgroundImage: `url(${arts[i]})` } : undefined} />
             ))
           ) : (
-            <span className="rb-musica-qp-mosaic-empty">🎧</span>
+            <span className="rb-musica-qp-mosaic-empty"><Icon name="headphones" size={22} /></span>
           )}
         </div>
         <strong>{tile.nome}</strong>
@@ -210,7 +213,7 @@ function QuickPickTile({ tile, onOpenPlaylist }) {
   return (
     <div className="rb-musica-qp-tile rb-musica-qp-artist">
       <div className="rb-musica-qp-avatar" style={tile.artworkUrl ? { backgroundImage: `url(${tile.artworkUrl})` } : undefined}>
-        {!tile.artworkUrl && '🎤'}
+        {!tile.artworkUrl && <Icon name="mic" size={20} />}
       </div>
       <strong>{tile.name}</strong>
     </div>
@@ -349,9 +352,9 @@ function MusicaHome({
               <Skeleton lines={2} />
             </div>
           )}
-          {error && <EmptyState icon="⚠️" title="Sezione non disponibile" subtitle={error} />}
+          {error && <EmptyState icon={<Icon name="info" size={30} />} title="Sezione non disponibile" subtitle={error} />}
           {!loading && !error && tracks.length === 0 && (
-            <EmptyState icon="🎵" title="Nessun brano qui ancora" subtitle="Prova un altro filtro o cerca in Esplora." />
+            <EmptyState icon={<Icon name="music" size={30} />} title="Nessun brano qui ancora" subtitle="Prova un altro filtro o cerca in Esplora." />
           )}
           <ul className="rb-musica-track-list">
             {tracks.map((t) => (
@@ -502,7 +505,7 @@ function MusicaRaccolta({
       <div className="rb-musica-raccolta-header">
         <h3>Raccolta</h3>
         <div className="rb-musica-raccolta-header-actions">
-          <button type="button" className="rb-musica-icon-btn" onClick={() => setShowHistory((v) => !v)} title="Cronologia recente" aria-label="Cronologia recente">🕘</button>
+          <button type="button" className="rb-musica-icon-btn" onClick={() => setShowHistory((v) => !v)} title="Cronologia recente" aria-label="Cronologia recente"><Icon name="clock" size={18} /></button>
           <input
             type="text"
             className="rb-musica-raccolta-search"
@@ -522,7 +525,7 @@ function MusicaRaccolta({
               <Skeleton lines={2} />
             </div>
           ) : recent.length === 0 ? (
-            <EmptyState icon="🕘" title="Non hai ancora ascoltato nulla" />
+            <EmptyState icon={<Icon name="clock" size={30} />} title="Non hai ancora ascoltato nulla" />
           ) : (
             <ul className="rb-musica-track-list">
               {recent.map((t) => (
@@ -542,7 +545,7 @@ function MusicaRaccolta({
       </div>
 
       {!user ? (
-        <EmptyState icon="🔒" title="Accedi per continuare" subtitle="Serve un account per creare playlist e vedere i tuoi brani." actions={[{ label: 'Accedi', primary: true, onClick: onOpenAuth }]} />
+        <EmptyState icon={<Icon name="lock" size={30} />} title="Accedi per continuare" subtitle="Serve un account per creare playlist e vedere i tuoi brani." actions={[{ label: 'Accedi', primary: true, onClick: onOpenAuth }]} />
       ) : chip === 'playlist' ? (
         <>
           <div className="rb-musica-raccolta-toolbar">
@@ -552,20 +555,20 @@ function MusicaRaccolta({
               onChange={setSort}
             />
             <button type="button" className="rb-musica-icon-btn" onClick={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))} title="Cambia vista" aria-label="Cambia vista">
-              {view === 'grid' ? '☰' : '▦'}
+              <Icon name={view === 'grid' ? 'list' : 'grid'} size={18} />
             </button>
           </div>
 
           <div className={view === 'grid' ? 'rb-musica-playlists-grid' : 'rb-musica-playlists-list'}>
             <button type="button" className={view === 'grid' ? 'rb-musica-playlist-card' : 'rb-musica-playlist-row'} onClick={() => onOpenPlaylist('__liked__')}>
-              <div className="rb-musica-playlist-cover rb-musica-playlist-cover-liked"><span>❤️</span></div>
+              <div className="rb-musica-playlist-cover rb-musica-playlist-cover-liked"><span><Icon name="heart" size={26} className="rb-icon--filled" /></span></div>
               <strong>Ti piace</strong>
               <span>{likedTracks.length} {likedTracks.length === 1 ? 'brano' : 'brani'}</span>
             </button>
             {filteredPlaylists.map((p) => (
               <button type="button" key={p.id} className={view === 'grid' ? 'rb-musica-playlist-card' : 'rb-musica-playlist-row'} onClick={() => onOpenPlaylist(p.id)}>
                 <div className="rb-musica-playlist-cover">
-                  {p.tracks[0]?.artwork_url ? <img src={p.tracks[0].artwork_url} alt="" /> : <span>🎧</span>}
+                  {p.tracks[0]?.artwork_url ? <img src={p.tracks[0].artwork_url} alt="" /> : <span><Icon name="headphones" size={24} /></span>}
                 </div>
                 <strong>{p.nome}</strong>
                 <span>{p.tracks.length} {p.tracks.length === 1 ? 'brano' : 'brani'}</span>
@@ -575,7 +578,7 @@ function MusicaRaccolta({
         </>
       ) : chip === 'brani' ? (
         <>
-          {likedTracks.length === 0 && <EmptyState icon="🎵" title="Nessun brano salvato ancora" />}
+          {likedTracks.length === 0 && <EmptyState icon={<Icon name="music" size={30} />} title="Nessun brano salvato ancora" />}
           <ul className="rb-musica-track-list">
             {likedTracks.map((t) => (
               <TrackRow key={t.id} track={t} playingId={playingId} onTogglePlay={onTogglePlay} action={null} />
@@ -583,7 +586,7 @@ function MusicaRaccolta({
           </ul>
         </>
       ) : (
-        <EmptyState icon="📂" title="Non hai ancora contenuti in questa categoria" />
+        <EmptyState icon={<Icon name="folder" size={30} />} title="Non hai ancora contenuti in questa categoria" />
       )}
 
       {user && !showNewForm && (

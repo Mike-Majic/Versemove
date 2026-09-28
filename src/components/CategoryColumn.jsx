@@ -10,6 +10,7 @@ import LabelMorphTitle from './LabelMorphTitle';
 import ParticleBurst from './ParticleBurst';
 import SponsorCard from './ads/SponsorCard';
 import './CategoryColumn.css';
+import Icon from './shared/Icon';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
 // l'oggetto categoria (nome, sottofamiglie...) più i suoi contenuti/ricerche
@@ -165,7 +166,7 @@ export default function CategoryColumn({
                   {c.caption && <p>{c.caption}</p>}
                   {c.tags?.length > 0 && <span className="rb-arte-uploaded-tags">{c.tags.map((t) => `#${t}`).join(' ')}</span>}
                   <button type="button" className="rb-arte-uploaded-like-btn" onClick={() => handleContentLike(c)}>
-                    {c.likedByMe ? '❤️' : '🤍'} {c.likeCount}
+                    <Icon name="heart" size={16} className={`rb-icon--inline ${c.likedByMe ? 'rb-icon--filled' : ''}`} /> {c.likeCount}
                   </button>
                 </div>
               </li>
@@ -177,7 +178,7 @@ export default function CategoryColumn({
       <ul className="rb-arte-results-list">
         {results.length === 0 && (
           <li className="rb-arte-no-results-wrap">
-            <EmptyState icon="🔍" title="Nessun risultato" subtitle="Prova un'altra ricerca o un altro filtro." />
+            <EmptyState icon={<Icon name="search" size={30} />} title="Nessun risultato" subtitle="Prova un'altra ricerca o un altro filtro." />
           </li>
         )}
         {results.map((r) => (
@@ -203,7 +204,7 @@ export default function CategoryColumn({
     <>
       {!isDesktop && (
         <button className="rb-arte-mobile-back" onClick={() => setMobileView('primary')}>
-          ← Torna a {category.label}
+          <Icon name="back" size={16} className="rb-icon--inline" /> Torna a {category.label}
         </button>
       )}
       <div className="rb-arte-panel-header">
@@ -212,11 +213,11 @@ export default function CategoryColumn({
       </div>
 
       {!myCity && (
-        <EmptyState icon="📍" title="Imposta la tua città" subtitle={`Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.`} />
+        <EmptyState icon={<Icon name="pin" size={30} />} title="Imposta la tua città" subtitle={`Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.`} />
       )}
 
       {myCity && nearbyPeople.length === 0 && (
-        <EmptyState icon="🧭" title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
+        <EmptyState icon={<Icon name="compass" size={30} />} title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
       )}
 
       {myCity && nearbyPeople.length > 0 && (

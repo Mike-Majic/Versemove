@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import MediaEditor from './social/MediaEditor';
-import { publishContent, listContentsForPlacement, toggleContentLike } from '../data/contents';
+import { publishContent } from '../data/contents';
+import { createPost } from '../data/posts';
 import { analyzeImageElement, extractVideoFrame } from '../data/localVision';
 import { searchYoutubeVideos, youtubeEmbedUrl } from '../data/youtubeSearch';
 import { listMyPlaylists, createPlaylist, addTrackToPlaylist } from '../data/musicPlaylists';
 import useYoutubeBridge, { formatPlaybackTime } from './shared/useYoutubeBridge';
 import AddToPlaylistMenu from './shared/AddToPlaylistMenu';
+import Icon from './shared/Icon';
+import SocialGallery from './arte/SocialGallery';
 import './VideoColumn.css';
 
 function loadVideoElement(src) {
@@ -119,7 +122,7 @@ function YoutubeVideoTab({ user, onOpenAuth }) {
 
   return (
     <div className="rb-video-yt">
-      <p className="rb-video-yt-note">🌍 Cerca e guarda video da YouTube, senza uscire da Versemove.</p>
+      <p className="rb-video-yt-note"><Icon name="globe" size={16} className="rb-icon--inline" /> Cerca e guarda video da YouTube, senza uscire da Versemove.</p>
       <div className="rb-video-yt-search-row">
         <input
           type="text"
@@ -174,12 +177,12 @@ function YoutubeVideoTab({ user, onOpenAuth }) {
               <p>{selected.artist}</p>
             </div>
             <div className="rb-video-yt-player-controls">
-              <button type="button" onClick={() => hasPrev && setSelected(results[selectedIndex - 1])} disabled={!hasPrev} aria-label="Precedente" title="Precedente">⏮</button>
+              <button type="button" onClick={() => hasPrev && setSelected(results[selectedIndex - 1])} disabled={!hasPrev} aria-label="Precedente" title="Precedente"><Icon name="skipBack" size={16} /></button>
               <button type="button" className="rb-video-yt-player-ctrl-main" onClick={togglePlay} aria-label={isPlaying ? 'Pausa' : 'Riproduci'} title={isPlaying ? 'Pausa' : 'Riproduci'}>
-                {isPlaying ? '⏸' : '▶️'}
+                <Icon name={isPlaying ? 'pause' : 'play'} size={18} />
               </button>
-              <button type="button" onClick={stop} aria-label="Stop" title="Stop">⏹</button>
-              <button type="button" onClick={() => hasNext && setSelected(results[selectedIndex + 1])} disabled={!hasNext} aria-label="Successivo" title="Successivo">⏭</button>
+              <button type="button" onClick={stop} aria-label="Stop" title="Stop"><Icon name="stop" size={16} /></button>
+              <button type="button" onClick={() => hasNext && setSelected(results[selectedIndex + 1])} disabled={!hasNext} aria-label="Successivo" title="Successivo"><Icon name="skipForward" size={16} /></button>
               {playlists && (
                 <AddToPlaylistMenu
                   compact
@@ -197,7 +200,7 @@ function YoutubeVideoTab({ user, onOpenAuth }) {
         {results.map((v) => (
           <li key={v.id} className={`rb-video-yt-result ${selected?.id === v.id ? 'active' : ''}`}>
             <button type="button" onClick={() => setSelected(v)}>
-              {v.artworkUrl ? <img src={v.artworkUrl} alt="" /> : <div className="rb-video-yt-result-empty">🎬</div>}
+              {v.artworkUrl ? <img src={v.artworkUrl} alt="" /> : <div className="rb-video-yt-result-empty"><Icon name="film" size={24} /></div>}
               <div>
                 <strong>{v.title}</strong>
                 <p>{v.artist}</p>
@@ -217,7 +220,7 @@ function YoutubeVideoTab({ user, onOpenAuth }) {
 // dove ripubblicare lo stesso video (like sempre condivisi, mai duplicati).
 export default function VideoColumn({ user, onOpenAuth }) {
   const [tab, setTab] = useState('community'); // 'community' | 'youtube'
-  const [videos, setVideos] = useState([]);
+  const [galleryKey, setGalleryKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [draftFile, setDraftFile] = useState(null);
   const [draftUrl, setDraftUrl] = useState(null);
@@ -234,10 +237,6 @@ export default function VideoColumn({ user, onOpenAuth }) {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
-  const refresh = () => {
-    listContentsForPlacement({ world: 'arte', category: 'video' }).then(setVideos);
-  };
-  useEffect(refresh, []);
 
   const openPicker = (ref) => {
     if (!user) {
@@ -304,32 +303,28 @@ export default function VideoColumn({ user, onOpenAuth }) {
     const allTags = Array.from(new Set([...suggestedTags, ...manualTags]));
     const chosenExtra = extraPlacements.filter((p) => confirmedPlacements.has(placementKey(p)));
     const placements = [{ world: 'arte', category: 'video' }, ...chosenExtra];
-    const { error } = await publishContent({
+    const { content, url, error } = await publishContent({
       file: draftFile,
       type: 'video',
       caption: title.trim(),
       tags: allTags,
       placements,
     });
-    setPublishing(false);
     if (error) {
+      setPublishing(false);
       setPublishError(error);
       return;
     }
-    resetForm();
-    refresh();
-  };
-
-  const handleLike = async (video) => {
-    if (!user) {
-      onOpenAuth();
+    // Post pubblico nel mondo Social col video: la galleria (RPC
+    // galleria_social) mostra i video dei post Social.
+    const post = await createPost({ testo: title.trim(), contentId: content.id, mediaUrl: url, mediaType: 'video', tags: allTags, mondo: 'social' });
+    setPublishing(false);
+    if (post.error) {
+      setPublishError(post.error);
       return;
     }
-    const { liked, error } = await toggleContentLike(video.id, video.likedByMe);
-    if (error) return;
-    setVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, likedByMe: liked, likeCount: v.likeCount + (liked ? 1 : -1) } : v))
-    );
+    resetForm();
+    setGalleryKey((k) => k + 1);
   };
 
   return (
@@ -341,8 +336,12 @@ export default function VideoColumn({ user, onOpenAuth }) {
         </div>
         {tab === 'community' && (
           <div className="rb-video-upload-btns">
-            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(cameraInputRef)}>📹 Registra</button>
-            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(fileInputRef)}>🎬 Galleria</button>
+            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(cameraInputRef)}>
+              <Icon name="video" size={17} className="rb-icon--inline" /> Registra
+            </button>
+            <button type="button" className="rb-video-upload-btn" onClick={() => openPicker(fileInputRef)}>
+              <Icon name="image" size={17} className="rb-icon--inline" /> Galleria
+            </button>
           </div>
         )}
       </div>
@@ -380,7 +379,9 @@ export default function VideoColumn({ user, onOpenAuth }) {
               if (trim?.trimStart) e.target.currentTime = trim.trimStart;
             }}
           />
-          <button type="button" className="rb-video-edit-btn" onClick={() => setEditing(true)}>✂️ Taglia</button>
+          <button type="button" className="rb-video-edit-btn" onClick={() => setEditing(true)}>
+            <Icon name="scissors" size={16} className="rb-icon--inline" /> Taglia
+          </button>
           {trim && (
             <p className="rb-video-trim-hint">
               Taglio impostato: {trim.trimStart.toFixed(1)}s → {trim.trimEnd.toFixed(1)}s
@@ -416,7 +417,9 @@ export default function VideoColumn({ user, onOpenAuth }) {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={60}
           />
-          {publishError && <p className="rb-video-form-error">⚠️ {publishError}</p>}
+          {publishError && <p className="rb-video-form-error">
+              <Icon name="info" size={16} className="rb-icon--inline" /> {publishError}
+            </p>}
           <div className="rb-video-form-actions">
             <button type="button" className="rb-video-form-cancel" onClick={resetForm}>Annulla</button>
             <button type="button" className="rb-video-form-publish" onClick={publish} disabled={publishing}>
@@ -426,20 +429,7 @@ export default function VideoColumn({ user, onOpenAuth }) {
         </div>
       )}
 
-      <ul className="rb-video-grid">
-        {videos.map((v) => (
-          <li key={v.id} className="rb-video-card">
-            <video src={v.url} controls />
-            <div className="rb-video-card-info">
-              <strong>{v.caption || 'Senza titolo'}</strong>
-              <button type="button" className="rb-video-like-btn" onClick={() => handleLike(v)}>
-                {v.likedByMe ? '❤️' : '🤍'} {v.likeCount}
-              </button>
-            </div>
-          </li>
-        ))}
-        {videos.length === 0 && <p className="rb-video-empty">Nessun video ancora in questa categoria.</p>}
-      </ul>
+      <SocialGallery key={galleryKey} tipo="video" user={user} onOpenAuth={onOpenAuth} />
 
       {editing && (
         <MediaEditor

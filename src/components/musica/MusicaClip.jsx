@@ -13,6 +13,7 @@ import { compressVideoClip, isCompressionSupported } from '../../data/videoCompr
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import './MusicaClip.css';
+import Icon from '../shared/Icon';
 
 const MAX_DURATION_SEC = 60;
 
@@ -40,7 +41,7 @@ function CommentsSheet({ clipId, onClose }) {
       <div className="rb-clip-comments-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="rb-clip-comments-header">
           <strong>Commenti</strong>
-          <button type="button" onClick={onClose} aria-label="Chiudi">✕</button>
+          <button type="button" onClick={onClose} aria-label="Chiudi"><Icon name="close" size={18} /></button>
         </div>
         <ul className="rb-clip-comments-list">
           {comments === null && (
@@ -50,7 +51,7 @@ function CommentsSheet({ clipId, onClose }) {
           )}
           {comments?.length === 0 && (
             <li>
-              <EmptyState icon="💬" title="Nessun commento ancora" subtitle="Il primo sei tu." />
+              <EmptyState icon={<Icon name="chat" size={30} />} title="Nessun commento ancora" subtitle="Il primo sei tu." />
             </li>
           )}
           {comments?.map((c) => (
@@ -116,28 +117,28 @@ function ClipCard({ clip, user, onOpenAuth, onLike, onSave, onDelete, isFullscre
 
       <div className="rb-clip-actions">
         <button type="button" className={`rb-clip-action ${clip.likedByMe ? 'active' : ''}`} onClick={requireAuth(() => onLike(clip))}>
-          <span>{clip.likedByMe ? '❤️' : '🤍'}</span>
+          <span><Icon name="heart" size={24} className={clip.likedByMe ? 'rb-icon--filled' : ''} /></span>
           <small>{clip.likeCount}</small>
         </button>
         <button type="button" className="rb-clip-action" onClick={() => setShowComments(true)}>
-          <span>💬</span>
+          <span><Icon name="chat" size={24} /></span>
           <small>{clip.commentCount}</small>
         </button>
         <button type="button" className={`rb-clip-action ${clip.savedByMe ? 'active' : ''}`} onClick={requireAuth(() => onSave(clip))}>
-          <span>{clip.savedByMe ? '🔖' : '📑'}</span>
+          <span><Icon name="bookmark" size={24} className={clip.savedByMe ? 'rb-icon--filled' : ''} /></span>
           <small>Salva</small>
         </button>
         <button type="button" className="rb-clip-action" onClick={share}>
-          <span>🔗</span>
+          <span><Icon name="link" size={24} /></span>
           <small>Condividi</small>
         </button>
         <button type="button" className="rb-clip-action" onClick={onToggleFullscreen}>
-          <span>{isFullscreen ? '⛶' : '⛶'}</span>
+          <span><Icon name={isFullscreen ? 'minimize' : 'maximize'} size={24} /></span>
           <small>{isFullscreen ? 'Esci' : 'A schermo intero'}</small>
         </button>
         {clip.isMine && (
           <button type="button" className="rb-clip-action" onClick={() => onDelete(clip)}>
-            <span>🗑️</span>
+            <span><Icon name="trash" size={24} /></span>
             <small>Elimina</small>
           </button>
         )}
@@ -208,7 +209,7 @@ function UploadForm({ user, onOpenAuth, onPublished, onCancel }) {
       <div className="rb-clip-upload-form" onClick={(e) => e.stopPropagation()}>
         <div className="rb-clip-upload-header">
           <strong>Nuova clip</strong>
-          <button type="button" onClick={onCancel} aria-label="Chiudi">✕</button>
+          <button type="button" onClick={onCancel} aria-label="Chiudi"><Icon name="close" size={18} /></button>
         </div>
         <p className="rb-clip-upload-note">Massimo {MAX_DURATION_SEC} secondi — viene tagliata e compressa automaticamente prima di essere caricata.</p>
         {!isCompressionSupported() && (
@@ -218,7 +219,9 @@ function UploadForm({ user, onOpenAuth, onPublished, onCancel }) {
         <input ref={fileInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={onFileChosen} />
 
         {!previewUrl ? (
-          <button type="button" className="rb-clip-upload-pick-btn" onClick={openPicker}>🎬 Scegli un video</button>
+          <button type="button" className="rb-clip-upload-pick-btn" onClick={openPicker}>
+            <Icon name="film" size={16} className="rb-icon--inline" /> Scegli un video
+          </button>
         ) : (
           <>
             <video className="rb-clip-upload-preview" src={previewUrl} controls />
@@ -229,7 +232,9 @@ function UploadForm({ user, onOpenAuth, onPublished, onCancel }) {
               onChange={(e) => setCaption(e.target.value)}
               maxLength={200}
             />
-            {error && <p className="rb-clip-upload-error">⚠️ {error}</p>}
+            {error && <p className="rb-clip-upload-error">
+            <Icon name="info" size={16} className="rb-icon--inline" /> {error}
+          </p>}
             <div className="rb-clip-upload-actions">
               <button type="button" onClick={onCancel}>Annulla</button>
               <button type="button" className="rb-clip-upload-publish" onClick={publish} disabled={processing}>
@@ -283,7 +288,7 @@ export default function MusicaClip({ user, onOpenAuth }) {
         </div>
       ) : clips.length === 0 ? (
         <div className="rb-clip-empty">
-          <EmptyState icon="🎬" title="Nessuna clip ancora" subtitle="Sii il primo a caricarne una." />
+          <EmptyState icon={<Icon name="film" size={30} />} title="Nessuna clip ancora" subtitle="Sii il primo a caricarne una." />
         </div>
       ) : (
         <ul className="rb-clip-feed">

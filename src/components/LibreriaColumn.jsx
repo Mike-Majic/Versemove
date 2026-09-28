@@ -8,6 +8,7 @@ import FreeBooksCatalog from './FreeBooksCatalog';
 import EmptyState from './EmptyState';
 import './CategoryColumn.css';
 import './LibreriaColumn.css';
+import Icon from './shared/Icon';
 
 // Variante di CategoryColumn solo per la Libreria: in più ha una scheda che
 // affianca ai libri pubblicati dalla community (dati finti, come tutto il
@@ -97,7 +98,7 @@ export default function LibreriaColumn({ category, initialSubfamily = '', locati
         ))}
       </div>
 
-      {results.length === 0 && <EmptyState icon="📚" title="Nessun risultato" subtitle="Prova un altro titolo, autore o filtro." />}
+      {results.length === 0 && <EmptyState icon={<Icon name="book" size={30} />} title="Nessun risultato" subtitle="Prova un altro titolo, autore o filtro." />}
       <ul className="rb-arte-results-list">
         {results.map((r) => (
           <li key={r.id} className="rb-arte-result-card">
@@ -145,7 +146,7 @@ export default function LibreriaColumn({ category, initialSubfamily = '', locati
     <>
       {!isDesktop && (
         <button className="rb-arte-mobile-back" onClick={() => setMobileView('primary')}>
-          ← Torna a {category.label}
+          <Icon name="back" size={16} className="rb-icon--inline" /> Torna a {category.label}
         </button>
       )}
       <div className="rb-arte-panel-header">
@@ -154,11 +155,11 @@ export default function LibreriaColumn({ category, initialSubfamily = '', locati
       </div>
 
       {!myCity && (
-        <EmptyState icon="📍" title="Imposta la tua città" subtitle='Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.' />
+        <EmptyState icon={<Icon name="pin" size={30} />} title="Imposta la tua città" subtitle='Nel filtro "Dove" di Impostazioni, per vedere chi è nelle vicinanze.' />
       )}
 
       {myCity && nearbyPeople.length === 0 && (
-        <EmptyState icon="👥" title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
+        <EmptyState icon={<Icon name="users" size={30} />} title="Nessuno nelle vicinanze" subtitle="Per ora, in questa categoria." />
       )}
 
       {myCity && nearbyPeople.length > 0 && (

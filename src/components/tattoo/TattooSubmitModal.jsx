@@ -9,6 +9,7 @@ import './tattoo.css';
 // rb-deal-duplicate-*...): stesso linguaggio visivo di form/conferma, non
 // duplicato qui.
 import '../vetrina/vetrinaOfferte.css';
+import Icon from '../shared/Icon';
 
 const STILE_OPTIONS = STILI_TATUAGGIO.map((s) => ({ value: s, label: s }));
 const PARTE_OPTIONS = PARTI_CORPO.map((p) => ({ value: p, label: p }));
@@ -88,7 +89,7 @@ function StudioLocationPicker({ lat, lng, onPick }) {
       <div className="rb-tattoo-picker-canvas" ref={mapElRef} />
       {ready && (
         <button type="button" className="rb-tattoo-picker-locate" onClick={useMyLocation}>
-          📍 Usa lo studio dove sono ora
+          <Icon name="pin" size={16} className="rb-icon--inline" /> Usa lo studio dove sono ora
         </button>
       )}
       <p className="rb-deal-submit-hint">Tocca la mappa per segnare dove si trova lo studio (si può trascinare per aggiustare).</p>
@@ -218,7 +219,9 @@ export default function TattooSubmitModal({ onClose, onPublished }) {
   return (
     <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-deal-submit-card rb-tattoo-submit-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">
+          <Icon name="close" size={18} />
+        </button>
         <h3>Pubblica un tatuaggio</h3>
 
         {step === 'luogo' && (
@@ -307,7 +310,7 @@ export default function TattooSubmitModal({ onClose, onPublished }) {
               <span>Il tuo voto a questo lavoro</span>
               <CustomSelect
                 value={String(voto)}
-                options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} ★` }))}
+                options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n === 1 ? '1 stella' : `${n} stelle` }))}
                 onChange={(v) => setVoto(Number(v))}
                 ariaLabel="Voto"
               />

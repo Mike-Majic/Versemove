@@ -8,6 +8,7 @@ import Skeleton from '../../Skeleton';
 import CosplayEventCard from './CosplayEventCard';
 import CosplayEventsMap from './CosplayEventsMap';
 import ProposeEventForm from './ProposeEventForm';
+import Icon from '../../shared/Icon';
 
 // Scheda Eventi: RPC eventi_vicini con la città del filtro "Dove"
 // (Impostazioni → Luogo) e la sua distanza, oppure tutto il mondo. In alto
@@ -163,11 +164,11 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       <div className="rb-cev-where-bar">
         <button type="button" className="rb-cev-where-btn" onClick={openDove} title="Cambia città e distanza">
           {canNearby && nearby ? (
-            <>📍 {locationFilters.city} · entro {locationFilters.distance} km</>
+            <><Icon name="pin" size={14} className="rb-icon--inline" /> {locationFilters.city} · entro {locationFilters.distance} km</>
           ) : hasCoords ? (
-            <>🌍 Tutto il mondo · <u>{locationFilters.city}</u></>
+            <><Icon name="globe" size={14} className="rb-icon--inline" /> Tutto il mondo · <u>{locationFilters.city}</u></>
           ) : (
-            <>🌍 Tutto il mondo · <u>Imposta la tua città</u></>
+            <><Icon name="globe" size={14} className="rb-icon--inline" /> Tutto il mondo · <u>Imposta la tua città</u></>
           )}
         </button>
         <div className="rb-cev-toggle" role="group" aria-label="Zona">
@@ -222,7 +223,7 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       {notice && (
         <p className="rb-vroom-notice" role="status">
           {notice}
-          <button type="button" onClick={() => setNotice('')} aria-label="Chiudi avviso">✕</button>
+          <button type="button" onClick={() => setNotice('')} aria-label="Chiudi avviso"><Icon name="close" size={15} /></button>
         </p>
       )}
       {error && <p className="rb-gaming-error" role="alert">{error}</p>}
@@ -230,8 +231,8 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       {shared !== undefined && (
         <section className="rb-cev-section rb-cev-shared">
           <div className="rb-gaming-section-title">
-            🔗 Evento condiviso
-            <button type="button" className="rb-cev-shared-close" onClick={() => setShared(undefined)} aria-label="Nascondi evento condiviso">✕</button>
+            <Icon name="link" size={16} className="rb-icon--inline" /> Evento condiviso
+            <button type="button" className="rb-cev-shared-close" onClick={() => setShared(undefined)} aria-label="Nascondi evento condiviso"><Icon name="close" size={15} /></button>
           </div>
           {shared ? (
             <ul className="rb-cev-list">{renderCards([shared])}</ul>
@@ -247,7 +248,7 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
         <CosplayEventsMap events={list} center={center} types={types} />
       ) : list.length === 0 ? (
         <EmptyState
-          icon={emptyIcon}
+          icon={typeof emptyIcon === 'string' && /^[a-z]+$/i.test(emptyIcon) ? <Icon name={emptyIcon} size={30} /> : emptyIcon}
           title={periodo === 'passati' ? 'Nessun evento passato' : nearby && canNearby ? `Nessun evento entro ${locationFilters.distance} km` : 'Nessun evento in programma'}
           subtitle={nearby && canNearby ? 'Prova "Tutto il mondo" o allarga la distanza in Impostazioni.' : canPropose ? 'Proponi tu il primo.' : 'Ne arrivano di nuovi ogni giorno.'}
         />
@@ -255,12 +256,18 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
         <>
           {inCorso.length > 0 && (
             <section className="rb-cev-section">
-              <div className="rb-gaming-section-title">🔴 In corso ora</div>
+              <div className="rb-gaming-section-title">
+              <Icon name="broadcast" size={16} className="rb-icon--inline" /> In corso ora
+            </div>
               <ul className="rb-cev-list">{renderCards(inCorso)}</ul>
             </section>
           )}
           <section className="rb-cev-section">
-            {periodo === 'prossimi' && <div className="rb-gaming-section-title">📅 In arrivo</div>}
+            {periodo === 'prossimi' && (
+            <div className="rb-gaming-section-title">
+              <Icon name="calendar" size={16} className="rb-icon--inline" /> In arrivo
+            </div>
+          )}
             {inArrivo.length === 0 ? <p className="rb-gaming-note">Niente altro in arrivo.</p> : <ul className="rb-cev-list">{renderCards(inArrivo)}</ul>}
           </section>
           {hasMore && <div ref={sentinelRef} className="rb-cev-sentinel">{loadingMore ? 'Carico altri eventi…' : ''}</div>}

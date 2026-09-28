@@ -8,6 +8,8 @@
 // pannello di scelta emoji.
 //
 // Uso: <Icon name="bell" /> oppure <Icon name="camera" size={20} />
+// Dove serve una stringa HTML (pin e popup delle mappe Leaflet):
+// iconHtml('pin', 16) da shared/iconHtml.jsx.
 
 const PATHS = {
   smile: (
@@ -317,6 +319,69 @@ const PATHS = {
       <path d="M4.5 15v3.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V15" />
     </>
   ),
+  pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
+  stop: <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />,
+  skipBack: (
+    <>
+      <path d="M17.5 6v12l-8.5-6z" />
+      <path d="M6.5 6v12" />
+    </>
+  ),
+  skipForward: (
+    <>
+      <path d="M6.5 6v12l8.5-6z" />
+      <path d="M17.5 6v12" />
+    </>
+  ),
+  list: <path d="M8.5 7h11M8.5 12h11M8.5 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01" />,
+  radio: (
+    <>
+      <rect x="3.5" y="8" width="17" height="11.5" rx="2" />
+      <path d="M7 8l9.5-4" />
+      <circle cx="15.5" cy="13.7" r="2.6" />
+      <path d="M7 12h3.5M7 15.5h3.5" />
+    </>
+  ),
+  scissors: (
+    <>
+      <circle cx="6.5" cy="7" r="2.5" />
+      <circle cx="6.5" cy="17" r="2.5" />
+      <path d="M8.6 8.4 19.5 17M8.6 15.6 19.5 7" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="M4 11 12 4.5l8 6.5" />
+      <path d="M6 9.5V19.5h12V9.5" />
+      <path d="M10 19.5v-5h4v5" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5z" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  folder: <path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 19.5H5A1.5 1.5 0 0 1 3.5 18z" />,
+  disc: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="2.2" />
+      <path d="M12 6.5a5.5 5.5 0 0 0-5.5 5.5" />
+    </>
+  ),
+  trending: (
+    <>
+      <path d="M3.5 17l6-6 4 4 7-7.5" />
+      <path d="M15 7.5h5.5V13" />
+    </>
+  ),
   chevronDown: <path d="M6.5 9.5 12 15l5.5-5.5" />,
   chevronUp: <path d="M6.5 14.5 12 9l5.5 5.5" />,
 };
@@ -343,3 +408,4 @@ export default function Icon({ name, size = 19, strokeWidth = 1.8, className = '
     </svg>
   );
 }
+

@@ -7,6 +7,7 @@ import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import CustomSelect from '../shared/CustomSelect';
 import './tattoo.css';
+import Icon from '../shared/Icon';
 
 const STILE_OPTIONS = [{ value: '', label: 'Tutti gli stili' }, ...STILI_TATUAGGIO.map((s) => ({ value: s, label: s }))];
 const PARTE_OPTIONS = [{ value: '', label: 'Tutto il corpo' }, ...PARTI_CORPO.map((p) => ({ value: p, label: p }))];
@@ -17,8 +18,8 @@ const COLORE_OPTIONS = [
 ];
 const VOTO_OPTIONS = [
   { value: '', label: 'Qualsiasi voto' },
-  { value: '3', label: '★3 e più' },
-  { value: '4', label: '★4 e più' },
+  { value: '3', label: '3 stelle e più' },
+  { value: '4', label: '4 stelle e più' },
 ];
 const ORDER_OPTIONS = [
   { value: 'recenti', label: 'Più recenti' },
@@ -56,7 +57,9 @@ export default function TattooFeed({ user, onOpenAuth }) {
     <div className="rb-tattoo-feed" style={{ '--accent': '#1d9bf0' }}>
       <div className="rb-tattoo-header">
         <div>
-          <h3>🖋️ Tattoo</h3>
+          <h3>
+            <Icon name="pen" size={18} className="rb-icon--inline" /> Tattoo
+          </h3>
           <p>Foto di tatuaggi condivise dalla community, con studio e voto — segnala mai foto con volti altrui senza consenso.</p>
         </div>
         <button type="button" className="rb-btn-primary" onClick={() => (user ? setSubmitOpen(true) : onOpenAuth?.())}>
@@ -85,7 +88,7 @@ export default function TattooFeed({ user, onOpenAuth }) {
         </ul>
       ) : posts.length === 0 ? (
         <EmptyState
-          icon="🖋️"
+          icon={<Icon name="pen" size={30} />}
           title="Ancora nessun tatuaggio qui"
           subtitle="Sii il primo a pubblicarne uno, oppure allarga i filtri."
           actions={user ? [{ label: 'Pubblica un tatuaggio', onClick: () => setSubmitOpen(true), primary: true }] : []}

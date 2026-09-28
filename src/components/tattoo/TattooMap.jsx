@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { pointsInBbox } from '../../data/tattoo';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
+import { iconHtml } from '../shared/iconHtml';
+import Icon from '../shared/Icon';
 
 const ITALY_CENTER = [42.3, 12.6];
 const ITALY_ZOOM = 6;
@@ -10,7 +12,7 @@ const MOVE_DEBOUNCE_MS = 350;
 function pointIconHtml(point) {
   const thumb = point.miniaturaUrl
     ? `<img src="${point.miniaturaUrl}" alt="" />`
-    : '<span class="rb-tattoomap-pin-empty">🖋️</span>';
+    : `<span class="rb-tattoomap-pin-empty">${iconHtml('pen', 16)}</span>`;
   return `<div class="rb-tattoomap-pin">${thumb}<span class="rb-tattoomap-pin-count">${point.nFoto}</span></div>`;
 }
 
@@ -124,7 +126,7 @@ export default function TattooMap({ onSelectPoint, stile, parteCorpo, colore }) 
   return (
     <div className="rb-tattoomap-viewport">
       {loadError ? (
-        <EmptyState icon="🖋️" title="Mappa non disponibile" subtitle="Controlla la connessione e riprova." />
+        <EmptyState icon={<Icon name="pen" size={30} />} title="Mappa non disponibile" subtitle="Controlla la connessione e riprova." />
       ) : !ready ? (
         <div className="rb-tattoomap-loading">
           <Skeleton height="100%" width="100%" />

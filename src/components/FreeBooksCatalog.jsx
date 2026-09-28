@@ -3,6 +3,7 @@ import { searchFreeBooks } from '../data/freeBooksApi';
 import EmptyState from './EmptyState';
 import Skeleton from './Skeleton';
 import './FreeBooksCatalog.css';
+import Icon from './shared/Icon';
 
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'Rilevanza' },
@@ -153,7 +154,7 @@ export default function FreeBooksCatalog() {
         <div className="rb-freebooks-reader-bar">
           <strong>{reading.title}</strong>
           <button type="button" className="rb-freebooks-reader-close" onClick={() => setReading(null)}>
-            ✕ Chiudi
+            <Icon name="close" size={16} className="rb-icon--inline" /> Chiudi
           </button>
         </div>
         <iframe
@@ -169,7 +170,7 @@ export default function FreeBooksCatalog() {
   return (
     <div className="rb-freebooks">
       <p className="rb-freebooks-note">
-        🌍 Catalogo mondiale delle opere libere da diritti (Internet Archive), milioni di titoli scansionati — cerca per titolo o autore. Si legge qui dentro, senza uscire da Versemove.
+        <Icon name="globe" size={16} className="rb-icon--inline" /> Catalogo mondiale delle opere libere da diritti (Internet Archive), milioni di titoli scansionati — cerca per titolo o autore. Si legge qui dentro, senza uscire da Versemove.
       </p>
 
       <div className="rb-freebooks-search-row">
@@ -224,9 +225,9 @@ export default function FreeBooksCatalog() {
           <Skeleton lines={2} />
         </div>
       )}
-      {error && <EmptyState icon="⚠️" title="Catalogo non raggiungibile" subtitle={error} />}
+      {error && <EmptyState icon={<Icon name="info" size={30} />} title="Catalogo non raggiungibile" subtitle={error} />}
       {!loading && !error && searched && books.length === 0 && (
-        <EmptyState icon="📖" title="Nessun libro trovato" subtitle="Prova un altro titolo o autore." />
+        <EmptyState icon={<Icon name="book" size={30} />} title="Nessun libro trovato" subtitle="Prova un altro titolo o autore." />
       )}
       {!loading && !error && count !== null && books.length > 0 && (
         <p className="rb-freebooks-count">{count} {count === 1 ? 'risultato leggibile subito' : 'risultati leggibili subito'}</p>
