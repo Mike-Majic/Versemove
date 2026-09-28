@@ -14,7 +14,8 @@ import { safeFileName } from './storagePath';
 // timestamptz): dopo la mezzanotte del giorno dell'evento non deve più
 // comparire, né sul globo né in colonna.
 export function isEventExpired(event) {
-  const d = new Date(event.dataEvento);
+  // Eventi di più giorni (fiere, sagre del bot): contano fino all'ultimo.
+  const d = new Date(event.dataFine ?? event.dataEvento);
   const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
   return Date.now() > endOfDay.getTime();
 }
@@ -23,12 +24,19 @@ function mapEvent(row, attendeeIds, likers, myId) {
   return {
     id: row.id,
     autoreId: row.autore_id,
-    author: row.author ?? { id: row.autore_id, name: 'Utente', avatar: '' },
+    // Gli eventi trovati dal bot (fonte 'bot') non li ha scritti una persona.
+    author:
+      row.fonte === 'bot'
+        ? { id: row.autore_id, name: 'Eventi Versemove', avatar: '' }
+        : row.author ?? { id: row.autore_id, name: 'Utente', avatar: '' },
+    fonte: row.fonte ?? 'utente',
+    urlUfficiale: row.url_ufficiale ?? null,
     titolo: row.titolo,
     citta: row.citta,
     lat: row.lat,
     lng: row.lng,
     dataEvento: row.data_evento,
+    dataFine: row.data_fine ?? null,
     bio: row.descrizione ?? '',
     fotoUrl: row.foto_url ?? null,
     createdAt: row.created_at,

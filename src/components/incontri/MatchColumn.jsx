@@ -18,6 +18,10 @@ import {
 } from '../../data/incontri';
 import './MatchColumn.css';
 import AvatarImg from '../shared/AvatarImg';
+import SponsorCard from '../ads/SponsorCard';
+
+const MATCH_AD_EVERY = 5;
+const MATCH_VOTES_KEY = 'rb-match-votes';
 
 const RIGHT_TABS = [
   { id: 'likesYou', label: 'A chi piaci' },
@@ -203,6 +207,22 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
 
   const current = deck[0] ?? null;
 
+  // Una pubblicità ogni MATCH_AD_EVERY voti (richiesta di Mike): il
+  // conteggio resta anche chiudendo e riaprendo Match (localStorage, solo
+  // su questo dispositivo); al 5°, 10°... voto al posto del profilo
+  // successivo compare la card pubblicitaria con "Continua".
+  const [adPending, setAdPending] = useState(false);
+  const countVote = () => {
+    let n = 0;
+    try {
+      n = (Number(localStorage.getItem(MATCH_VOTES_KEY)) || 0) + 1;
+      localStorage.setItem(MATCH_VOTES_KEY, String(n));
+    } catch {
+      n = 0;
+    }
+    if (n > 0 && n % MATCH_AD_EVERY === 0) setAdPending(true);
+  };
+
   const decide = (outcome) => {
     if (!user) {
       onOpenAuth();
@@ -220,6 +240,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
         return;
       }
       setDeck((prev) => prev.filter((p) => p.id !== current.id));
+      countVote();
       if (matched) {
         justMatchedIds.current.add(current.id);
         triggerMatchToast(current);
@@ -308,6 +329,12 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
         <p className="rb-match-empty">{eligibilityMessage ?? 'Accedi per scoprire nuovi profili.'}</p>
       ) : deckLoading ? (
         <p className="rb-match-empty">Caricamento...</p>
+      ) : adPending ? (
+        <SponsorCard mondo="incontri" categoria="match" formato="card_feed" fallbackDeal className="rb-match-ad" onEmpty={() => setAdPending(false)}>
+          <button type="button" className="rb-match-ad-continue" onClick={() => setAdPending(false)}>
+            Continua con i profili
+          </button>
+        </SponsorCard>
       ) : current ? (
         <div className={`rb-match-card ${swiping ? `leaving-${swiping.direction}` : ''}`}>
           <button
@@ -334,7 +361,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
           subtitle="Prova ad allargare la ricerca dalle Impostazioni → Luogo e Mostrami."
         />
       )}
-      {eligible && current && (
+      {eligible && current && !adPending && (
         <div className="rb-match-actions">
           <button type="button" className="rb-match-pass-btn" onClick={() => decide('passed')} disabled={!!swiping}>✕ Passa</button>
           <button type="button" className="rb-match-super-btn" onClick={() => decide('super')} disabled={!!swiping}>⭐ Super Like</button>

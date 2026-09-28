@@ -18,6 +18,39 @@ function mapSponsorship(row) {
     url: row.url,
     inserzionista: row.inserzionista,
     formato: row.formato,
+    video: row.video ?? null,
+  };
+}
+
+// Riempitivo quando nessun inserzionista ha una campagna attiva per quel
+// punto: un'offerta vera del mondo Vetrina trovata dal bot (deals-bot,
+// fonte 'feed', link affiliato quando c'è il tag Amazon). Stessa forma di
+// una campagna, con `offerta: true` (niente contatori sponsorships).
+export async function getHouseDeal() {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('vetrina_deals')
+    .select('id, titolo, negozio, descrizione, url, immagine, prezzo, prezzo_originale, sconto_pct')
+    .eq('fonte', 'feed')
+    .eq('stato', 'attiva')
+    .not('immagine', 'is', null)
+    .or(`scade_il.is.null,scade_il.gt.${nowIso}`)
+    .order('updated_at', { ascending: false })
+    .limit(40);
+  if (error || !data?.length) return null;
+  const d = data[Math.floor(Math.random() * data.length)];
+  const prezzo = d.prezzo != null ? `${Number(d.prezzo).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}` : '';
+  const sconto = d.sconto_pct ? ` (-${d.sconto_pct}%)` : '';
+  return {
+    id: d.id,
+    offerta: true,
+    titolo: d.titolo,
+    testo: [prezzo && `${prezzo}${sconto}`, d.descrizione].filter(Boolean).join(' · '),
+    immagine: d.immagine,
+    url: d.url,
+    inserzionista: d.negozio,
+    formato: 'card_feed',
+    video: null,
   };
 }
 
@@ -65,6 +98,8 @@ function mapSponsorshipAdmin(row) {
     citta: row.citta ?? '',
     raggioKm: row.raggio_km ?? '',
     soloMaggiorenni: row.solo_maggiorenni,
+    video: row.video ?? '',
+    adattoBambini: Boolean(row.adatto_bambini),
     peso: row.peso,
     inizio: row.inizio,
     fine: row.fine,
@@ -87,7 +122,7 @@ export async function listAllSponsorships() {
 // CHECK del database (titolo/url/inserzionista ecc.).
 function cleanFields(fields) {
   const out = { ...fields };
-  ['categoria', 'testo', 'immagine', 'citta', 'fine'].forEach((k) => {
+  ['categoria', 'testo', 'immagine', 'citta', 'fine', 'video'].forEach((k) => {
     if (out[k] === '') out[k] = null;
   });
   if (out.raggio_km === '' || out.raggio_km === null) out.raggio_km = null;

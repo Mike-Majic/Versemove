@@ -1,0 +1,139 @@
+.rb-adbreak {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 320px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #0d0d16;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f5f5f7;
+  overflow: hidden;
+}
+
+.rb-adbreak-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rb-adbreak-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rb-adbreak-who {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-adbreak-skip {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-adbreak-skip:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.rb-adbreak-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+.rb-adbreak-stage video {
+  width: 100%;
+  max-height: 60vh;
+  border-radius: 12px;
+  background: #000;
+  cursor: pointer;
+}
+
+.rb-adbreak-deal,
+.rb-adbreak-promo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.rb-adbreak-deal img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.rb-adbreak-deal em {
+  font-style: normal;
+  font-weight: 700;
+  color: #ffc83d;
+}
+
+.rb-adbreak-promo {
+  background: linear-gradient(135deg, #ff7eb3, #7c5cff 55%, #2fb6ff);
+  color: #fff;
+  padding: 26px 22px;
+}
+
+.rb-adbreak-promo-icon {
+  font-size: 54px;
+  animation: rb-adbreak-bounce 1.6s ease-in-out infinite;
+}
+
+@keyframes rb-adbreak-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-adbreak-promo-icon { animation: none; }
+}
+
+.rb-adbreak-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.rb-adbreak-bar::after {
+  content: '';
+  display: block;
+  width: var(--p, 0%);
+  height: 100%;
+  background: #ffc83d;
+  transition: width 1s linear;
+}

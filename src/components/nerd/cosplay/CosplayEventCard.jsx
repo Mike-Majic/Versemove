@@ -24,7 +24,7 @@ export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor
         <div className="rb-cev-badges">
           {event.inCorso && <span className="rb-cev-live">LIVE</span>}
           <span className="rb-cev-type">
-            {type.iconName ? <Icon name="{type.iconName}" size={16} className="rb-icon--inline" /> : type.icon} {type.label}
+            {type.iconName ? <Icon name={type.iconName} size={16} className="rb-icon--inline" /> : type.icon} {type.label}
           </span>
           {event.fonte === 'curato' && <span className="rb-cev-verified" title="Evento verificato dalla redazione">
               <Icon name="check" size={14} className="rb-icon--inline" /> Verificato

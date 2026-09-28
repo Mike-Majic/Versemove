@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getSponsorships, trackSponsorship } from '../../data/sponsorships';
+import { getHouseDeal, getSponsorships, trackSponsorship } from '../../data/sponsorships';
 import './SponsorCard.css';
 
 // Spazio sponsorizzato in uno dei 3 formati richiesti (vedi App.jsx/i punti
@@ -12,28 +12,40 @@ import './SponsorCard.css';
 //
 // mondo/categoria sono i filtri per get_sponsorships; citta è facoltativa
 // (solo dove ha senso, es. Annunci). Se non arriva nessuna campagna il
-// componente non renderizza nulla (niente spazio vuoto lasciato apposta).
-export default function SponsorCard({ mondo, categoria = null, formato, citta = null, as: Tag = 'div', className = '' }) {
+// componente non renderizza nulla (niente spazio vuoto lasciato apposta),
+// a meno di fallbackDeal: allora al posto della campagna compare
+// un'offerta del mondo Vetrina trovata dal bot (etichetta "Offerta").
+export default function SponsorCard({ mondo, categoria = null, formato, citta = null, as: Tag = 'div', className = '', fallbackDeal = false, children = null, onEmpty }) {
   const [sponsor, setSponsor] = useState(undefined); // undefined = ancora in caricamento, null = nessuna campagna
   const trackedViewRef = useRef(false);
+  const onEmptyRef = useRef(onEmpty);
+  useEffect(() => {
+    onEmptyRef.current = onEmpty;
+  }, [onEmpty]);
   const elRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     setSponsor(undefined);
-    getSponsorships({ mondo, categoria, formato, citta, limit: 1 }).then((list) => {
-      if (!cancelled) setSponsor(list[0] ?? null);
-    });
+    getSponsorships({ mondo, categoria, formato, citta, limit: 1 })
+      .then(async (list) => list[0] ?? (fallbackDeal ? await getHouseDeal() : null))
+      .then((found) => {
+        if (cancelled) return;
+        setSponsor(found ?? null);
+        // Nessuna campagna né offerta: chi aspetta la pubblicità (Match,
+        // giochi) va avanti da solo.
+        if (!found) onEmptyRef.current?.();
+      });
     return () => {
       cancelled = true;
     };
-  }, [mondo, categoria, formato, citta]);
+  }, [mondo, categoria, formato, citta, fallbackDeal]);
 
   // Conta una visualizzazione solo quando la card è DAVVERO visibile (almeno
   // metà, per almeno un secondo) — non al semplice rendering, che
   // conterebbe anche una card mai scrollata in vista.
   useEffect(() => {
-    if (!sponsor || trackedViewRef.current) return undefined;
+    if (!sponsor || sponsor.offerta || trackedViewRef.current) return undefined;
     const el = elRef.current;
     if (!el) return undefined;
     let timer = null;
@@ -62,7 +74,9 @@ export default function SponsorCard({ mondo, categoria = null, formato, citta = 
 
   if (!sponsor) return null;
 
-  const handleClick = () => trackSponsorship(sponsor.id, 'click');
+  const handleClick = () => {
+    if (!sponsor.offerta) trackSponsorship(sponsor.id, 'click');
+  };
 
   return (
     <Tag ref={elRef} className={`rb-sponsor-card rb-sponsor-${formato} ${className}`}>
@@ -74,7 +88,7 @@ export default function SponsorCard({ mondo, categoria = null, formato, citta = 
         onClick={handleClick}
       >
         <div className="rb-sponsor-label">
-          <span className="rb-sponsor-badge">Sponsorizzato</span>
+          <span className="rb-sponsor-badge">{sponsor.offerta ? 'Offerta' : 'Sponsorizzato'}</span>
           <span className="rb-sponsor-advertiser">{sponsor.inserzionista}</span>
         </div>
         {sponsor.immagine && (
@@ -87,6 +101,7 @@ export default function SponsorCard({ mondo, categoria = null, formato, citta = 
           {sponsor.testo && <p className="rb-sponsor-text">{sponsor.testo}</p>}
         </div>
       </a>
+      {children}
     </Tag>
   );
 }

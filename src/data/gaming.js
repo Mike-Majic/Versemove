@@ -31,6 +31,7 @@ export const GAMING_TABS = [
   { id: 'giochi', label: 'Giochi' },
   { id: 'clip', label: 'Clip' },
   { id: 'community', label: 'Community' },
+  { id: 'eventi', label: 'Eventi' },
 ];
 export const PLATFORM_TAB = {
   pc: { id: 'build', label: 'Build', tag: 'build' },

@@ -32,8 +32,8 @@ const ADMIN_TABS = [
   { id: 'log', label: 'Log azioni' },
 ];
 
-const SPONSOR_MONDI = ['social', 'vetrina', 'annunci', 'arte', 'nerd', 'lavoro', 'incontri'];
-const SPONSOR_FORMATI = ['card_feed', 'banner_pannello', 'riga_lista'];
+const SPONSOR_MONDI = ['social', 'vetrina', 'annunci', 'arte', 'nerd', 'lavoro', 'incontri', 'bambini'];
+const SPONSOR_FORMATI = ['card_feed', 'banner_pannello', 'riga_lista', 'video'];
 const SPONSOR_STATI = ['bozza', 'attiva', 'sospesa', 'conclusa'];
 const SPONSOR_STATO_LABELS = { bozza: 'Bozza', attiva: 'Attiva', sospesa: 'Sospesa', conclusa: 'Conclusa' };
 
@@ -64,13 +64,15 @@ function SponsorshipForm({ initial, onCancel, onSave }) {
   const [citta, setCitta] = useState(initial?.citta ?? '');
   const [raggioKm, setRaggioKm] = useState(initial?.raggioKm ?? '');
   const [soloMaggiorenni, setSoloMaggiorenni] = useState(initial?.soloMaggiorenni ?? false);
+  const [video, setVideo] = useState(initial?.video ?? '');
+  const [adattoBambini, setAdattoBambini] = useState(initial?.adattoBambini ?? false);
   const [peso, setPeso] = useState(initial?.peso ?? 1);
   const [inizio, setInizio] = useState(toDatetimeLocal(initial?.inizio) || toDatetimeLocal(new Date().toISOString()));
   const [fine, setFine] = useState(toDatetimeLocal(initial?.fine));
   const [stato, setStato] = useState(initial?.stato ?? 'attiva');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  useFormDirty({ mondo, categoria, formato, titolo, testo, immagine, url, inserzionista, citta, raggioKm, soloMaggiorenni, peso, inizio, fine, stato });
+  useFormDirty({ mondo, categoria, formato, titolo, testo, immagine, url, inserzionista, citta, raggioKm, soloMaggiorenni, peso, inizio, fine, stato, video, adattoBambini });
 
   const submit = async (e) => {
     e.preventDefault();
@@ -87,7 +89,9 @@ function SponsorshipForm({ initial, onCancel, onSave }) {
       inserzionista: inserzionista.trim(),
       citta: citta.trim(),
       raggio_km: raggioKm,
-      solo_maggiorenni: soloMaggiorenni,
+      solo_maggiorenni: mondo === 'bambini' ? false : soloMaggiorenni,
+      video: video.trim(),
+      adatto_bambini: mondo === 'bambini' ? true : adattoBambini,
       peso,
       inizio: fromDatetimeLocal(inizio),
       fine: fromDatetimeLocal(fine),
@@ -143,6 +147,12 @@ function SponsorshipForm({ initial, onCancel, onSave }) {
         <span>Immagine (URL, facoltativa)</span>
         <input type="text" value={immagine} onChange={(e) => setImmagine(e.target.value)} placeholder="https://..." />
       </label>
+      {formato === 'video' && (
+        <label className="rb-field">
+          <span>Video (URL https di un file .mp4, mostrato fra una partita e l'altra dei giochi)</span>
+          <input type="text" value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://.../spot.mp4" required />
+        </label>
+      )}
       <label className="rb-field">
         <span>Link di destinazione</span>
         <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." required />
@@ -167,7 +177,11 @@ function SponsorshipForm({ initial, onCancel, onSave }) {
         </label>
         <label className="rb-field rb-admin-sponsor-checkbox">
           <span>Solo maggiorenni</span>
-          <input type="checkbox" checked={soloMaggiorenni} onChange={(e) => setSoloMaggiorenni(e.target.checked)} />
+          <input type="checkbox" checked={soloMaggiorenni} disabled={mondo === 'bambini'} onChange={(e) => setSoloMaggiorenni(e.target.checked)} />
+        </label>
+        <label className="rb-field rb-admin-sponsor-checkbox" title="Solo queste campagne possono comparire nel mondo Bambini">
+          <span>Adatta ai bambini</span>
+          <input type="checkbox" checked={mondo === 'bambini' || adattoBambini} disabled={mondo === 'bambini'} onChange={(e) => setAdattoBambini(e.target.checked)} />
         </label>
       </div>
 

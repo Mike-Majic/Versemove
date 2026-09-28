@@ -123,7 +123,7 @@ export default function ArteExplorer({
           ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (
             // Gaming PC / PS / Xbox: una sola colonna, la piattaforma della
             // categoria fa da contesto (vedi nerd/gaming/GamingColumn.jsx).
-            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} />
+            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} locationFilters={locationFilters} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : world.id === 'nerd' && category.id === 'streaming' ? (
@@ -137,7 +137,7 @@ export default function ArteExplorer({
           ) : world.id === 'arte' && category.id === 'dirette' ? (
             // In diretta (Intrattenimento): link di dirette YouTube e TikTok.
             <LiveWorldPanel key={category.id} mondo="arte" standalone title="In diretta" user={user} onOpenAuth={onOpenAuth} />
-          ) : world.id === 'arte' && category.id === 'teatro' ? (
+          ) : world.id === 'arte' && ['teatro', 'arti-visive', 'live'].includes(category.id) ? (
             // Teatro: eventi come in Cosplay (lista/mappa, città + km,
             // periodo, tipo) più la scheda Community di prima.
             <TeatroColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} locationFilters={locationFilters} />

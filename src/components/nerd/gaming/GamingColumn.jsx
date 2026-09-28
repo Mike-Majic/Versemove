@@ -4,6 +4,9 @@ import { useCalls } from '../../../calls/CallProvider';
 import GiochiTab from './GiochiTab';
 import LfgTab from './LfgTab';
 import GamingFeed from './GamingFeed';
+import CosplayEventsTab from '../cosplay/CosplayEventsTab';
+import { GAMING_EVENTS_CONFIG } from '../../../data/teatroEvents';
+import '../cosplay/cosplay.css';
 import '../videoRooms.css';
 import './gaming.css';
 
@@ -15,7 +18,7 @@ import './gaming.css';
 // piattaforma (Build / Trofei / Game Pass; Nintendo non ne ha).
 // focus: { lfgId, seq } da una notifica di "Cerco compagni": apre quella
 // scheda con l'annuncio evidenziato.
-export default function GamingColumn({ category, user, onOpenAuth, focus = null }) {
+export default function GamingColumn({ category, user, onOpenAuth, focus = null, locationFilters }) {
   const platform = PLATFORM_BY_CATEGORY[category.id];
   const platformTab = PLATFORM_TAB[platform] ?? null;
   const tabs = [...GAMING_TABS, ...(platformTab ? [platformTab] : [])];
@@ -89,6 +92,12 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
         )}
         {tab === 'clip' && <GamingFeed key="clip" category={category} platform={platform} tag="clip" user={user} onOpenAuth={onOpenAuth} layout="grid" />}
         {tab === 'community' && <GamingFeed key="community" category={category} platform={platform} tag="discussione" user={user} onOpenAuth={onOpenAuth} />}
+        {tab === 'eventi' && (
+          // Fiere, tornei e raduni del videogioco, aggiornati ogni giorno dal bot.
+          <div className="rb-cosplay-panel">
+            <CosplayEventsTab user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} config={GAMING_EVENTS_CONFIG} />
+          </div>
+        )}
         {platformTab && tab === platformTab.id && (
           <GamingFeed key={platformTab.tag} category={category} platform={platform} tag={platformTab.tag} user={user} onOpenAuth={onOpenAuth} />
         )}

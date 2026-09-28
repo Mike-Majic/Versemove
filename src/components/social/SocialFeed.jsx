@@ -49,7 +49,7 @@ import './SocialFeed.css';
 const TRENDING_EVERY = 3;
 
 // Una card sponsorizzata ogni 8 post del feed, mai la prima — richiesta esplicita.
-const SPONSOR_FEED_EVERY = 8;
+const SPONSOR_FEED_EVERY = 7;
 
 // Un post è "della zona" se il suo autore ha una città nel Profilo Social
 // (public_profiles.citta_social, in author.citta) che rispetta i filtri
@@ -856,11 +856,11 @@ export default function SocialFeed({
                   onToggleSave={toggleSavePost}
                   onOpenGroup={openGroup}
                 />
-                {/* Una card sponsorizzata ogni 8 post, mai la prima (richiesta
+                {/* Una pubblicità ogni 7 post, mai la prima (richiesta
                     esplicita): SPONSOR_FEED_EVERY posti dopo l'inizio, poi si
                     ripete. */}
                 {(i + 1) % SPONSOR_FEED_EVERY === 0 && (
-                  <SponsorCard as="li" mondo="social" formato="card_feed" />
+                  <SponsorCard as="li" mondo="social" formato="card_feed" fallbackDeal />
                 )}
               </Fragment>
             ))}
