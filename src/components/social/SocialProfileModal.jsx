@@ -23,6 +23,8 @@ import { fetchGamertagsMap } from '../../data/gaming';
 import GamertagChips from '../shared/GamertagChips';
 import './SocialProfileModal.css';
 import LoadMoreButton from '../shared/LoadMoreButton';
+import AvatarImg from '../shared/AvatarImg';
+import Icon from '../shared/Icon';
 
 const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
 const STATO_LABELS = {
@@ -147,7 +149,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
         ) : (
           <>
             <div className="rb-social-profile-head">
-              <img src={profile.avatar} alt={profile.name} />
+              <AvatarImg src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt={profile.name} />
               <div>
                 <strong>{profile.name}</strong>
                 {profile.citta && <span className="rb-social-profile-city">{profile.citta}</span>}
@@ -161,10 +163,10 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
               </button>
               {profile.nickname && (
                 <ShareLinkButton
-                  className="rb-social-profile-follow-btn"
+                  className="rb-social-profile-share-btn"
                   url={() => linkToProfile(profile.nickname)}
                   title={`${profile.name} su Versemove`}
-                  label="🔗"
+                  label={<Icon name="link" size={17} />}
                   copiedLabel="✓"
                   ariaLabel="Condividi il link del profilo"
                 />
@@ -198,7 +200,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
                 <ul className="rb-social-profile-family-list">
                   {family.map((f) => (
                     <li key={f.linkId}>
-                      <img src={f.other.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                      <AvatarImg src={f.other.avatar} name={f.other?.name || f.other?.nickname} seed={f.other?.id} alt="" />
                       <span>{f.other.name}</span>
                       <span className="rb-social-profile-family-relation">{familyRelationLabel(f.relazione)}</span>
                     </li>

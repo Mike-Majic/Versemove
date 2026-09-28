@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ModalOverlay from '../ModalOverlay';
 import '../EventLikersModal.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Generalizzazione di EventLikersModal per le reazioni culturali (Cinema,
 // Teatro, Arte, Live): stessa lista con "Messaggio"/"+ Amico" per ognuno,
@@ -37,7 +38,7 @@ export default function ReactorsModal({ title, subtitle, reactors, user, onOpenA
             const requested = !isMe && friendRequestsSent.includes(l.id);
             return (
               <li key={l.id} className="rb-event-likers-item">
-                <img src={l.avatar} alt="" />
+                <AvatarImg src={l.avatar} name={l?.name || l?.nickname} seed={l?.id} alt="" />
                 <strong>{isMe ? 'Tu' : l.name}</strong>
                 {!isMe && (
                   isFriend ? (

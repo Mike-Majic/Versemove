@@ -5,6 +5,7 @@ import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
+import AvatarImg from '../../shared/AvatarImg';
 
 // Il tavolo di gioco vero e proprio: legge lo stato pubblico della mano, la
 // propria mano privata e le prese, tutto rifatto ad ogni "tick" di eventi
@@ -228,7 +229,7 @@ function PlayerBadge({ entry, me = false, captureCount = 0 }) {
       {entry.isBot ? (
         <span className="rb-scopa-bot-avatar">🤖</span>
       ) : (
-        <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+        <AvatarImg src={entry.profilo.avatar} name={entry.profilo?.name || entry.profilo?.nickname} seed={entry.profilo?.id} alt="" />
       )}
       <div>
         <strong>{entry.profilo.name}{me ? ' (tu)' : ''}</strong>

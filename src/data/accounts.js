@@ -320,11 +320,10 @@ export async function registerAccount({
     return { needsEmailConfirmation: true };
   }
 
-  // Sessione subito attiva: l'avatar di default (nessun vero upload) e gli
-  // eventuali allegati caricati in registrazione si possono sistemare ora.
-  const avatar = `https://i.pravatar.cc/150?u=${encodeURIComponent(cleanEmail)}`;
-  await supabase.rpc('update_own_avatar', { p_avatar_url: avatar });
-
+  // Sessione subito attiva: gli eventuali allegati caricati in
+  // registrazione si possono sistemare ora. Nessuna foto profilo finta:
+  // finché la persona non ne carica una, l'app mostra l'iniziale del
+  // nickname (shared/AvatarImg.jsx), uguale in tutte le schede.
   let attachmentError = '';
   if (attachments?.length) {
     for (const att of attachments) {
@@ -498,9 +497,8 @@ export function profileCooldownRemaining(account) {
 // Foto profilo: carica nel bucket pubblico "content-media" già usato per i
 // contenuti (stesso percorso sotto il proprio uid, come richiedono le sue
 // policy di storage) e salva l'URL con la RPC già pronta lato server —
-// finora chiamata solo una volta, in automatico, con un avatar finto
-// (pravatar.cc) alla registrazione: qui è la prima volta che la persona può
-// davvero scegliere la propria foto.
+// qui la persona sceglie la propria foto (alla registrazione non se ne
+// assegna nessuna).
 export async function uploadAvatar(file) {
   try {
     const { data: auth } = await supabase.auth.getUser();

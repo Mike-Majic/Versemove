@@ -4,6 +4,7 @@ import Icon from './shared/Icon';
 import { isStaff } from '../data/roles';
 import { translateWorld } from '../i18n/worldLabels';
 import './TopBar.css';
+import AvatarImg from './shared/AvatarImg';
 
 export default function TopBar({
   world,
@@ -63,7 +64,7 @@ export default function TopBar({
               </button>
             )}
             <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title={t('topbar.myProfile')}>
-              <img src={user.avatar} alt={user.name} onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+              <AvatarImg src={user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.name} />
               <span>{user.name}</span>
               {user.verificato && <span className="rb-verified-badge" title={t('topbar.verified')}>✓</span>}
             </button>

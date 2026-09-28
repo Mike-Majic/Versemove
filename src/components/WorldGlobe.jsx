@@ -68,6 +68,8 @@ const CATEGORY_LOOK_BY_WORLD = {
   bambini: { sizeFactor: 0.72 },
   // Mondo Rosa: 14 triangoli, erano ammassati.
   vetrina: { sizeFactor: 0.7 },
+  // Mondo Rosso: i cuori erano enormi e quasi attaccati.
+  incontri: { sizeFactor: 0.62 },
   faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
   animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };
@@ -75,7 +77,7 @@ const CATEGORY_LOOK_BY_WORLD = {
 // Solo Annunci ha bisogno di più margine fra le categorie (poche categorie
 // su un guscio con parecchie facce libere, vedi marginRings in
 // categoryShell.js): gli altri mondi restano sul margine storico.
-const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2 };
+const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2, incontri: 2 };
 
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio
 // marker quando si condivide la posizione in tempo reale (vedi App.jsx,

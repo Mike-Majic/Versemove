@@ -9,8 +9,9 @@ import i18n from '../i18n';
 // array con al massimo un item per "tipo" (content = foto/video caricata
 // col sistema contents.js già esistente, gif, link) così non servivano
 // nuove colonne per gif/link_esterno.
-function mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags }) {
+function mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags, punteggio }) {
   const items = [];
+  if (punteggio) items.push({ kind: 'punteggio', ...punteggio });
   if (contentId) items.push({ kind: 'content', content_id: contentId, media_type: mediaType, url: mediaUrl, tags: tags ?? [] });
   if (gif) items.push({ kind: 'gif', url: gif });
   if (link_esterno?.url) items.push({ kind: 'link', url: link_esterno.url });
@@ -22,7 +23,9 @@ function fieldsFromMedia(media) {
   const content = arr.find((m) => m.kind === 'content');
   const gifItem = arr.find((m) => m.kind === 'gif');
   const linkItem = arr.find((m) => m.kind === 'link');
+  const scoreItem = arr.find((m) => m.kind === 'punteggio');
   return {
+    punteggio: scoreItem ? { gioco: scoreItem.gioco, icona: scoreItem.icona, punti: scoreItem.punti, livello: scoreItem.livello, dettaglio: scoreItem.dettaglio } : null,
     contentId: content?.content_id ?? null,
     mediaUrl: content?.url ?? null,
     mediaType: content?.media_type ?? null,
@@ -269,11 +272,11 @@ export async function fetchComments(postIds) {
 
 // categoria/tag/titleId/extra solo per i post di categoria del mondo Nerd
 // (il server accetta tag solo insieme a una categoria gaming e mondo nerd).
-export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social', menzioni = [], categoria = null, tag = null, titleId = null, extra = null }) {
+export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, punteggio, mondo = 'social', menzioni = [], categoria = null, tag = null, titleId = null, extra = null }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
-    const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags });
+    const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags, punteggio });
     const { data, error } = await supabase
       .from('posts')
       .insert({

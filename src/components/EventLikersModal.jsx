@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ModalOverlay from './ModalOverlay';
 import './EventLikersModal.css';
+import AvatarImg from './shared/AvatarImg';
 
 // Elenco di chi ha messo "mi piace" a un evento: si apre sia dal badge sul
 // marker quadrato sul globo sia dalla card in colonna, stessa lista in
@@ -48,7 +49,7 @@ export default function EventLikersModal({
             const requested = !isMe && friendRequestsSent.includes(l.id);
             return (
               <li key={l.id} className="rb-event-likers-item">
-                <img src={l.avatar} alt="" />
+                <AvatarImg src={l.avatar} name={l?.name || l?.nickname} seed={l?.id} alt="" />
                 <strong>{isMe ? 'Tu' : l.name}</strong>
                 {!isMe && (
                   isFriend ? (

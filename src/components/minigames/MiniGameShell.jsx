@@ -8,6 +8,17 @@ const DIFFICULTIES = [
   { id: 'difficile', label: '🔴 Difficile' },
 ];
 
+const BRAGS = [
+  (p, g, l) => `🔥 ${p} punti a ${g}${l ? ` (livello ${l})` : ''}! Chi riesce a battermi?`,
+  (p, g) => `🏆 Nuovo punteggio: ${p} a ${g}. Vi sfido a fare di meglio! 💪`,
+  (p, g, l) => `🚀 Ho appena chiuso ${g} con ${p} punti${l ? ` a livello ${l}` : ''}. Tocca a voi!`,
+  (p, g) => `⚡ ${p} punti a ${g}! Qualcuno accetta la sfida? 🎮`,
+];
+
+function scoreBrag(punti, gioco, livello, seed) {
+  return BRAGS[seed % BRAGS.length](punti, gioco, livello);
+}
+
 // Fase A — wrapper comune a tutti i minigiochi: schermata iniziale (con
 // scelta del livello: facile/medio/difficile, passato al gioco come prop
 // "difficulty" — ogni gioco decide da solo cosa cambiare, qui c'è solo la
@@ -28,11 +39,17 @@ export default function MiniGameShell({ game, user, onOpenAuth }) {
   };
 
   const finish = (score, extra = {}) => {
-    setResult({ score, ...extra });
+    setResult({ score, seed: Math.floor(Math.random() * 1000), ...extra });
     setPhase('ended');
   };
 
-  const shareText = `Ho fatto ${result?.score ?? 0} punti a "${game.nome}" su Versemove!`;
+  // Testo del risultato: una frase diversa ogni volta, con un po' di
+  // sfida per chi legge (niente "su Versemove": il link c'è già). Nel feed
+  // il post diventa una card punteggio (vedi social/GameScoreCard.jsx).
+  const score = result?.score ?? 0;
+  const livello = DIFFICULTIES.find((d) => d.id === difficulty)?.label.replace(/^\S+\s/, '') ?? '';
+  const shareText = scoreBrag(score, game.nome, livello, result?.seed ?? 0);
+  const punteggio = { gioco: game.nome, icona: game.icon, punti: score, livello, dettaglio: result?.detail ?? null };
 
   const Component = game.Component;
 
@@ -90,6 +107,8 @@ export default function MiniGameShell({ game, user, onOpenAuth }) {
             <ShareSheet
               title="Condividi risultato"
               text={shareText}
+              feedText={shareText}
+              punteggio={punteggio}
               user={user}
               onOpenAuth={onOpenAuth}
               onClose={() => setShareOpen(false)}

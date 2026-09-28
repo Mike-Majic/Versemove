@@ -22,6 +22,7 @@ import { getLavoroProfiles } from '../../data/lavoro';
 import { supabase } from '../../data/supabaseClient';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import './LiveWorldPanel.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Anteprima di una diretta: miniatura della piattaforma se esiste (YouTube,
 // Twitch), altrimenti — o se non si carica — la foto profilo di chi l'ha
@@ -35,7 +36,7 @@ function LivePreview({ session }) {
   }
   return session.host.avatar ? (
     <span className="rb-live-card-thumb-avatar">
-      <img src={session.host.avatar} alt="" loading="lazy" />
+      <AvatarImg src={session.host.avatar} name={session.host?.name || session.host?.nickname} seed={session.host?.id} alt="" loading="lazy" />
     </span>
   ) : (
     <span className="rb-live-card-thumb-avatar rb-live-card-thumb-letter">{(session.host.name || '?').charAt(0).toUpperCase()}</span>
@@ -147,7 +148,7 @@ function LiveChat({ sessionId, user, onOpenAuth }) {
       <div className="rb-live-chat-panel-messages" ref={listRef}>
         {messages.map((m) => (
           <div key={m.id} className={`rb-live-chat-panel-msg ${m.autoreId === user?.id ? 'me' : ''}`}>
-            <img src={m.author.avatar} alt="" />
+            <AvatarImg src={m.author.avatar} name={m.author?.name || m.author?.nickname} seed={m.author?.id} alt="" />
             <div>
               <div className="rb-live-chat-panel-head">
                 <strong>{m.autoreId === user?.id ? 'Tu' : m.author.name}</strong>
@@ -359,7 +360,7 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth, standalone = f
               </span>
               <span className="rb-live-card-meta">
                 {s.host.avatar ? (
-                  <img className="rb-live-card-avatar" src={s.host.avatar} alt="" />
+                  <AvatarImg className="rb-live-card-avatar" src={s.host.avatar} name={s.host?.name || s.host?.nickname} seed={s.host?.id} alt="" />
                 ) : (
                   <span className="rb-live-card-avatar rb-live-card-thumb-letter">{(s.host.name || '?').charAt(0).toUpperCase()}</span>
                 )}

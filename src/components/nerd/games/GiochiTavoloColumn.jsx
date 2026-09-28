@@ -29,6 +29,7 @@ import { useBackLayer } from '../../../hooks/useBackLayer';
 import { useCardTable } from './cardTheme';
 import { useGlobeCover } from '../../../fx/globeCover';
 import './giochiTavolo.css';
+import AvatarImg from '../../shared/AvatarImg';
 
 const GAMES = [
   { id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane', playerCounts: [2] },
@@ -663,7 +664,7 @@ function SeatCard({ seat, isMe, teamLabel, onAddBot, onRemoveBot, onSetDifficult
       {seat.isBot ? (
         <span className="rb-giochi-waiting-avatar-placeholder">🤖</span>
       ) : (
-        <img src={seat.profilo.avatar || undefined} alt="" className="rb-giochi-waiting-avatar" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+        <AvatarImg src={seat.profilo.avatar} name={seat.profilo?.name || seat.profilo?.nickname} seed={seat.profilo?.id} alt="" className="rb-giochi-waiting-avatar" />
       )}
       <strong>{seat.profilo.name}{isMe ? ' (tu)' : ''}</strong>
       {seat.isBot ? (

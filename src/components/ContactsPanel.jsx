@@ -9,6 +9,7 @@ import {
   removeFriend,
 } from '../data/friends';
 import './FriendsModal.css';
+import AvatarImg from './shared/AvatarImg';
 
 const TABS = [
   { id: 'amici', label: 'Amici' },
@@ -147,7 +148,7 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
                   const requested = sentTo.includes(p.id);
                   return (
                     <li key={p.id} className="rb-friends-row">
-                      <img src={p.avatar} alt="" />
+                      <AvatarImg src={p.avatar} name={p?.name || p?.nickname} seed={p?.id} alt="" />
                       <strong>{p.name}</strong>
                       {isFriend ? (
                         <span className="rb-friends-already">Già amico</span>
@@ -173,7 +174,7 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
                   <ul className="rb-friends-list">
                     {received.map((r) => (
                       <li key={r.id} className="rb-friends-row">
-                        <img src={r.other.avatar} alt="" />
+                        <AvatarImg src={r.other.avatar} name={r.other?.name || r.other?.nickname} seed={r.other?.id} alt="" />
                         <strong>{r.other.name}</strong>
                         <div className="rb-friends-row-actions">
                           <button type="button" disabled={busyId === r.id} onClick={() => handleRespond(r.id, true)}>
@@ -195,7 +196,7 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
                   <ul className="rb-friends-list">
                     {sent.map((r) => (
                       <li key={r.id} className="rb-friends-row">
-                        <img src={r.other.avatar} alt="" />
+                        <AvatarImg src={r.other.avatar} name={r.other?.name || r.other?.nickname} seed={r.other?.id} alt="" />
                         <strong>{r.other.name}</strong>
                         <button type="button" disabled={busyId === r.id} onClick={() => handleCancel(r.id)}>
                           Annulla
@@ -215,7 +216,7 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
                 )}
                 {friendsList.map((f) => (
                   <li key={f.id} className="rb-friends-row">
-                    <img src={f.avatar} alt="" />
+                    <AvatarImg src={f.avatar} name={f?.name || f?.nickname} seed={f?.id} alt="" />
                     <strong>{f.name}</strong>
                     <div className="rb-friends-row-actions">
                       <button type="button" onClick={() => onOpenChat(f.id)}>Messaggio</button>

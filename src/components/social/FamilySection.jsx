@@ -12,6 +12,7 @@ import {
   getSentFamilyRequests,
 } from '../../data/family';
 import './FamilySection.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Familiari del Profilo Social: collegamento fra account con conferma
 // reciproca, stesso schema delle richieste di amicizia (data/friends.js)
@@ -78,7 +79,7 @@ export default function FamilySection({ userId }) {
           <ul className="rb-family-list">
             {received.map((r) => (
               <li key={r.id} className="rb-family-row">
-                <img src={r.other.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                <AvatarImg src={r.other.avatar} name={r.other?.name || r.other?.nickname} seed={r.other?.id} alt="" />
                 <div className="rb-family-row-info">
                   <strong>{r.other.name}</strong>
                   <span>vuole essere tuo/a {familyRelationLabel(r.relazione)}</span>
@@ -103,7 +104,7 @@ export default function FamilySection({ userId }) {
           <ul className="rb-family-list">
             {sent.map((r) => (
               <li key={r.id} className="rb-family-row">
-                <img src={r.other.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                <AvatarImg src={r.other.avatar} name={r.other?.name || r.other?.nickname} seed={r.other?.id} alt="" />
                 <div className="rb-family-row-info">
                   <strong>{r.other.name}</strong>
                   <span>in attesa — lo/a hai aggiunto come {familyRelationLabel(r.relazione)}</span>
@@ -127,7 +128,7 @@ export default function FamilySection({ userId }) {
           <ul className="rb-family-list">
             {family.map((f) => (
               <li key={f.linkId} className="rb-family-row">
-                <img src={f.other.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                <AvatarImg src={f.other.avatar} name={f.other?.name || f.other?.nickname} seed={f.other?.id} alt="" />
                 <div className="rb-family-row-info">
                   <strong>{f.other.name}</strong>
                   <span>{familyRelationLabel(f.relazione)}</span>
@@ -207,7 +208,7 @@ function AddFamilyForm({ onDone, onCancel }) {
               {results.map((r) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => setTarget(r)}>
-                    <img src={r.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                    <AvatarImg src={r.avatar} name={r?.name || r?.nickname} seed={r?.id} alt="" />
                     {r.name}
                   </button>
                 </li>

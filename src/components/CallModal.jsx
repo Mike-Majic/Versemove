@@ -5,6 +5,7 @@ import { displayName } from '../data/posts';
 import { useCalls } from '../calls/CallProvider';
 import { MiniCallMonitor, MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../calls/CallSurface';
 import './CallModal.css';
+import AvatarImg from './shared/AvatarImg';
 
 // Videochiamata 1:1 via WebRTC, senza server proprio: il canale Realtime
 // privato "call:<conversationId>" (autorizzato dal DB ai soli 2
@@ -463,7 +464,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
       {remoteAudio}
       {phase === 'calling' && (
         <div className="rb-call-panel">
-          <img className="rb-call-avatar" src={friend?.avatar} alt="" />
+          <AvatarImg className="rb-call-avatar" src={friend?.avatar} name={friend?.name || friend?.nickname} seed={friend?.id} alt="" />
           <p className="rb-call-title">Chiamata a {friend?.name}...</p>
           <p className="rb-call-hint">In attesa di risposta</p>
           <button type="button" className="rb-call-btn-decline" onClick={hangup}>Annulla</button>
@@ -472,7 +473,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
       {phase === 'ringing' && (
         <div className="rb-call-panel rb-call-ringing">
-          <img className="rb-call-avatar" src={incomingFrom?.avatar} alt="" />
+          <AvatarImg className="rb-call-avatar" src={incomingFrom?.avatar} name={incomingFrom?.name || incomingFrom?.nickname} seed={incomingFrom?.id} alt="" />
           <p className="rb-call-title">{incomingFrom?.name} ti sta chiamando</p>
           <div className="rb-call-actions">
             <button type="button" className="rb-call-btn-decline" onClick={declineCall}>✕ Rifiuta</button>

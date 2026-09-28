@@ -6,6 +6,7 @@ import EmptyState from '../EmptyState';
 import ReportModal from '../shared/ReportModal';
 import Icon from '../shared/Icon';
 import './DogPlaceSheet.css';
+import AvatarImg from '../shared/AvatarImg';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -274,7 +275,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                     <div key={r.id} className="rb-dogsheet-review">
                       <div className="rb-dogsheet-review-head">
                         {r.authorAvatar ? (
-                          <img className="rb-dogsheet-review-avatar" src={r.authorAvatar} alt={r.authorName} />
+                          <AvatarImg className="rb-dogsheet-review-avatar" src={r.authorAvatar} name={r.authorName} seed={r.authorId} alt={r.authorName} />
                         ) : (
                           <span className="rb-dogsheet-review-avatar rb-dogsheet-review-avatar-placeholder">🐾</span>
                         )}

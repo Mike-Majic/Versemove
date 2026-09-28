@@ -31,7 +31,7 @@ export const INCONTRI_CATEGORIES = [
     id: 'videochiamata',
     label: 'Videochiamata',
     icon: '🎥',
-    anchor: { lat: -22, lng: 72 }, // Oceano Indiano
+    anchor: { lat: -30, lng: 82 }, // Oceano Indiano, lontano da Match
     aliases: ['videochiamata', 'videochiamate', 'stanze video', 'video chat', 'chiamata di gruppo'],
     subfamilies: [],
   },

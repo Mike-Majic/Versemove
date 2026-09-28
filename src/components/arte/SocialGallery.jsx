@@ -7,6 +7,7 @@ import { useBackLayer } from '../../hooks/useBackLayer';
 import Icon from '../shared/Icon';
 import EmptyState from '../EmptyState';
 import './SocialGallery.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Galleria del mondo Social dentro Intrattenimento (Galleria immagini /
 // Galleria Video): solo il contenuto e il suo autore, senza il testo del
@@ -28,7 +29,7 @@ function AuthorChip({ item, size = 28 }) {
   return (
     <button type="button" className="rb-sg-author" onClick={(e) => { e.stopPropagation(); openProfileFromMention(item.autoreId); }} title={`Profilo di ${item.autoreNickname}`}>
       {item.autoreAvatar ? (
-        <img src={item.autoreAvatar} alt="" width={size} height={size} />
+        <AvatarImg src={item.autoreAvatar} name={item.autoreNickname} seed={item.autoreId} alt="" width={size} height={size} />
       ) : (
         <span className="rb-sg-author-letter" style={{ width: size, height: size }}>{item.autoreNickname.charAt(0).toUpperCase()}</span>
       )}

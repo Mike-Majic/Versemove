@@ -11,6 +11,7 @@ import ParticleBurst from './ParticleBurst';
 import SponsorCard from './ads/SponsorCard';
 import './CategoryColumn.css';
 import Icon from './shared/Icon';
+import AvatarImg from './shared/AvatarImg';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
 // l'oggetto categoria (nome, sottofamiglie...) più i suoi contenuti/ricerche
@@ -224,7 +225,7 @@ export default function CategoryColumn({
         <ul className="rb-arte-nearby-list">
           {nearbyPeople.map(({ id, person, content, type }) => (
             <li key={id} className="rb-arte-nearby-card">
-              <img className="rb-arte-nearby-avatar" src={person.avatar} alt={person.name} />
+              <AvatarImg className="rb-arte-nearby-avatar" src={person.avatar} name={person?.name || person?.nickname} seed={person?.id} alt={person.name} />
               <div>
                 <strong>{person.name}</strong>
                 <p>{type === 'parteciperò' ? `Parteciperà a ${content.title}` : `Gli piace ${content.title}`}</p>

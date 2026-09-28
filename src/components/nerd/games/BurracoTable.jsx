@@ -22,6 +22,7 @@ import Skeleton from '../../Skeleton';
 // fra una mano e l'altra (stesso linguaggio visivo per tutti i giochi).
 import './scopaTable.css';
 import './burracoTable.css';
+import AvatarImg from '../../shared/AvatarImg';
 
 const BOT_DIFFICULTY_LABEL = { facile: 'facile', medio: 'medio', difficile: 'difficile' };
 
@@ -787,7 +788,7 @@ function Seat({ entry, cards, isTurn, isTeammate, position }) {
         {entry.isBot ? (
           <span aria-hidden="true">🤖</span>
         ) : entry.profilo.avatar ? (
-          <img src={entry.profilo.avatar} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+          <AvatarImg src={entry.profilo.avatar} name={entry.profilo?.name || entry.profilo?.nickname} seed={entry.profilo?.id} alt="" />
         ) : (
           <span aria-hidden="true">🙂</span>
         )}

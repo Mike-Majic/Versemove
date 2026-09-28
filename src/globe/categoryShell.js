@@ -859,6 +859,33 @@ export function buildCategoryShell(
   const usedFaces = new Set();
   const blockedFaces = new Set();
 
+  // Le facce dell'icosaedro suddiviso non sono tutte uguali (quelle vicino
+  // ai 12 vertici originali sono più piccole): con la scala presa dalla
+  // faccia scelta, due sagome dello stesso mondo venivano di grandezze
+  // diverse. Per le sagome (cuori, UFO...) si usa la media di tutte le
+  // facce: stessa grandezza per ogni categoria.
+  let uniformShapeRadius = 0;
+  {
+    const ua = new THREE.Vector3();
+    const ub = new THREE.Vector3();
+    const uc = new THREE.Vector3();
+    const uCentroid = new THREE.Vector3();
+    const uCenter = new THREE.Vector3();
+    for (let f = 0; f < faceCount; f++) {
+      ua.fromBufferAttribute(pos, f * 3);
+      ub.fromBufferAttribute(pos, f * 3 + 1);
+      uc.fromBufferAttribute(pos, f * 3 + 2);
+      uCentroid.copy(ua).add(ub).add(uc).divideScalar(3);
+      uCenter.copy(uCentroid).normalize().multiplyScalar(radius);
+      const d =
+        shrinkVertex(ua, uCentroid, radius).distanceTo(uCenter) +
+        shrinkVertex(ub, uCentroid, radius).distanceTo(uCenter) +
+        shrinkVertex(uc, uCentroid, radius).distanceTo(uCenter);
+      uniformShapeRadius += d / 3;
+    }
+    uniformShapeRadius /= faceCount;
+  }
+
   const nearestFace = (targetDir, exclude) => {
     let bestFace = -1;
     let bestDot = -Infinity;
@@ -921,7 +948,7 @@ export function buildCategoryShell(
     let shapeScale = 0;
     if (face) {
       shapeCenter = normal.clone().multiplyScalar(radius);
-      shapeScale = ((sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3) * sizeFactor;
+      shapeScale = uniformShapeRadius * sizeFactor;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
       if (vivid) {
         // Geometria lasciata LOCALE (piana, centrata nell'origine): la

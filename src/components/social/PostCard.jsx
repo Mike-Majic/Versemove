@@ -16,6 +16,9 @@ import GamingPostExtra from '../nerd/gaming/GamingPostExtra';
 import CosplayPostExtra from '../nerd/cosplay/CosplayPostExtra';
 import { COSPLAY_POST_TAGS } from '../../data/cosplay';
 import './PostCard.css';
+import AvatarImg from '../shared/AvatarImg';
+import GameScoreCard from './GameScoreCard';
+import { scoreFromOldText } from './gameScore';
 
 // Stesse emoji ammesse dal server (comment_reactions).
 const REACTION_EMOJIS = COMMENT_REACTION_EMOJIS;
@@ -37,7 +40,7 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
   const canModerate = !isOwn && isStaff(user?.ruolo);
   return (
     <li className="rb-comment">
-      <img className="rb-comment-avatar" src={author.avatar} alt={author.name} />
+      <AvatarImg className="rb-comment-avatar" src={author.avatar} name={author?.name || author?.nickname} seed={author?.id} alt={author.name} />
       <div className="rb-comment-body">
         <div className="rb-comment-bubble">
           <strong>{author.name}</strong>
@@ -197,13 +200,16 @@ export default function PostCard({
     setReport({ targetType: 'commento', targetId: commentId, targetLabel: 'commento' });
   };
 
+  // Vecchi post "Ho fatto N punti a ..." (prima della card punteggio).
+  const legacyScore = post.punteggio ? null : scoreFromOldText(post.testo);
+
   return (
     <li className="rb-post-card" data-post-id={post.id}>
       {trendingRank !== null && (
         <span className="rb-post-trending-badge">🔥 #{trendingRank} di tendenza nel mondo Social</span>
       )}
       <div className="rb-post-header">
-        <img className="rb-post-avatar" src={author.avatar} alt={author.name} />
+        <AvatarImg className="rb-post-avatar" src={author.avatar} name={author?.name || author?.nickname} seed={author?.id} alt={author.name} />
         <div className="rb-post-header-info">
           <strong>{author.name}</strong>
           <span className="rb-post-date">{formatRelativeDate(post.data)}</span>
@@ -247,8 +253,9 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          {post.testo && <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />}
-          {post.testo && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+          {post.testo && !legacyScore && <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />}
+          {post.testo && !legacyScore && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+          {(post.punteggio || legacyScore) && <GameScoreCard punteggio={post.punteggio || legacyScore} />}
         </>
       )}
       {post.extra && post.tag && isCosplay && <CosplayPostExtra post={post} />}

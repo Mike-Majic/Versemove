@@ -30,6 +30,7 @@ import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import ModalOverlay from '../ModalOverlay';
 import './videoRooms.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Live del mondo Nerd: stanze video di gruppo gratuite (fino a 8 persone,
 // WebRTC mesh con hooks/useMeshCall), pubbliche o private con password.
@@ -142,7 +143,7 @@ function openSince(iso) {
 function Avatar({ profile, size = 28 }) {
   const name = displayName(profile, 'Utente');
   return profile?.avatar ? (
-    <img className="rb-vroom-avatar" src={profile.avatar} alt="" style={{ width: size, height: size }} />
+    <AvatarImg className="rb-vroom-avatar" src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt="" style={{ width: size, height: size }} />
   ) : (
     <span className="rb-vroom-avatar rb-vroom-avatar--letter" style={{ width: size, height: size, fontSize: size * 0.45 }}>
       {name.charAt(0).toUpperCase()}

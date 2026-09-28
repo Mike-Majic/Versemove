@@ -14,6 +14,7 @@ import PlayingCard from './PlayingCard';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
 import './trentunoTable.css';
+import AvatarImg from '../../shared/AvatarImg';
 
 const MODO_LABEL = { trentuno: 'Trentuno!', confronto: 'Confronto mani', esaurito: 'Mazzo esaurito' };
 
@@ -231,7 +232,7 @@ function TrentunoPlayerBadge({ entry, me = false }) {
       {entry.isBot ? (
         <span className="rb-scopa-bot-avatar">🤖</span>
       ) : (
-        <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+        <AvatarImg src={entry.profilo.avatar} name={entry.profilo?.name || entry.profilo?.nickname} seed={entry.profilo?.id} alt="" />
       )}
       <div>
         <strong>{entry.profilo.name}{me ? ' (tu)' : ''}</strong>

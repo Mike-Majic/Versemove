@@ -62,6 +62,7 @@ import PageLoading from './components/PageLoading';
 import { useGlobeCover } from './fx/globeCover';
 import './App.css';
 import { CallProvider } from './calls/CallProvider';
+import AvatarImg from './components/shared/AvatarImg';
 
 // Componenti pesanti o aperti solo su richiesta, caricati al bisogno invece
 // che nel bundle iniziale (React.lazy + Suspense, vedi fallback PageLoading
@@ -1523,7 +1524,7 @@ export default function App() {
 
       {notifToast && (
         <button type="button" className="rb-notif-toast" onClick={() => openNotificationTarget(notifToast)}>
-          <img src={notifToast.actor.avatar} alt="" />
+          <AvatarImg src={notifToast.actor.avatar} name={notifToast.actor?.name || notifToast.actor?.nickname} seed={notifToast.actor?.id} alt="" />
           {(() => {
             const { who, text } = describeNotification(notifToast);
             return who ? `${who} ${text}` : text;

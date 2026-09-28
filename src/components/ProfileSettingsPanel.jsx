@@ -50,6 +50,7 @@ import { ANIMALI_CATEGORIES } from '../data/animaliCategories';
 import { ARTE_CATEGORIES } from '../data/arteCategories';
 import { NERD_CATEGORIES } from '../data/nerdCategories';
 import { LAVORO_CATEGORIES } from '../data/lavoroCategories';
+import AvatarImg from './shared/AvatarImg';
 
 const CITTA_MAX = 80;
 const BIO_MAX = 300;
@@ -171,7 +172,7 @@ function AvatarUploader({ user, onUpdateUser }) {
 
   return (
     <div className="rb-avatar-uploader">
-      <img className="rb-avatar-uploader-preview" src={preview ?? user.avatar} alt={user.nickname} />
+      <AvatarImg className="rb-avatar-uploader-preview" src={preview ?? user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.nickname} />
       <div className="rb-avatar-uploader-btns">
         <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading}>
           <Icon name="camera" size={16} /> Scatta
@@ -704,7 +705,7 @@ function AccountLinkPanel({ user, onClose }) {
 
       {linked && (
         <div className="rb-profile-linked-card">
-          <img src={linked.avatar} alt={linked.nickname} />
+          <AvatarImg src={linked.avatar} name={linked?.name || linked?.nickname} seed={linked?.id} alt={linked.nickname} />
           <div className="rb-profile-linked-info">
             <strong>{linked.nickname}</strong>
             <span>{linked.tipoAccount === 'azienda' ? '🏢 Azienda' : '🙂 Persona'}</span>
@@ -1469,7 +1470,7 @@ function ProfilePreviewCard({ user }) {
     <div className="rb-profile-preview">
       <p className="rb-profile-preview-label">Anteprima — così ti vedono gli altri utenti</p>
       <div className="rb-profile-preview-card">
-        <img className="rb-profile-preview-avatar" src={user.avatar} alt={user.nickname} />
+        <AvatarImg className="rb-profile-preview-avatar" src={user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.nickname} />
         <div className="rb-profile-preview-info">
           <div className="rb-profile-preview-name-row">
             <strong>{user.nickname}</strong>

@@ -17,6 +17,7 @@ import {
   subscribeToOwnMatches,
 } from '../../data/incontri';
 import './MatchColumn.css';
+import AvatarImg from '../shared/AvatarImg';
 
 const RIGHT_TABS = [
   { id: 'likesYou', label: 'A chi piaci' },
@@ -318,7 +319,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
           >
             {isFavorite(current.id) ? '⭐' : '☆'}
           </button>
-          <img className="rb-match-card-photo" src={current.avatar} alt={current.name} />
+          <AvatarImg className="rb-match-card-photo" src={current.avatar} name={current?.name || current?.nickname} seed={current?.id} alt={current.name} />
           <div className="rb-match-card-info">
             <strong>{current.name}{current.age ? `, ${current.age}` : ''}</strong>
             <span>{current.city}</span>
@@ -350,7 +351,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {likesYou.length === 0 && <p className="rb-match-pane-empty">Nessuno per ora, torna più tardi.</p>}
       {likesYou.map((u) => (
         <li key={u.id} className="rb-match-likes-item">
-          <img src={u.avatar} alt="" />
+          <AvatarImg src={u.avatar} name={u?.name || u?.nickname} seed={u?.id} alt="" />
           <span>
             <strong>{u.super ? '⭐ ' : ''}{u.name}{u.age ? `, ${u.age}` : ''}</strong>
             <span className="rb-match-list-city">{u.city}</span>
@@ -372,7 +373,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matches.length === 0 && <p className="rb-match-pane-empty">Metti &quot;Mi piace&quot; a un profilo per iniziare a fare match.</p>}
       {matches.map((m) => (
         <li key={m.id} className="rb-match-likes-item">
-          <img src={m.avatar} alt="" />
+          <AvatarImg src={m.avatar} name={m?.name || m?.nickname} seed={m?.id} alt="" />
           <span>
             <strong>{m.name}{m.age ? `, ${m.age}` : ''}</strong>
             <span className="rb-match-list-city">{m.city}</span>
@@ -399,7 +400,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matches.map((m) => (
         <li key={m.id}>
           <button type="button" className="rb-match-list-item" onClick={() => onOpenChat(m.id)}>
-            <img src={m.avatar} alt="" />
+            <AvatarImg src={m.avatar} name={m?.name || m?.nickname} seed={m?.id} alt="" />
             <span>
               <strong>{m.name}</strong>
               <span className="rb-match-list-city">Scrivi un messaggio →</span>
@@ -417,7 +418,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {favorites.length === 0 && <p className="rb-match-pane-empty">Tocca la stellina su un profilo per salvarlo qui.</p>}
       {favorites.map((f) => (
         <li key={f.id} className="rb-match-likes-item">
-          <img src={f.avatar} alt="" />
+          <AvatarImg src={f.avatar} name={f?.name || f?.nickname} seed={f?.id} alt="" />
           <span>
             <strong>{f.name}</strong>
             <span className="rb-match-list-city">{f.city}</span>

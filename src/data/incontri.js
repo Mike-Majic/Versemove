@@ -11,7 +11,7 @@ function mapProfileRow(row) {
   return {
     id: row.id,
     name: displayName(row),
-    avatar: row.avatar_url || `https://i.pravatar.cc/150?u=${row.id}`,
+    avatar: row.avatar_url || '',
     age: row.eta ?? null,
     city: row.citta || '',
     bio: row.bio || '',
