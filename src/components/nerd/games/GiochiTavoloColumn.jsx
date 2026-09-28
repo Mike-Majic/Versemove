@@ -30,6 +30,8 @@ import { useCardTable } from './cardTheme';
 import { useGlobeCover } from '../../../fx/globeCover';
 import './giochiTavolo.css';
 import AvatarImg from '../../shared/AvatarImg';
+import GameAdBreak from '../../ads/GameAdBreak';
+import { adBreakAfterGame } from '../../ads/gameAds';
 
 const GAMES = [
   { id: 'scopa', label: 'Scopa', icon: '🃏', tagline: '2 giocatori, mazzo di 40 carte italiane', playerCounts: [2] },
@@ -515,10 +517,31 @@ function RoomView({ roomId, user, onExit }) {
   // girare appena la partita finisce o si esce dalla stanza).
   useGlobeCover(room?.stato === 'in_corso' ? 'paused' : null);
 
+  // Pubblicità come nei giochi del mondo Bambini (ads/gameAds.js): ogni
+  // partita finita conta; alla 2ª, 4ª... un video saltabile dopo 5 s, alla
+  // 5ª, 10ª... uno saltabile dopo 30 s, mostrato uscendo dalla partita
+  // finita ("Torna alla lobby").
+  const [pendingAd, setPendingAd] = useState(0);
+  const [showingAd, setShowingAd] = useState(false);
+  const countedRoomRef = useRef(null);
+  useEffect(() => {
+    if (room?.stato !== 'conclusa' || countedRoomRef.current === roomId) return;
+    countedRoomRef.current = roomId;
+    setPendingAd(adBreakAfterGame());
+  }, [room?.stato, roomId]);
+
   if (!room) {
     return (
       <div className="rb-giochi-tavolo">
         <Skeleton lines={4} />
+      </div>
+    );
+  }
+
+  if (room.stato === 'conclusa' && showingAd) {
+    return (
+      <div className="rb-giochi-tavolo">
+        <GameAdBreak mondo="nerd" skipAfter={pendingAd} onDone={onExit} />
       </div>
     );
   }
@@ -543,7 +566,7 @@ function RoomView({ roomId, user, onExit }) {
           title={title}
           subtitle="Un giocatore ha abbandonato o la partita è finita."
         />
-        <button type="button" className="rb-btn-primary" onClick={onExit}>Torna alla lobby</button>
+        <button type="button" className="rb-btn-primary" onClick={() => (pendingAd ? setShowingAd(true) : onExit())}>Torna alla lobby</button>
       </div>
     );
   }

@@ -390,3 +390,11 @@
 .rb-deal-filters-open {
   align-self: flex-start;
 }
+
+/* Avviso affiliazione Amazon, obbligatorio dove ci sono link affiliati. */
+.rb-deal-affiliate-note {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.72);
+  text-align: center;
+}
