@@ -108,9 +108,11 @@
   cursor: pointer;
 }
 
+/* Anche a campo vuoto resta acceso come la scheda "Per te": a 0.4 di
+   opacità sembrava spento/rotto. Il cursore dice che non è ancora cliccabile. */
 .rb-composer-submit:disabled {
-  opacity: 0.4;
-  cursor: default;
+  opacity: 0.85;
+  cursor: not-allowed;
 }
 
 .rb-composer-media-btn {

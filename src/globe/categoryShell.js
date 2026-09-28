@@ -400,6 +400,51 @@ function ribbonShape(points, width) {
   return s;
 }
 
+// Sagoma di un cane di profilo (mondo Animali, categoria Cani): muso a
+// destra, orecchio, zampe, coda alzata. Solo il contorno pieno, come le
+// altre sagome; i punti vengono centrati e riportati in [-1, 1].
+function buildDogShape() {
+  const pts = [
+    [-0.72, 0.16], // attacco coda
+    [-0.98, 0.52], // punta coda
+    [-0.9, 0.57],
+    [-0.64, 0.3], // dorso
+    [0.22, 0.28],
+    [0.34, 0.5], // collo
+    [0.38, 0.64], // nuca
+    [0.36, 0.86], // orecchio
+    [0.52, 0.68],
+    [0.66, 0.66], // fronte
+    [0.74, 0.54],
+    [0.98, 0.48], // naso
+    [0.98, 0.34],
+    [0.66, 0.32], // mandibola
+    [0.52, 0.22], // gola
+    [0.46, -0.04], // petto
+    [0.46, -0.62], // zampa anteriore
+    [0.34, -0.62],
+    [0.3, -0.14],
+    [-0.44, -0.14], // pancia
+    [-0.48, -0.62], // zampa posteriore
+    [-0.6, -0.62],
+    [-0.66, -0.04],
+  ];
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const k = 1 / Math.max(Math.max(...xs) - cx, Math.max(...ys) - cy);
+  const shape = new THREE.Shape();
+  pts.forEach(([x, y], i) => {
+    const px = (x - cx) * k;
+    const py = (y - cy) * k;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  });
+  shape.closePath();
+  return shape;
+}
+
 // Sagoma di una "M" (mondo Social), terza versione — le prime due (blocco
 // con tacca, poi pilastri+V pieni) erano venute male entrambe: il problema
 // non era la forma ma il RIEMPIMENTO. Il logo di riferimento mandato
@@ -537,6 +582,8 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
       return { shape: buildLetterMShape(), color: null };
     case 'star':
       return { shape: buildStarShape(), color: null };
+    case 'dog':
+      return { shape: buildDogShape(), color: null };
     case 'cloud':
       // La Stanza MOD (solo staff, vedi faqCategories.js) resta una nuvola
       // ROSSA distinta dalle altre nuvole grigie/bianche del mondo FAQ —
@@ -718,9 +765,23 @@ export function makeLabelSprite(text, spriteScale, textColor = '#ffffff', option
 // due categorie). Usato dal mondo Annunci, che con poche categorie (7 su
 // almeno 80 facce) ha ampiamente spazio per stare più larghe — richiesta
 // esplicita ("le categorie le vedo troppo vicine").
+// sizeFactor: grandezza della sagoma rispetto al triangolo che sostituisce
+// (1 = come sempre; il mondo Bambini, con 16 categorie, le vuole più
+// piccole per lasciare spazio fra l'una e l'altra). fillColor/fillOpacity/
+// activeOpacity: colore e trasparenza delle sagome quando il colore del
+// mondo, a trasparenza 0.2, le rende poco visibili (FAQ nero, Animali).
 export function buildCategoryShell(
   categories,
-  { radius = 122, color = '#8b5cf6', shapeType = 'triangle', marginRings = 1 } = {}
+  {
+    radius = 122,
+    color = '#8b5cf6',
+    shapeType = 'triangle',
+    marginRings = 1,
+    sizeFactor = 1,
+    fillColor = null,
+    fillOpacity = 0.2,
+    activeOpacity = 0.45,
+  } = {}
 ) {
   const detail = pickDetailLevel(categories.length);
   const geo = new THREE.IcosahedronGeometry(radius, detail);
@@ -856,7 +917,7 @@ export function buildCategoryShell(
     let shapeScale = 0;
     if (face) {
       shapeCenter = normal.clone().multiplyScalar(radius);
-      shapeScale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
+      shapeScale = ((sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3) * sizeFactor;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
       if (vivid) {
         // Geometria lasciata LOCALE (piana, centrata nell'origine): la
@@ -874,13 +935,13 @@ export function buildCategoryShell(
       faceGeo.computeVertexNormals();
     }
 
-    const faceColor = face?.color ?? color;
+    const faceColor = face?.color ?? fillColor ?? color;
     const material = new THREE.MeshBasicMaterial({
       color: faceColor,
       transparent: true,
       // Vivace: colore pieno (niente "vetro scuro"); MeshBasicMaterial non
       // risente delle luci, quindi resta acceso anche sul lato in ombra.
-      opacity: vivid ? VIVID_OPACITY : 0.2,
+      opacity: vivid ? VIVID_OPACITY : fillOpacity,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -969,7 +1030,7 @@ export function buildCategoryShell(
       return;
     }
     faceMeshes.forEach((mesh) => {
-      mesh.material.opacity = mesh.userData.categoryId === activeId ? 0.45 : 0.2;
+      mesh.material.opacity = mesh.userData.categoryId === activeId ? activeOpacity : fillOpacity;
     });
   }
 

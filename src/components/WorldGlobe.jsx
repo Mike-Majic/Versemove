@@ -58,6 +58,16 @@ const CATEGORY_SHAPE_BY_WORLD = {
   bambini: 'kids',
   faq: 'cloud',
   annunci: 'annunci',
+  animali: 'dog',
+};
+
+// Aspetto delle sagome per mondo, oltre alla forma (vedi categoryShell.js):
+// Bambini più piccole e distanziate; FAQ e Animali bianche e più piene,
+// perché col colore del mondo a trasparenza 0.2 si vedevano appena.
+const CATEGORY_LOOK_BY_WORLD = {
+  bambini: { sizeFactor: 0.72 },
+  faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
+  animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };
 
 // Solo Annunci ha bisogno di più margine fra le categorie (poche categorie
@@ -777,6 +787,7 @@ export default function WorldGlobe({
       color: world.color,
       shapeType: CATEGORY_SHAPE_BY_WORLD[world.id] ?? 'triangle',
       marginRings: CATEGORY_MARGIN_RINGS_BY_WORLD[world.id] ?? 1,
+      ...(CATEGORY_LOOK_BY_WORLD[world.id] ?? {}),
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;

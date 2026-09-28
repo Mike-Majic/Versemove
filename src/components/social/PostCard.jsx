@@ -5,6 +5,7 @@ import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
 import MentionText from '../shared/MentionText';
+import Icon from '../shared/Icon';
 import ShareLinkButton from '../shared/ShareLinkButton';
 import { linkToPost } from '../../data/deepLinks';
 import { isStaff } from '../../data/roles';
@@ -267,11 +268,27 @@ export default function PostCard({
       {post.link_esterno && <LinkPreview url={post.link_esterno.url} />}
 
       <div className="rb-post-actions">
-        <button type="button" className={`rb-post-action-btn ${liked ? 'active' : ''}`} onClick={handleLike}>
-          {liked ? '❤️' : '🤍'} {likeCount}
+        <button
+          type="button"
+          className={`rb-post-action-btn rb-post-like-btn ${liked ? 'active' : ''}`}
+          onClick={handleLike}
+          aria-pressed={liked}
+          aria-label={liked ? 'Togli mi piace' : 'Mi piace'}
+          title={liked ? 'Togli mi piace' : 'Mi piace'}
+        >
+          <Icon name="heart" size={17} fill={liked ? 'currentColor' : 'none'} />
+          <span>{likeCount}</span>
         </button>
-        <button type="button" className="rb-post-action-btn" onClick={() => setExpanded((v) => !v)}>
-          💬 {postComments.length}
+        <button
+          type="button"
+          className={`rb-post-action-btn ${expanded ? 'open' : ''}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label="Commenti"
+          title="Commenti"
+        >
+          <Icon name="chat" size={17} />
+          <span>{postComments.length}</span>
         </button>
         {post.fromPostsTable && !post.categoria && (
           <ShareLinkButton
@@ -279,29 +296,37 @@ export default function PostCard({
             url={() => linkToPost(post.id)}
             title={`Post di ${author.name}`}
             text={post.testo ? post.testo.slice(0, 120) : undefined}
-            label="🔗"
-            copiedLabel="✓ Copiato"
+            label={<Icon name="link" size={17} />}
+            copiedLabel={<Icon name="check" size={17} />}
             ariaLabel="Condividi il link del post"
           />
         )}
         {onToggleSave && (
-          <button type="button" className={`rb-post-action-btn rb-post-save-btn ${saved ? 'active' : ''}`} onClick={handleSave}>
-            {saved ? '🔖 Salvato' : '🔖 Salva'}
+          <button
+            type="button"
+            className={`rb-post-action-btn rb-post-save-btn ${saved ? 'active' : ''}`}
+            onClick={handleSave}
+            aria-pressed={saved}
+            aria-label={saved ? 'Salvato' : 'Salva'}
+            title={saved ? 'Salvato' : 'Salva'}
+          >
+            <Icon name="bookmark" size={17} fill={saved ? 'currentColor' : 'none'} />
           </button>
         )}
         {isOwn && onEditPost && (
-          <button type="button" className="rb-post-action-btn" title="Modifica post" onClick={startEdit}>
-            ✏️
+          <button type="button" className="rb-post-action-btn" title="Modifica post" aria-label="Modifica post" onClick={startEdit}>
+            <Icon name="pencil" size={17} />
           </button>
         )}
         {(isOwn || canModeratePost) && onDeletePost && !confirmDelete && (
           <button
             type="button"
-            className="rb-post-action-btn"
+            className="rb-post-action-btn rb-post-danger-btn"
             title={isOwn ? 'Elimina post' : 'Rimuovi post (moderazione)'}
+            aria-label={isOwn ? 'Elimina post' : 'Rimuovi post (moderazione)'}
             onClick={() => setConfirmDelete(true)}
           >
-            {isOwn ? '🗑️' : '🛡️'}
+            <Icon name={isOwn ? 'trash' : 'shield'} size={17} />
           </button>
         )}
         {(isOwn || canModeratePost) && onDeletePost && confirmDelete && (
@@ -311,8 +336,8 @@ export default function PostCard({
             <button type="button" className="rb-post-delete-confirm-no" onClick={() => setConfirmDelete(false)}>No</button>
           </span>
         )}
-        <button type="button" className="rb-post-action-btn" title="Segnala post" onClick={openReportPost}>
-          🚩
+        <button type="button" className="rb-post-action-btn rb-post-report-btn" title="Segnala post" aria-label="Segnala post" onClick={openReportPost}>
+          <Icon name="flag" size={17} />
         </button>
       </div>
 
