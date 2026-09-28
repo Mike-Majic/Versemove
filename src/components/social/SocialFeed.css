@@ -14,22 +14,6 @@
   }
 }
 
-/* Colonne del Social su schermo largo: più larghe (si mangiano lo spazio
-   vuoto ai lati del globo), fino in fondo alla finestra e più accese. */
-.rb-social-feed .rb-2col-panel {
-  top: 72px;
-  bottom: 14px;
-  width: min(640px, calc(50vw - 85px));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent, #1d9bf0) 16%, rgba(6, 12, 26, 0.92)),
-    color-mix(in srgb, var(--accent, #1d9bf0) 7%, rgba(6, 12, 26, 0.92))
-  );
-  border-color: color-mix(in srgb, var(--accent, #1d9bf0) 65%, transparent);
-  box-shadow: 0 0 36px color-mix(in srgb, var(--accent, #1d9bf0) 32%, transparent),
-    inset 0 0 24px color-mix(in srgb, var(--accent, #1d9bf0) 10%, transparent);
-}
-
 .rb-social-panel-header {
   margin-bottom: 12px;
 }

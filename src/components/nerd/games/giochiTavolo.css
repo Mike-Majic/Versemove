@@ -7,19 +7,26 @@
    comodamente il ventaglio di carte in mano senza andare a capo. */
 .rb-giochi-tavolo {
   position: absolute;
-  top: 76px;
-  bottom: 90px;
+  top: 72px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(820px, 94vw);
-  background: rgba(10, 8, 4, 0.92);
-  border: 1px solid color-mix(in srgb, var(--accent, #d4f634) 45%, transparent);
+  width: min(820px, calc(100vw - 150px));
+  /* Stesso aspetto delle colonne affiancate (layout/TwoColumnSwitcher.css):
+     tinta del mondo, bordo e bagliore più accesi. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent, #d4f634) 16%, rgba(6, 12, 26, 0.92)),
+    color-mix(in srgb, var(--accent, #d4f634) 7%, rgba(6, 12, 26, 0.92))
+  );
+  border: 1px solid color-mix(in srgb, var(--accent, #d4f634) 65%, transparent);
   border-radius: 18px;
   padding: 20px 20px 24px;
   overflow-y: auto;
   pointer-events: auto;
   color: #f5f5f7;
-  box-shadow: 0 0 30px color-mix(in srgb, var(--accent, #d4f634) 18%, transparent);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--accent, #d4f634) 32%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--accent, #d4f634) 10%, transparent);
 }
 
 /* Pannello del tavolo a partita in corso (vedi RoomView in
