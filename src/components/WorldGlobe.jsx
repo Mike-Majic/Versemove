@@ -302,6 +302,23 @@ export default function WorldGlobe({
   // Nomi di città/regioni/stati/mari (globe/placeLabels.js).
   const placeLabelsRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
+  // Rotazione ferma durante il volo verso una categoria e finché la
+  // categoria resta aperta: la sua stella deve restare al centro.
+  const spinFrozenRef = useRef(false);
+  // Globo, marker, eventi e stelle delle categorie ruotano tutti insieme
+  // (globeSpinAngleRef, attorno all'asse Y): un punto a lat/lng "sul
+  // globo" in questo momento si trova a lng + angolo. Ogni volo della
+  // camera verso un punto del globo passa da qui, altrimenti dopo qualche
+  // secondo di rotazione la camera arriva dove il punto ERA (bug: clic su
+  // Cinema -> inquadrata Fotografia). Verso verificato a runtime:
+  // rotation.y = a sposta il punto da lng L a L + a (in gradi).
+  const toWorldLatLng = (lat, lng) => {
+    const deg = (globeSpinAngleRef.current * 180) / Math.PI;
+    let out = (((lng + deg + 180) % 360) + 360) % 360 - 180;
+    if (out === -180) out = 180;
+    return { lat, lng: out };
+  };
+  const categoryPositionsRef = useRef({});
   const idleTargetRef = useRef(0);
   const idleRampFromRef = useRef(0);
   const idleRampStartRef = useRef(0);
@@ -379,7 +396,7 @@ export default function WorldGlobe({
 
   const expandCluster = (cluster) => {
     const g = globeRef.current;
-    if (g) g.pointOfView({ lat: cluster.lat, lng: cluster.lng, altitude: cluster.targetAltitude }, 1200);
+    if (g) g.pointOfView({ ...toWorldLatLng(cluster.lat, cluster.lng), altitude: cluster.targetAltitude }, 1200);
   };
 
   // Elementi HTML dei marker (creati da htmlElement più giù), per chi deve
@@ -742,7 +759,7 @@ export default function WorldGlobe({
           : altitude >= ZOOM_TIER_CITY
           ? ZOOM_TIER_CITY - 0.15
           : Math.max(0.02, altitude * 0.5);
-        g.pointOfView({ lat, lng, altitude: target }, 1200);
+        g.pointOfView({ ...toWorldLatLng(lat, lng), altitude: target }, 1200);
       },
     });
     placeLabelsRef.current = labels;
@@ -793,6 +810,10 @@ export default function WorldGlobe({
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;
+    categoryPositionsRef.current = shell.positions;
+    // Mondo nuovo: la rotazione riparte (una categoria aperta nel mondo di
+    // prima non la tiene più ferma).
+    spinFrozenRef.current = false;
     shell.setActive(activeCategory);
     onCategoryPositionsReady?.(shell.positions);
 
@@ -820,8 +841,12 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, world.color]);
 
+  const prevActiveCategoryRef = useRef(activeCategory);
   useEffect(() => {
     categoryShellRef.current?.setActive(activeCategory);
+    // Categoria chiusa (da qualunque strada): il globo riprende a girare.
+    if (prevActiveCategoryRef.current && !activeCategory) spinFrozenRef.current = false;
+    prevActiveCategoryRef.current = activeCategory;
   }, [activeCategory]);
 
   // Rileva i click sui triangoli delle categorie, distinguendoli da un trascinamento
@@ -1016,7 +1041,7 @@ export default function WorldGlobe({
       const idleFactor = computeIdleFactor(now);
       const reduceMotion = reduceMotionActiveRef.current;
       if (!reduceMotion) {
-        globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
+        if (!spinFrozenRef.current) globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
         const angle = globeSpinAngleRef.current;
         if (globeRootRef.current) globeRootRef.current.rotation.y = angle;
         if (overlayRef.current) overlayRef.current.group.rotation.y = angle;
@@ -1212,11 +1237,19 @@ export default function WorldGlobe({
     if (!g || !flyTo) return undefined;
 
     globeActivity.stopAutoRotate();
+    // Volo verso una categoria: rotazione ferma subito (non con la rampa di
+    // stopAutoRotate) e finché la categoria resta aperta; lo zoom indietro
+    // (chiusura) la fa ripartire.
+    if (flyTo.categoryId) spinFrozenRef.current = true;
+    else if (flyTo.lat === undefined) spinFrozenRef.current = false;
     // Il volo è animato dal ciclo di disegno: a pieno regime finché dura.
     globeActivity.wake(CATEGORY_FLY_MS + IDLE_MS);
     const pov = { altitude: flyTo.altitude ?? 1.3 };
-    if (flyTo.lat !== undefined) pov.lat = flyTo.lat;
-    if (flyTo.lng !== undefined) pov.lng = flyTo.lng;
+    // Posizione ATTUALE: quella della stella calcolata dal guscio (più
+    // precisa dell'anchor passata da App), poi riportata alla rotazione del
+    // momento (vedi toWorldLatLng).
+    const local = (flyTo.categoryId && categoryPositionsRef.current[flyTo.categoryId]) || (flyTo.lat !== undefined ? flyTo : null);
+    if (local && local.lat !== undefined && local.lng !== undefined) Object.assign(pov, toWorldLatLng(local.lat, local.lng));
     g.pointOfView(pov, CATEGORY_FLY_MS);
 
     // Su mobile il globo resta sempre fermo (si muove solo con le dita), quindi

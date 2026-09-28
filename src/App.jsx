@@ -820,7 +820,9 @@ export default function App() {
     if (pendingOpenRef.current) clearTimeout(pendingOpenRef.current);
     cancelCategoryClosing();
     setActiveArteCategory(null);
-    setFlyTo({ lat: pos.lat, lng: pos.lng, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
+    // categoryId: WorldGlobe usa la posizione ATTUALE della stella (il globo
+    // ruota), lat/lng restano solo come ripiego.
+    setFlyTo({ lat: pos.lat, lng: pos.lng, categoryId: id, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
     pendingOpenRef.current = setTimeout(() => {
       setActiveArteCategory(id);
       // Il volo finisce sempre con la camera centrata sulla categoria: la
