@@ -1,4 +1,5 @@
-// Categorie del mondo Incontri (rosso): solo "Match" (stile Tinder) — le
+// Categorie del mondo Incontri (rosso): "Match" (stile Tinder) e
+// "Videochiamata" (stanze video di gruppo, arrivate dal mondo Nerd) — le
 // live sono state spostate nei mondi Social e Lavoro (vedi
 // liveStreams.js), qui restano solo gli incontri. Stessa struttura di
 // BAMBINI_CATEGORIES/ARTE_CATEGORIES, così funziona con lo stesso
@@ -21,6 +22,17 @@ export const INCONTRI_CATEGORIES = [
     icon: '💘',
     anchor: { lat: 12, lng: 48 }, // Golfo di Aden
     aliases: ['match', 'tinder', 'mi piace', 'incontri rapidi', 'swipe'],
+    subfamilies: [],
+  },
+  {
+    // Stanze video di gruppo (fino a 8 persone), spostate qui dal mondo
+    // Nerd: stesso componente (nerd/VideoRoomsColumn.jsx, preset
+    // 'incontri'), categoria 'videochiamata' lato server.
+    id: 'videochiamata',
+    label: 'Videochiamata',
+    icon: '🎥',
+    anchor: { lat: -22, lng: 72 }, // Oceano Indiano
+    aliases: ['videochiamata', 'videochiamate', 'stanze video', 'video chat', 'chiamata di gruppo'],
     subfamilies: [],
   },
 ];

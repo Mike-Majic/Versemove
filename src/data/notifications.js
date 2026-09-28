@@ -65,6 +65,9 @@ export function describeNotification(n, relationLabel) {
       return { who, text: `si è unito al tuo gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
     case 'lfg_leave':
       return { who, text: `ha lasciato il tuo gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
+    // Stanza video piena per cui avevo chiesto l'avviso (anteprima = titolo).
+    case 'posto_libero':
+      return { who: '', text: `Si è liberato un posto nella stanza «${n.anteprima || 'video'}»: entra ora!` };
     case 'lfg_kick':
       return { who: '', text: `Sei stato rimosso dal gruppo${n.riferimentoTipo === 'cosplay_lfg' ? ' cosplay' : ''} per ${n.anteprima || (n.riferimentoTipo === 'cosplay_lfg' ? 'la serie' : 'il gioco')}` };
     default:

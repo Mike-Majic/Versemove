@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery } from '../../data/incontriCategories';
 import MatchColumn from './MatchColumn';
+import VideoRoomsColumn from '../nerd/VideoRoomsColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import SponsorCard from '../ads/SponsorCard';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Incontri: stesso pattern di ArteExplorer
-// (X + ricerca in alto, chiuso finché non si sceglie la categoria). Resta
-// solo "Match" (stile Tinder): le dirette sono state spostate nei mondi
-// Social e Lavoro.
+// (X + ricerca in alto, chiuso finché non si sceglie la categoria):
+// "Match" (stile Tinder) e "Videochiamata" (stanze video di gruppo, le
+// stesse del mondo Nerd, preset 'incontri'). Le dirette sono nei mondi
+// Social, Lavoro, Nerd e Intrattenimento.
 export default function IncontriLiveExplorer({
   world,
   activeCategory,
@@ -68,7 +70,7 @@ export default function IncontriLiveExplorer({
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. match)..."
+                placeholder="Cerca (es. match, videochiamata)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -79,14 +81,18 @@ export default function IncontriLiveExplorer({
             </form>
           </div>
 
-          <MatchColumn
-            user={user}
-            onOpenAuth={onOpenAuth}
-            onOpenChat={onOpenChat}
-            initialTab={initialMatchTab}
-            onConsumeInitialTab={onConsumeInitialMatchTab}
-            matchFilters={matchFilters}
-          />
+          {category.id === 'videochiamata' ? (
+            <VideoRoomsColumn key={category.id} preset="incontri" user={user} onOpenAuth={onOpenAuth} />
+          ) : (
+            <MatchColumn
+              user={user}
+              onOpenAuth={onOpenAuth}
+              onOpenChat={onOpenChat}
+              initialTab={initialMatchTab}
+              onConsumeInitialTab={onConsumeInitialMatchTab}
+              matchFilters={matchFilters}
+            />
+          )}
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
           <SponsorCard mondo="incontri" categoria={category.id} formato="banner_pannello" />
         </>

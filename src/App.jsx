@@ -9,6 +9,7 @@ import TopBar from './components/TopBar';
 import DisabledWorldPopover from './components/DisabledWorldPopover';
 import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
+import { fetchVideoRoom, setPendingRoomFocus, roomCategoryTarget } from './data/videoRooms';
 import { fetchLfg } from './data/gaming';
 import { getListing } from './data/annunci';
 import { clearDeepLinkHash, parseDeepLink, profileIdByNickname } from './data/deepLinks';
@@ -1000,6 +1001,20 @@ export default function App() {
       fetchLfg(lfgId).then((lfg) => {
         setGamingFocus(lfgId ? { lfgId, seq: Date.now() } : null);
         navigateToCategory('nerd', lfg?.categoria ?? 'gaming-pc');
+      });
+      return;
+    }
+    if (tipo === 'posto_libero') {
+      // Stanza video piena che si è liberata: la sua categoria, con la
+      // stanza in evidenza nell'elenco (vedi VideoRoomsColumn).
+      fetchVideoRoom(notif.riferimentoId).then((room) => {
+        const target = room && !room.endedAt ? roomCategoryTarget(room.mondo, room.categoria) : null;
+        if (!target) {
+          setNotifToast(null);
+          return;
+        }
+        setPendingRoomFocus(room.id);
+        navigateToCategory(target.world, target.category);
       });
       return;
     }

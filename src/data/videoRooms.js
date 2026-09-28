@@ -72,6 +72,27 @@ export async function joinVideoRoom(roomId, password = null) {
   return { error: String(data) };
 }
 
+// Stanza piena: "Avvisami quando si libera un posto". Il server tiene la
+// lista d'attesa (video_room_waitlist) e, appena c'è un posto (qualcuno
+// esce, anche senza dirlo: controllo ogni minuto), manda una notifica
+// 'posto_libero' a chi aspetta da più tempo e lo toglie dalla lista.
+export async function waitVideoRoomSlot(roomId) {
+  const { error } = await rpc('wait_video_room_slot', { p_room_id: roomId });
+  return error ? { error } : {};
+}
+
+export async function cancelVideoRoomWait(roomId) {
+  const { error } = await rpc('cancel_video_room_wait', { p_room_id: roomId });
+  return error ? { error } : {};
+}
+
+// Stanze per cui sto aspettando un posto (la RLS mostra solo le mie righe).
+export async function fetchMyRoomWaits() {
+  const { data, error } = await supabase.from('video_room_waitlist').select('room_id');
+  if (error || !data) return new Set();
+  return new Set(data.map((r) => r.room_id));
+}
+
 // true finché si è dentro; false = espulso, bloccato o stanza chiusa.
 export async function touchVideoRoom(roomId) {
   const { data, error } = await rpc('touch_video_room', { p_room_id: roomId });
@@ -79,6 +100,9 @@ export async function touchVideoRoom(roomId) {
   return { active: data === true };
 }
 
+// Uscita: se esce il proprietario la stanza NON si chiude, passa a chi è
+// dentro da più tempo (si chiude solo se resta vuota) — per chiuderla a
+// tutti c'è endVideoRoom ("Chiudi per tutti").
 export async function leaveVideoRoom(roomId) {
   const { error } = await rpc('leave_video_room', { p_room_id: roomId });
   return error ? { error } : {};
@@ -117,13 +141,15 @@ export async function setVideoMemberMuted(roomId, userId, muted) {
 export async function fetchVideoRoom(roomId) {
   const { data, error } = await supabase
     .from('video_rooms')
-    .select('id, titolo, owner_id, max_partecipanti, created_at, ended_at')
+    .select('id, titolo, mondo, categoria, owner_id, max_partecipanti, created_at, ended_at')
     .eq('id', roomId)
     .maybeSingle();
   if (error || !data) return null;
   return {
     id: data.id,
     titolo: data.titolo,
+    mondo: data.mondo,
+    categoria: data.categoria,
     ownerId: data.owner_id,
     maxPartecipanti: data.max_partecipanti,
     createdAt: data.created_at,
@@ -156,4 +182,25 @@ export async function fetchRoomBans(roomId) {
   if (error || !data) return [];
   const profiles = await fetchProfilesMap(data.map((b) => b.user_id));
   return data.map((b) => ({ userId: b.user_id, profilo: profiles.get(b.user_id) ?? { id: b.user_id, name: 'Utente', avatar: '' } }));
+}
+
+// Stanza da mettere in evidenza all'apertura della sua categoria (clic sulla
+// notifica "posto libero"): la colonna la legge una volta, al montaggio.
+let pendingRoomFocus = null;
+export function setPendingRoomFocus(roomId) {
+  pendingRoomFocus = roomId ? { roomId, at: Date.now() } : null;
+}
+export function takePendingRoomFocus() {
+  const f = pendingRoomFocus;
+  pendingRoomFocus = null;
+  return f && Date.now() - f.at < 60000 ? f.roomId : null;
+}
+
+// Da mondo/categoria di una stanza alla categoria dell'interfaccia che la
+// mostra (le party del Gaming stanno in nerd/live ma si aprono dal Gaming).
+export function roomCategoryTarget(mondo, categoria) {
+  if (mondo === 'incontri') return { world: 'incontri', category: 'videochiamata' };
+  if (mondo === 'lavoro') return { world: 'lavoro', category: 'conferenze' };
+  if (mondo === 'nerd' && categoria === 'live') return { world: 'nerd', category: 'gaming-pc' };
+  return null;
 }
