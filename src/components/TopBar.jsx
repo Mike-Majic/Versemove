@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './shared/Icon';
 import { isStaff } from '../data/roles';
@@ -17,6 +18,19 @@ export default function TopBar({
   unreadMessagesCount = 0,
   unreadNotifCount = 0,
 }) {
+  // Larghezza delle icone a destra (campanella, chat, ...) come variabile
+  // CSS: la barra "Cerca" delle categorie (categoryExplorerShell.css) si
+  // mette subito alla loro sinistra, qualunque sia il numero di icone.
+  const actionsRef = useRef(null);
+  useEffect(() => {
+    const el = actionsRef.current;
+    if (!el) return undefined;
+    const set = () => document.documentElement.style.setProperty('--rb-topbar-actions-w', `${Math.round(el.getBoundingClientRect().width)}px`);
+    set();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(set) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, []);
   const { t } = useTranslation();
   return (
     <header className="rb-topbar" style={{ '--accent': world.color }}>
@@ -28,7 +42,7 @@ export default function TopBar({
         <span className="rb-world-pill">{translateWorld(t, world).label}</span>
       </div>
 
-      <div className="rb-topbar-actions">
+      <div className="rb-topbar-actions" ref={actionsRef}>
         {user ? (
           <div className="rb-user-chip">
             <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenNotifications} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
