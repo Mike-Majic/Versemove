@@ -1251,6 +1251,7 @@ export default function App() {
             onOpenAuth={() => setAuthOpen(true)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            onNoAccess={() => setLavoroConsentState(false)}
           />
         </Suspense>
       )}

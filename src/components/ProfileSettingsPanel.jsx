@@ -47,6 +47,9 @@ import FamilySection from './social/FamilySection';
 import { GAMERTAG_FIELDS, GAMERTAG_MAX, cleanGamertags } from '../data/gaming';
 import './ProfileSettingsPanel.css';
 import { ANIMALI_CATEGORIES } from '../data/animaliCategories';
+import { ARTE_CATEGORIES } from '../data/arteCategories';
+import { NERD_CATEGORIES } from '../data/nerdCategories';
+import { LAVORO_CATEGORIES } from '../data/lavoroCategories';
 
 const CITTA_MAX = 80;
 const BIO_MAX = 300;
@@ -539,8 +542,17 @@ function AccountTab({ user, onUpdateUser }) {
 // con lo sfondo del colore del suo mondo, testo sempre nel colore standard
 // del resto dell'app.
 // Etichetta salvata col preferito, ma se la categoria è stata rinominata
-// (es. Animali: "Cani" -> "Amici a 4 zampe") vince il nome attuale.
-const RENAMED_CATEGORY_LABELS = new Map(ANIMALI_CATEGORIES.map((c) => [`animali:${c.id}`, c.label]));
+// (es. Animali: "Cani" -> "Amici a 4 zampe", Intrattenimento: "Cinema" ->
+// "Sala cinema") vince il nome attuale.
+const RENAMED_CATEGORY_LABELS = new Map([
+  ...ANIMALI_CATEGORIES.map((c) => [`animali:${c.id}`, c.label]),
+  ...ARTE_CATEGORIES.map((c) => [`arte:${c.id}`, c.label]),
+  ...NERD_CATEGORIES.map((c) => [`nerd:${c.id}`, c.label]),
+  ...LAVORO_CATEGORIES.map((c) => [`lavoro:${c.id}`, c.label]),
+]);
+// Categorie tolte (Lavoro "Live", sostituita da "Stanza conferenze"): un
+// vecchio preferito non si mostra più.
+const REMOVED_CATEGORIES = new Set(['lavoro:live']);
 function currentCategoryLabel(f) {
   return RENAMED_CATEGORY_LABELS.get(`${f.worldId}:${f.categoryId}`) ?? f.categoryLabel;
 }
@@ -549,7 +561,7 @@ function FavoriteCategoriesList({ favoriteCategories }) {
   const { t } = useTranslation();
   const byWorld = WORLDS.map((w) => ({
     world: w,
-    items: favoriteCategories.filter((f) => f.worldId === w.id),
+    items: favoriteCategories.filter((f) => f.worldId === w.id && !REMOVED_CATEGORIES.has(`${f.worldId}:${f.categoryId}`)),
   })).filter((g) => g.items.length > 0);
 
   if (byWorld.length === 0) {

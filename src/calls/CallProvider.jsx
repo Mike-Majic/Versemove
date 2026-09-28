@@ -7,8 +7,8 @@ import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useM
 // la categoria o la chat non smonta la sessione.
 //
 // Tre slot indipendenti:
-// - room: stanza video di gruppo (vroom:<id>, mondo Nerd Live e party
-//   Gaming) — RoomView;
+// - room: stanza video di gruppo (vroom:<id>, mondo Nerd Videochiamata e
+//   party Gaming, mondo Lavoro Stanza conferenze) — RoomView;
 // - modroom: videochiamata della Stanza MOD (call:modroom) — ModRoomCallSession;
 // - direct: chiamata 1:1 dalla chat (call:<conversation>), anche fra match
 //   di Incontri — CallModal.
@@ -171,7 +171,7 @@ export function CallProvider({ user, children }) {
       {children}
       {user && (
         <Suspense fallback={null}>
-          {room && <RoomView key={room.roomId} roomId={room.roomId} user={user} onExit={onRoomExit} />}
+          {room && <RoomView key={room.roomId} roomId={room.roomId} source={room.source} user={user} onExit={onRoomExit} />}
           {modroomActive && <ModRoomCallSession user={user} />}
           {direct && (
             <CallModal

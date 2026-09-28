@@ -1,7 +1,8 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 
-// Stanze video di gruppo (mondo Nerd, categoria Live): video_rooms,
+// Stanze video di gruppo (mondo Nerd, Videochiamata; mondo Lavoro, Stanza
+// conferenze: stesse RPC con p_mondo/p_categoria diversi): video_rooms,
 // video_room_members, video_room_bans. Tutto passa da RPC lato server,
 // che controllano fascia d'età, blocchi, posti (massimo 8) e chi è il
 // proprietario; le tabelle si leggono soltanto (RLS). Gli errori delle RPC
@@ -16,11 +17,14 @@ const rpc = async (name, args) => {
   return { data };
 };
 
+// { rooms, error }: rooms è sempre un array (vuoto se errore); error serve
+// alla colonna per riconoscere "Non hai accesso a questo mondo" (Lavoro
+// senza consenso) e mostrare il consenso invece di una lista vuota.
 export async function listVideoRooms(mondo = 'nerd', categoria = 'live') {
   const { data, error } = await rpc('list_video_rooms', { p_mondo: mondo, p_categoria: categoria });
-  if (error || !data) return [];
+  if (error || !data) return { rooms: [], error: error ?? null };
   const owners = await fetchProfilesMap(data.map((r) => r.owner_id));
-  return data.map((r) => ({
+  const rooms = data.map((r) => ({
     id: r.id,
     titolo: r.titolo,
     ownerId: r.owner_id,
@@ -31,6 +35,7 @@ export async function listVideoRooms(mondo = 'nerd', categoria = 'live') {
     bloccato: r.sono_bloccato,
     privata: Boolean(r.privata),
   }));
+  return { rooms, error: null };
 }
 
 // privata: la password (4-32 caratteri) la controlla il server, che ne

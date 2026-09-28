@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { LAVORO_CATEGORIES, resolveCategoryQuery } from '../../data/lavoroCategories';
-import LiveWorldPanel from '../live/LiveWorldPanel';
+import VideoRoomsColumn from '../nerd/VideoRoomsColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import SponsorCard from '../ads/SponsorCard';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Lavoro: stesso pattern di ArteExplorer/
 // IncontriLiveExplorer (X + ricerca in alto, chiuso finché non si sceglie
-// la categoria). Per ora solo "Live".
+// la categoria). Per ora solo "Stanza conferenze".
 export default function LavoroWorldExplorer({
   world,
   activeCategory,
@@ -17,6 +17,7 @@ export default function LavoroWorldExplorer({
   onOpenAuth,
   favorites = [],
   onToggleFavorite,
+  onNoAccess,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -63,7 +64,7 @@ export default function LavoroWorldExplorer({
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. live)..."
+                placeholder="Cerca (es. conferenze)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -74,7 +75,9 @@ export default function LavoroWorldExplorer({
             </form>
           </div>
 
-          <LiveWorldPanel mondo="lavoro" user={user} onOpenAuth={onOpenAuth} />
+          {/* Stanze video del Nerd con i testi e i nomi del Lavoro (nome e
+              cognome); "Non hai accesso a questo mondo" -> consenso Lavoro. */}
+          <VideoRoomsColumn key={category.id} preset="conferenze" user={user} onOpenAuth={onOpenAuth} onNoAccess={onNoAccess} />
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
           <SponsorCard mondo="lavoro" categoria={category.id} formato="banner_pannello" />
         </>

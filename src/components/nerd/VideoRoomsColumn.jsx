@@ -15,6 +15,7 @@ import {
   fetchRoomBans,
 } from '../../data/videoRooms';
 import { displayName } from '../../data/posts';
+import { getLavoroProfiles } from '../../data/lavoro';
 import { useMeshCall } from '../../hooks/useMeshCall';
 import { useCalls } from '../../calls/CallProvider';
 import CallSurface, { MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../../calls/CallSurface';
@@ -39,6 +40,73 @@ const TITLE_MIN = 3;
 const TITLE_MAX = 80;
 const PW_MIN = 4;
 const PW_MAX = 32;
+
+// Stesso componente per le stanze video del Nerd (Videochiamata, party del
+// Gaming) e per la Stanza conferenze del mondo Lavoro: cambiano solo mondo/
+// categoria delle RPC, i testi e — nel Lavoro — i nomi mostrati (nome e
+// cognome al posto del nickname, visibili dopo il consenso Lavoro). La
+// chiave è la "source" con cui la stanza viene aperta in CallProvider.
+const ROOM_PRESETS = {
+  live: {
+    mondo: 'nerd',
+    categoria: 'live',
+    realNames: false,
+    createButton: '＋ Apri stanza',
+    modalTitle: 'Apri una stanza video',
+    titleLabel: 'Titolo della stanza',
+    titlePlaceholder: 'es. Serata D&D, Chiacchiere sugli anime…',
+    createAction: 'Apri stanza',
+    emptyIcon: '🎥',
+    emptyTitle: 'Nessuna stanza aperta — aprine una tu',
+    emptySubtitle: 'Fino a 8 persone in video, gratis.',
+    fallbackTitle: 'Stanza video',
+  },
+  conferenze: {
+    mondo: 'lavoro',
+    categoria: 'conferenze',
+    realNames: true,
+    createButton: '＋ Crea stanza conferenze',
+    modalTitle: 'Crea stanza conferenze',
+    titleLabel: 'Titolo della conferenza',
+    titlePlaceholder: 'Riunione di progetto',
+    createAction: 'Crea stanza',
+    emptyIcon: '💼',
+    emptyTitle: 'Nessuna conferenza attiva: creane una',
+    emptySubtitle: 'Fino a 8 persone, con condivisione dello schermo.',
+    fallbackTitle: 'Stanza conferenze',
+  },
+};
+ROOM_PRESETS.gaming = ROOM_PRESETS.live;
+const presetFor = (source) => ROOM_PRESETS[source] ?? ROOM_PRESETS.live;
+
+// Il server risponde così a chi non ha accesso al mondo (Lavoro: niente
+// consenso o minorenne): la colonna mostra il consenso Lavoro.
+const NO_ACCESS_RE = /non hai accesso a questo mondo/i;
+
+// Nome e cognome (mondo Lavoro) per una lista di utenti: la RPC li dà solo
+// se entrambe le parti hanno il consenso Lavoro, altrimenti resta il
+// nickname. enabled = false (Nerd): mappa vuota, nessuna chiamata.
+function useRealNames(ids, enabled) {
+  const [names, setNames] = useState(() => new Map());
+  const key = enabled ? Array.from(new Set(ids.filter(Boolean))).sort().join(',') : '';
+  useEffect(() => {
+    if (!key) return undefined;
+    let cancelled = false;
+    getLavoroProfiles(key.split(',')).then((map) => {
+      if (cancelled) return;
+      const next = new Map();
+      map.forEach((p, id) => {
+        const full = `${p.nome} ${p.cognome}`.trim();
+        if (full) next.set(id, full);
+      });
+      setNames(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return names;
+}
 
 const MSG_KICKED = 'Sei stato espulso dalla stanza';
 const MSG_BANNED = 'Il proprietario ti ha bloccato';
@@ -180,7 +248,7 @@ function PasswordField({ id, value, onChange, onEnter, autoFocus = false }) {
 
 // Finestra "Apri stanza": titolo, Pubblica / Privata e, se privata, la
 // password (obbligatoria, 4-32 caratteri).
-function CreateRoomModal({ busy, error, onCreate, onClose }) {
+function CreateRoomModal({ preset, busy, error, onCreate, onClose }) {
   const [title, setTitle] = useState('');
   const [privata, setPrivata] = useState(false);
   const [password, setPassword] = useState('');
@@ -192,17 +260,17 @@ function CreateRoomModal({ busy, error, onCreate, onClose }) {
   };
   return (
     <ModalOverlay onClose={onClose} hasUnsavedChanges={titleLen > 0 || password.length > 0}>
-      <div className="rb-vroom-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Apri una stanza video">
+      <div className="rb-vroom-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={preset.modalTitle}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-        <h3>Apri una stanza video</h3>
-        <label className="rb-vroom-create-label" htmlFor="rb-vroom-title">Titolo della stanza</label>
+        <h3>{preset.modalTitle}</h3>
+        <label className="rb-vroom-create-label" htmlFor="rb-vroom-title">{preset.titleLabel}</label>
         <input
           id="rb-vroom-title"
           className="rb-vroom-modal-input"
           type="text"
           value={title}
           maxLength={TITLE_MAX}
-          placeholder="es. Serata D&D, Chiacchiere sugli anime…"
+          placeholder={preset.titlePlaceholder}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
@@ -239,7 +307,7 @@ function CreateRoomModal({ busy, error, onCreate, onClose }) {
         <div className="rb-vroom-modal-actions">
           <button type="button" className="rb-vroom-btn" onClick={onClose}>Annulla</button>
           <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={submit} disabled={!canCreate}>
-            {busy ? 'Apertura…' : 'Apri stanza'}
+            {busy ? 'Apertura…' : preset.createAction}
           </button>
         </div>
       </div>
@@ -275,7 +343,7 @@ function JoinPasswordModal({ room, busy, error, onSubmit, onClose }) {
   );
 }
 
-function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomId }) {
+function RoomsList({ preset, user, onOpenAuth, onEnter, onNoAccess, notice, onDismissNotice, inRoomId }) {
   const [rooms, setRooms] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -287,10 +355,15 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const list = await listVideoRooms('nerd', 'live');
-    setRooms(list);
+    const res = await listVideoRooms(preset.mondo, preset.categoria);
     setLoading(false);
-  }, []);
+    if (res.error && NO_ACCESS_RE.test(res.error)) {
+      onNoAccess?.();
+      return;
+    }
+    setRooms(res.rooms);
+  }, [preset.mondo, preset.categoria, onNoAccess]);
+  const realNames = useRealNames((rooms ?? []).map((r) => r.ownerId), preset.realNames);
 
   useEffect(() => {
     refresh();
@@ -327,6 +400,10 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
       return;
     }
     if (res.error) {
+      if (NO_ACCESS_RE.test(res.error)) {
+        onNoAccess?.();
+        return;
+      }
       setPwRoom(null);
       setError(res.error);
       refresh();
@@ -344,8 +421,12 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
     }
     setBusy(true);
     setCreateError('');
-    const { id, error: err } = await createVideoRoom(title, 'nerd', 'live', { privata, password });
+    const { id, error: err } = await createVideoRoom(title, preset.mondo, preset.categoria, { privata, password });
     setBusy(false);
+    if (err && NO_ACCESS_RE.test(err)) {
+      onNoAccess?.();
+      return;
+    }
     if (err) {
       setCreateError(err);
       return;
@@ -366,7 +447,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
               setShowCreate(true);
             }}
           >
-            ＋ Apri stanza
+            {preset.createButton}
           </button>
         ) : (
           <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={() => onOpenAuth?.()}>
@@ -376,7 +457,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
         <button type="button" className="rb-vroom-btn" onClick={refresh} disabled={loading}>↻ Aggiorna</button>
       </div>
 
-      {showCreate && user && <CreateRoomModal busy={busy} error={createError} onCreate={create} onClose={() => setShowCreate(false)} />}
+      {showCreate && user && <CreateRoomModal preset={preset} busy={busy} error={createError} onCreate={create} onClose={() => setShowCreate(false)} />}
       {pwRoom && (
         <JoinPasswordModal
           room={pwRoom}
@@ -401,7 +482,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
       {rooms === null ? (
         <Skeleton lines={3} />
       ) : rooms.length === 0 ? (
-        <EmptyState icon="🎥" title="Nessuna stanza aperta — aprine una tu" subtitle="Fino a 8 persone in video, gratis." />
+        <EmptyState icon={preset.emptyIcon} title={preset.emptyTitle} subtitle={preset.emptySubtitle} />
       ) : (
         <ul className="rb-vroom-list">
           {rooms.map((r) => {
@@ -421,7 +502,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomI
                   </p>
                   <p className="rb-vroom-item-meta">
                     <Avatar profile={r.owner} size={20} />
-                    <span>{displayName(r.owner, 'Utente')}</span>
+                    <span>{realNames.get(r.ownerId) ?? displayName(r.owner, 'Utente')}</span>
                     <span className="rb-vroom-dot">·</span>
                     <span>{openSince(r.createdAt)}</span>
                   </p>
@@ -485,7 +566,8 @@ function useIdSet(ids) {
 // Sessione della stanza: montata da calls/CallProvider (non dalla colonna),
 // così resta attiva cambiando mondo. La vista completa va nella colonna
 // che la ospita (Live o Gaming), altrimenti mini-monitor.
-export function RoomView({ roomId, user, onExit }) {
+export function RoomView({ roomId, source, user, onExit }) {
+  const preset = presetFor(source);
   const { views, setView } = useCalls();
   const fullOpen = views.room === 'full';
   const [room, setRoom] = useState(null);
@@ -493,6 +575,10 @@ export function RoomView({ roomId, user, onExit }) {
   const [bans, setBans] = useState([]);
   const [error, setError] = useState('');
   const [menuFor, setMenuFor] = useState(null);
+  // Lavoro: nome e cognome al posto del nickname (anche il mio).
+  const realNames = useRealNames([...(members ?? []).map((m) => m.userId), ...bans.map((b) => b.userId)], preset.realNames);
+  const myRealName = preset.realNames ? `${user?.nome ?? ''} ${user?.cognome ?? ''}`.trim() : '';
+  const nameOf = (id, profile, fallback = 'Utente') => (id === user?.id && myRealName) || realNames.get(id) || displayName(profile, fallback);
   const [confirm, setConfirm] = useState(null); // { text, label, action }
   const [started, setStarted] = useState(false);
   const exitingRef = useRef(false);
@@ -549,10 +635,12 @@ export function RoomView({ roomId, user, onExit }) {
     };
   }, [roomId, exitRoom]);
 
+  const realNamesOn = preset.realNames;
   const startCall = useCallback(async () => {
     setStarted(true);
-    await callJoin({ name: displayName(user, 'Utente'), avatar: user?.avatar || '' });
-  }, [callJoin, user]);
+    const full = realNamesOn ? `${user?.nome ?? ''} ${user?.cognome ?? ''}`.trim() : '';
+    await callJoin({ name: full || displayName(user, 'Utente'), avatar: user?.avatar || '' });
+  }, [callJoin, user, realNamesOn]);
 
   useEffect(() => {
     if (room && members && !started) startCall();
@@ -699,7 +787,7 @@ export function RoomView({ roomId, user, onExit }) {
   const miniTile = speakingTile ?? firstTile ?? null;
   const miniProfile = miniTile ? members?.find((m) => m.userId === miniTile.userId)?.profilo : user;
   const mini = {
-    title: room ? `${room.titolo}${miniTile ? ` · ${displayName(miniProfile, miniTile.name || 'Utente')}` : ''}` : 'Stanza video',
+    title: room ? `${room.titolo}${miniTile ? ` · ${nameOf(miniTile.userId, miniProfile, miniTile.name || 'Utente')}` : ''}` : preset.fallbackTitle,
     stream: miniTile?.stream ?? myVideo,
     placeholder: <Avatar profile={miniProfile} size={56} />,
     micOn: call.micOn,
@@ -737,7 +825,7 @@ export function RoomView({ roomId, user, onExit }) {
         <div className="rb-vroom-room-title">
           <h3>{room.titolo}</h3>
           <p>
-            <span>👑 {isOwner ? 'Tu' : displayName(ownerProfile, 'Proprietario')}</span>
+            <span>👑 {isOwner ? 'Tu' : nameOf(room.ownerId, ownerProfile, 'Proprietario')}</span>
             <span className="rb-vroom-dot">·</span>
             <span>{count}/{room.maxPartecipanti} persone</span>
           </p>
@@ -775,7 +863,7 @@ export function RoomView({ roomId, user, onExit }) {
             <VideoTile
               key={m.userId}
               stream={tile?.stream}
-              name={displayName(m.profilo, tile?.name || 'Utente')}
+              name={nameOf(m.userId, m.profilo, tile?.name || 'Utente')}
               profile={m.profilo}
               isOwner={m.userId === room.ownerId}
               muted={m.muted}
@@ -788,7 +876,7 @@ export function RoomView({ roomId, user, onExit }) {
                     <button
                       type="button"
                       className="rb-vroom-menu-btn"
-                      aria-label={`Azioni su ${displayName(m.profilo, 'Utente')}`}
+                      aria-label={`Azioni su ${nameOf(m.userId, m.profilo)}`}
                       aria-expanded={menuFor === m.userId}
                       onClick={() => setMenuFor((v) => (v === m.userId ? null : m.userId))}
                     >
@@ -807,7 +895,7 @@ export function RoomView({ roomId, user, onExit }) {
                           onClick={() => {
                             setMenuFor(null);
                             setConfirm({
-                              text: `Bloccare ${displayName(m.profilo, 'questa persona')}? Non potrà più rientrare in questa stanza.`,
+                              text: `Bloccare ${nameOf(m.userId, m.profilo, 'questa persona')}? Non potrà più rientrare in questa stanza.`,
                               label: 'Blocca',
                               action: () => {
                                 setConfirm(null);
@@ -865,7 +953,7 @@ export function RoomView({ roomId, user, onExit }) {
             {bans.map((b) => (
               <li key={b.userId}>
                 <Avatar profile={b.profilo} size={24} />
-                <span>{displayName(b.profilo, 'Utente')}</span>
+                <span>{nameOf(b.userId, b.profilo)}</span>
                 <button type="button" className="rb-vroom-btn" onClick={() => unban(b.userId)}>Sblocca</button>
               </li>
             ))}
@@ -879,38 +967,47 @@ export function RoomView({ roomId, user, onExit }) {
 
 // ---------------------------------------------------------------------------
 
-// Colonna Live del mondo Nerd: solo "Stanze video" (gli eventi restano
-// nelle loro categorie). La stanza in corso vive in calls/CallProvider:
-// qui c'è il contenitore (host) dove entra la sua vista completa; se la
-// stanza è ridotta a mini-monitor si rivede l'elenco.
-export default function VideoRoomsColumn({ user, onOpenAuth }) {
+// Colonna delle stanze: Videochiamata del mondo Nerd (preset 'live') o
+// Stanza conferenze del mondo Lavoro (preset 'conferenze'). La stanza in
+// corso vive in calls/CallProvider: qui c'è il contenitore (host) dove
+// entra la sua vista completa; se la stanza è ridotta a mini-monitor si
+// rivede l'elenco. onNoAccess: il server ha risposto "Non hai accesso a
+// questo mondo" (Lavoro senza consenso): chi monta la colonna mostra il
+// consenso.
+export default function VideoRoomsColumn({ user, onOpenAuth, preset: presetKey = 'live', onNoAccess }) {
   const calls = useCalls();
   const { room, views, roomExit, consumeRoomExit, openRoom, setView, hostRef } = calls;
+  const preset = presetFor(presetKey);
   const [notice, setNotice] = useState('');
-  const showingRoom = Boolean(room && user && views.room === 'full');
+  // La vista completa entra qui solo se la stanza in corso è di questa
+  // colonna (una conferenza non si apre dentro la colonna del Nerd).
+  const roomHere = Boolean(room && presetFor(room.source) === preset);
+  const showingRoom = Boolean(roomHere && user && views.room === 'full');
 
   // Uscita dalla stanza (per scelta, espulsione, chiusura): il motivo qui.
   useEffect(() => {
-    if (!roomExit || roomExit.source !== 'live') return;
+    if (!roomExit || presetFor(roomExit.source) !== preset || roomExit.source === 'gaming') return;
     setNotice(roomExit.message);
     consumeRoomExit();
-  }, [roomExit, consumeRoomExit]);
+  }, [roomExit, consumeRoomExit, preset]);
 
   return (
     <>
-      <div ref={hostRef('room')} className="rb-vroom-host" />
+      {(roomHere || !room) && <div ref={hostRef('room')} className="rb-vroom-host" />}
       {!showingRoom && (
         <div className="rb-vroom-panel">
           <RoomsList
+            preset={preset}
             user={user}
             onOpenAuth={onOpenAuth}
+            onNoAccess={onNoAccess}
             notice={notice}
             inRoomId={room?.roomId ?? null}
             onDismissNotice={() => setNotice('')}
             onEnter={(id) => {
               setNotice('');
               if (room?.roomId === id) setView('room', 'full');
-              else openRoom(id, 'live');
+              else openRoom(id, presetKey);
             }}
           />
         </div>
