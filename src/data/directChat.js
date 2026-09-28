@@ -35,9 +35,57 @@ export async function fetchMessages(conversationId, { before = null, limit = nul
       rows = rows.slice(0, limit).reverse();
     }
 
+    // Messaggi che ho eliminato "per me" (chat_message_hidden, la RLS fa
+    // leggere solo le proprie righe): non si mostrano.
+    const hidden = await fetchHiddenMessageIds(rows.map((m) => m.id));
+    if (hidden.size) rows = rows.filter((m) => !hidden.has(m.id));
+
     const profilesMap = await fetchProfilesMap(rows.map((m) => m.sender_id));
     const messages = rows.map((row) => mapMessageRow(row, profilesMap.get(row.sender_id)));
     return { messages, hasMore };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+async function fetchHiddenMessageIds(ids) {
+  if (!ids.length) return new Set();
+  try {
+    const { data } = await supabase.from('chat_message_hidden').select('message_id').in('message_id', ids);
+    return new Set((data ?? []).map((r) => r.message_id));
+  } catch {
+    return new Set();
+  }
+}
+
+// "Elimina per tutti" (solo i miei messaggi): il server svuota il messaggio
+// (tipo 'eliminato') e restituisce il vecchio allegato; il file va tolto
+// dallo storage qui (la policy lo permette al mittente). Se la rimozione
+// del file non riesce il messaggio resta comunque eliminato.
+export async function deleteMessageForAll(messageId) {
+  try {
+    const { data, error } = await supabase.rpc('delete_chat_message_for_all', { p_message_id: messageId });
+    if (error) return { error: translateInteractionError(error) };
+    if (data?.path) {
+      try {
+        await supabase.storage.from('chat-media').remove([data.path]);
+      } catch {
+        // file già sparito o permesso negato: non blocca l'eliminazione
+      }
+    }
+    return {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// "Elimina per me": qualunque messaggio della conversazione, sparisce solo
+// dalla mia vista (chat_message_hidden).
+export async function deleteMessageForMe(messageId) {
+  try {
+    const { error } = await supabase.rpc('delete_chat_message_for_me', { p_message_id: messageId });
+    if (error) return { error: translateInteractionError(error) };
+    return {};
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
@@ -62,6 +110,7 @@ export function mapMessageRow(row, author) {
 // Testo breve di un messaggio per le anteprime (hub 💬): i vocali con la
 // durata, i video con l'etichetta, il resto col testo salvato.
 export function messagePreviewText({ tipo, testo, allegato } = {}) {
+  if (tipo === 'eliminato') return 'Messaggio eliminato';
   if (tipo === 'audio') {
     const s = Math.max(0, Math.round(Number(allegato?.durata) || 0));
     return s ? `🎤 Messaggio vocale · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '🎤 Messaggio vocale';
@@ -161,7 +210,9 @@ export function subscribeToParticipantUpdates(conversationId, onUpdate) {
 // cade e si ristabilisce (per ricaricare i messaggi dal DB e non perderne).
 // Va rimosso con supabase.removeChannel alla chiusura/cambio chat, altrimenti
 // resta appeso.
-export function subscribeToConversationMessages(conversationId, onInsert, onReconnect) {
+// onUpdate: un messaggio modificato (es. "Elimina per tutti" dell'altra
+// persona), così la bolla diventa "Messaggio eliminato" subito.
+export function subscribeToConversationMessages(conversationId, onInsert, onReconnect, onUpdate) {
   let everSubscribed = false;
   return supabase
     .channel(`chat-messages-${conversationId}`)
@@ -169,6 +220,11 @@ export function subscribeToConversationMessages(conversationId, onInsert, onReco
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${conversationId}` },
       (payload) => onInsert(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${conversationId}` },
+      (payload) => onUpdate?.(payload.new)
     )
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') return;

@@ -6,6 +6,7 @@ import MusicaApp from './musica/MusicaApp';
 import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
+import TeatroColumn from './arte/TeatroColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
 import VideoRoomsColumn from './nerd/VideoRoomsColumn';
@@ -125,9 +126,13 @@ export default function ArteExplorer({
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
-            // Live del mondo Nerd: stanze video di gruppo, più la scheda
-            // "Eventi" con la colonna di prima, identica.
-            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} events={genericColumn} />
+            // Live del mondo Nerd: solo stanze video di gruppo (gli eventi
+            // restano nelle loro categorie).
+            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'arte' && category.id === 'teatro' ? (
+            // Teatro: eventi come in Cosplay (lista/mappa, città + km,
+            // periodo, tipo) più la scheda Community di prima.
+            <TeatroColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} locationFilters={locationFilters} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}

@@ -29,18 +29,42 @@ export async function listVideoRooms(mondo = 'nerd', categoria = 'live') {
     maxPartecipanti: r.max_partecipanti,
     partecipanti: r.partecipanti,
     bloccato: r.sono_bloccato,
+    privata: Boolean(r.privata),
   }));
 }
 
-export async function createVideoRoom(titolo, mondo = 'nerd', categoria = 'live') {
-  const { data, error } = await rpc('create_video_room', { p_titolo: titolo, p_mondo: mondo, p_categoria: categoria });
+// privata: la password (4-32 caratteri) la controlla il server, che ne
+// salva solo l'hash; chi crea la stanza la comunica lui agli invitati.
+export async function createVideoRoom(titolo, mondo = 'nerd', categoria = 'live', { privata = false, password = null } = {}) {
+  const { data, error } = await rpc('create_video_room', {
+    p_titolo: titolo,
+    p_mondo: mondo,
+    p_categoria: categoria,
+    p_privata: privata,
+    p_password: privata ? password : null,
+  });
   if (error) return { error };
   return { id: data };
 }
 
-export async function joinVideoRoom(roomId) {
-  const { error } = await rpc('join_video_room', { p_room_id: roomId });
-  return error ? { error } : {};
+// Esito dell'ingresso: {} = entrato; { needPassword } = stanza privata, va
+// chiesta la password; { error, wrongPassword | tooMany } = password
+// sbagliata o troppi tentativi (5 ogni 10 minuti, contati dal server).
+// Gli altri errori (stanza chiusa, piena, bloccato) arrivano come { error }.
+export const JOIN_MESSAGES = {
+  password_richiesta: 'Questa stanza è privata: serve la password.',
+  password_errata: 'Password errata',
+  troppi_tentativi: 'Troppi tentativi, riprova tra qualche minuto',
+};
+
+export async function joinVideoRoom(roomId, password = null) {
+  const { data, error } = await rpc('join_video_room', { p_room_id: roomId, p_password: password });
+  if (error) return { error };
+  if (data === 'ok' || data == null) return {};
+  if (data === 'password_richiesta') return { needPassword: true, error: JOIN_MESSAGES.password_richiesta };
+  if (data === 'password_errata') return { wrongPassword: true, error: JOIN_MESSAGES.password_errata };
+  if (data === 'troppi_tentativi') return { tooMany: true, error: JOIN_MESSAGES.troppi_tentativi };
+  return { error: String(data) };
 }
 
 // true finché si è dentro; false = espulso, bloccato o stanza chiusa.

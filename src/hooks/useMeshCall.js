@@ -22,6 +22,10 @@ import { supabase } from '../data/supabaseClient';
 // dallo stesso canale: send(event, payload) e onEvent(event, handler).
 const SIGNAL_EVENT = 'app';
 
+// Condivisione schermo possibile solo dove il browser ha getDisplayMedia
+// (quasi nessun telefono): altrove il pulsante non si mostra.
+export const canShareScreen = () => Boolean(navigator.mediaDevices?.getDisplayMedia);
+
 export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds = null }) {
   const [members, setMembers] = useState([]); // presence: [{ userId, name, avatar }]
   const [joined, setJoined] = useState(false);
@@ -32,6 +36,10 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
   const [micLocked, setMicLocked] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [error, setError] = useState('');
+  // Schermo condiviso al posto della webcam (stessa traccia video inviata a
+  // tutti con replaceTrack): screenStream serve per l'anteprima locale.
+  const [screenStream, setScreenStream] = useState(null);
+  const screenTrackRef = useRef(null);
 
   const channelRef = useRef(null);
   const subscribedRef = useRef(null); // Promise risolta a SUBSCRIBED
@@ -155,7 +163,11 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
       }
     }, PEER_CONNECT_TIMEOUT_MS);
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
+      // Chi entra mentre condivido lo schermo riceve direttamente lo schermo.
+      localStreamRef.current.getTracks().forEach((track) => {
+        const out = track.kind === 'video' && screenTrackRef.current ? screenTrackRef.current : track;
+        pc.addTrack(out, localStreamRef.current);
+      });
     }
     peersRef.current.set(id, entry);
     return entry;
@@ -257,6 +269,8 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
         entry.pc.close();
       });
       peers.clear();
+      screenTrackRef.current?.stop();
+      screenTrackRef.current = null;
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       joinedRef.current = false;
@@ -326,8 +340,55 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
     [userId]
   );
 
+  // Traccia video uscente su tutte le connessioni (webcam o schermo).
+  const replaceOutgoingVideo = (track) => {
+    peersRef.current.forEach((entry) => {
+      const sender = entry.pc.getSenders().find((sd) => sd.track?.kind === 'video');
+      if (sender) sender.replaceTrack(track).catch(() => {});
+    });
+  };
+
+  const stopScreenShare = useCallback(() => {
+    const screen = screenTrackRef.current;
+    if (!screen) return;
+    screenTrackRef.current = null;
+    screen.onended = null;
+    screen.stop();
+    const cam = localStreamRef.current?.getVideoTracks()[0] ?? null;
+    replaceOutgoingVideo(cam);
+    setScreenStream(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Condivisione schermo: la traccia dello schermo prende il posto della
+  // webcam su tutte le connessioni; quando finisce (anche col pulsante del
+  // browser, evento "ended") si torna alla webcam.
+  const startScreenShare = useCallback(async () => {
+    if (!joinedRef.current || screenTrackRef.current || !canShareScreen()) return false;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch {
+      return false; // annullata dall'utente o non permessa
+    }
+    const track = stream.getVideoTracks()[0];
+    if (!track) return false;
+    screenTrackRef.current = track;
+    track.onended = () => stopScreenShare();
+    replaceOutgoingVideo(track);
+    setScreenStream(stream);
+    return true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopScreenShare]);
+
   const leave = useCallback(() => {
     channelRef.current?.untrack();
+    if (screenTrackRef.current) {
+      screenTrackRef.current.onended = null;
+      screenTrackRef.current.stop();
+      screenTrackRef.current = null;
+    }
+    setScreenStream(null);
     peersRef.current.forEach((entry) => {
       clearTimeout(entry.timer);
       entry.pc.close();
@@ -393,5 +454,9 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
     closePeer,
     send,
     onEvent,
+    screenStream,
+    sharingScreen: Boolean(screenStream),
+    startScreenShare,
+    stopScreenShare,
   };
 }

@@ -16,6 +16,9 @@ import {
 } from '../../data/videoRooms';
 import { displayName } from '../../data/posts';
 import { useMeshCall } from '../../hooks/useMeshCall';
+import { useCalls } from '../../calls/CallProvider';
+import CallSurface, { MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../../calls/CallSurface';
+import Icon from '../shared/Icon';
 import { useBackLayer } from '../../hooks/useBackLayer';
 import { useGlobeCover } from '../../fx/globeCover';
 import EmptyState from '../EmptyState';
@@ -24,15 +27,18 @@ import ModalOverlay from '../ModalOverlay';
 import './videoRooms.css';
 
 // Live del mondo Nerd: stanze video di gruppo gratuite (fino a 8 persone,
-// WebRTC mesh con hooks/useMeshCall) più, nella seconda scheda, gli eventi
-// della community come negli altri mondi. Regole, posti, fascia d'età e
-// poteri del proprietario li controlla il server (data/videoRooms.js): qui
-// si mostra lo stato e si avvisano gli altri client con send('mod', ...).
+// WebRTC mesh con hooks/useMeshCall), pubbliche o private con password.
+// Regole, posti, fascia d'età, password e poteri del proprietario li
+// controlla il server (data/videoRooms.js): qui si mostra lo stato e si
+// avvisano gli altri client con send('mod', ...). La stanza in corso vive
+// in calls/CallProvider (resta attiva cambiando mondo, mini-monitor).
 
 const LIST_REFRESH_MS = 15000;
 const HEARTBEAT_MS = 20000;
 const TITLE_MIN = 3;
 const TITLE_MAX = 80;
+const PW_MIN = 4;
+const PW_MAX = 32;
 
 const MSG_KICKED = 'Sei stato espulso dalla stanza';
 const MSG_BANNED = 'Il proprietario ti ha bloccato';
@@ -142,13 +148,142 @@ function Confirm({ text, confirmLabel, onConfirm, onCancel }) {
 // ---------------------------------------------------------------------------
 // Elenco stanze
 
-function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
+// Campo password con l'occhio per mostrarla/nasconderla.
+function PasswordField({ id, value, onChange, onEnter, autoFocus = false }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="rb-vroom-pw">
+      <input
+        id={id}
+        type={show ? 'text' : 'password'}
+        value={value}
+        maxLength={PW_MAX}
+        autoComplete="off"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onEnter?.();
+        }}
+        autoFocus={autoFocus}
+      />
+      <button
+        type="button"
+        className="rb-vroom-pw-eye"
+        onClick={() => setShow((v) => !v)}
+        aria-label={show ? 'Nascondi password' : 'Mostra password'}
+        title={show ? 'Nascondi password' : 'Mostra password'}
+      >
+        <Icon name={show ? 'eyeOff' : 'eye'} size={18} />
+      </button>
+    </div>
+  );
+}
+
+// Finestra "Apri stanza": titolo, Pubblica / Privata e, se privata, la
+// password (obbligatoria, 4-32 caratteri).
+function CreateRoomModal({ busy, error, onCreate, onClose }) {
+  const [title, setTitle] = useState('');
+  const [privata, setPrivata] = useState(false);
+  const [password, setPassword] = useState('');
+  const titleLen = title.trim().length;
+  const pwOk = !privata || (password.length >= PW_MIN && password.length <= PW_MAX);
+  const canCreate = titleLen >= TITLE_MIN && pwOk && !busy;
+  const submit = () => {
+    if (canCreate) onCreate({ title: title.trim(), privata, password });
+  };
+  return (
+    <ModalOverlay onClose={onClose} hasUnsavedChanges={titleLen > 0 || password.length > 0}>
+      <div className="rb-vroom-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Apri una stanza video">
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <h3>Apri una stanza video</h3>
+        <label className="rb-vroom-create-label" htmlFor="rb-vroom-title">Titolo della stanza</label>
+        <input
+          id="rb-vroom-title"
+          className="rb-vroom-modal-input"
+          type="text"
+          value={title}
+          maxLength={TITLE_MAX}
+          placeholder="es. Serata D&D, Chiacchiere sugli anime…"
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submit();
+          }}
+          autoFocus
+        />
+        <span className={`rb-vroom-counter ${titleLen > 0 && titleLen < TITLE_MIN ? 'is-short' : ''}`}>
+          {titleLen}/{TITLE_MAX} · minimo {TITLE_MIN} caratteri
+        </span>
+
+        <div className="rb-vroom-privacy" role="radiogroup" aria-label="Chi può entrare">
+          <button type="button" role="radio" aria-checked={!privata} className={!privata ? 'is-active' : ''} onClick={() => setPrivata(false)}>
+            🌐 Pubblica
+            <small>Chiunque può entrare</small>
+          </button>
+          <button type="button" role="radio" aria-checked={privata} className={privata ? 'is-active' : ''} onClick={() => setPrivata(true)}>
+            <Icon name="lock" size={16} /> Privata
+            <small>Si entra con la password</small>
+          </button>
+        </div>
+
+        {privata && (
+          <>
+            <label className="rb-vroom-create-label" htmlFor="rb-vroom-pw">Password</label>
+            <PasswordField id="rb-vroom-pw" value={password} onChange={setPassword} onEnter={submit} />
+            <span className={`rb-vroom-counter ${password.length > 0 && password.length < PW_MIN ? 'is-short' : ''}`}>
+              da {PW_MIN} a {PW_MAX} caratteri
+            </span>
+            <p className="rb-vroom-pw-hint">🔑 Comunica tu la password alle persone che vuoi far entrare.</p>
+          </>
+        )}
+
+        {error && <p className="rb-vroom-error" role="alert">{error}</p>}
+        <div className="rb-vroom-modal-actions">
+          <button type="button" className="rb-vroom-btn" onClick={onClose}>Annulla</button>
+          <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={submit} disabled={!canCreate}>
+            {busy ? 'Apertura…' : 'Apri stanza'}
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// Password per entrare in una stanza privata.
+function JoinPasswordModal({ room, busy, error, onSubmit, onClose }) {
+  const [password, setPassword] = useState('');
+  const submit = () => {
+    if (password.length > 0 && !busy) onSubmit(password);
+  };
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="rb-vroom-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Password della stanza">
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <h3>
+          <Icon name="lock" size={18} /> {room.titolo}
+        </h3>
+        <p className="rb-vroom-pw-hint">Questa stanza è privata: inserisci la password che ti ha dato chi l’ha aperta.</p>
+        <label className="rb-vroom-create-label" htmlFor="rb-vroom-join-pw">Password</label>
+        <PasswordField id="rb-vroom-join-pw" value={password} onChange={setPassword} onEnter={submit} autoFocus />
+        {error && <p className="rb-vroom-error" role="alert">{error}</p>}
+        <div className="rb-vroom-modal-actions">
+          <button type="button" className="rb-vroom-btn" onClick={onClose}>Annulla</button>
+          <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={submit} disabled={!password || busy}>
+            {busy ? 'Controllo…' : 'Entra'}
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice, inRoomId }) {
   const [rooms, setRooms] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [pwRoom, setPwRoom] = useState(null); // stanza privata di cui chiedere la password
+  const [pwError, setPwError] = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -163,47 +298,74 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
     return () => clearInterval(timer);
   }, [refresh, user?.id]);
 
-  const enter = async (room) => {
+  const enter = async (room, password = null) => {
     if (!user) {
       onOpenAuth?.();
+      return;
+    }
+    if (room.id === inRoomId) {
+      onEnter(room.id);
+      return;
+    }
+    if (inRoomId) {
+      setError('Sei già in una stanza video: esci da quella prima di entrare in un’altra.');
       return;
     }
     if (busy) return;
     setBusy(true);
     setError('');
-    const { error: err } = await joinVideoRoom(room.id);
+    setPwError('');
+    const res = await joinVideoRoom(room.id, password);
     setBusy(false);
-    if (err) {
-      setError(err);
+    if (res.needPassword) {
+      setPwRoom(room);
+      return;
+    }
+    if (res.wrongPassword || res.tooMany) {
+      setPwRoom(room);
+      setPwError(res.error);
+      return;
+    }
+    if (res.error) {
+      setPwRoom(null);
+      setError(res.error);
       refresh();
       return;
     }
+    setPwRoom(null);
     onEnter(room.id);
   };
 
-  const create = async () => {
-    const clean = title.trim();
-    if (clean.length < TITLE_MIN || busy) return;
-    setBusy(true);
-    setError('');
-    const { id, error: err } = await createVideoRoom(clean);
-    setBusy(false);
-    if (err) {
-      setError(err);
+  const create = async ({ title, privata, password }) => {
+    if (busy) return;
+    if (inRoomId) {
+      setCreateError('Sei già in una stanza video: esci da quella prima di aprirne un’altra.');
       return;
     }
-    setTitle('');
+    setBusy(true);
+    setCreateError('');
+    const { id, error: err } = await createVideoRoom(title, 'nerd', 'live', { privata, password });
+    setBusy(false);
+    if (err) {
+      setCreateError(err);
+      return;
+    }
     setShowCreate(false);
     onEnter(id);
   };
-
-  const titleLen = title.trim().length;
 
   return (
     <div className="rb-vroom-list-wrap">
       <div className="rb-vroom-toolbar">
         {user ? (
-          <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={() => setShowCreate((v) => !v)}>
+          <button
+            type="button"
+            className="rb-vroom-btn rb-vroom-btn--primary"
+            onClick={() => {
+              setCreateError('');
+              setShowCreate(true);
+            }}
+          >
             ＋ Apri stanza
           </button>
         ) : (
@@ -214,30 +376,18 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
         <button type="button" className="rb-vroom-btn" onClick={refresh} disabled={loading}>↻ Aggiorna</button>
       </div>
 
-      {showCreate && user && (
-        <div className="rb-vroom-create">
-          <label className="rb-vroom-create-label" htmlFor="rb-vroom-title">Titolo della stanza</label>
-          <div className="rb-vroom-create-row">
-            <input
-              id="rb-vroom-title"
-              type="text"
-              value={title}
-              maxLength={TITLE_MAX}
-              placeholder="es. Serata D&D, Chiacchiere sugli anime…"
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') create();
-              }}
-              autoFocus
-            />
-            <button type="button" className="rb-vroom-btn rb-vroom-btn--primary" onClick={create} disabled={titleLen < TITLE_MIN || busy}>
-              {busy ? 'Apertura…' : 'Apri'}
-            </button>
-          </div>
-          <span className={`rb-vroom-counter ${titleLen > 0 && titleLen < TITLE_MIN ? 'is-short' : ''}`}>
-            {titleLen}/{TITLE_MAX} · minimo {TITLE_MIN} caratteri
-          </span>
-        </div>
+      {showCreate && user && <CreateRoomModal busy={busy} error={createError} onCreate={create} onClose={() => setShowCreate(false)} />}
+      {pwRoom && (
+        <JoinPasswordModal
+          room={pwRoom}
+          busy={busy}
+          error={pwError}
+          onSubmit={(pw) => enter(pwRoom, pw)}
+          onClose={() => {
+            setPwRoom(null);
+            setPwError('');
+          }}
+        />
       )}
 
       {notice && (
@@ -256,11 +406,19 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
         <ul className="rb-vroom-list">
           {rooms.map((r) => {
             const full = r.partecipanti >= r.maxPartecipanti;
-            const label = !user ? 'Accedi per entrare' : r.bloccato ? 'Bloccato' : full ? 'Piena' : 'Entra';
+            const mine = r.id === inRoomId;
+            const label = !user ? 'Accedi per entrare' : mine ? 'Torna' : r.bloccato ? 'Bloccato' : full ? 'Piena' : 'Entra';
             return (
               <li key={r.id} className="rb-vroom-item">
                 <div className="rb-vroom-item-main">
-                  <p className="rb-vroom-item-title">{r.titolo}</p>
+                  <p className="rb-vroom-item-title">
+                    {r.privata && (
+                      <span className="rb-vroom-lock" title="Stanza privata: serve la password" aria-label="Stanza privata">
+                        <Icon name="lock" size={15} />
+                      </span>
+                    )}
+                    {r.titolo}
+                  </p>
                   <p className="rb-vroom-item-meta">
                     <Avatar profile={r.owner} size={20} />
                     <span>{displayName(r.owner, 'Utente')}</span>
@@ -273,7 +431,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
                   type="button"
                   className="rb-vroom-btn rb-vroom-btn--primary"
                   onClick={() => enter(r)}
-                  disabled={Boolean(user) && (r.bloccato || full || busy)}
+                  disabled={Boolean(user) && !mine && (r.bloccato || full || busy)}
                 >
                   {label}
                 </button>
@@ -289,7 +447,7 @@ function RoomsList({ user, onOpenAuth, onEnter, notice, onDismissNotice }) {
 // ---------------------------------------------------------------------------
 // Dentro la stanza
 
-function VideoTile({ stream, name, profile, isMe, isOwner, muted, speaking, failed, pending, menu }) {
+function VideoTile({ stream, name, profile, isOwner, muted, speaking, failed, pending, menu }) {
   const videoRef = useRef(null);
   useEffect(() => {
     if (videoRef.current && videoRef.current.srcObject !== stream) videoRef.current.srcObject = stream ?? null;
@@ -297,7 +455,9 @@ function VideoTile({ stream, name, profile, isMe, isOwner, muted, speaking, fail
   return (
     <div className={`rb-vroom-tile ${speaking ? 'is-speaking' : ''} ${failed ? 'is-failed' : ''}`}>
       {stream && !failed ? (
-        <video ref={videoRef} autoPlay playsInline muted={isMe} />
+        // Sempre muto: l'audio degli altri lo suona RemoteAudio, che resta
+        // acceso anche col mini-monitor.
+        <video ref={videoRef} autoPlay playsInline muted />
       ) : (
         <div className="rb-vroom-tile-placeholder">
           <Avatar profile={profile} size={56} />
@@ -322,7 +482,12 @@ function useIdSet(ids) {
   return useMemo(() => new Set(ids), [key]);
 }
 
+// Sessione della stanza: montata da calls/CallProvider (non dalla colonna),
+// così resta attiva cambiando mondo. La vista completa va nella colonna
+// che la ospita (Live o Gaming), altrimenti mini-monitor.
 export function RoomView({ roomId, user, onExit }) {
+  const { views, setView } = useCalls();
+  const fullOpen = views.room === 'full';
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState(null);
   const [bans, setBans] = useState([]);
@@ -484,18 +649,16 @@ export function RoomView({ roomId, user, onExit }) {
         : { text: 'Uscire dalla stanza?', label: 'Esci', action: leaveOrClose }
     );
 
-  useBackLayer(true, () => exitRoom('', { callServer: true }), 'subpage:video-room', {
+  // Indietro con la stanza a tutto schermo: si riduce a mini-monitor (la
+  // chiamata continua), non si esce.
+  useBackLayer(fullOpen, () => setView('room', 'mini'), 'subpage:video-room', {
     onBack: () => {
-      setConfirm({
-        text: isOwner ? 'Uscire dalla stanza? Si chiuderà per tutti.' : 'Uscire dalla stanza?',
-        label: 'Esci',
-        action: leaveOrClose,
-      });
-      return false;
+      setView('room', 'mini');
+      return true;
     },
   });
 
-  useGlobeCover('paused');
+  useGlobeCover(fullOpen ? 'paused' : null);
 
   const moderate = async (target, action) => {
     setMenuFor(null);
@@ -526,9 +689,38 @@ export function RoomView({ roomId, user, onExit }) {
     [user?.id, call.localStream, call.remoteTiles]
   );
   const speaking = useSpeaking(speakingStreams);
+  const remoteStreams = useMemo(() => call.remoteTiles.map((t) => t.stream), [call.remoteTiles]);
+  const myVideo = call.screenStream ?? call.localStream;
+
+  // Mini-monitor: chi sta parlando, altrimenti il primo partecipante con
+  // video, altrimenti io.
+  const speakingTile = call.remoteTiles.find((t) => t.stream && speaking.has(t.userId));
+  const firstTile = call.remoteTiles.find((t) => t.stream && !t.failed);
+  const miniTile = speakingTile ?? firstTile ?? null;
+  const miniProfile = miniTile ? members?.find((m) => m.userId === miniTile.userId)?.profilo : user;
+  const mini = {
+    title: room ? `${room.titolo}${miniTile ? ` · ${displayName(miniProfile, miniTile.name || 'Utente')}` : ''}` : 'Stanza video',
+    stream: miniTile?.stream ?? myVideo,
+    placeholder: <Avatar profile={miniProfile} size={56} />,
+    micOn: call.micOn,
+    micLocked: call.micLocked,
+    onToggleMic: call.joined ? call.toggleMic : null,
+    onHangup: askLeave,
+    sharing: call.sharingScreen,
+    onStartShare: call.joined ? call.startScreenShare : null,
+    onStopShare: call.stopScreenShare,
+  };
+
+  const surface = (content) => (
+    <>
+      <RemoteAudio streams={remoteStreams} />
+      <CallSurface kind="room" full={<div className="rb-vroom-panel rb-vroom-panel--room">{content}</div>} mini={mini} />
+      {confirm && <Confirm text={confirm.text} confirmLabel={confirm.label} onConfirm={confirm.action} onCancel={() => setConfirm(null)} />}
+    </>
+  );
 
   if (!room || !members) {
-    return (
+    return surface(
       <div className="rb-vroom-room">
         <Skeleton lines={4} />
       </div>
@@ -539,7 +731,7 @@ export function RoomView({ roomId, user, onExit }) {
   const ownerProfile = members.find((m) => m.userId === room.ownerId)?.profilo;
   const micLocked = call.micLocked;
 
-  return (
+  return surface(
     <div className="rb-vroom-room">
       <header className="rb-vroom-room-head">
         <div className="rb-vroom-room-title">
@@ -550,9 +742,12 @@ export function RoomView({ roomId, user, onExit }) {
             <span>{count}/{room.maxPartecipanti} persone</span>
           </p>
         </div>
-        <button type="button" className={`rb-vroom-btn ${isOwner ? 'rb-vroom-btn--danger' : ''}`} onClick={askLeave}>
-          {isOwner ? 'Chiudi stanza' : 'Esci'}
-        </button>
+        <div className="rb-vroom-room-actions">
+          <MinimizeCallButton kind="room" />
+          <button type="button" className={`rb-vroom-btn ${isOwner ? 'rb-vroom-btn--danger' : ''}`} onClick={askLeave}>
+            {isOwner ? 'Chiudi stanza' : 'Esci'}
+          </button>
+        </div>
       </header>
 
       {call.error && (
@@ -565,8 +760,8 @@ export function RoomView({ roomId, user, onExit }) {
 
       <div className={`rb-vroom-grid rb-vroom-grid--${Math.min(8, others.length + 1)}`}>
         <VideoTile
-          stream={call.localStream}
-          name="Tu"
+          stream={myVideo}
+          name={call.sharingScreen ? 'Tu · schermo condiviso' : 'Tu'}
           profile={user}
           isMe
           isOwner={isOwner}
@@ -654,6 +849,9 @@ export function RoomView({ roomId, user, onExit }) {
         >
           {call.cameraOn ? '📷' : '🚫'}
         </button>
+        {call.joined && (
+          <ScreenShareButton className="rb-vroom-ctrl" sharing={call.sharingScreen} onStart={call.startScreenShare} onStop={call.stopScreenShare} />
+        )}
         <button type="button" className="rb-vroom-ctrl rb-vroom-ctrl--leave" onClick={askLeave} aria-label={isOwner ? 'Chiudi stanza' : 'Esci dalla stanza'}>
           📞
         </button>
@@ -675,68 +873,47 @@ export function RoomView({ roomId, user, onExit }) {
         </section>
       )}
 
-      {confirm && <Confirm text={confirm.text} confirmLabel={confirm.label} onConfirm={confirm.action} onCancel={() => setConfirm(null)} />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
 
-// events: la colonna che la categoria mostrava prima (CategoryColumn a due
-// pannelli), resa così com'è nella scheda "Eventi". Per questo le schede non
-// stanno dentro un pannello ma in una barra a sé, sotto la X e la stellina:
-// così valgono sia sopra le stanze sia sopra i due pannelli degli eventi.
-export default function VideoRoomsColumn({ user, onOpenAuth, events }) {
-  const [tab, setTab] = useState('rooms');
-  const [roomId, setRoomId] = useState(null);
+// Colonna Live del mondo Nerd: solo "Stanze video" (gli eventi restano
+// nelle loro categorie). La stanza in corso vive in calls/CallProvider:
+// qui c'è il contenitore (host) dove entra la sua vista completa; se la
+// stanza è ridotta a mini-monitor si rivede l'elenco.
+export default function VideoRoomsColumn({ user, onOpenAuth }) {
+  const calls = useCalls();
+  const { room, views, roomExit, consumeRoomExit, openRoom, setView, hostRef } = calls;
   const [notice, setNotice] = useState('');
+  const showingRoom = Boolean(room && user && views.room === 'full');
 
-  // Senza login (o cambiando account) non si resta dentro una stanza.
+  // Uscita dalla stanza (per scelta, espulsione, chiusura): il motivo qui.
   useEffect(() => {
-    if (!user) setRoomId(null);
-  }, [user]);
-
-  if (roomId && user) {
-    return (
-      <div className="rb-vroom-panel rb-vroom-panel--room">
-        <RoomView
-          key={roomId}
-          roomId={roomId}
-          user={user}
-          onExit={(message) => {
-            setRoomId(null);
-            setNotice(message);
-          }}
-        />
-      </div>
-    );
-  }
+    if (!roomExit || roomExit.source !== 'live') return;
+    setNotice(roomExit.message);
+    consumeRoomExit();
+  }, [roomExit, consumeRoomExit]);
 
   return (
     <>
-      <div className="rb-vroom-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'rooms'} className={tab === 'rooms' ? 'is-active' : ''} onClick={() => setTab('rooms')}>
-          Stanze video
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'events'} className={tab === 'events' ? 'is-active' : ''} onClick={() => setTab('events')}>
-          Eventi
-        </button>
-      </div>
-      {tab === 'rooms' ? (
+      <div ref={hostRef('room')} className="rb-vroom-host" />
+      {!showingRoom && (
         <div className="rb-vroom-panel">
           <RoomsList
             user={user}
             onOpenAuth={onOpenAuth}
             notice={notice}
+            inRoomId={room?.roomId ?? null}
             onDismissNotice={() => setNotice('')}
             onEnter={(id) => {
               setNotice('');
-              setRoomId(id);
+              if (room?.roomId === id) setView('room', 'full');
+              else openRoom(id, 'live');
             }}
           />
         </div>
-      ) : (
-        events
       )}
     </>
   );

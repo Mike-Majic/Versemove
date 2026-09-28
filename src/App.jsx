@@ -60,6 +60,7 @@ import { supabase } from './data/supabaseClient';
 import PageLoading from './components/PageLoading';
 import { useGlobeCover } from './fx/globeCover';
 import './App.css';
+import { CallProvider } from './calls/CallProvider';
 
 // Componenti pesanti o aperti solo su richiesta, caricati al bisogno invece
 // che nel bundle iniziale (React.lazy + Suspense, vedi fallback PageLoading
@@ -1105,6 +1106,9 @@ export default function App() {
     !(user.mondiAbilitati ?? []).includes(world.id);
 
   return (
+    // Chiamate che restano attive cambiando mondo o pagina (stanze video,
+    // Stanza MOD, 1:1 dalla chat): vedi calls/CallProvider.jsx.
+    <CallProvider user={user}>
     <div className="rb-app" style={{ '--accent': world.color }}>
       <TopBar
         world={world}
@@ -1559,17 +1563,6 @@ export default function App() {
         </Suspense>
       )}
 
-      {mentionProfileId && (
-        <Suspense fallback={<PageLoading />}>
-          <MentionProfileViewer
-            userId={mentionProfileId}
-            user={user}
-            onOpenAuth={() => setAuthOpen(true)}
-            onClose={() => setMentionProfileId(null)}
-          />
-        </Suspense>
-      )}
-
       {activeFriendChatId && (
         <Suspense fallback={<PageLoading />}>
           <FriendChatModal
@@ -1582,6 +1575,19 @@ export default function App() {
             }}
             onMessagesRead={refreshUnread}
             autoAnswerCall={answerCallFrom === activeFriendChatId}
+          />
+        </Suspense>
+      )}
+
+      {/* Dopo la chat: il profilo aperto dall'avatar di un contatto deve
+          stare sopra la finestra della chat (stesso z-index, vince l'ordine). */}
+      {mentionProfileId && (
+        <Suspense fallback={<PageLoading />}>
+          <MentionProfileViewer
+            userId={mentionProfileId}
+            user={user}
+            onOpenAuth={() => setAuthOpen(true)}
+            onClose={() => setMentionProfileId(null)}
           />
         </Suspense>
       )}
@@ -1657,5 +1663,6 @@ export default function App() {
 
       <CookieConsentBanner user={user} onOpenPrivacyInfo={() => navigateToCategory('faq', 'informazioni')} />
     </div>
+    </CallProvider>
   );
 }

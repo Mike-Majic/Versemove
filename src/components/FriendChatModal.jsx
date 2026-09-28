@@ -11,9 +11,11 @@ import {
   getOtherParticipantLastRead,
   subscribeToParticipantUpdates,
   setConversationArchived,
+  deleteMessageForAll,
+  deleteMessageForMe,
 } from '../data/directChat';
+import { openProfileFromMention } from '../data/mentions';
 import ChatAttachment from './chat/ChatAttachment';
-import ContactProfileModal from './chat/ContactProfileModal';
 import TranslateHint from './shared/TranslateHint';
 import MentionText from './shared/MentionText';
 import MessageList from './shared/chat/MessageList';
@@ -26,7 +28,7 @@ import { areConnected } from '../data/friends';
 import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
 import ModalOverlay from './ModalOverlay';
-import CallModal from './CallModal';
+import { useCalls } from '../calls/CallProvider';
 import Icon from './shared/Icon';
 import './shared/chat/chat.css';
 import './FriendChatModal.css';
@@ -78,7 +80,10 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   // 📹 solo se la videochiamata 1:1 è già possibile (amici o match,
   // are_connected): stessa condizione della RLS del canale della chiamata.
   const [canCall, setCanCall] = useState(false);
-  const startCallRef = useRef(null);
+  // La chiamata vive in calls/CallProvider (resta attiva chiudendo la chat):
+  // qui la chat la "aggancia" finché è aperta, per ricevere lo squillo.
+  const { attachDirect, detachDirect, startDirectCall, direct, directBusy } = useCalls();
+  const otherCallBusy = directBusy && direct?.conversationId !== conversationId;
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -86,7 +91,9 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   const [confirmLocation, setConfirmLocation] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
   const [lightbox, setLightbox] = useState(null);
-  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  // { message, mode: 'me' | 'all' } in attesa di conferma.
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const panelRef = useRef(null);
   const retryPayloadsRef = useRef(new Map());
 
@@ -136,6 +143,12 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friendId]);
 
+  useEffect(() => {
+    if (!canCall || !conversationId) return undefined;
+    attachDirect({ conversationId, friend, autoAnswer: autoAnswerCall });
+    return () => detachDirect(conversationId);
+  }, [canCall, conversationId, friend, autoAnswerCall, attachDirect, detachDirect]);
+
   // Ultimo `friend` per la callback del canale realtime, senza riaprirlo.
   const friendRef = useRef(friend);
   useEffect(() => {
@@ -170,6 +183,10 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
             return [...prev, ...fresh].sort((a, b) => new Date(a.data) - new Date(b.data));
           });
         });
+      },
+      // Eliminato per tutti (anche dall'altra persona): la bolla cambia subito.
+      (row) => {
+        setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, tipo: row.tipo, testo: row.testo, allegato: row.allegato ?? null } : m)));
       }
     );
     return () => {
@@ -304,6 +321,35 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     await setConversationArchived(conversationId, next);
   };
 
+  // Profilo del contatto: lo stesso che si apre dagli altri punti dell'app
+  // (SocialProfileModal, via App.jsx).
+  const openFriendProfile = () => {
+    if (friend?.id) openProfileFromMention(friend.id);
+  };
+
+  const runDelete = async () => {
+    const pending = confirmDelete;
+    setConfirmDelete(null);
+    if (!pending) return;
+    const { message, mode } = pending;
+    setDeleteError('');
+    if (mode === 'all') {
+      const res = await deleteMessageForAll(message.id);
+      if (res.error) {
+        setDeleteError(res.error);
+        return;
+      }
+      setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, tipo: 'eliminato', testo: '', allegato: null } : m)));
+    } else {
+      const res = await deleteMessageForMe(message.id);
+      if (res.error) {
+        setDeleteError(res.error);
+        return;
+      }
+      setMessages((prev) => prev.filter((m) => m.id !== message.id));
+    }
+  };
+
   const query = search.trim().toLowerCase();
   const shown = useMemo(() => {
     const list = messages.map((m) => ({ ...m, mine: m.senderId === user.id }));
@@ -316,6 +362,13 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     const from = m.mondo && m.mondo !== activeWorld.id ? WORLD_BY_ID.get(m.mondo) : null;
     const att = m.tipo === 'posizione' ? null : toAttachment(m.tipo, m.allegato);
     const isText = !m.tipo || m.tipo === 'testo';
+    const deleted = m.tipo === 'eliminato';
+    const menu = m.pending || m.failed
+      ? null
+      : [
+          { label: '🙈 Elimina per me', onClick: () => setConfirmDelete({ message: m, mode: 'me' }) },
+          ...(m.mine && !deleted ? [{ label: '🗑️ Elimina per tutti', danger: true, onClick: () => setConfirmDelete({ message: m, mode: 'all' }) }] : []),
+        ];
     return (
       <ChatBubble
         key={m.id}
@@ -325,6 +378,8 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
         pending={m.pending}
         failed={m.failed}
         onRetry={() => retry(m.id)}
+        menu={menu}
+        onAvatarClick={m.mine ? null : openFriendProfile}
         footer={
           from ? (
             <span className="rb-dm-from">
@@ -334,7 +389,9 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           ) : null
         }
       >
-        {m.tipo === 'posizione' && m.allegato ? (
+        {deleted ? (
+          <p className="rb-chat-deleted">Messaggio eliminato</p>
+        ) : m.tipo === 'posizione' && m.allegato ? (
           <ChatAttachment tipo="posizione" allegato={m.allegato} />
         ) : att ? (
           <div className="rb-chat-atts">
@@ -343,7 +400,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
         ) : (
           <MentionText as="p" className="rb-chat-text" testo={m.testo} menzioni={m.menzioni} />
         )}
-        {!m.mine && isText && <TranslateHint text={m.testo} sourceLang={m.lingua} />}
+        {!m.mine && isText && !deleted && <TranslateHint text={m.testo} sourceLang={m.lingua} />}
         <span className="rb-dm-meta">
           {timeLabel(m.data)}
           {m.mine && !m.pending && !m.failed && (
@@ -373,7 +430,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           <button
             type="button"
             className="rb-dm-chat-avatar"
-            onClick={() => friend && setProfilePreviewOpen(true)}
+            onClick={openFriendProfile}
             aria-label={friend ? `Vedi profilo di ${friend.name}` : 'Profilo'}
             title="Vedi profilo"
           >
@@ -390,7 +447,14 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           </div>
           <div className="rb-dm-chat-actions">
             {canCall && conversationId && (
-              <button type="button" className="rb-dm-chat-btn" onClick={() => startCallRef.current?.()} aria-label="Videochiamata" title="Videochiamata">
+              <button
+                type="button"
+                className="rb-dm-chat-btn"
+                onClick={startDirectCall}
+                disabled={otherCallBusy}
+                aria-label="Videochiamata"
+                title={otherCallBusy ? 'Sei già in un’altra videochiamata' : 'Videochiamata'}
+              >
                 📹
               </button>
             )}
@@ -419,7 +483,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
               </button>
               {menuOpen && (
                 <div className="rb-dm-chat-menu" role="menu" onMouseLeave={() => setMenuOpen(false)}>
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setProfilePreviewOpen(true); }} disabled={!friend}>
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); openFriendProfile(); }} disabled={!friend}>
                     👤 Vedi profilo
                   </button>
                   <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSearchOpen(true); }}>
@@ -482,6 +546,29 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
           </p>
         )}
 
+        {deleteError && (
+          <p className="rb-dm-chat-status-line">
+            ⚠️ {deleteError}
+            <button type="button" onClick={() => setDeleteError('')} aria-label="Chiudi avviso">✕</button>
+          </p>
+        )}
+
+        {confirmDelete && (
+          <div className="rb-dm-chat-confirm" role="alertdialog" aria-label="Conferma eliminazione">
+            <p>
+              {confirmDelete.mode === 'all'
+                ? 'Eliminare questo messaggio per tutti? Anche l\'altra persona vedrà "Messaggio eliminato" e l\'eventuale allegato verrà cancellato.'
+                : 'Eliminare questo messaggio solo per te? L\'altra persona continuerà a vederlo.'}
+            </p>
+            <div>
+              <button type="button" onClick={() => setConfirmDelete(null)}>Annulla</button>
+              <button type="button" className="primary danger" onClick={runDelete}>
+                {confirmDelete.mode === 'all' ? 'Elimina per tutti' : 'Elimina per me'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {confirmLocation && (
           <div className="rb-dm-chat-confirm">
             <p>
@@ -511,19 +598,6 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
 
       {lightbox && <Lightbox src={lightbox.src} nome={lightbox.nome} onClose={() => setLightbox(null)} />}
 
-      {canCall && conversationId && (
-        <CallModal
-          conversationId={conversationId}
-          user={user}
-          friend={friend}
-          autoAnswer={autoAnswerCall}
-          registerStart={(fn) => {
-            startCallRef.current = fn;
-          }}
-        />
-      )}
-
-      {profilePreviewOpen && friend && <ContactProfileModal contact={friend} onClose={() => setProfilePreviewOpen(false)} />}
     </ModalOverlay>
   );
 }

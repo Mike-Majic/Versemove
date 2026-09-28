@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GAMING_TABS, PLATFORM_BY_CATEGORY, PLATFORM_TAB } from '../../../data/gaming';
-import { RoomView } from '../VideoRoomsColumn';
+import { useCalls } from '../../../calls/CallProvider';
 import GiochiTab from './GiochiTab';
 import LfgTab from './LfgTab';
 import GamingFeed from './GamingFeed';
@@ -23,10 +23,18 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
   // Gioco scelto da "Cerco compagni per questo gioco": precompila il form
   // della scheda Cerco compagni.
   const [lfgPrefill, setLfgPrefill] = useState(null);
-  // Stanza party aperta (video di gruppo, stessa RoomView della Live):
-  // prende il posto della colonna finché non si esce.
-  const [roomId, setRoomId] = useState(null);
+  // Stanza party (video di gruppo, stessa stanza della Live): vive in
+  // calls/CallProvider e resta attiva cambiando mondo; a tutto schermo
+  // prende il posto della colonna (contenitore "host" qui sotto).
+  const { room, views, roomExit, consumeRoomExit, openRoom, setView, hostRef } = useCalls();
+  const showingRoom = Boolean(room && user && views.room === 'full');
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!roomExit || roomExit.source !== 'gaming') return;
+    setNotice(roomExit.message);
+    setTab('lfg');
+    consumeRoomExit();
+  }, [roomExit, consumeRoomExit]);
 
   // Una nuova notifica (seq diverso) porta sulla scheda Cerco compagni.
   const focusSeqRef = useRef(focus?.seq ?? null);
@@ -40,25 +48,11 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
     setTab('lfg');
   };
 
-  if (roomId && user) {
-    return (
-      <div className="rb-vroom-panel rb-vroom-panel--room">
-        <RoomView
-          key={roomId}
-          roomId={roomId}
-          user={user}
-          onExit={(message) => {
-            setRoomId(null);
-            setNotice(message);
-            setTab('lfg');
-          }}
-        />
-      </div>
-    );
-  }
+  if (showingRoom) return <div ref={hostRef('room')} className="rb-vroom-host" />;
 
   return (
     <>
+      <div ref={hostRef('room')} className="rb-vroom-host" />
       <div className="rb-vroom-tabs rb-gaming-tabs" role="tablist" aria-label={category.label}>
         {tabs.map((t) => (
           <button
@@ -86,7 +80,8 @@ export default function GamingColumn({ category, user, onOpenAuth, focus = null 
             focusId={focus?.lfgId ?? null}
             onEnterRoom={(id) => {
               setNotice('');
-              setRoomId(id);
+              if (room?.roomId === id) setView('room', 'full');
+              else openRoom(id, 'gaming');
             }}
             notice={notice}
             onDismissNotice={() => setNotice('')}

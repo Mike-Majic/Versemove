@@ -134,3 +134,20 @@
   font-size: 24px;
   transform: rotate(135deg);
 }
+
+/* Riduci a mini-monitor (la chiamata continua). */
+.rb-call-minimize {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+/* Anteprima dello schermo condiviso: niente effetto specchio. */
+.rb-call-local-video.is-screen {
+  transform: none;
+}
+
+.rb-call-ctrl-btn.is-on {
+  background: #2f80ff;
+}

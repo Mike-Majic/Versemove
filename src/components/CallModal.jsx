@@ -2,23 +2,35 @@ import { useEffect, useRef, useState } from 'react';
 import { openCallChannel, getIceServers, logIceRoute, RING_TIMEOUT_MS, CONNECT_TIMEOUT_MS, RING_REPEAT_MS, ringCall, setRingState, answerLatestRing, playRingtone } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
 import { displayName } from '../data/posts';
+import { useCalls } from '../calls/CallProvider';
+import { MiniCallMonitor, MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../calls/CallSurface';
 import './CallModal.css';
 
 // Videochiamata 1:1 via WebRTC, senza server proprio: il canale Realtime
 // privato "call:<conversationId>" (autorizzato dal DB ai soli 2
 // partecipanti) porta solo la segnalazione, i video passano diretti
-// (peer-to-peer) una volta stabilita la connessione. Montato sempre
-// insieme a FriendChatModal (non solo mentre si chiama): serve a
-// ricevere una chiamata in arrivo anche se non l'ho avviata io. Fuori
-// dalla chat la chiamata arriva con lo squillo (call_rings, vedi
-// IncomingCallToast): "Rispondi" apre la chat con autoAnswer, e al primo
-// "ring" ricevuto qui la chiamata viene accettata da sola.
-export default function CallModal({ conversationId, user, friend, registerStart, autoAnswer = false }) {
+// (peer-to-peer) una volta stabilita la connessione. Montato da
+// calls/CallProvider quando una chat è aperta (serve a ricevere una
+// chiamata in arrivo anche se non l'ho avviata io) e tenuto montato finché
+// la chiamata è in corso, anche chiudendo la chat o cambiando mondo
+// (mini-monitor). Fuori dalla chat la chiamata arriva con lo squillo
+// (call_rings, vedi IncomingCallToast): "Rispondi" apre la chat con
+// autoAnswer, e al primo "ring" ricevuto qui la chiamata viene accettata
+// da sola. Vale anche per le videochiamate fra match di Incontri.
+export default function CallModal({ conversationId, user, friend, registerStart, autoAnswer = false, onPhaseChange }) {
+  const { views, setView } = useCalls();
+  const mini = views.direct === 'mini';
   const [phase, setPhase] = useState('idle'); // idle | calling | ringing | connecting | active | ended
   const [endMessage, setEndMessage] = useState('');
   const [incomingFrom, setIncomingFrom] = useState(null);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  // Stream dell'altra persona in stato (non solo nel ref): serve all'audio
+  // sempre acceso (RemoteAudio) e al mini-monitor.
+  const [remoteStream, setRemoteStream] = useState(null);
+  // Condivisione schermo: traccia che sostituisce la webcam sulla connessione.
+  const [screenStream, setScreenStream] = useState(null);
+  const screenTrackRef = useRef(null);
 
   const phaseRef = useRef('idle');
   const roleRef = useRef(null); // 'caller' | 'callee'
@@ -56,7 +68,14 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
   useEffect(() => {
     phaseRef.current = phase;
-  }, [phase]);
+    onPhaseChange?.(phase);
+  }, [phase, onPhaseChange]);
+  // Smontata (altra conversazione, uscita dall'account): chiamata ferma.
+  const onPhaseChangeRef = useRef(onPhaseChange);
+  useEffect(() => {
+    onPhaseChangeRef.current = onPhaseChange;
+  }, [onPhaseChange]);
+  useEffect(() => () => onPhaseChangeRef.current?.('idle'), []);
 
   const send = (event, payload) => {
     channelRef.current?.send({ type: 'broadcast', event, payload: payload ?? {} });
@@ -68,8 +87,19 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     clearInterval(ringRepeatRef.current);
   };
 
+  const stopScreenTrack = () => {
+    const screen = screenTrackRef.current;
+    if (!screen) return;
+    screenTrackRef.current = null;
+    screen.onended = null;
+    screen.stop();
+    setScreenStream(null);
+  };
+
   const cleanupPeer = () => {
     clearTimers();
+    stopScreenTrack();
+    setRemoteStream(null);
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -111,6 +141,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     };
     pc.ontrack = (e) => {
       remoteStreamRef.current = e.streams[0];
+      setRemoteStream(e.streams[0]);
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
     };
     pc.onconnectionstatechange = () => {
@@ -349,10 +380,42 @@ export default function CallModal({ conversationId, user, friend, registerStart,
   // mano ai ref, altrimenti resterebbero a schermo nero — ontrack/
   // getUserMedia possono essere scattati mentre i tag non erano ancora nel DOM.
   useEffect(() => {
-    if (phase !== 'active') return;
-    if (localVideoRef.current && localStreamRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+    if (phase !== 'active' || mini) return;
+    const mine = screenStream ?? localStreamRef.current;
+    if (localVideoRef.current && mine) localVideoRef.current.srcObject = mine;
     if (remoteVideoRef.current && remoteStreamRef.current) remoteVideoRef.current.srcObject = remoteStreamRef.current;
-  }, [phase]);
+  }, [phase, mini, screenStream]);
+
+  // Condivisione schermo: la traccia dello schermo prende il posto della
+  // webcam (replaceTrack); finita (anche dal pulsante del browser) si torna
+  // alla webcam.
+  const stopScreenShare = () => {
+    if (!screenTrackRef.current) return;
+    stopScreenTrack();
+    const cam = localStreamRef.current?.getVideoTracks()[0] ?? null;
+    const sender = pcRef.current?.getSenders().find((sd) => sd.track?.kind === 'video');
+    if (sender) sender.replaceTrack(cam).catch(() => {});
+  };
+
+  const startScreenShare = async () => {
+    if (screenTrackRef.current || !pcRef.current) return;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch {
+      return;
+    }
+    const track = stream.getVideoTracks()[0];
+    const sender = pcRef.current?.getSenders().find((sd) => sd.track?.kind === 'video');
+    if (!track || !sender) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    screenTrackRef.current = track;
+    track.onended = () => stopScreenShare();
+    await sender.replaceTrack(track).catch(() => {});
+    setScreenStream(stream);
+  };
 
   const toggleMuted = () => {
     const stream = localStreamRef.current;
@@ -372,8 +435,32 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
   if (phase === 'idle') return null;
 
+  const remoteAudio = <RemoteAudio streams={[remoteStream]} />;
+
+  if (phase === 'active' && mini) {
+    return (
+      <>
+        {remoteAudio}
+        <MiniCallMonitor
+          kind="direct"
+          title={friend?.name ?? 'Videochiamata'}
+          stream={remoteStream}
+          placeholder={friend?.avatar ? <img src={friend.avatar} alt="" /> : <span>{friend?.name}</span>}
+          micOn={!muted}
+          onToggleMic={toggleMuted}
+          onHangup={hangup}
+          sharing={Boolean(screenStream)}
+          onStartShare={startScreenShare}
+          onStopShare={stopScreenShare}
+          onExpand={() => setView('direct', 'full')}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="rb-call-overlay" onClick={(e) => e.stopPropagation()}>
+      {remoteAudio}
       {phase === 'calling' && (
         <div className="rb-call-panel">
           <img className="rb-call-avatar" src={friend?.avatar} alt="" />
@@ -403,8 +490,10 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
       {phase === 'active' && (
         <div className="rb-call-active">
-          <video ref={remoteVideoRef} className="rb-call-remote-video" autoPlay playsInline />
-          <video ref={localVideoRef} className="rb-call-local-video" autoPlay playsInline muted />
+          {/* Muto: l'audio passa da RemoteAudio, che resta col mini-monitor. */}
+          <video ref={remoteVideoRef} className="rb-call-remote-video" autoPlay playsInline muted />
+          <video ref={localVideoRef} className={`rb-call-local-video ${screenStream ? 'is-screen' : ''}`} autoPlay playsInline muted />
+          <MinimizeCallButton kind="direct" className="rb-call-minimize" />
           <div className="rb-call-controls">
             <button type="button" className={`rb-call-ctrl-btn ${muted ? 'active' : ''}`} onClick={toggleMuted} aria-label="Muto">
               {muted ? '🔇' : '🎙️'}
@@ -413,6 +502,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
             <button type="button" className={`rb-call-ctrl-btn ${cameraOff ? 'active' : ''}`} onClick={toggleCamera} aria-label="Camera">
               {cameraOff ? '🚫' : '📷'}
             </button>
+            <ScreenShareButton className="rb-call-ctrl-btn" sharing={Boolean(screenStream)} onStart={startScreenShare} onStop={stopScreenShare} size={22} />
           </div>
         </div>
       )}
