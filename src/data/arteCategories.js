@@ -75,6 +75,18 @@ export const ARTE_CATEGORIES = [
     subfamilies: [],
   },
   {
+    // Dirette di chi va in live su YouTube o TikTok: si condivide il link,
+    // si guarda dentro Versemove quando la piattaforma lo permette (vedi
+    // live/LiveWorldPanel.jsx, mondo 'arte'). Diversa da "Live" (concerti e
+    // spettacoli dal vivo, eventi del bot).
+    id: 'dirette',
+    label: 'In diretta',
+    icon: '🔴',
+    anchor: { lat: -35, lng: 60 }, // Oceano Indiano meridionale
+    aliases: ['in diretta', 'dirette', 'diretta', 'streaming', 'streamer', 'youtube', 'tiktok', 'live youtube', 'live tiktok'],
+    subfamilies: [],
+  },
+  {
     id: 'tattoo',
     label: 'Tattoo',
     icon: '🖋️',

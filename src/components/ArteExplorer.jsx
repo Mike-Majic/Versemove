@@ -9,8 +9,8 @@ import CommunityEventsColumn from './cultural/CommunityEventsColumn';
 import TeatroColumn from './arte/TeatroColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
-import VideoRoomsColumn from './nerd/VideoRoomsColumn';
 import TwitchColumn from './nerd/twitch/TwitchColumn';
+import LiveWorldPanel from './live/LiveWorldPanel';
 import GamingColumn from './nerd/gaming/GamingColumn';
 import NerdBachecaColumn from './nerd/NerdBachecaColumn';
 import CosplayColumn from './nerd/cosplay/CosplayColumn';
@@ -131,9 +131,12 @@ export default function ArteExplorer({
             // ricerca, player e chat incorporati).
             <TwitchColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
-            // Live del mondo Nerd: solo stanze video di gruppo (gli eventi
-            // restano nelle loro categorie).
-            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
+            // Live del mondo Nerd: dirette Twitch/YouTube/Kick come nel Social
+            // (le stanze video sono passate al mondo Incontri).
+            <LiveWorldPanel key={category.id} mondo="nerd" standalone title="Live" user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'arte' && category.id === 'dirette' ? (
+            // In diretta (Intrattenimento): link di dirette YouTube e TikTok.
+            <LiveWorldPanel key={category.id} mondo="arte" standalone title="In diretta" user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'arte' && category.id === 'teatro' ? (
             // Teatro: eventi come in Cosplay (lista/mappa, città + km,
             // periodo, tipo) più la scheda Community di prima.
