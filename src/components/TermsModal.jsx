@@ -1,6 +1,6 @@
 import ModalOverlay from './ModalOverlay';
 import './TermsModal.css';
-import { AFFILIATE_DISCLOSURE } from '../data/affiliate';
+import { AFFILIATE_ACTIVE, AFFILIATE_DISCLOSURE } from '../data/affiliate';
 
 // Testo segnaposto: serve perché la registrazione DEVE avere un link ai
 // Termini/Privacy da far spuntare (obbligo GDPR + buona prassi), ma non è
@@ -34,7 +34,7 @@ export default function TermsModal({ open, onClose }) {
 
         <h3>Pubblicità e link affiliati</h3>
         <ul>
-          <li>{AFFILIATE_DISCLOSURE}</li>
+          {AFFILIATE_ACTIVE && <li>{AFFILIATE_DISCLOSURE}</li>}
           <li>Alcune offerte del mondo Vetrina e alcuni spazi pubblicitari portano a negozi esterni: se acquisti da quei link Versemove può ricevere una commissione, senza costi aggiuntivi per te.</li>
           <li>Nel mondo Bambini compaiono solo pubblicità scelte come adatte ai bambini, senza profilazione.</li>
         </ul>

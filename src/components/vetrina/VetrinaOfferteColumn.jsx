@@ -11,7 +11,7 @@ import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import { useIsDesktopLayout } from '../../hooks/useIsDesktopLayout';
 import CustomSelect from '../shared/CustomSelect';
 import './vetrinaOfferte.css';
-import { AFFILIATE_DISCLOSURE } from '../../data/affiliate';
+import { AFFILIATE_ACTIVE, AFFILIATE_DISCLOSURE } from '../../data/affiliate';
 
 const ORDER_OPTIONS = [
   { value: 'caldo', label: 'Più calde' },
@@ -132,7 +132,7 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
           ))}
         </ul>
       )}
-      <p className="rb-deal-affiliate-note">{AFFILIATE_DISCLOSURE}</p>
+      {AFFILIATE_ACTIVE && <p className="rb-deal-affiliate-note">{AFFILIATE_DISCLOSURE}</p>}
     </div>
   );
 
