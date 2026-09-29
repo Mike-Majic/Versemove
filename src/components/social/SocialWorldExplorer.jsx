@@ -64,7 +64,7 @@ export default function SocialWorldExplorer({
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. move)..."
+                placeholder="Cerca (es. verse)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -76,10 +76,10 @@ export default function SocialWorldExplorer({
           </div>
 
           {category.id === 'verse' ? (
-            // Verse: categoria appena creata, contenuto ancora da decidere.
+            // id 'verse' (etichetta "move", lettera M): contenuto ancora da decidere.
             <div className="rb-verse-placeholder" role="status">
-              <span className="rb-verse-placeholder-logo" aria-hidden="true">V</span>
-              <h2>Verse</h2>
+              <span className="rb-verse-placeholder-logo" aria-hidden="true">M</span>
+              <h2>{category.label}</h2>
               <p>Presto qui qualcosa di nuovo.</p>
             </div>
           ) : (
