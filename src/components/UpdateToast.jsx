@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { WORLDS } from '../data/worlds';
 import './UpdateToast.css';
+
+// Bordo coi colori di tutti i mondi, come l'hub dei messaggi (DMHub).
+const WORLD_COLORS = WORLDS.map((w) => w.color);
+const TOAST_STYLE = { '--update-conic': `conic-gradient(from var(--update-angle, 0deg), ${[...WORLD_COLORS, WORLD_COLORS[0]].join(', ')})` };
 
 // Avviso "Nuova versione disponibile, ricarica." dopo un deploy.
 //
@@ -96,7 +101,7 @@ export default function UpdateToast() {
   if (!newVersion || dismissed) return null;
 
   return (
-    <div className="rb-update-toast" role="status" aria-live="polite">
+    <div className="rb-update-toast" style={TOAST_STYLE} role="status" aria-live="polite">
       <span className="rb-update-text">{t('common.updateAvailable')}</span>
       <button type="button" className="rb-update-btn" onClick={reloadToNewVersion}>
         {t('common.reload')}
