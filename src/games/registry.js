@@ -25,7 +25,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'Trivia veloce a tempo, risposta a scelta multipla',
     icon: '⚡',
-    anchor: { lat: 40, lng: -30 },
+    anchor: { lat: 35.3, lng: -45 }, // distribuzione uniforme sull'oceano
     aliases: ['quiz', 'trivia', 'lampo', 'domande'],
     Component: lazy(() => import('./quiz/QuizLampo.jsx')),
   },
@@ -36,7 +36,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'Ascolta un’anteprima musicale e indovina il titolo tra 4 opzioni',
     icon: '🎵',
-    anchor: { lat: -20, lng: 70 },
+    anchor: { lat: -40.8, lng: 90 }, // distribuzione uniforme sull'oceano
     aliases: ['canzone', 'musica', 'indovina la canzone'],
     Component: lazy(() => import('./quiz/IndovinaCanzone.jsx')),
   },
@@ -47,7 +47,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 5,
     meccanica: '2 giocatori locali o contro una CPU semplice',
     icon: '❌',
-    anchor: { lat: 10, lng: -120 },
+    anchor: { lat: -10.2, lng: -107.4 }, // distribuzione uniforme sull'oceano
     aliases: ['tris', 'tic tac toe'],
     Component: lazy(() => import('./logica/Tris.jsx')),
   },
@@ -58,7 +58,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 4,
     meccanica: 'Carte abbinate, da solo o in 2 giocatori locali',
     icon: '🧠',
-    anchor: { lat: -50, lng: -40 },
+    anchor: { lat: -49.2, lng: 0 }, // distribuzione uniforme sull'oceano
     aliases: ['memory', 'carte', 'memoria'],
     Component: lazy(() => import('./logica/Memory.jsx')),
   },
@@ -69,7 +69,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'Rimetti in ordine i numeri facendo scorrere le tessere',
     icon: '🧩',
-    anchor: { lat: 60, lng: 100 },
+    anchor: { lat: 16.6, lng: 127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['puzzle', 'scorrevole', '15 puzzle'],
     Component: lazy(() => import('./logica/PuzzleScorrevole.jsx')),
   },
@@ -80,7 +80,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'Arcade classico: mangia i frutti ed evita muri e coda',
     icon: '🐍',
-    anchor: { lat: -10, lng: 20 },
+    anchor: { lat: 0, lng: -159.1 }, // distribuzione uniforme sull'oceano
     aliases: ['snake', 'serpente'],
     Component: lazy(() => import('./arcade/Snake.jsx')),
   },
@@ -91,7 +91,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 7,
     meccanica: 'Cambia corsia ed elimina i droni prima che ti raggiungano',
     icon: '🤖',
-    anchor: { lat: 30, lng: 160 },
+    anchor: { lat: 49.2, lng: 180 }, // distribuzione uniforme sull'oceano
     aliases: ['corsa', 'spara', 'robot', 'droni'],
     Component: lazy(() => import('./arcade/CorsaSpara.jsx')),
   },
@@ -102,7 +102,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 5,
     meccanica: 'Impila blocchi in equilibrio, un tocco alla volta',
     icon: '🧱',
-    anchor: { lat: -40, lng: -150 },
+    anchor: { lat: -49.7, lng: -116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['torre', 'blocchi', 'stack'],
     Component: lazy(() => import('./arcade/TorreBlocchi.jsx')),
   },
@@ -113,7 +113,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 8,
     meccanica: 'Incolonna le pedine e fai 4 in fila prima del computer — livello difficile con una vera CPU strategica',
     icon: '🔴',
-    anchor: { lat: 45, lng: 40 },
+    anchor: { lat: 10.2, lng: 72.6 }, // distribuzione uniforme sull'oceano
     aliases: ['forza 4', 'forza quattro', 'connect four'],
     Component: lazy(() => import('./logica/ForzaQuattro.jsx')),
   },
@@ -124,7 +124,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'A turni, uno disegna una parola e gli altri indovinano a voce',
     icon: '🎨',
-    anchor: { lat: 5, lng: -60 },
+    anchor: { lat: 0, lng: -20.9 }, // distribuzione uniforme sull'oceano
     aliases: ['disegna', 'disegno', 'indovina'],
     Component: lazy(() => import('./sociale/DisegnaIndovina.jsx')),
   },
@@ -135,7 +135,7 @@ export const MINIGAMES = [
     fasciaEtaMinima: 6,
     meccanica: 'Party game di votazione a rotazione, passando il dispositivo',
     icon: '🎉',
-    anchor: { lat: -65, lng: 130 },
+    anchor: { lat: -35.5, lng: 159.5 }, // distribuzione uniforme sull'oceano
     aliases: ['probabile', 'voto', 'party'],
     Component: lazy(() => import('./sociale/ChiEPiuProbabile.jsx')),
   },

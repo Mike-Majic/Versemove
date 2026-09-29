@@ -126,6 +126,32 @@
   object-fit: cover;
   display: block;
 }
+/* Codice sconto scaduto: barra rossa di traverso sull'immagine, card spenta. */
+.rb-deal-scaduta-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 0;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  z-index: 2;
+}
+.rb-deal-card-scaduta .rb-deal-media img,
+.rb-deal-card-scaduta .rb-deal-media-empty {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.rb-deal-card-scaduta .rb-deal-info {
+  opacity: 0.6;
+}
+
 .rb-deal-media-empty {
   width: 100%;
   height: 100%;
