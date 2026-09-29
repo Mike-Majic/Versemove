@@ -809,6 +809,8 @@ export default function WorldGlobe({
       shapeType: CATEGORY_SHAPE_BY_WORLD[world.id] ?? 'triangle',
       marginRings: CATEGORY_MARGIN_RINGS_BY_WORLD[world.id] ?? 1,
       ...(CATEGORY_LOOK_BY_WORLD[world.id] ?? {}),
+      // M gotica pronta (font caricato): pieno regime per l'intro a particelle.
+      onAnimatedReady: () => globeActivity.wake(3000),
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;
@@ -1050,10 +1052,10 @@ export default function WorldGlobe({
         if (categoryShellRef.current) categoryShellRef.current.group.rotation.y = angle;
       }
       satellitesRef.current?.update(elapsed, deltaSec, camera, reduceMotion ? 0 : idleFactor, reduceMotion);
-      // Forme "vivaci" del mondo Bambini (pulsazione, galleggiamento, hover):
-      // stesso giro di disegno, niente ciclo a parte (vedi categoryShell.js
-      // update). Negli altri mondi è un no-op immediato.
-      if (categoryShellRef.current?.supportsHover) {
+      // Forme "vivaci" del mondo Bambini (pulsazione, galleggiamento, hover)
+      // e M gotica del mondo Social: stesso giro di disegno, niente ciclo a
+      // parte (vedi categoryShell.js update). Negli altri mondi non si chiama.
+      if (categoryShellRef.current?.animated) {
         categoryShellRef.current.update(elapsed, deltaSec, {
           reduceMotion: reduceMotion || reducedMotionQuery.matches,
           viewportSize: renderer.getSize(shellViewportSize),

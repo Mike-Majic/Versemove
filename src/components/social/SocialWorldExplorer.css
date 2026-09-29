@@ -1,0 +1,35 @@
+/* Categoria Verse (mondo Social): per ora solo un riquadro provvisorio al
+   centro dello schermo, sotto ai controlli in alto (X, stella, ricerca). */
+.rb-verse-placeholder {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 28px 20px;
+  border-radius: 18px;
+  background: rgba(6, 14, 30, 0.92);
+  border: 1px solid color-mix(in srgb, var(--accent, #3b82f6) 55%, transparent);
+  color: #e6f0ff;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.rb-verse-placeholder-logo {
+  display: block;
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent, #3b82f6);
+}
+
+.rb-verse-placeholder h2 {
+  margin: 12px 0 6px;
+  font-size: 22px;
+}
+
+.rb-verse-placeholder p {
+  margin: 0;
+  opacity: 0.8;
+}

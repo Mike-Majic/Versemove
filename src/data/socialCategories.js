@@ -16,6 +16,17 @@ export const SOCIAL_CATEGORIES = [
     aliases: ['world', 'mondo', 'feed', 'bacheca', 'social'],
     subfamilies: [],
   },
+  // Verse: alle spalle della M (punto opposto del globo, Oceano Pacifico).
+  // Logo provvisorio: una V piatta (vedi buildLetterVShape in
+  // categoryShell.js); il contenuto arriverà più avanti.
+  {
+    id: 'verse',
+    label: 'Verse',
+    icon: '✨',
+    anchor: { lat: -2, lng: 172 },
+    aliases: ['verse', 'versemove'],
+    subfamilies: [],
+  },
 ];
 
 export function resolveCategoryQuery(query) {

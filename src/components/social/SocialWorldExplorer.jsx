@@ -3,6 +3,7 @@ import { SOCIAL_CATEGORIES, resolveCategoryQuery } from '../../data/socialCatego
 import SocialFeed from './SocialFeed';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import '../shared/categoryExplorerShell.css';
+import './SocialWorldExplorer.css';
 
 // Guscio di navigazione del mondo Social: stesso pattern di ArteExplorer/
 // IncontriLiveExplorer (X + ricerca in alto, chiuso finché non si sceglie
@@ -44,8 +45,8 @@ export default function SocialWorldExplorer({
                 type="button"
                 className="rb-arte-close-all-btn"
                 onClick={() => onToggleCategory(null)}
-                aria-label="Chiudi il feed"
-                title="Chiudi il feed"
+                aria-label={category.id === 'verse' ? 'Chiudi' : 'Chiudi il feed'}
+                title={category.id === 'verse' ? 'Chiudi' : 'Chiudi il feed'}
               >
                 ✕
               </button>
@@ -74,7 +75,16 @@ export default function SocialWorldExplorer({
             </form>
           </div>
 
-          <SocialFeed world={world} {...feedProps} />
+          {category.id === 'verse' ? (
+            // Verse: categoria appena creata, contenuto ancora da decidere.
+            <div className="rb-verse-placeholder" role="status">
+              <span className="rb-verse-placeholder-logo" aria-hidden="true">V</span>
+              <h2>Verse</h2>
+              <p>Presto qui qualcosa di nuovo.</p>
+            </div>
+          ) : (
+            <SocialFeed world={world} {...feedProps} />
+          )}
         </>
       )}
     </div>
