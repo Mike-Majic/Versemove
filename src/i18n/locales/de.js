@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: 'Veröffentlicht am {{date}} um {{time}}',
+    publishedAgo: 'Veröffentlicht {{ago}}',
     close: 'Schließen',
     save: 'Speichern',
     cancel: 'Abbrechen',

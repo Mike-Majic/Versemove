@@ -25,6 +25,7 @@ import Lightbox from '../../shared/chat/Lightbox';
 import { GalleriaFields, WipFields } from './CosplayComposers';
 import { emptyFields, fieldsToPost } from './cosplayPost';
 import LoadMoreButton from '../../shared/LoadMoreButton';
+import PublishedAt from '../../shared/PublishedAt';
 
 // Galleria / WIP / Community della categoria Cosplay: posts con mondo
 // nerd, categoria cosplay e tag galleria / wip / discussione, come le

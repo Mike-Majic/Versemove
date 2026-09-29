@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: '发布于 {{date}} {{time}}',
+    publishedAgo: '发布于{{ago}}',
     close: '关闭',
     save: '保存',
     cancel: '取消',

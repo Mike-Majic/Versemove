@@ -14,6 +14,7 @@ import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import './MusicaClip.css';
 import Icon from '../shared/Icon';
+import PublishedAt from '../shared/PublishedAt';
 
 const MAX_DURATION_SEC = 60;
 

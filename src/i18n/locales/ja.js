@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: '{{date}} {{time}} に投稿',
+    publishedAgo: '{{ago}}に投稿',
     close: '閉じる',
     save: '保存',
     cancel: 'キャンセル',

@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: '{{date}} {{time}}에 게시됨',
+    publishedAgo: '{{ago}} 게시됨',
     close: '닫기',
     save: '저장',
     cancel: '취소',

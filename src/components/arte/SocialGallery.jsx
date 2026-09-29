@@ -8,6 +8,7 @@ import Icon from '../shared/Icon';
 import EmptyState from '../EmptyState';
 import './SocialGallery.css';
 import AvatarImg from '../shared/AvatarImg';
+import PublishedAt from '../shared/PublishedAt';
 
 // Galleria del mondo Social dentro Intrattenimento (Galleria immagini /
 // Galleria Video): solo il contenuto e il suo autore, senza il testo del

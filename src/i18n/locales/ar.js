@@ -6,6 +6,7 @@
 export default {
   common: {
     publishedAt: 'نُشر في {{date}} الساعة {{time}}',
+    publishedAgo: 'نُشر {{ago}}',
     close: 'إغلاق',
     save: 'حفظ',
     cancel: 'إلغاء',

@@ -23,6 +23,7 @@ import Lightbox from '../../shared/chat/Lightbox';
 import { BuildFields, ClipFields, GamePassFields, TrofeoFields } from './GamingComposers';
 import { GAMEPASS_ACTIONS, emptyFields, fieldsToPost, formatDay } from './gamingPost';
 import LoadMoreButton from '../../shared/LoadMoreButton';
+import PublishedAt from '../../shared/PublishedAt';
 
 // Feed di posts filtrati per categoria + tag (Clip, Community, Build,
 // Trofei, Game Pass), o di tutto il mondo Nerd se categoria e tag sono

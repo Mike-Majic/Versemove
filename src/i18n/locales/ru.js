@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: 'Опубликовано {{date}} в {{time}}',
+    publishedAgo: 'Опубликовано {{ago}}',
     close: 'Закрыть',
     save: 'Сохранить',
     cancel: 'Отмена',

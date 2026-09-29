@@ -12,6 +12,7 @@ import CustomSelect from '../shared/CustomSelect';
 import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import Skeleton from '../Skeleton';
+import PublishedAt from '../shared/PublishedAt';
 
 const ORDER_OPTIONS = [
   { value: 'votati', label: 'Più votati' },

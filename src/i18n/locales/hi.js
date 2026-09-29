@@ -2,6 +2,7 @@
 export default {
   common: {
     publishedAt: '{{date}} को {{time}} बजे प्रकाशित',
+    publishedAgo: '{{ago}} प्रकाशित',
     close: 'बंद करें',
     save: 'सेव करें',
     cancel: 'रद्द करें',
