@@ -13,7 +13,7 @@ function formatCountdown(scadeIl) {
   const diffMs = new Date(scadeIl).getTime() - Date.now();
   if (diffMs <= 0) return 'Scade a breve';
   const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days >= 1) return `Scade tra ${days} giorno${days === 1 ? '' : 'i'}`;
+  if (days >= 1) return `Scade tra ${days} giorn${days === 1 ? 'o' : 'i'}`;
   const hours = Math.floor(diffMs / (60 * 60 * 1000));
   if (hours >= 1) return `Scade tra ${hours} ora${hours === 1 ? '' : 'e'}`;
   return 'Scade a breve';
