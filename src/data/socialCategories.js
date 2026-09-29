@@ -1,4 +1,5 @@
-// Categorie del mondo Social (Blu). "World" apre il feed
+// Categorie del mondo Social (Blu). "move" (id storico 'world', tenuto per
+// preferiti e link già salvati; nome tutto minuscolo su richiesta) apre il feed
 // esistente (colonne, composer, eventi...) — stesso meccanismo a triangoli
 // sul globo degli altri mondi, invece del feed sempre aperto di prima.
 // Anchor in mezzo all'oceano (non su una città), stesso motivo delle
@@ -6,17 +7,17 @@
 // terraferma finirebbe sopra ai marker degli utenti di quella zona.
 // Le due lettere sono agli antipodi: la V di Verse vicino al centro della
 // vista di default del globo (lat 0, lng 0), la prima visibile entrando nel
-// mondo Social; la M di World dal lato opposto (scambiate su richiesta).
+// mondo Social; la M di move dal lato opposto (scambiate su richiesta).
 export const SOCIAL_CATEGORIES = [
   {
     id: 'world',
-    label: 'World',
+    label: 'move',
     icon: '🌐',
     anchor: { lat: -2, lng: 172 }, // Oceano Pacifico, lato opposto a Verse
-    aliases: ['world', 'mondo', 'feed', 'bacheca', 'social'],
+    aliases: ['move', 'world', 'mondo', 'feed', 'bacheca', 'social'],
     subfamilies: [],
   },
-  // Verse: davanti, agli antipodi della M di World.
+  // Verse: davanti, agli antipodi della M di move.
   // Logo: V gotica 3D con brillantini (vedi GOTHIC_LETTERS in
   // categoryShell.js); il contenuto arriverà più avanti.
   {

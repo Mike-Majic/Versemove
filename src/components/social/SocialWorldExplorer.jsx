@@ -64,7 +64,7 @@ export default function SocialWorldExplorer({
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. world)..."
+                placeholder="Cerca (es. move)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
