@@ -142,3 +142,19 @@
     width: min(240px, calc(50vw - var(--rb-topbar-actions-w, 200px) - 110px));
   }
 }
+
+/* Categorie a DUE colonne (TwoColumnSwitcher, desktop: .rb-2col-right;
+   telefono: la maniglia per passare all'altra colonna). Le categorie a una
+   colonna sola restano come sopra.
+   - Niente ricerca categorie accanto a X e stellina.
+   - X e stellina centrate sullo spazio fra le due colonne (le colonne
+     stanno a 22px da sinistra e 70px da destra, quindi il centro non è
+     quello dello schermo). */
+.rb-arte-explorer:has(.rb-2col-right) .rb-arte-category-search,
+.rb-arte-explorer:has(.rb-2col-edge-handle) .rb-arte-category-search {
+  display: none;
+}
+.rb-arte-explorer:has(.rb-2col-right) .rb-arte-top-controls {
+  left: 22px;
+  right: 70px;
+}
