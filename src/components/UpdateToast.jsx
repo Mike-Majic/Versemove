@@ -5,7 +5,7 @@ import './UpdateToast.css';
 
 // Bordo coi colori di tutti i mondi, come l'hub dei messaggi (DMHub).
 const WORLD_COLORS = WORLDS.map((w) => w.color);
-const TOAST_STYLE = { '--update-conic': `conic-gradient(from var(--update-angle, 0deg), ${[...WORLD_COLORS, WORLD_COLORS[0]].join(', ')})` };
+const TOAST_STYLE = { '--update-conic': `conic-gradient(${[...WORLD_COLORS, WORLD_COLORS[0]].join(', ')})` };
 
 // Avviso "Nuova versione disponibile, ricarica." dopo un deploy.
 //
@@ -102,13 +102,15 @@ export default function UpdateToast() {
 
   return (
     <div className="rb-update-toast" style={TOAST_STYLE} role="status" aria-live="polite">
-      <span className="rb-update-text">{t('common.updateAvailable')}</span>
-      <button type="button" className="rb-update-btn" onClick={reloadToNewVersion}>
-        {t('common.reload')}
-      </button>
-      <button type="button" className="rb-update-close" aria-label={t('common.close')} onClick={() => setDismissed(true)}>
-        ✕
-      </button>
+      <div className="rb-update-inner">
+        <span className="rb-update-text">{t('common.updateAvailable')}</span>
+        <button type="button" className="rb-update-btn" onClick={reloadToNewVersion}>
+          {t('common.reload')}
+        </button>
+        <button type="button" className="rb-update-close" aria-label={t('common.close')} onClick={() => setDismissed(true)}>
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
