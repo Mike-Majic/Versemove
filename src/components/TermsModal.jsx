@@ -32,10 +32,9 @@ export default function TermsModal({ open, onClose }) {
           <li>L'account può essere sospeso o rimosso dai moderatori in caso di violazione di queste regole.</li>
         </ul>
 
-        <h3>Pubblicità e link affiliati</h3>
+        <h3>Pubblicità</h3>
         <ul>
           {AFFILIATE_ACTIVE && <li>{AFFILIATE_DISCLOSURE}</li>}
-          <li>Alcune offerte del mondo Vetrina e alcuni spazi pubblicitari portano a negozi esterni: se acquisti da quei link Versemove può ricevere una commissione, senza costi aggiuntivi per te.</li>
           <li>Nel mondo Bambini compaiono solo pubblicità scelte come adatte ai bambini, senza profilazione.</li>
         </ul>
 
