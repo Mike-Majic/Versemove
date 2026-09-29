@@ -107,10 +107,21 @@ function makeMarkerEl(user, world, onOpen) {
   if (src) img.src = src;
   img.alt = String(user.name ?? '');
   img.loading = 'lazy';
+  // Foto mancante o che non si carica: al suo posto l'iniziale del nome.
+  const showInitial = () => {
+    img.remove();
+    const initial = document.createElement('span');
+    initial.className = 'rb-marker-initial';
+    initial.textContent = String(user.name ?? '?').trim().charAt(0).toUpperCase() || '?';
+    photo.style.background = world.color;
+    photo.prepend(initial);
+  };
+  img.addEventListener('error', showInitial, { once: true });
   const dot = document.createElement('span');
   dot.className = `rb-marker-dot ${user.isLive ? 'rb-marker-dot-live' : ''}`;
   dot.style.background = dotColor;
   photo.append(img, dot);
+  if (!src) showInitial();
   el.append(photo);
   el.title = `${user.name} · ${user.city}`;
   el.addEventListener('click', (e) => {
@@ -133,7 +144,12 @@ function makeEventMarkerEl(event, world, onOpen) {
   photo.className = 'rb-event-marker-photo';
   const foto = safeUrl(event.fotoUrl);
   if (foto) photo.style.backgroundImage = `url(${JSON.stringify(foto)})`;
-  else photo.style.background = world.color;
+  else {
+    // Evento senza foto: un calendario, così non sembra un quadrato vuoto.
+    photo.style.background = world.color;
+    photo.classList.add('rb-event-marker-photo-empty');
+    photo.textContent = '📅';
+  }
   photo.style.borderColor = world.color;
   el.append(photo);
   if (likeCount > 0) {

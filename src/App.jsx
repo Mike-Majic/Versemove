@@ -14,6 +14,7 @@ import { fetchLfg } from './data/gaming';
 import { getListing } from './data/annunci';
 import { clearDeepLinkHash, parseDeepLink, profileIdByNickname } from './data/deepLinks';
 import { usersForWorld } from './data/mockUsers';
+import { fetchGlobeUsers } from './data/globeUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
 import { getCityInfo, findCityMatch } from './data/geo';
@@ -752,8 +753,27 @@ export default function App() {
     return {};
   };
 
+  // Utenti veri del mondo attivo sul globo (vedi data/globeUsers.js): si
+  // ricaricano a ogni cambio di mondo o di account.
+  const [dbWorldUsers, setDbWorldUsers] = useState({ worldId: null, users: [] });
+  useEffect(() => {
+    if (!user) {
+      setDbWorldUsers({ worldId: null, users: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    const worldId = world.id;
+    fetchGlobeUsers(worldId).then((users) => {
+      if (!cancelled) setDbWorldUsers({ worldId, users });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [world.id, user?.id]);
+
   const worldUsers = useMemo(() => {
-    const base = usersForWorld(world.id);
+    const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
+    const base = [...usersForWorld(world.id), ...fromDb];
 
     const matchesLocation = (u) => {
       if (locationFilters.city && !u.city.toLowerCase().includes(locationFilters.city.toLowerCase())) return false;
@@ -768,7 +788,7 @@ export default function App() {
       if (u.age && (u.age < filters.ageMin || u.age > filters.ageMax)) return false;
       return matchesLocation(u);
     });
-  }, [world.id, filters, locationFilters]);
+  }, [world.id, filters, locationFilters, dbWorldUsers]);
 
   // Il proprio marker (quando si condivide la posizione in tempo reale) si
   // aggiunge SOPRA ai risultati già filtrati, non dentro: i propri filtri
@@ -780,6 +800,9 @@ export default function App() {
   const globeUsers = useMemo(() => {
     if (!user || !visibility.shareLiveLocation || !ownPosition) return worldUsers;
     if (!(user.mondiAbilitati ?? []).includes(world.id)) return worldUsers;
+    // Con la posizione in tempo reale il proprio marker "di città" sparisce:
+    // resta solo quello live.
+    const others = worldUsers.filter((u) => u.id !== user.id);
     const ownMarker = {
       id: 'me-live',
       name: user.nickname ?? user.name ?? 'Io',
@@ -790,7 +813,7 @@ export default function App() {
       lng: ownPosition.lng,
       isLive: true,
     };
-    return [...worldUsers, ownMarker];
+    return [...others, ownMarker];
   }, [worldUsers, user, visibility.shareLiveLocation, ownPosition]);
 
   // Quando la città cercata nei filtri (globali, validi per tutti i mondi) corrisponde
@@ -1179,7 +1202,9 @@ export default function App() {
         <WorldGlobe
           world={world}
           users={globeUsers}
-          onSelectUser={setSelectedUser}
+          // Utenti veri: il profilo Social completo (post, Segui...), lo
+          // stesso delle @menzioni; il vecchio ProfileModal resta per gli altri.
+          onSelectUser={(u) => (u?.fromDb ? setMentionProfileId(u.id) : setSelectedUser(u))}
           containerRef={containerRef}
           flyTo={flyTo}
           categories={categorySet?.categories ?? null}
