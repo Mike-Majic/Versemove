@@ -579,24 +579,27 @@ const VIVID_EDGE_WIDTH_PX = 2.5;
 const VIVID_SURFACE_LIFT = 8;
 const VIVID_RENDER_ORDER = 1;
 
-// Mondo Social: la "M" piatta della categoria World è sostituita da una M
-// gotica 3D (vedi gothicLetter.js). La sagoma piatta resta come bersaglio
-// del click (invisibile) e come ripiego finché il font non è pronto.
+// Mondo Social: le sagome piatte delle due categorie (V di move, M di
+// Verse) sono sostituite da lettere gotiche 3D (vedi gothicLetter.js). La
+// sagoma piatta resta come bersaglio del click (invisibile) e come ripiego
+// finché il font non è pronto.
 // GOTHIC_M_SIZE_FACTOR: lato maggiore della M gotica rispetto alla M piatta
 // (~1.78 × shapeScale), un po' più grande come chiesto.
-// Verse (lato opposto): V gotica in New Rocker, scalata in altezza (vedi
+// La V: gotica in New Rocker, scalata in altezza (vedi
 // scaleMode in gothicLetter.js) con la stessa scala della M, così le due
 // lettere hanno la stessa altezza; in più i brillantini sul fianco destro.
 const GOTHIC_M_SIZE_FACTOR = 1.78 * 1.1;
 const GOTHIC_LETTERS = {
-  world: {
+  // Scambiate su richiesta: la V (davanti) è di move ('world'), la M
+  // (dietro) di Verse.
+  verse: {
     char: 'M',
     font: '440px "UnifrakturMaguntia", "Old English Text MT", serif',
     fontLoad: '380px "UnifrakturMaguntia"',
     scaleMode: 'max',
     sparkles: 0,
   },
-  verse: {
+  world: {
     char: 'V',
     font: '440px "New Rocker", "Old English Text MT", serif',
     fontLoad: '440px "New Rocker"',
@@ -618,9 +621,9 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
     case 'briefcase':
       return { shape: buildBriefcaseShape(), color: null };
     case 'letterM':
-      // Mondo Social: World è la M, Verse (alle spalle della M) la V. Sono
+      // Mondo Social: move ('world') è la V, Verse (alle sue spalle) la M. Sono
       // le sagome piatte di ripiego: sopra ci vanno le lettere gotiche 3D.
-      return { shape: categoryId === 'verse' ? buildLetterVShape() : buildLetterMShape(), color: null };
+      return { shape: categoryId === 'world' ? buildLetterVShape() : buildLetterMShape(), color: null };
     case 'star':
       return { shape: buildStarShape(), color: null };
     case 'dog':
@@ -1156,7 +1159,7 @@ export function buildCategoryShell(
         letter.mesh.userData.categoryId = t.id;
         faceMeshes.push(letter.mesh);
 
-        // Etichetta "World" sotto la lettera, alla stessa altezza del fronte.
+        // Etichetta sotto la lettera, alla stessa altezza del fronte.
         const below = t.shapeCenter.clone().addScaledVector(up, -(letter.halfHeight * k + labelScale * 0.6));
         t.sprite.position.copy(below.normalize()).multiplyScalar(radius + lift + letter.halfDepth * k);
         t.sprite.renderOrder = GOTHIC_RENDER_ORDER + 3;
