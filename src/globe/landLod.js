@@ -1,7 +1,9 @@
 // Continenti del globo grande a più livelli di dettaglio (vedi
 // scripts/build-land-geojson.mjs per i file):
-// - lontano (altitudine > ALT_DETAIL): land-110m, costruito subito sul
-//   thread principale (125 poligoni, pochi ms), come sempre;
+// - lontano (altitudine > ALT_DETAIL): land-110m (125 poligoni), anche lui
+//   nel worker: sul thread principale ConicPolygonGeometry lo costruiva in
+//   ~2 s su un portatile con GPU integrata, proprio durante l'animazione
+//   d'ingresso del globo (che quindi si congelava e saltava alla fine);
 // - zoom medio e ravvicinato: land-50m, ritagliato in riquadri da 10°;
 // - zoom ravvicinato (altitudine < ALT_10M): i riquadri land10 vicini al
 //   centro della vista prendono il posto dei riquadri 50m corrispondenti.
@@ -10,9 +12,10 @@
 // (coste) e UNA LineSegments tratteggiata (confini di stato) per tutto il
 // livello "dettaglio": 3 draw call, qualunque sia il numero di riquadri.
 // Mai un buco: finché il 50m non è pronto resta il 110m, e un riquadro 10m
-// non ancora arrivato resta al 50m.
+// non ancora arrivato resta al 50m. L'unico momento senza continenti è il
+// primo secondo dopo il mount, finché il worker non consegna il 110m.
 import * as THREE from 'three';
-import { polygonsArrays, concatIndexed, concatDashed } from './landGeometry';
+import { concatIndexed, concatDashed } from './landGeometry';
 
 const TILE_DEG = 10;
 // Sotto questa altitudine il livello dettaglio (50m + 10m) sostituisce il
@@ -123,7 +126,8 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     return { level, set, dispose };
   };
 
-  // Livello lontano: 110m, subito.
+  // Livello lontano: 110m. I poligoni si estraggono qui (istantaneo) e le
+  // geometrie le fa il worker (vedi sotto, dopo `request`).
   const polygons110 = [];
   features110.forEach((f) => {
     const geometry = f.geometry;
@@ -131,7 +135,6 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     else if (geometry?.type === 'MultiPolygon') polygons110.push(...geometry.coordinates);
   });
   const far = makeLevel();
-  far.set(polygonsArrays(polygons110));
 
   // Livello dettaglio: 50m + riquadri 10m, costruito dal worker.
   const detail = makeLevel();
@@ -167,6 +170,17 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     pending.set(id, onMessage);
     worker.postMessage({ id, ...message });
   };
+
+  // 110m: i poligoni viaggiano nel messaggio (niente seconda richiesta del
+  // file, che non è in precache), tornano gli array pronti per far.set.
+  request({ kind: 'land110', polygons: polygons110 }, (msg) => {
+    if (disposed) return;
+    if (msg.error) {
+      console.error('Impossibile costruire i continenti 110m', msg.error);
+      return;
+    }
+    far.set(msg.arrays);
+  });
 
   const ensure50 = () => {
     if (land50Requested) return;

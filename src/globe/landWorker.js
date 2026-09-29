@@ -2,7 +2,7 @@
 // file, costruisce le geometrie (ConicPolygonGeometry è lenta, sul thread
 // principale farebbe scattare il globo) e rimanda solo array trasferibili.
 import './workerWindowShim.js';
-import { tileArrays } from './landGeometry.js';
+import { polygonsArrays, tileArrays } from './landGeometry.js';
 
 const TILE_DEG = 10;
 
@@ -20,8 +20,14 @@ const tileOf = (key, data) => {
 };
 
 self.onmessage = async (event) => {
-  const { id, kind, url, key } = event.data;
+  const { id, kind, url, key, polygons } = event.data;
   try {
+    if (kind === 'land110') {
+      // Livello lontano: i poligoni arrivano già nel messaggio.
+      const arrays = polygonsArrays(polygons);
+      self.postMessage({ id, arrays, done: true }, buffersOf(arrays));
+      return;
+    }
     const res = await fetch(url);
     if (!res.ok) throw new Error(`richiesta fallita (${res.status})`);
     const data = await res.json();
