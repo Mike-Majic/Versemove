@@ -19,7 +19,7 @@ i 6 profili e i 7 post reali).
 
 Rete di sicurezza in più:
 - schema `backup_prima_demo`: copia delle tabelle toccate prima del seed;
-- tag git `backup-prima-demo-2026-09-29`: il codice prima di questo lavoro.
+- branch git `backup-prima-demo-2026-09-29` (commit 109d61c): il codice prima di questo lavoro.
 
 ## Cosa contiene
 
