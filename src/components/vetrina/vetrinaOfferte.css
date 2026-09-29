@@ -185,8 +185,9 @@
   margin: 0;
   padding: 0;
   display: grid;
-  /* Quante card entrano: ~4 su uno schermo standard, 1 sul telefono. */
-  grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
+  /* Quante card entrano: 260px minimo l'una (4 su un 1920 con Windows al
+     150%, 5 al 125%, 6 al 100%), 1 sul telefono. */
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 16px;
 }
 
