@@ -17,7 +17,7 @@ export const SOCIAL_CATEGORIES = [
     subfamilies: [],
   },
   // Verse: alle spalle della M (punto opposto del globo, Oceano Pacifico).
-  // Logo provvisorio: una V piatta (vedi buildLetterVShape in
+  // Logo: V gotica 3D con brillantini (vedi GOTHIC_LETTERS in
   // categoryShell.js); il contenuto arriverà più avanti.
   {
     id: 'verse',

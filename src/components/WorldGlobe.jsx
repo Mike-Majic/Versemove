@@ -1059,6 +1059,7 @@ export default function WorldGlobe({
         categoryShellRef.current.update(elapsed, deltaSec, {
           reduceMotion: reduceMotion || reducedMotionQuery.matches,
           viewportSize: renderer.getSize(shellViewportSize),
+          pixelRatio: renderer.getPixelRatio(),
           camera,
         });
       }

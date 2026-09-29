@@ -161,7 +161,10 @@ function pointInPoly(pt, poly) {
   return c;
 }
 
-function buildShapes(char, font, fixedScaleBase) {
+// scaleMode 'max': lato maggiore del glifo = 5.6 (la M). 'height': altezza
+// del glifo = 4.5 (la V, come nel riferimento: così ha la stessa altezza
+// della M anche se è più stretta).
+function buildShapes(char, font, fixedScaleBase, scaleMode) {
   const loops = traceGlyph(char, font);
   if (loops.length === 0) return null;
   let minX = Infinity;
@@ -176,7 +179,10 @@ function buildShapes(char, font, fixedScaleBase) {
       maxY = Math.max(maxY, p[1]);
     })
   );
-  const scale = LETTER_SIZE / (fixedScaleBase ?? Math.max(maxY - minY, maxX - minX));
+  let scale;
+  if (fixedScaleBase) scale = LETTER_SIZE / fixedScaleBase;
+  else if (scaleMode === 'height') scale = 4.5 / (maxY - minY);
+  else scale = LETTER_SIZE / Math.max(maxY - minY, maxX - minX);
   const ox = (minX + maxX) / 2;
   const oy = (minY + maxY) / 2;
   const toWorld = (p) => [(p[0] - ox) * scale, -(p[1] - oy) * scale];
@@ -216,7 +222,8 @@ function buildShapes(char, font, fixedScaleBase) {
 // fixedScaleBase: per lettere che devono avere la stessa altezza di
 // un'altra invece di riempire 5.6 (la V del riferimento usa 330).
 // particleCount/pulseCount: meno su schermi piccoli. introRadius: sfera di
-// partenza delle particelle (unità lettera). holo: anelli/tacche/staffe HUD
+// partenza delle particelle (unità lettera). sparkleCount: brillantini
+// sul fianco destro esterno (la V di Verse; 0 = niente). holo: anelli/tacche/staffe HUD
 // (spenti di default). spin: 'full' come il riferimento (giro continuo
 // sull'asse Y) oppure 'sway' (oscillazione lieve, per quando dietro la
 // lettera c'è qualcosa in cui non deve entrare, es. il globo).
@@ -226,6 +233,8 @@ export function createGothicLetter({
   size = LETTER_SIZE,
   depth = 0.9,
   fixedScaleBase = null,
+  scaleMode = 'max',
+  sparkleCount = 0,
   particleCount = 2600,
   pulseCount = 6,
   introRadius = [9, 15],
@@ -234,7 +243,7 @@ export function createGothicLetter({
   swayAmount = 0.25,
   renderOrder = 0,
 } = {}) {
-  const built = buildShapes(char, font, fixedScaleBase);
+  const built = buildShapes(char, font, fixedScaleBase, scaleMode);
   if (!built) return null;
   const { shapes, bigOuter } = built;
   const disposables = [];
@@ -357,6 +366,74 @@ export function createGothicLetter({
   }
   placePulses(0, 0);
 
+  // Brillantini lungo il fianco destro esterno (stesso effetto del
+  // riferimento): per ogni fascia di y da 0.08 il punto più a destra del
+  // contorno esterno, dalla punta in alto a destra al vertice in basso.
+  let sparkles = null;
+  let sparkUniforms = null;
+  if (sparkleCount > 0) {
+    const buckets = new Map();
+    bigOuter.forEach((p) => {
+      if (p[0] <= 0) return;
+      const b = Math.round(p[1] / 0.08);
+      if (!buckets.has(b) || buckets.get(b)[0] < p[0]) buckets.set(b, p);
+    });
+    const edgePts = [...buckets.values()].map((p) => [p[0] - centerOff.x, p[1] - centerOff.y]);
+    if (edgePts.length > 0) {
+      const N = sparkleCount;
+      const sPos = new Float32Array(N * 3);
+      const sPhase = new Float32Array(N);
+      const sSize = new Float32Array(N);
+      const sCol = new Float32Array(N * 3);
+      const tints = [[1, 1, 1], [1, 0.9, 0.55], [0.6, 0.95, 1], [1, 0.75, 0.95]];
+      for (let i = 0; i < N; i++) {
+        const e = edgePts[Math.floor(Math.random() * edgePts.length)];
+        const spread = Math.random() * 0.3;
+        sPos[i * 3] = e[0] - spread * 0.6 + (Math.random() - 0.5) * 0.08;
+        sPos[i * 3 + 1] = e[1] + (Math.random() - 0.5) * 0.1;
+        sPos[i * 3 + 2] = depth / 2 + 0.03 + Math.random() * 0.12;
+        sPhase[i] = Math.random() * Math.PI * 2;
+        sSize[i] = 0.08 + Math.random() * 0.16;
+        const t = tints[Math.floor(Math.random() * tints.length)];
+        sCol[i * 3] = t[0];
+        sCol[i * 3 + 1] = t[1];
+        sCol[i * 3 + 2] = t[2];
+      }
+      const sGeo = new THREE.BufferGeometry();
+      sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+      sGeo.setAttribute('phase', new THREE.BufferAttribute(sPhase, 1));
+      sGeo.setAttribute('psize', new THREE.BufferAttribute(sSize, 1));
+      sGeo.setAttribute('color', new THREE.BufferAttribute(sCol, 3));
+      // uPx = pixelRatio × altezza del canvas; uScale = scala del gruppo (la
+      // grandezza dei punti non la segue da sola).
+      sparkUniforms = {
+        uTime: { value: 0 },
+        uPx: { value: (typeof window !== 'undefined' ? window.devicePixelRatio * window.innerHeight : 800) },
+        uScale: { value: size / LETTER_SIZE },
+      };
+      const sMat = new THREE.ShaderMaterial({
+        uniforms: sparkUniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexShader: `attribute float phase; attribute float psize; attribute vec3 color; uniform float uTime; uniform float uPx; uniform float uScale; varying float vA; varying vec3 vC;
+        void main(){ float tw = sin(uTime * (2.5 + fract(phase) * 3.0) + phase * 7.0); vA = pow(max(tw, 0.0), 6.0); vC = color;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = psize * uScale * (0.4 + vA) * uPx * 0.9 / -mv.z; gl_Position = projectionMatrix * mv; }`,
+        fragmentShader: `varying float vA; varying vec3 vC;
+        void main(){ vec2 p = gl_PointCoord - 0.5; float r = length(p);
+          float star = max(0.0, 1.0 - (abs(p.x) + abs(p.y)) * 2.6) * 0.9 + max(0.0, 1.0 - min(abs(p.x), abs(p.y)) * 18.0) * max(0.0, 1.0 - r * 2.2) * 0.8;
+          float core = smoothstep(0.5, 0.0, r) * 0.6;
+          float a = (star + core) * vA; if (a < 0.02) discard;
+          gl_FragColor = vec4(vC * (0.6 + 0.4 * vA) + vec3(a * 0.5), a); }`,
+      });
+      sparkles = new THREE.Points(sGeo, sMat);
+      sparkles.renderOrder = renderOrder + 1;
+      sparkles.frustumCulled = false;
+      root.add(sparkles);
+      disposables.push(sGeo, sMat);
+    }
+  }
+
   // Extra olografici (spenti di default).
   let holoGroup = null;
   if (holo) {
@@ -445,6 +522,7 @@ export function createGothicLetter({
   let spinAngle = 0;
   const setVisible = (v) => {
     mesh.visible = v;
+    if (sparkles) sparkles.visible = v;
     edges.visible = v;
     edgesGlow.visible = v;
     halo.visible = v;
@@ -473,7 +551,12 @@ export function createGothicLetter({
   }
 
   const easeOut = (x) => 1 - Math.pow(1 - x, 3);
-  function update(time, dt, { reduceMotion = false } = {}) {
+  function update(time, dt, { reduceMotion = false, pixelHeight = 0 } = {}) {
+    if (sparkUniforms) {
+      // Con "riduci animazioni" i brillantini restano fermi ma visibili.
+      sparkUniforms.uTime.value = reduceMotion ? 1.0 : time;
+      if (pixelHeight > 0) sparkUniforms.uPx.value = pixelHeight;
+    }
     if (introActive) {
       if (reduceMotion) {
         finishIntro();

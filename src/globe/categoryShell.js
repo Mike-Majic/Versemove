@@ -467,7 +467,8 @@ function buildLetterMShape() {
   return ribbonShape(points, 0.44);
 }
 
-// V provvisoria della categoria Verse (mondo Social): stesso nastro della M.
+// V piatta della categoria Verse (mondo Social): stesso nastro della M,
+// ripiego e bersaglio del click sotto la V gotica 3D.
 function buildLetterVShape() {
   const points = [
     new THREE.Vector2(-0.62, 0.66), // punta sinistra
@@ -583,9 +584,26 @@ const VIVID_RENDER_ORDER = 1;
 // del click (invisibile) e come ripiego finché il font non è pronto.
 // GOTHIC_M_SIZE_FACTOR: lato maggiore della M gotica rispetto alla M piatta
 // (~1.78 × shapeScale), un po' più grande come chiesto.
-const GOTHIC_M_FONT = '440px "UnifrakturMaguntia", "Old English Text MT", serif';
-const GOTHIC_M_FONT_LOAD = '380px "UnifrakturMaguntia"';
+// Verse (lato opposto): V gotica in New Rocker, scalata in altezza (vedi
+// scaleMode in gothicLetter.js) con la stessa scala della M, così le due
+// lettere hanno la stessa altezza; in più i brillantini sul fianco destro.
 const GOTHIC_M_SIZE_FACTOR = 1.78 * 1.1;
+const GOTHIC_LETTERS = {
+  world: {
+    char: 'M',
+    font: '440px "UnifrakturMaguntia", "Old English Text MT", serif',
+    fontLoad: '380px "UnifrakturMaguntia"',
+    scaleMode: 'max',
+    sparkles: 0,
+  },
+  verse: {
+    char: 'V',
+    font: '440px "New Rocker", "Old English Text MT", serif',
+    fontLoad: '440px "New Rocker"',
+    scaleMode: 'height',
+    sparkles: 700,
+  },
+};
 const GOTHIC_RENDER_ORDER = 2;
 
 // Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
@@ -600,8 +618,8 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
     case 'briefcase':
       return { shape: buildBriefcaseShape(), color: null };
     case 'letterM':
-      // Mondo Social: World è la M, Verse (alle spalle della M) per ora ha
-      // una V piatta provvisoria, in attesa del logo vero.
+      // Mondo Social: World è la M, Verse (alle spalle della M) la V. Sono
+      // le sagome piatte di ripiego: sopra ci vanno le lettere gotiche 3D.
       return { shape: categoryId === 'verse' ? buildLetterVShape() : buildLetterMShape(), color: null };
     case 'star':
       return { shape: buildStarShape(), color: null };
@@ -1078,8 +1096,8 @@ export function buildCategoryShell(
     labelSprites.push(sprite);
     disposables.push(labelMat, texture);
 
-    // Solo World diventa la M gotica: Verse resta con la sua V piatta.
-    if (gothicM && shapeCenter && cat.id !== 'verse') {
+    // World diventa la M gotica, Verse la V gotica.
+    if (gothicM && shapeCenter && GOTHIC_LETTERS[cat.id]) {
       gothicTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
     }
   });
@@ -1091,16 +1109,20 @@ export function buildCategoryShell(
   let disposed = false;
   let lastActiveId = null; // per accendere la M se era già aperta prima che fosse pronta
   if (gothicTargets.length > 0) {
-    loadGothicFont(GOTHIC_M_FONT_LOAD).then(() => {
+    const fontLoads = [...new Set(gothicTargets.map((t) => GOTHIC_LETTERS[t.id].fontLoad))];
+    Promise.all(fontLoads.map((f) => loadGothicFont(f))).then(() => {
       if (disposed) return;
       const small = typeof window !== 'undefined' && window.innerWidth < 600;
       gothicTargets.forEach((t) => {
+        const cfg = GOTHIC_LETTERS[t.id];
         const size = t.shapeScale * GOTHIC_M_SIZE_FACTOR;
         let letter = null;
         try {
           letter = createGothicLetter({
-            char: 'M',
-            font: GOTHIC_M_FONT,
+            char: cfg.char,
+            font: cfg.font,
+            scaleMode: cfg.scaleMode,
+            sparkleCount: small ? Math.min(cfg.sparkles, 300) : cfg.sparkles,
             size,
             particleCount: small ? 900 : 2600,
             pulseCount: small ? 4 : 6,
@@ -1128,8 +1150,8 @@ export function buildCategoryShell(
         pivot.add(letter.group);
         group.add(pivot);
 
-        // La M piatta non si vede più ma resta cliccabile; si clicca anche
-        // la lettera 3D.
+        // La sagoma piatta non si vede più ma resta cliccabile; si clicca
+        // anche la lettera 3D.
         t.flatMesh.material.visible = false;
         letter.mesh.userData.categoryId = t.id;
         faceMeshes.push(letter.mesh);
@@ -1179,7 +1201,7 @@ export function buildCategoryShell(
   const worldPos = new THREE.Vector3();
   const toCamera = new THREE.Vector3();
   const worldNormal = new THREE.Vector3();
-  function update(elapsed, deltaSec, { reduceMotion = false, viewportSize = null, camera = null } = {}) {
+  function update(elapsed, deltaSec, { reduceMotion = false, viewportSize = null, camera = null, pixelRatio = 1 } = {}) {
     if (document.hidden) return;
     if (gothicItems.length > 0) {
       for (let i = 0; i < gothicItems.length; i++) {
@@ -1193,7 +1215,10 @@ export function buildCategoryShell(
           if (item.pivot.visible !== visible) item.pivot.visible = visible;
           if (!visible) continue;
         }
-        item.letter.update(elapsed, deltaSec, { reduceMotion });
+        item.letter.update(elapsed, deltaSec, {
+          reduceMotion,
+          pixelHeight: viewportSize ? viewportSize.y * pixelRatio : 0,
+        });
       }
     }
     if (!vivid) return;
