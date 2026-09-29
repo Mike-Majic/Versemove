@@ -1,0 +1,67 @@
+/* Avviso "Nuova versione disponibile" (UpdateToast): stesso posto e stesso
+   stile dell'avviso di chiamata in arrivo (IncomingCallToast), bordo rosa
+   Versemove invece del verde. Sotto la chiamata (z-index 1290 < 1300). */
+.rb-update-toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1290;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 10px 10px 10px 14px;
+  border-radius: 18px;
+  background: #131318;
+  border: 1px solid #ec4899;
+  color: #f5f5f7;
+  font-size: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  animation: rb-update-in 0.25s ease;
+}
+.rb-update-text {
+  flex: 1;
+  min-width: 0;
+}
+.rb-update-btn {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #ec4899;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rb-update-btn:hover {
+  filter: brightness(1.1);
+}
+.rb-update-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 14px;
+  cursor: pointer;
+}
+.rb-update-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+@keyframes rb-update-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

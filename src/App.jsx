@@ -39,6 +39,7 @@ import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery
 import { ANIMALI_CATEGORIES, resolveCategoryQuery as resolveAnimaliCategoryQuery } from './data/animaliCategories';
 import AccessGate from './components/AccessGate';
 import CookieConsentBanner from './components/CookieConsentBanner';
+import UpdateToast from './components/UpdateToast';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
@@ -1610,6 +1611,8 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      <UpdateToast />
 
       {user && (
         <Suspense fallback={null}>

@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: '他のカテゴリー',
     scrollWorldsUp: 'ワールドを上にスクロール',
     scrollWorldsDown: 'ワールドを下にスクロール',
+    updateAvailable: '新しいバージョンがあります。再読み込みしてください。',
+    reload: '再読み込み',
   },
   topbar: {
     notifications: '通知',

@@ -16,6 +16,8 @@ export default {
     nextCategoriesPage: 'المزيد من الفئات',
     scrollWorldsUp: 'تمرير العوالم للأعلى',
     scrollWorldsDown: 'تمرير العوالم للأسفل',
+    updateAvailable: 'يتوفر إصدار جديد، أعد التحميل.',
+    reload: 'إعادة التحميل',
   },
   topbar: {
     notifications: 'الإشعارات',

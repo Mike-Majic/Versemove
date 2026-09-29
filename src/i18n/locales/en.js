@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: 'More categories',
     scrollWorldsUp: 'Scroll worlds up',
     scrollWorldsDown: 'Scroll worlds down',
+    updateAvailable: 'New version available, reload.',
+    reload: 'Reload',
   },
   topbar: {
     notifications: 'Notifications',

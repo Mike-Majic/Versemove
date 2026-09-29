@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: '更多分类',
     scrollWorldsUp: '向上滚动世界列表',
     scrollWorldsDown: '向下滚动世界列表',
+    updateAvailable: '有新版本可用，请刷新。',
+    reload: '刷新',
   },
   topbar: {
     notifications: '通知',

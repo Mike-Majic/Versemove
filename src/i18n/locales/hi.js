@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: 'और श्रेणियाँ',
     scrollWorldsUp: 'वर्ल्ड्स को ऊपर स्क्रॉल करें',
     scrollWorldsDown: 'वर्ल्ड्स को नीचे स्क्रॉल करें',
+    updateAvailable: 'नया संस्करण उपलब्ध है, रीलोड करें।',
+    reload: 'रीलोड',
   },
   topbar: {
     notifications: 'सूचनाएं',

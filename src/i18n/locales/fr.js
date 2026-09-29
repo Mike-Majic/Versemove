@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: 'Autre page de catégories',
     scrollWorldsUp: 'Faire défiler les mondes vers le haut',
     scrollWorldsDown: 'Faire défiler les mondes vers le bas',
+    updateAvailable: 'Nouvelle version disponible, rechargez.',
+    reload: 'Recharger',
   },
   topbar: {
     notifications: 'Notifications',

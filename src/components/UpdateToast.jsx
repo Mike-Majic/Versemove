@@ -1,0 +1,95 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import './UpdateToast.css';
+
+// Avviso "Nuova versione disponibile, ricarica." dopo un deploy.
+//
+// Non si appoggia all'aggiornamento del service worker (registration.update()
+// in Chromium a volte resta in sospeso senza nemmeno chiedere sw.js: è il
+// motivo per cui dopo un deploy servivano due ricariche). Si guarda invece
+// l'index.html vero in rete: il nome del bundle principale
+// (assets/index-<hash>.js) cambia a ogni build, quindi se quello online è
+// diverso da quello in esecuzione c'è una versione nuova. Il ?v= impedisce
+// alla precache di Workbox di rispondere con l'index.html vecchio.
+//
+// "Ricarica" toglie il service worker e le sue cache e ricarica: alla
+// riapertura la pagina è quella nuova e il worker nuovo si reinstalla da sé.
+// La ✕ rimanda al prossimo caricamento. Controllo dopo 10 s e poi ogni 30
+// minuti finché la pagina resta aperta, solo con la scheda in primo piano.
+const FIRST_CHECK_DELAY_MS = 10_000;
+const CHECK_EVERY_MS = 30 * 60 * 1000;
+const BUNDLE_RE = /assets\/index-[\w-]+\.js/;
+
+function runningBundle() {
+  for (const s of document.scripts) {
+    const m = String(s.src).match(BUNDLE_RE);
+    if (m) return m[0];
+  }
+  return null;
+}
+
+async function onlineBundle() {
+  const url = `${import.meta.env.BASE_URL}index.html?v=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return null;
+  return (await res.text()).match(BUNDLE_RE)?.[0] ?? null;
+}
+
+async function reloadToNewVersion() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    // Anche senza riuscire a pulire, la ricarica prova comunque.
+  }
+  window.location.reload();
+}
+
+export default function UpdateToast() {
+  const { t } = useTranslation();
+  const [newVersion, setNewVersion] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    // In sviluppo (vite dev) non c'è un bundle con hash: niente controllo.
+    const current = runningBundle();
+    if (!current) return undefined;
+    let stopped = false;
+    const check = async () => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      try {
+        const online = await onlineBundle();
+        if (!stopped && online && online !== current) setNewVersion(true);
+      } catch {
+        // Offline o rete che non risponde: si riprova al prossimo giro.
+      }
+    };
+    const first = setTimeout(check, FIRST_CHECK_DELAY_MS);
+    const every = setInterval(check, CHECK_EVERY_MS);
+    return () => {
+      stopped = true;
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, []);
+
+  if (!newVersion || dismissed) return null;
+
+  return (
+    <div className="rb-update-toast" role="status" aria-live="polite">
+      <span className="rb-update-text">{t('common.updateAvailable')}</span>
+      <button type="button" className="rb-update-btn" onClick={reloadToNewVersion}>
+        {t('common.reload')}
+      </button>
+      <button type="button" className="rb-update-close" aria-label={t('common.close')} onClick={() => setDismissed(true)}>
+        ✕
+      </button>
+    </div>
+  );
+}

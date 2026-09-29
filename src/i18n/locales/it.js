@@ -16,6 +16,8 @@ export default {
     nextCategoriesPage: 'Altra pagina di categorie',
     scrollWorldsUp: 'Scorri su i mondi',
     scrollWorldsDown: 'Scorri giù i mondi',
+    updateAvailable: 'Nuova versione disponibile, ricarica.',
+    reload: 'Ricarica',
   },
   topbar: {
     notifications: 'Notifiche',

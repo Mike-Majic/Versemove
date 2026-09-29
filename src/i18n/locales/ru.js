@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: 'Ещё категории',
     scrollWorldsUp: 'Прокрутить миры вверх',
     scrollWorldsDown: 'Прокрутить миры вниз',
+    updateAvailable: 'Доступна новая версия, перезагрузите.',
+    reload: 'Перезагрузить',
   },
   topbar: {
     notifications: 'Уведомления',

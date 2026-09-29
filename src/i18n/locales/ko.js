@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: '다른 카테고리 보기',
     scrollWorldsUp: '월드 위로 스크롤',
     scrollWorldsDown: '월드 아래로 스크롤',
+    updateAvailable: '새 버전이 있습니다. 새로고침하세요.',
+    reload: '새로고침',
   },
   topbar: {
     notifications: '알림',

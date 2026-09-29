@@ -12,6 +12,8 @@ export default {
     nextCategoriesPage: 'Mais categorias',
     scrollWorldsUp: 'Rolar mundos para cima',
     scrollWorldsDown: 'Rolar mundos para baixo',
+    updateAvailable: 'Nova versão disponível, recarregue.',
+    reload: 'Recarregar',
   },
   topbar: {
     notifications: 'Notificações',
