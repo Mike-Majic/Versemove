@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { dealInterestScore, getDealCountry } from './dealsRegion';
 
 // Spazi sponsorizzati: nessuna rete esterna (AdSense ecc., serve un dominio
 // proprio e un banner cookie completo, si valuta dopo il lancio), nessun
@@ -26,20 +27,26 @@ function mapSponsorship(row) {
 // punto: un'offerta vera del mondo Vetrina trovata dal bot (deals-bot,
 // fonte 'feed', link affiliato quando c'è il tag Amazon). Stessa forma di
 // una campagna, con `offerta: true` (niente contatori sponsorships).
+// Solo offerte del paese di chi guarda (dealsRegion.getDealCountry) e, tra
+// quelle, estratte a sorte pesando gli interessi salvati sul dispositivo
+// (categorie aperte, parole cercate, offerte cliccate nella Vetrina).
 export async function getHouseDeal() {
   const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from('vetrina_deals')
-    .select('id, titolo, negozio, descrizione, url, immagine, prezzo, prezzo_originale, sconto_pct')
+    .select('id, categoria, titolo, negozio, descrizione, url, immagine, prezzo, prezzo_originale, sconto_pct, valuta')
     .eq('fonte', 'feed')
     .eq('stato', 'attiva')
+    .eq('paese', getDealCountry())
     .not('immagine', 'is', null)
     .or(`scade_il.is.null,scade_il.gt.${nowIso}`)
     .order('updated_at', { ascending: false })
-    .limit(40);
+    .limit(120);
   if (error || !data?.length) return null;
-  const d = data[Math.floor(Math.random() * data.length)];
-  const prezzo = d.prezzo != null ? `${Number(d.prezzo).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}` : '';
+  const weights = data.map(dealInterestScore);
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+  const d = data.find((_, i) => (r -= weights[i]) < 0) ?? data[0];
+  const prezzo = d.prezzo != null ? `${Number(d.prezzo).toLocaleString(undefined, { style: 'currency', currency: d.valuta || 'EUR' })}` : '';
   const sconto = d.sconto_pct ? ` (-${d.sconto_pct}%)` : '';
   return {
     id: d.id,

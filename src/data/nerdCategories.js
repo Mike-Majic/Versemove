@@ -9,7 +9,7 @@ export const NERD_CATEGORIES = [
     id: 'bacheca',
     label: 'Bacheca',
     icon: '📰',
-    anchor: { lat: -55, lng: -110 },
+    anchor: { lat: -40.8, lng: -90 }, // distribuzione uniforme sull'oceano
     aliases: ['bacheca', 'feed', 'post', 'discussioni'],
     subfamilies: ['Discussioni', 'Novità', 'Consigli'],
   },
@@ -17,7 +17,7 @@ export const NERD_CATEGORIES = [
     id: 'giochi-tavolo',
     label: 'Giochi da tavolo & carte',
     icon: '🎲',
-    anchor: { lat: 40, lng: 0 },
+    anchor: { lat: 35.5, lng: -20.5 }, // distribuzione uniforme sull'oceano
     aliases: ['giochi da tavolo', 'giochi di carte', 'boardgame', 'board game', 'carte collezionabili'],
     subfamilies: ['Strategici', 'Party game', 'Carte collezionabili', 'Cooperativi', 'Giochi di ruolo da tavolo'],
   },
@@ -25,7 +25,7 @@ export const NERD_CATEGORIES = [
     id: 'gaming-pc',
     label: 'Gaming PC',
     icon: '🖥️',
-    anchor: { lat: -20, lng: -60 },
+    anchor: { lat: -35.5, lng: 159.5 }, // distribuzione uniforme sull'oceano
     aliases: ['gaming pc', 'pc gaming', 'steam'],
     subfamilies: ['FPS', 'RPG', 'Strategia', 'Simulazione', 'Indie'],
   },
@@ -33,7 +33,7 @@ export const NERD_CATEGORIES = [
     id: 'gaming-ps',
     label: 'Gaming PS',
     icon: '🎮',
-    anchor: { lat: 20, lng: 100 },
+    anchor: { lat: 16.6, lng: 127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['gaming ps', 'playstation', 'ps5', 'ps4'],
     subfamilies: ['Esclusive PlayStation', 'Azione/Avventura', 'Sportivi', 'Multiplayer online', 'Retrocompatibili'],
   },
@@ -41,7 +41,7 @@ export const NERD_CATEGORIES = [
     id: 'gaming-xbox',
     label: 'Gaming XBOX',
     icon: '🕹️',
-    anchor: { lat: -40, lng: 20 },
+    anchor: { lat: -49.2, lng: 0 }, // distribuzione uniforme sull'oceano
     aliases: ['gaming xbox', 'xbox', 'game pass'],
     subfamilies: ['Esclusive Xbox', 'Game Pass', 'Sparatutto', 'Sportivi', 'Co-op'],
   },
@@ -49,7 +49,7 @@ export const NERD_CATEGORIES = [
     id: 'gaming-nintendo',
     label: 'Gaming Nintendo',
     icon: '🔴',
-    anchor: { lat: 30, lng: -45 },
+    anchor: { lat: -40.8, lng: 90 }, // distribuzione uniforme sull'oceano
     aliases: ['nintendo', 'switch', 'switch 2', 'mario', 'zelda', 'pokemon', 'pokémon', 'eshop'],
     subfamilies: ['Switch', 'Giochi Nintendo', 'Multiplayer locale', 'Amiibo e collezionismo', 'Retro Nintendo'],
   },
@@ -57,7 +57,7 @@ export const NERD_CATEGORIES = [
     id: 'cosplay',
     label: 'Cosplay',
     icon: '🦸',
-    anchor: { lat: 60, lng: -100 },
+    anchor: { lat: 35.5, lng: -159.5 }, // distribuzione uniforme sull'oceano
     aliases: ['cosplay', 'costume', 'cosplayer'],
     subfamilies: ['Anime/Manga', 'Videogiochi', 'Fumetti/Comics', 'Armor building', 'Prop making'],
   },
@@ -65,7 +65,7 @@ export const NERD_CATEGORIES = [
     id: 'streaming',
     label: 'Streaming & Content Creator',
     icon: '🎥',
-    anchor: { lat: -10, lng: -150 },
+    anchor: { lat: 10.2, lng: -107.4 }, // distribuzione uniforme sull'oceano
     aliases: ['streaming', 'content creation', 'content creator', 'twitch', 'youtube'],
     subfamilies: ['Live streaming', 'YouTube', 'Editing video', 'Grafica/Overlay', 'Community management'],
   },
@@ -76,7 +76,7 @@ export const NERD_CATEGORIES = [
     id: 'nerd-live',
     label: 'Live',
     icon: '🔴',
-    anchor: { lat: 5, lng: 60 },
+    anchor: { lat: 10.2, lng: 72.6 }, // distribuzione uniforme sull'oceano
     aliases: ['live', 'diretta', 'dirette', 'in diretta', 'twitch', 'kick', 'streamer'],
     subfamilies: ['Fiere ed eventi', 'Tornei eSports', 'Raduni cosplay', 'Incontri con creator', 'Anteprime e presentazioni'],
   },

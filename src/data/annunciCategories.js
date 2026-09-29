@@ -16,7 +16,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'auto',
     label: ANNUNCI_CATEGORIES_META.auto.label,
     icon: ANNUNCI_CATEGORIES_META.auto.icon,
-    anchor: { lat: 20, lng: -150 }, // Pacifico settentrionale
+    anchor: { lat: 16.6, lng: -127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['auto', 'automobile', 'macchina', 'macchine'],
     subfamilies: [],
   },
@@ -24,7 +24,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'moto',
     label: ANNUNCI_CATEGORIES_META.moto.label,
     icon: ANNUNCI_CATEGORIES_META.moto.icon,
-    anchor: { lat: -25, lng: -99 }, // Pacifico meridionale, al largo del Cile
+    anchor: { lat: -49.7, lng: -116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['moto', 'motocicletta', 'motociclette', 'scooter'],
     subfamilies: [],
   },
@@ -32,7 +32,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'biciclette',
     label: ANNUNCI_CATEGORIES_META.biciclette.label,
     icon: ANNUNCI_CATEGORIES_META.biciclette.icon,
-    anchor: { lat: 20, lng: -47 }, // Atlantico equatoriale
+    anchor: { lat: 35.3, lng: -45 }, // distribuzione uniforme sull'oceano
     aliases: ['biciclette', 'bici', 'bicicletta', 'ebike'],
     subfamilies: [],
   },
@@ -40,7 +40,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'barche',
     label: ANNUNCI_CATEGORIES_META.barche.label,
     icon: ANNUNCI_CATEGORIES_META.barche.icon,
-    anchor: { lat: -25, lng: 4 }, // Atlantico meridionale
+    anchor: { lat: -17.1, lng: -10.6 }, // distribuzione uniforme sull'oceano
     aliases: ['barche', 'barca', 'gommone', 'yacht'],
     subfamilies: [],
   },
@@ -48,7 +48,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'case',
     label: ANNUNCI_CATEGORIES_META.case.label,
     icon: ANNUNCI_CATEGORIES_META.case.icon,
-    anchor: { lat: 10, lng: 70 }, // Mar Arabico
+    anchor: { lat: 10.2, lng: 72.6 }, // distribuzione uniforme sull'oceano
     aliases: ['case', 'casa', 'immobili', 'affitto', 'appartamento'],
     subfamilies: [],
   },
@@ -56,7 +56,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'abbigliamento',
     label: ANNUNCI_CATEGORIES_META.abbigliamento.label,
     icon: ANNUNCI_CATEGORIES_META.abbigliamento.icon,
-    anchor: { lat: -25, lng: 107 }, // Oceano Indiano orientale
+    anchor: { lat: -49.7, lng: 116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['abbigliamento', 'accessori', 'vestiti', 'moda', 'scarpe', 'borse'],
     subfamilies: [],
   },
@@ -64,7 +64,7 @@ export const ANNUNCI_CATEGORIES = [
     id: 'oggetti-vari',
     label: ANNUNCI_CATEGORIES_META['oggetti-vari'].label,
     icon: ANNUNCI_CATEGORIES_META['oggetti-vari'].icon,
-    anchor: { lat: 20, lng: 159 }, // Pacifico occidentale
+    anchor: { lat: 17.1, lng: 169.4 }, // distribuzione uniforme sull'oceano
     aliases: ['oggetti vari', 'oggetti', 'varie', 'altro', 'elettronica', 'arredamento'],
     subfamilies: [],
   },

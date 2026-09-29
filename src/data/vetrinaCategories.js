@@ -12,13 +12,17 @@
 // erano ammassati — feedback utente "le vedo troppo appiccicate"),
 // verificati uno per uno contro public/geo/land-110m.geojson.json (stesso
 // controllo già fatto per l'anchor di Incontri) perché nessuno cada su
-// terraferma.
+// terraferma. Poi ricalcolati tutti insieme (anche per Arte, Nerd, Annunci,
+// FAQ e Bambini): ogni anchor è il centro di una faccia del guscio
+// (icosaedro, dettaglio 1) con al massimo il 20% di terra, scelte per
+// allontanarle il più possibile fra loro — in Vetrina la distanza minima fra
+// due categorie è passata da 15° a 35°.
 export const VETRINA_CATEGORIES = [
   {
     id: 'novita',
     label: 'Novità',
     icon: '🛍️',
-    anchor: { lat: 0, lng: -150 }, // Pacifico centrale
+    anchor: { lat: 0, lng: -159.1 }, // distribuzione uniforme sull'oceano
     aliases: ['novita', 'novità', 'vetrina', 'in mostra'],
     subfamilies: [],
   },
@@ -30,7 +34,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-animali',
     label: 'Animali',
     icon: '🐕',
-    anchor: { lat: -40, lng: -170 }, // Pacifico meridionale
+    anchor: { lat: -49.2, lng: 180 }, // distribuzione uniforme sull'oceano
     aliases: ['animali', 'cani', 'cane', 'pet', 'mangime', 'guinzagli', 'accessori animali'],
     subfamilies: [],
   },
@@ -38,7 +42,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-casa-arredamento',
     label: 'Casa & Arredamento',
     icon: '🏠',
-    anchor: { lat: 40, lng: -160 }, // Pacifico settentrionale
+    anchor: { lat: 49.2, lng: 180 }, // distribuzione uniforme sull'oceano
     aliases: ['casa', 'arredamento', 'ikea', 'mondo convenienza', 'leroy merlin', 'maisons du monde'],
     subfamilies: [],
   },
@@ -46,7 +50,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-cibo-supermercati',
     label: 'Cibo & Supermercati',
     icon: '🛒',
-    anchor: { lat: -10, lng: -100 }, // Pacifico orientale
+    anchor: { lat: -20.9, lng: -90 }, // distribuzione uniforme sull'oceano
     aliases: ['cibo', 'supermercati', 'volantini', 'esselunga', 'coop', 'conad', 'lidl', 'eurospin'],
     subfamilies: [],
   },
@@ -54,7 +58,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-abbigliamento',
     label: 'Abbigliamento',
     icon: '👕',
-    anchor: { lat: 30, lng: -40 }, // Atlantico settentrionale
+    anchor: { lat: 16.6, lng: -127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['abbigliamento', 'vestiti', 'moda'],
     subfamilies: [],
   },
@@ -62,7 +66,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-scarpe',
     label: 'Scarpe',
     icon: '👟',
-    anchor: { lat: -30, lng: -20 }, // Atlantico meridionale
+    anchor: { lat: -17.1, lng: -10.6 }, // distribuzione uniforme sull'oceano
     aliases: ['scarpe', 'sneaker', 'calzature'],
     subfamilies: [],
   },
@@ -70,7 +74,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-elettronica',
     label: 'Elettronica',
     icon: '💻',
-    anchor: { lat: 10, lng: 70 }, // Oceano Indiano
+    anchor: { lat: 10.2, lng: 72.6 }, // distribuzione uniforme sull'oceano
     aliases: ['elettronica', 'informatica', 'smartphone', 'elettrodomestici'],
     subfamilies: [],
   },
@@ -78,7 +82,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-bellezza-cura-persona',
     label: 'Bellezza & Cura persona',
     icon: '💄',
-    anchor: { lat: -35, lng: 90 }, // Oceano Indiano meridionale
+    anchor: { lat: -49.7, lng: 116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['bellezza', 'cura persona', 'cosmetici', 'profumeria'],
     subfamilies: [],
   },
@@ -86,7 +90,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-sport-outdoor',
     label: 'Sport & Outdoor',
     icon: '⚽',
-    anchor: { lat: 50, lng: -30 }, // Nord Atlantico
+    anchor: { lat: 35.5, lng: -20.5 }, // distribuzione uniforme sull'oceano
     aliases: ['sport', 'outdoor', 'decathlon'],
     subfamilies: [],
   },
@@ -94,7 +98,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-bambini-giocattoli',
     label: 'Bambini & Giocattoli',
     icon: '🧸',
-    anchor: { lat: -55, lng: -60 }, // Oceano Meridionale, al largo del Sud America
+    anchor: { lat: -35.3, lng: -45 }, // distribuzione uniforme sull'oceano
     aliases: ['bambini', 'giocattoli', 'giochi'],
     subfamilies: [],
   },
@@ -102,7 +106,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-viaggi-voli',
     label: 'Viaggi & Voli',
     icon: '✈️',
-    anchor: { lat: 20, lng: 160 }, // Pacifico occidentale
+    anchor: { lat: 0, lng: 159.1 }, // distribuzione uniforme sull'oceano
     aliases: ['viaggi', 'voli', 'hotel', 'vacanze'],
     subfamilies: [],
   },
@@ -110,7 +114,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-fai-da-te-giardino',
     label: 'Fai da te & Giardino',
     icon: '🔨',
-    anchor: { lat: -20, lng: 150 }, // Mar dei Coralli
+    anchor: { lat: 16.6, lng: 127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['fai da te', 'giardino', 'bricolage'],
     subfamilies: [],
   },
@@ -118,7 +122,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-auto-moto',
     label: 'Auto & Moto',
     icon: '🚗',
-    anchor: { lat: 63, lng: -15 }, // Nord Atlantico, tra Islanda e Fær Øer
+    anchor: { lat: -49.7, lng: -116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['auto', 'moto', 'veicoli'],
     subfamilies: [],
   },
@@ -126,7 +130,7 @@ export const VETRINA_CATEGORIES = [
     id: 'offerte-codici-sconto',
     label: 'Codici sconto',
     icon: '🎟️',
-    anchor: { lat: -65, lng: 40 }, // Oceano Meridionale, a sud dell'Africa
+    anchor: { lat: -35.3, lng: 45 }, // distribuzione uniforme sull'oceano
     aliases: ['codici sconto', 'coupon', 'sconti'],
     subfamilies: [],
   },
@@ -136,7 +140,9 @@ export const VETRINA_CATEGORIES = [
 // (VetrinaOfferteColumn, parametrizzato dalla categoria) invece di averne
 // uno a testa: aggiungere o rinominare un'offerta si fa da questa lista
 // sola, senza toccare ArteExplorer.jsx (vedi il branch lì).
-export const VETRINA_OFFERTE_CATEGORY_IDS = VETRINA_CATEGORIES.filter((c) => c.id.startsWith('offerte-')).map(
+// Anche "Novità" usa la colonna delle offerte: mostra le ultime di tutte le
+// categorie (vedi listDeals in data/vetrinaDeals.js).
+export const VETRINA_OFFERTE_CATEGORY_IDS = VETRINA_CATEGORIES.filter((c) => c.id === 'novita' || c.id.startsWith('offerte-')).map(
   (c) => c.id
 );
 

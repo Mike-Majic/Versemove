@@ -6,7 +6,7 @@ export const ARTE_CATEGORIES = [
     id: 'libreria',
     label: 'Libreria',
     icon: '📚',
-    anchor: { lat: 35, lng: -20 },
+    anchor: { lat: 35.3, lng: -45 }, // distribuzione uniforme sull'oceano
     aliases: ['libreria', 'libri', 'libro', 'biblioteca', 'lettura'],
     subfamilies: ['Romanzo', "Romanzo d'esordio", 'Poesia', 'Saggistica', 'Fumetti/Graphic novel', 'Antologia'],
   },
@@ -14,7 +14,7 @@ export const ARTE_CATEGORIES = [
     id: 'musica',
     label: 'Musica',
     icon: '🎵',
-    anchor: { lat: -15, lng: 130 },
+    anchor: { lat: 0, lng: -159.1 }, // distribuzione uniforme sull'oceano
     aliases: ['musica', 'music', 'canzoni', 'canzone', 'brani'],
     subfamilies: ['Rock', 'Pop', 'Jazz', 'Hip-hop', 'Classica', 'Elettronica'],
   },
@@ -22,7 +22,7 @@ export const ARTE_CATEGORIES = [
     id: 'cinema',
     label: 'Sala cinema',
     icon: '🎬',
-    anchor: { lat: 10, lng: 40 },
+    anchor: { lat: 10.2, lng: 72.6 }, // distribuzione uniforme sull'oceano
     aliases: ['sala cinema', 'cinema', 'film', 'filmato', 'movie', 'cortometraggio'],
     subfamilies: ['Commedia', 'Drammatico', 'Horror', 'Documentario', 'Animazione'],
   },
@@ -30,7 +30,7 @@ export const ARTE_CATEGORIES = [
     id: 'teatro',
     label: 'Teatro',
     icon: '🎭',
-    anchor: { lat: 45, lng: -70 },
+    anchor: { lat: 49.2, lng: 180 }, // distribuzione uniforme sull'oceano
     aliases: ['teatro', 'theatre', 'spettacolo', 'commedia teatrale'],
     subfamilies: ['Prosa', 'Musical', 'Improvvisazione', 'Sperimentale'],
   },
@@ -38,7 +38,7 @@ export const ARTE_CATEGORIES = [
     id: 'arti-visive',
     label: 'Arte',
     icon: '🎨',
-    anchor: { lat: -30, lng: -55 },
+    anchor: { lat: -49.7, lng: -116.2 }, // distribuzione uniforme sull'oceano
     aliases: ['arte', 'art', 'pittura', 'mostra', 'galleria', 'museo'],
     subfamilies: ['Mostre', 'Musei', 'Pittura', 'Scultura', 'Street Art'],
   },
@@ -46,7 +46,7 @@ export const ARTE_CATEGORIES = [
     id: 'podcast',
     label: 'Podcast',
     icon: '🎙️',
-    anchor: { lat: -45, lng: 145 },
+    anchor: { lat: -35.5, lng: 159.5 }, // distribuzione uniforme sull'oceano
     aliases: ['podcast', 'audio', 'puntata', 'episodio'],
     subfamilies: ['Narrativo', 'Intervista', 'True crime', 'Attualità', 'Comico'],
   },
@@ -54,7 +54,7 @@ export const ARTE_CATEGORIES = [
     id: 'fotografia',
     label: 'Galleria immagini',
     icon: '📷',
-    anchor: { lat: 5, lng: -100 },
+    anchor: { lat: -10.2, lng: -107.4 }, // distribuzione uniforme sull'oceano
     aliases: ['galleria immagini', 'immagini', 'fotografia', 'foto', 'fotografico', 'scatto', 'photography'],
     subfamilies: ['Ritratto', 'Reportage', 'Analogica', 'Still life', 'Paesaggio', 'Tramonti'],
   },
@@ -62,7 +62,7 @@ export const ARTE_CATEGORIES = [
     id: 'live',
     label: 'Live',
     icon: '🎤',
-    anchor: { lat: -60, lng: 0 },
+    anchor: { lat: -49.2, lng: 0 }, // distribuzione uniforme sull'oceano
     aliases: ['live', 'concerto', 'concerti', 'dal vivo', 'dj set'],
     subfamilies: ['Concerti', 'DJ set', 'Reading dal vivo', 'Session acustiche', 'Festival'],
   },
@@ -70,7 +70,7 @@ export const ARTE_CATEGORIES = [
     id: 'video',
     label: 'Galleria Video',
     icon: '🎥',
-    anchor: { lat: 25, lng: 105 },
+    anchor: { lat: 16.6, lng: 127.3 }, // distribuzione uniforme sull'oceano
     aliases: ['galleria video', 'video', 'video breve', 'cortometraggio video', 'clip'],
     subfamilies: [],
   },
@@ -82,7 +82,7 @@ export const ARTE_CATEGORIES = [
     id: 'dirette',
     label: 'In diretta',
     icon: '🔴',
-    anchor: { lat: -35, lng: 60 }, // Oceano Indiano meridionale
+    anchor: { lat: -40.8, lng: 90 }, // distribuzione uniforme sull'oceano
     aliases: ['in diretta', 'dirette', 'diretta', 'streaming', 'streamer', 'youtube', 'tiktok', 'live youtube', 'live tiktok'],
     subfamilies: [],
   },
@@ -90,7 +90,7 @@ export const ARTE_CATEGORIES = [
     id: 'tattoo',
     label: 'Tattoo',
     icon: '🖋️',
-    anchor: { lat: -15, lng: -25 }, // Oceano Atlantico meridionale
+    anchor: { lat: 0, lng: -20.9 }, // distribuzione uniforme sull'oceano
     aliases: ['tattoo', 'tatuaggio', 'tatuaggi', 'tatuatore'],
     subfamilies: [],
   },

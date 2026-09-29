@@ -12,7 +12,7 @@ export const FAQ_CATEGORIES = [
     id: 'mod-room',
     label: 'Stanza MOD',
     icon: '🛡️',
-    anchor: { lat: 40, lng: -140 }, // Pacifico nord-orientale
+    anchor: { lat: 35.5, lng: -159.5 }, // distribuzione uniforme sull'oceano
     aliases: ['stanza mod', 'mod room', 'staff'],
     subfamilies: [],
     staffOnly: true,
@@ -21,7 +21,7 @@ export const FAQ_CATEGORIES = [
     id: 'segnalazioni',
     label: 'Segnalazioni',
     icon: '🚩',
-    anchor: { lat: -30, lng: 60 }, // Oceano Indiano meridionale
+    anchor: { lat: -35.3, lng: 45 }, // distribuzione uniforme sull'oceano
     aliases: ['segnalazioni', 'segnala', 'problema', 'bug'],
     subfamilies: [],
   },
@@ -29,7 +29,7 @@ export const FAQ_CATEGORIES = [
     id: 'suggerimenti',
     label: 'Suggerimenti',
     icon: '💡',
-    anchor: { lat: 10, lng: -35 }, // Atlantico equatoriale
+    anchor: { lat: 35.5, lng: -20.5 }, // distribuzione uniforme sull'oceano
     aliases: ['suggerimenti', 'idee', 'proposte'],
     subfamilies: [],
   },
@@ -37,7 +37,7 @@ export const FAQ_CATEGORIES = [
     id: 'informazioni',
     label: 'Informazioni',
     icon: 'ℹ️',
-    anchor: { lat: -55, lng: -60 }, // Passaggio di Drake
+    anchor: { lat: -40.8, lng: -90 }, // distribuzione uniforme sull'oceano
     aliases: ['informazioni', 'guida', 'aiuto', 'come funziona'],
     subfamilies: [],
   },

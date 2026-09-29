@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { voteDeal, listComments, addComment } from '../../data/vetrinaDeals';
 import ReportModal from '../shared/ReportModal';
+import { recordDealInterest } from '../../data/dealsRegion';
 
 const REPORT_MOTIVI = ['Offerta scaduta', 'Prezzo sbagliato', 'Spam o pubblicità', 'Altro'];
 
@@ -20,7 +21,7 @@ function formatCountdown(scadeIl) {
 
 function formatPrice(value, valuta) {
   if (value == null) return null;
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: valuta || 'EUR' }).format(value);
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: valuta || 'EUR' }).format(value);
 }
 
 export default function DealCard({ deal, user, onOpenAuth }) {
@@ -111,7 +112,7 @@ export default function DealCard({ deal, user, onOpenAuth }) {
           {countdown && <span className="rb-deal-countdown">{countdown}</span>}
         </div>
 
-        <a className="rb-deal-link" href={deal.url} target="_blank" rel="noopener nofollow">
+        <a className="rb-deal-link" href={deal.url} target="_blank" rel="noopener nofollow" onClick={() => recordDealInterest({ categoria: deal.categoria, peso: 3 })}>
           Vai all'offerta
         </a>
 

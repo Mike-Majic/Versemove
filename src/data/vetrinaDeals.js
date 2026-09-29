@@ -59,7 +59,12 @@ const ORDER_COLUMNS = {
 // Voti/commenti arrivano da una vista aggregata (vetrina_deal_stats, da
 // creare lato Cowork — stesso principio di dog_place_stats già in uso per
 // Cani) invece di ricalcolarli qui ad ogni feed.
-export async function listDeals({ categoria, negozio, scontoMin, online, citta, ordinamento = 'caldo' } = {}) {
+// "novita" non è una categoria di prodotti: mostra le ultime offerte di
+// tutte le categorie. paese (ISO-2, vedi dealsRegion.js): solo le offerte
+// del bot per quel paese più quelle degli utenti (paese vuoto).
+// cerca: parole nel titolo o nel nome del negozio.
+const MAX_DEALS = 200;
+export async function listDeals({ categoria, cerca, scontoMin, online, citta, paese, ordinamento = 'caldo' } = {}) {
   // Condizione di "attiva" esatta indicata da Cowork: stato='attiva' E
   // (scade_il è vuoto O nel futuro) — lato query, non filtrata dopo
   // (mai scaricare offerte scadute solo per poi nasconderle a mano).
@@ -67,17 +72,22 @@ export async function listDeals({ categoria, negozio, scontoMin, online, citta, 
   let query = supabase
     .from('vetrina_deals')
     .select('*')
-    .eq('categoria', categoria)
     .eq('stato', 'attiva')
     .or(`scade_il.is.null,scade_il.gt.${nowIso}`);
-  if (negozio) query = query.eq('negozio', negozio);
+  if (categoria && categoria !== 'novita') query = query.eq('categoria', categoria);
+  if (paese) query = query.or(`paese.is.null,paese.eq.${paese}`);
+  // Virgole e parentesi romperebbero la sintassi di .or() di PostgREST.
+  const q = String(cerca ?? '').replace(/[,()%*\\]/g, ' ').trim();
+  if (q) query = query.or(`titolo.ilike.%${q}%,negozio.ilike.%${q}%`);
   if (scontoMin) query = query.gte('sconto_pct', scontoMin);
   if (online === true) query = query.eq('online', true);
   if (online === false) query = query.eq('online', false);
   if (citta) query = query.ilike('citta', citta);
 
   const orderColumn = ORDER_COLUMNS[ordinamento];
-  if (orderColumn) query = query.order(orderColumn, { ascending: ordinamento === 'scadenza' });
+  if (orderColumn) query = query.order(orderColumn, { ascending: ordinamento === 'scadenza', nullsFirst: false });
+  // A parità (e per "caldo", riordinato sotto) prima le più recenti.
+  query = query.order('created_at', { ascending: false }).limit(MAX_DEALS);
 
   const { data, error } = await query;
   if (error || !data) return [];
