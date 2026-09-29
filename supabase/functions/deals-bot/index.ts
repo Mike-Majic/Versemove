@@ -110,6 +110,17 @@ function words(s: string): Set<string> {
   );
 }
 
+// Offerte di stagioni passate (es. "SALDI SS25" a fine 2026): Gemini a
+// volte ripesca pagine vecchie ancora online. Anno intero o sigla di
+// collezione (SS/FW/AW/PE + 2 cifre; non "AI", "ai 20" è italiano)
+// precedenti all'anno in corso = scarto.
+function looksStale(text: string): boolean {
+  const year = new Date().getUTCFullYear();
+  for (const m of text.matchAll(/\b(20\d{2})\b/g)) if (Number(m[1]) < year) return true;
+  for (const m of text.matchAll(/\b(?:ss|fw|aw|pe)\s?(\d{2})\b/gi)) if (2000 + Number(m[1]) < year) return true;
+  return false;
+}
+
 // La pagina parla davvero di quello che dice l'offerta? Se il titolo della
 // pagina non ha nessuna parola in comune con quello proposto (tolto il nome
 // del negozio), Gemini ha abbinato il link sbagliato: si scarta. Pagine
@@ -190,16 +201,21 @@ async function checkPage(raw: string): Promise<{ url: URL; image: string | null;
       } catch {
         // già chiuso
       }
-      const m =
-        html.match(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*content=["']([^"']+)["']/i) ||
-        html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["']/i);
+      const candidates = [
+        ...html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*content=["']([^"']+)["']/gi),
+        ...html.matchAll(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["']/gi),
+        ...html.matchAll(/<link[^>]+rel=["']image_src["'][^>]*href=["']([^"']+)["']/gi),
+      ].map((x) => x[1]);
+      // Icone del sito (favicon, android-icon, logo): nella card sembrano
+      // un'immagine vuota o trasparente, meglio il segnaposto.
+      const m = candidates.find((c) => !/favicon|android-icon|apple-touch|(^|[/_.-])(logo|icon|sprite|placeholder)s?([/_.-]|$)|\.(ico|svg)(\?|$)/i.test(c));
       const tm =
         html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
         html.match(/<title[^>]*>([^<]+)<\/title>/i);
       if (tm) title = tm[1].replace(/&amp;/g, "&").trim().slice(0, 300);
       if (m) {
         try {
-          const iu = new URL(m[1].replace(/&amp;/g, "&"), finalUrl);
+          const iu = new URL(m.replace(/&amp;/g, "&"), finalUrl);
           if (iu.protocol === "https:") image = iu.toString().slice(0, 600);
         } catch {
           image = null;
@@ -388,7 +404,13 @@ Deno.serve(async (req) => {
     const page = checked[i];
     const titolo = str(raw.titolo, 160);
     const negozio = str(raw.negozio, 80) || (page ? page.url.hostname.replace(/^www\./, "") : "");
-    if (!page || titolo.length < 3 || !negozio || !titleMatches(titolo, negozio, page.title)) {
+    if (
+      !page ||
+      titolo.length < 3 ||
+      !negozio ||
+      !titleMatches(titolo, negozio, page.title) ||
+      looksStale(`${titolo} ${str(raw.descrizione, 300)} ${page.title ?? ""}`)
+    ) {
       scartati += 1;
       continue;
     }
