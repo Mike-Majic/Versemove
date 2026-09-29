@@ -59,6 +59,9 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
   // Offerte del paese di chi guarda (città del filtro "Dove", altrimenti
   // fuso orario/lingua del dispositivo): a New York niente offerte italiane.
   const paese = getDealCountry(locationFilters);
+  // Codici sconto: quelli scaduti da meno di una settimana restano visibili
+  // con la barra rossa "Scaduto" (vedi DealCard), gli altri spariscono.
+  const mostraScadute = category.id === 'offerte-codici-sconto' ? 7 : 0;
 
   // Categoria aperta = interesse (per le offerte mostrate come pubblicità
   // nel resto dell'app, vedi getHouseDeal).
@@ -80,7 +83,7 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
     let cancelled = false;
     setDeals(null);
     setError('');
-    listDeals({ categoria: category.id, cerca: cercaDebounced || undefined, scontoMin: scontoMin ? Number(scontoMin) : undefined, online, citta: citta || undefined, paese, ordinamento })
+    listDeals({ categoria: category.id, cerca: cercaDebounced || undefined, scontoMin: scontoMin ? Number(scontoMin) : undefined, online, citta: citta || undefined, paese, mostraScadute, ordinamento })
       .then((list) => {
         if (!cancelled) setDeals(list);
       })
@@ -94,13 +97,13 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category.id, cercaDebounced, scontoMin, online, citta, paese, ordinamento]);
+  }, [category.id, cercaDebounced, scontoMin, online, citta, paese, mostraScadute, ordinamento]);
 
   // listDeals filtra già lato query su stato='attiva' e scadenza (vedi
   // vetrinaDeals.js, condizione esatta indicata da Cowork); "scaduta" dalla
   // vista vetrina_deal_stats resta solo come ultima rete di sicurezza, per
   // un'offerta arrivata giusto mentre scadeva.
-  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => !d.scaduta), [deals]);
+  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => mostraScadute || !d.scaduta), [deals, mostraScadute]);
 
   const dealsPanel = (
     <div className="rb-deal-column">
@@ -202,7 +205,7 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
           onClose={() => setSubmitOpen(false)}
           onPublished={() => {
             setSubmitOpen(false);
-            listDeals({ categoria: category.id, paese, ordinamento }).then(setDeals);
+            listDeals({ categoria: category.id, paese, mostraScadute, ordinamento }).then(setDeals);
           }}
         />
       )}

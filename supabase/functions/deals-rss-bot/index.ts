@@ -1,6 +1,7 @@
 // deals-rss-bot: riempie il mondo Vetrina con le offerte pubblicate nei feed
 // RSS/Atom dei siti di offerte di tutto il mondo (rete Pepper, Slickdeals,
-// OzBargain, RedFlagDeals, dealnews, siti italiani di tecnologia). Niente
+// OzBargain, RedFlagDeals, dealnews, 9to5Toys, siti italiani di tecnologia,
+// rete "Pirates" per i viaggi). Niente
 // intelligenza artificiale e niente quote: si leggono i feed, si ricava la
 // categoria dalle parole del titolo e della categoria del feed, e si
 // inserisce l'offerta con il paese e la lingua della fonte (colonne
@@ -27,7 +28,9 @@ const RUN_KEY = "vetrina/rss";
 const ALLOWED_ORIGINS = ["https://mike-majic.github.io", "http://localhost:5173", "http://127.0.0.1:5173"];
 const USER_AGENT = "VersemoveDeals/1.0 (+https://mike-majic.github.io)";
 
-type Source = { id: string; url: string; paese: string; lingua: string; valuta: string; negozio: string };
+// categoria: fissa per le fonti di un solo tipo (i siti "Pirates" sono
+// tutti viaggi, anche quando il titolo parla di "codice sconto").
+type Source = { id: string; url: string; paese: string; lingua: string; valuta: string; negozio: string; categoria?: string };
 
 // Solo feed verificati (rispondono 200 con voci dentro dai server Supabase).
 const SOURCES: Source[] = [
@@ -55,6 +58,15 @@ const SOURCES: Source[] = [
   { id: "smartworld", url: "https://www.smartworld.it/offerte/feed", paese: "IT", lingua: "it", valuta: "EUR", negozio: "SmartWorld" },
   { id: "tuttotech", url: "https://www.tuttotech.net/offerte/feed", paese: "IT", lingua: "it", valuta: "EUR", negozio: "TuttoTech" },
   { id: "tomshw", url: "https://www.tomshw.it/feed/offerte", paese: "IT", lingua: "it", valuta: "EUR", negozio: "Tom's Hardware" },
+  { id: "9to5toys", url: "https://9to5toys.com/feed/", paese: "US", lingua: "en", valuta: "USD", negozio: "9to5Toys" },
+  { id: "piratinviaggio", url: "https://www.piratinviaggio.it/feed", paese: "IT", lingua: "it", valuta: "EUR", negozio: "Pirati in Viaggio", categoria: "offerte-viaggi-voli" },
+  { id: "holidaypirates", url: "https://www.holidaypirates.com/feed", paese: "GB", lingua: "en", valuta: "GBP", negozio: "HolidayPirates", categoria: "offerte-viaggi-voli" },
+  { id: "urlaubspiraten-de", url: "https://www.urlaubspiraten.de/feed", paese: "DE", lingua: "de", valuta: "EUR", negozio: "Urlaubspiraten", categoria: "offerte-viaggi-voli" },
+  { id: "urlaubspiraten-at", url: "https://www.urlaubspiraten.at/feed", paese: "AT", lingua: "de", valuta: "EUR", negozio: "Urlaubspiraten", categoria: "offerte-viaggi-voli" },
+  { id: "voyagespirates", url: "https://www.voyagespirates.fr/feed", paese: "FR", lingua: "fr", valuta: "EUR", negozio: "Voyages Pirates", categoria: "offerte-viaggi-voli" },
+  { id: "viajerospiratas", url: "https://www.viajerospiratas.es/feed", paese: "ES", lingua: "es", valuta: "EUR", negozio: "Viajeros Piratas", categoria: "offerte-viaggi-voli" },
+  { id: "vakantiepiraten", url: "https://www.vakantiepiraten.nl/feed", paese: "NL", lingua: "nl", valuta: "EUR", negozio: "Vakantiepiraten", categoria: "offerte-viaggi-voli" },
+  { id: "wakacyjnipiraci", url: "https://www.wakacyjnipiraci.pl/feed", paese: "PL", lingua: "pl", valuta: "PLN", negozio: "Wakacyjni Piraci", categoria: "offerte-viaggi-voli" },
 ];
 
 // Categoria dell'app dalle parole (titolo + categoria del feed), in tutte le
@@ -314,7 +326,7 @@ Deno.serve(async (req) => {
       seen.add(it.ref);
       rows.push({
         fonte_ref: it.ref,
-        categoria: categorize(`${it.titolo} | ${it.categoriaFeed}`),
+        categoria: src.categoria ?? categorize(`${it.titolo} | ${it.categoriaFeed}`),
         titolo: it.titolo,
         negozio: it.negozio,
         descrizione: it.descrizione || null,

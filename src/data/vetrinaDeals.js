@@ -39,7 +39,7 @@ function mapDeal(row, statsByDeal, myVotesByDeal) {
     // (autorevole, calcolata lì con lo stesso now() del resto delle
     // query) — se la vista non risponde ancora si ricade sul controllo
     // locale su scadeIl, mai un'offerta scaduta che sembra ancora attiva.
-    scaduta: stats?.scaduta ?? (row.scade_il ? new Date(row.scade_il).getTime() <= Date.now() : false),
+    scaduta: row.stato === 'scaduta' || (stats?.scaduta ?? (row.scade_il ? new Date(row.scade_il).getTime() <= Date.now() : false)),
     mioVoto: myVotesByDeal?.get(row.id) ?? null,
   };
 }
@@ -63,17 +63,21 @@ const ORDER_COLUMNS = {
 // tutte le categorie. paese (ISO-2, vedi dealsRegion.js): solo le offerte
 // del bot per quel paese più quelle degli utenti (paese vuoto).
 // cerca: parole nel titolo o nel nome del negozio.
+// mostraScadute (giorni): tiene anche le offerte scadute da al massimo
+// quei giorni, segnate con scaduta=true — nei Codici sconto restano in
+// lista con la barra rossa "Scaduto" invece di sparire di colpo.
 const MAX_DEALS = 200;
-export async function listDeals({ categoria, cerca, scontoMin, online, citta, paese, ordinamento = 'caldo' } = {}) {
+export async function listDeals({ categoria, cerca, scontoMin, online, citta, paese, mostraScadute = 0, ordinamento = 'caldo' } = {}) {
   // Condizione di "attiva" esatta indicata da Cowork: stato='attiva' E
   // (scade_il è vuoto O nel futuro) — lato query, non filtrata dopo
   // (mai scaricare offerte scadute solo per poi nasconderle a mano).
   const nowIso = new Date().toISOString();
+  const limiteIso = new Date(Date.now() - mostraScadute * 86_400_000).toISOString();
   let query = supabase
     .from('vetrina_deals')
     .select('*')
-    .eq('stato', 'attiva')
-    .or(`scade_il.is.null,scade_il.gt.${nowIso}`);
+    .in('stato', mostraScadute ? ['attiva', 'scaduta'] : ['attiva'])
+    .or(`scade_il.is.null,scade_il.gt.${mostraScadute ? limiteIso : nowIso}`);
   if (categoria && categoria !== 'novita') query = query.eq('categoria', categoria);
   if (paese) query = query.or(`paese.is.null,paese.eq.${paese}`);
   // Virgole e parentesi romperebbero la sintassi di .or() di PostgREST.
@@ -97,6 +101,8 @@ export async function listDeals({ categoria, cerca, scontoMin, online, citta, pa
   const deals = data.map((row) => mapDeal(row, statsByDeal, myVotesByDeal));
 
   if (ordinamento === 'caldo') deals.sort((a, b) => b.caldo - a.caldo);
+  // Le scadute (solo con mostraScadute) sempre in fondo.
+  deals.sort((a, b) => Number(a.scaduta) - Number(b.scaduta));
   return deals;
 }
 
