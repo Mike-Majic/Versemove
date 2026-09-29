@@ -1,6 +1,7 @@
 // English. Keep the same key structure as it.js — see the comment there.
 export default {
   common: {
+    publishedAt: 'Published {{date}} at {{time}}',
     close: 'Close',
     save: 'Save',
     cancel: 'Cancel',

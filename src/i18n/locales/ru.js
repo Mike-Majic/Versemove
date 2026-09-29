@@ -1,6 +1,7 @@
 // Русский: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: 'Опубликовано {{date}} в {{time}}',
     close: 'Закрыть',
     save: 'Сохранить',
     cancel: 'Отмена',

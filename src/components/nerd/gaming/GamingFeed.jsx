@@ -100,6 +100,7 @@ function ClipGrid({ posts, onOpen }) {
             <span className="rb-clip-caption">
               {p.title && <strong>🎮 {p.title.nome}</strong>}
               <span>{p.author?.name ?? 'Utente'}{p.testo ? ` — ${p.testo}` : ''}</span>
+              <PublishedAt at={p.data} />
             </span>
           </button>
         </li>

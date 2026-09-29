@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { voteDeal, listComments, addComment } from '../../data/vetrinaDeals';
 import ReportModal from '../shared/ReportModal';
 import { recordDealInterest } from '../../data/dealsRegion';
+import PublishedAt from '../shared/PublishedAt';
 
 const REPORT_MOTIVI = ['Offerta scaduta', 'Prezzo sbagliato', 'Spam o pubblicità', 'Altro'];
 
@@ -112,6 +113,7 @@ export default function DealCard({ deal, user, onOpenAuth }) {
           <span>{deal.online ? 'Online' : deal.citta ? `In negozio · ${deal.citta}` : 'In negozio'}</span>
           {countdown && !deal.scaduta && <span className="rb-deal-countdown">{countdown}</span>}
         </div>
+        <PublishedAt at={deal.createdAt} />
 
         <a className="rb-deal-link" href={deal.url} target="_blank" rel="noopener nofollow" onClick={() => recordDealInterest({ categoria: deal.categoria, peso: 3 })}>
           Vai all'offerta
@@ -143,6 +145,7 @@ export default function DealCard({ deal, user, onOpenAuth }) {
                 {comments.map((c) => (
                   <li key={c.id}>
                     <strong>{c.authorName}</strong> {c.testo}
+                    <PublishedAt at={c.createdAt} />
                   </li>
                 ))}
               </ul>

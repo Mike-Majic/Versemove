@@ -154,6 +154,7 @@ function Viewer({ item, user, onVote, onFollow, onClose, onPrev, onNext }) {
       </div>
       <div className="rb-sg-viewer-bar" onClick={(e) => e.stopPropagation()}>
         <AuthorChip item={item} size={36} />
+        <PublishedAt at={item.createdAt} className="inline" />
         <Follow item={item} user={user} onFollow={onFollow} />
         <Votes item={item} onVote={onVote} />
       </div>
@@ -309,6 +310,7 @@ export default function SocialGallery({ tipo, user, onOpenAuth }) {
                   <AuthorChip item={item} />
                   <Follow item={item} user={user} onFollow={follow} />
                 </div>
+                <PublishedAt at={item.createdAt} />
                 <Votes item={item} onVote={vote} />
               </div>
             </article>

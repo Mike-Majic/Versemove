@@ -3,6 +3,7 @@ import { countryFlag } from '../../../data/citta';
 import { linkToCosplayEvent } from '../../../data/deepLinks';
 import ShareLinkButton from '../../shared/ShareLinkButton';
 import Icon from '../../shared/Icon';
+import PublishedAt from '../../shared/PublishedAt';
 
 // Card di un evento Cosplay: titolo, badge tipo, date "28 ott – 1 nov
 // 2026", città + bandierina, "a 27 km", conteggi, badge Verificato
@@ -44,6 +45,7 @@ export default function CosplayEventCard({ event, user, busy, onAttend, onLfgFor
           {event.nPartecipa} {event.nPartecipa === 1 ? 'ci va' : 'ci vanno'} · {event.nInteressati} {event.nInteressati === 1 ? 'interessato' : 'interessati'}
         </span>
         {!compact && event.descrizione && <p className="rb-cev-desc">{event.descrizione}</p>}
+        <PublishedAt at={event.createdAt} />
         <div className="rb-cev-actions">
           <button type="button" className={`rb-vroom-btn ${going ? 'rb-vroom-btn--primary' : ''}`} disabled={busy} onClick={() => onAttend(event, going ? null : 'partecipa')} aria-pressed={going}>
             <Icon name="check" size={16} className="rb-icon--inline" /> Ci vado

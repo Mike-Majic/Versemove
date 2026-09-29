@@ -1,4 +1,5 @@
 import './EventCard.css';
+import PublishedAt from '../shared/PublishedAt';
 
 function formatEventDate(dataEventoISO) {
   const d = new Date(dataEventoISO);
@@ -38,6 +39,7 @@ export default function EventCard({ event, user, onOpenAuth, onToggleLike, onOpe
         <span className="rb-event-card-city">📍 {event.citta}</span>
         {event.bio && <p className="rb-event-card-bio">{event.bio}</p>}
         <span className="rb-event-card-author">Creato da {author.name}</span>
+        <PublishedAt at={event.createdAt} />
 
         <div className="rb-event-card-actions">
           <button type="button" className={`rb-event-card-like-btn ${liked ? 'active' : ''}`} onClick={handleLike}>

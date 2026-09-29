@@ -234,6 +234,7 @@ function mapArticle(row) {
     corpo: row.corpo,
     ordine: row.ordine ?? 0,
     pubblicato: row.pubblicato !== false,
+    createdAt: row.created_at ?? null,
   };
 }
 

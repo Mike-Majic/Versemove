@@ -121,6 +121,7 @@ function PodcastTab({ user, onOpenAuth }) {
           <div className="rb-cultural-card-info">
             {c.caption && <strong>{c.caption}</strong>}
             {c.tags?.length > 0 && <p className="rb-cultural-card-meta">{c.tags.map((t) => `#${t}`).join(' ')}</p>}
+            <PublishedAt at={c.created_at} />
           </div>
           <button type="button" className="rb-cultural-reaction-btn" onClick={() => handleLike(c)}>
             <Icon name="heart" size={16} className={`rb-icon--inline ${c.likedByMe ? 'rb-icon--filled' : ''}`} /> {c.likeCount}

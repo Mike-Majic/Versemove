@@ -23,6 +23,7 @@ import CityAutocomplete from '../../shared/CityAutocomplete';
 import EmptyState from '../../EmptyState';
 import Skeleton from '../../Skeleton';
 import AvatarImg from '../../shared/AvatarImg';
+import PublishedAt from '../../shared/PublishedAt';
 
 // Scheda "Cerco gruppo": stesso schema di "Cerco compagni" di Gaming PC
 // (annunci aperti per data, Realtime + ricaricamento di riserva, nuovo
@@ -368,6 +369,7 @@ export default function CosplayLfgTab({ user, onOpenAuth, locationFilters, prefi
                   {l.stato === 'chiuso' && <span>🔒 Chiuso</span>}
                 </div>
                 {l.note && <p className="rb-lfg-note">{l.note}</p>}
+                <PublishedAt at={l.createdAt} />
                 <div className="rb-lfg-people">
                   <span>Di</span>
                   <Person profile={l.author} />

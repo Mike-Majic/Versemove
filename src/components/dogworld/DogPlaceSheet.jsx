@@ -7,11 +7,7 @@ import ReportModal from '../shared/ReportModal';
 import Icon from '../shared/Icon';
 import './DogPlaceSheet.css';
 import AvatarImg from '../shared/AvatarImg';
-
-function formatDate(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+import PublishedAt from '../shared/PublishedAt';
 
 function Stars({ value }) {
   return (
@@ -175,6 +171,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
               {meta.emoji} {meta.label}
             </span>
             <h3>{place.nome}</h3>
+            {detail?.createdAt && <PublishedAt at={detail.createdAt} />}
             {stats && stats.nRecensioni > 0 && (
               <div className="rb-dogsheet-rating">
                 <Stars value={Math.round(stats.votoMedio)} />
@@ -282,7 +279,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                         <div>
                           <strong>{r.authorName}</strong>
                           <div className="rb-dogsheet-review-meta">
-                            <Stars value={r.voto} /> · {formatDate(r.createdAt)}
+                            <Stars value={r.voto} /> · <PublishedAt at={r.createdAt} className="inline" />
                           </div>
                         </div>
                       </div>

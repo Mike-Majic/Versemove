@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toggleLike, listComments, addComment, rateStudio } from '../../data/tattoo';
 import ReportModal from '../shared/ReportModal';
 import Icon from '../shared/Icon';
+import PublishedAt from '../shared/PublishedAt';
 
 const REPORT_MOTIVI = ['Nudità', 'Contenuto offensivo', 'Non è una mia foto', 'Spam o pubblicità', 'Altro'];
 
@@ -128,6 +129,7 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
           {post.studioNome && <span> · {post.studioNome}</span>}
           {post.studioCitta && <span className="rb-tattoo-citta"> · {post.studioCitta}</span>}
         </div>
+        <PublishedAt at={post.createdAt} />
 
         {post.voto != null && (
           <div className="rb-tattoo-author-vote">
@@ -168,6 +170,7 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
                 {comments.map((c) => (
                   <li key={c.id}>
                     <strong>{c.authorName}</strong> {c.testo}
+                    <PublishedAt at={c.createdAt} />
                   </li>
                 ))}
               </ul>

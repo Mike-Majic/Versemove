@@ -4,6 +4,7 @@ import { getCommunityReactionsSummary, toggleCommunityReaction } from '../../dat
 import { displayName } from '../../data/posts';
 import ReactionButtons from './ReactionButtons';
 import './cultural.css';
+import PublishedAt from '../shared/PublishedAt';
 
 function formatEventDate(iso) {
   if (!iso) return null;
@@ -135,6 +136,7 @@ export default function CommunityEventsColumn({ categoryId, label, user, onOpenA
                   {[ev.location, formatEventDate(ev.event_date)].filter(Boolean).join(' · ')}
                 </p>
                 {ev.description && <p className="rb-cultural-card-desc">{ev.description}</p>}
+                <PublishedAt at={ev.created_at} />
               </div>
               <ReactionButtons
                 summary={reactions.get(ev.id)}

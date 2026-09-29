@@ -12,6 +12,7 @@ import SponsorCard from './ads/SponsorCard';
 import './CategoryColumn.css';
 import Icon from './shared/Icon';
 import AvatarImg from './shared/AvatarImg';
+import PublishedAt from './shared/PublishedAt';
 
 // Componente unico e parametrizzato per esplorare una categoria: riceve
 // l'oggetto categoria (nome, sottofamiglie...) più i suoi contenuti/ricerche
@@ -166,6 +167,7 @@ export default function CategoryColumn({
                 <div className="rb-arte-uploaded-info">
                   {c.caption && <p>{c.caption}</p>}
                   {c.tags?.length > 0 && <span className="rb-arte-uploaded-tags">{c.tags.map((t) => `#${t}`).join(' ')}</span>}
+                  <PublishedAt at={c.created_at} />
                   <button type="button" className="rb-arte-uploaded-like-btn" onClick={() => handleContentLike(c)}>
                     <Icon name="heart" size={16} className={`rb-icon--inline ${c.likedByMe ? 'rb-icon--filled' : ''}`} /> {c.likeCount}
                   </button>

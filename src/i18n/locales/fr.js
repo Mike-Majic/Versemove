@@ -1,6 +1,7 @@
 // Français. Garde la même structure de clés que it.js — voir le commentaire là-bas.
 export default {
   common: {
+    publishedAt: 'Publié le {{date}} à {{time}}',
     close: 'Fermer',
     save: 'Enregistrer',
     cancel: 'Annuler',

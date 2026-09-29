@@ -5,6 +5,7 @@
 // come ripiego (fallbackLng: 'en'), mai questa versione italiana.
 export default {
   common: {
+    publishedAt: 'Pubblicato il {{date}} alle {{time}}',
     close: 'Chiudi',
     save: 'Salva',
     cancel: 'Annulla',

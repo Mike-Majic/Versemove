@@ -1,6 +1,7 @@
 // हिन्दी: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '{{date}} को {{time}} बजे प्रकाशित',
     close: 'बंद करें',
     save: 'सेव करें',
     cancel: 'रद्द करें',

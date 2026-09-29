@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatRelativeDate } from './resolveAuthor';
+import PublishedAt from '../shared/PublishedAt';
 import LinkPreview from './LinkPreview';
 import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
@@ -50,7 +50,7 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
           )}
         </div>
         <div className="rb-comment-footer">
-          <span className="rb-comment-date">{formatRelativeDate(comment.data)}</span>
+          <PublishedAt at={comment.data} className="rb-comment-date inline" />
           {REACTION_EMOJIS.map((emoji) => {
             const count = comment.reazioni?.[emoji] ?? 0;
             return (
@@ -212,7 +212,7 @@ export default function PostCard({
         <AvatarImg className="rb-post-avatar" src={author.avatar} name={author?.name || author?.nickname} seed={author?.id} alt={author.name} />
         <div className="rb-post-header-info">
           <strong>{author.name}</strong>
-          <span className="rb-post-date">{formatRelativeDate(post.data)}</span>
+          <PublishedAt at={post.data} className="rb-post-date" />
         </div>
         {canFollow && (
           <button type="button" className={`rb-post-follow-btn ${isFollowing ? 'active' : ''}`} onClick={handleFollow}>

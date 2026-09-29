@@ -77,6 +77,7 @@ function SuggestionCard({ s, user, onOpenAuth, staff, onChanged }) {
         <div>
           <strong>{s.titolo}</strong>
           {s.mondo && <span className="rb-faq-suggestion-world"> · {s.mondo}</span>}
+          <PublishedAt at={s.data} />
         </div>
         <span className={`rb-faq-stato-badge rb-faq-stato-${s.stato}`}>{STATO_LABEL[s.stato] ?? s.stato}</span>
       </div>

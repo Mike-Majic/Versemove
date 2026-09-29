@@ -16,6 +16,7 @@ import './annunci.css';
 // stesso linguaggio visivo di Segnalazioni/Suggerimenti) invece di
 // duplicarlo qui.
 import '../faq/faq.css';
+import PublishedAt from '../shared/PublishedAt';
 
 const DEFAULT_FILTERS = { prezzoMin: null, prezzoMax: null, citta: '', soloConFoto: false, ordinamento: 'recenti', fieldFilters: {} };
 
@@ -181,6 +182,7 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
                 <div className="rb-annunci-mie-info">
                   <strong>{l.titolo}</strong>
                   <span className={`rb-faq-stato-badge rb-annunci-stato-${l.stato}`}>{l.stato}</span>
+                  <PublishedAt at={l.createdAt} />
                 </div>
                 <div className="rb-annunci-mie-actions">
                   {l.stato === 'attivo' && (

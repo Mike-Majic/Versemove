@@ -5,6 +5,7 @@
 // destra a sinistra grazie all'algoritmo bidi del browser.
 export default {
   common: {
+    publishedAt: 'نُشر في {{date}} الساعة {{time}}',
     close: 'إغلاق',
     save: 'حفظ',
     cancel: 'إلغاء',

@@ -1,6 +1,7 @@
 // 中文（简体）: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '发布于 {{date}} {{time}}',
     close: '关闭',
     save: '保存',
     cancel: '取消',

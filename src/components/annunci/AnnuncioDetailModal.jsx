@@ -4,6 +4,7 @@ import { getSellerInfo, toggleFavorite } from '../../data/annunci';
 import { linkToListing, shareLink } from '../../data/deepLinks';
 import ModalOverlay from '../ModalOverlay';
 import ReportModal from '../shared/ReportModal';
+import PublishedAt from '../shared/PublishedAt';
 
 function formatPrice(listing) {
   if (listing.prezzo == null) return 'Prezzo su richiesta';
@@ -96,7 +97,7 @@ export default function AnnuncioDetailModal({ listing, user, onOpenAuth, onOpenC
           <div className="rb-annuncio-detail-meta">
             <span>{listing.citta}</span>
             {listing.trattabile && <span className="rb-annuncio-card-trattabile">Trattabile</span>}
-            <span>Pubblicato il {new Date(listing.createdAt).toLocaleDateString('it-IT')}</span>
+            <PublishedAt at={listing.createdAt} className="inline" />
           </div>
 
           {fields.length > 0 && (

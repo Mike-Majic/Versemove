@@ -1,6 +1,7 @@
 // Português: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: 'Publicado em {{date}} às {{time}}',
     close: 'Fechar',
     save: 'Salvar',
     cancel: 'Cancelar',

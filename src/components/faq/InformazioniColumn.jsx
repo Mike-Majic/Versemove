@@ -4,6 +4,7 @@ import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import Skeleton from '../Skeleton';
 import TermsModal from '../TermsModal';
+import PublishedAt from '../shared/PublishedAt';
 
 function ArticleEditForm({ initial, onCancel, onSave }) {
   const [sezione, setSezione] = useState(initial?.sezione ?? '');
@@ -127,6 +128,7 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
                   <strong>{a.titolo}</strong>
                   {!a.pubblicato && <span className="rb-faq-info-hidden-badge">Nascosto</span>}
                   <p>{a.corpo}</p>
+                  <PublishedAt at={a.createdAt} />
                   {staff && (
                     <div className="rb-faq-info-article-actions">
                       <button type="button" className="rb-reset-filters-btn" onClick={() => setEditingId(a.id)}>Modifica</button>

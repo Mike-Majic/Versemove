@@ -55,7 +55,10 @@ function CommentsSheet({ clipId, onClose }) {
             </li>
           )}
           {comments?.map((c) => (
-            <li key={c.id}>{c.text}</li>
+            <li key={c.id}>
+              {c.text}
+              <PublishedAt at={c.created_at} />
+            </li>
           ))}
         </ul>
         <div className="rb-clip-comments-form">
@@ -146,6 +149,7 @@ function ClipCard({ clip, user, onOpenAuth, onLike, onSave, onDelete, isFullscre
 
       <div className="rb-clip-info">
         {clip.caption && <p>{clip.caption}</p>}
+        <PublishedAt at={clip.createdAt} />
       </div>
 
       {showComments && <CommentsSheet clipId={clip.id} onClose={() => setShowComments(false)} />}

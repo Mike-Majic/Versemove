@@ -1,6 +1,7 @@
 // 한국어: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '{{date}} {{time}}에 게시됨',
     close: '닫기',
     save: '저장',
     cancel: '취소',

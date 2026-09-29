@@ -105,6 +105,7 @@ function mapEvento(row) {
     nPartecipa: Number(row.n_partecipa ?? 0),
     nInteressati: Number(row.n_interessati ?? 0),
     mioStato: row.mio_stato ?? null,
+    createdAt: row.created_at ?? null,
   };
 }
 

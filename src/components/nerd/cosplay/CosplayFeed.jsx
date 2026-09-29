@@ -52,6 +52,7 @@ function GalleriaGrid({ posts, onOpen }) {
             <span className="rb-clip-caption">
               <strong>{[p.extra?.personaggio, p.extra?.serie].filter(Boolean).join(' · ') || 'Cosplay'}</strong>
               <span>{p.author?.name ?? 'Utente'}{p.extra?.fotografo ? ` · 📷 ${p.extra.fotografo}` : ''}</span>
+              <PublishedAt at={p.data} />
             </span>
           </button>
         </li>
