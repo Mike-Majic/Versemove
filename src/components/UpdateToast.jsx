@@ -14,10 +14,14 @@ import './UpdateToast.css';
 //
 // "Ricarica" toglie il service worker e le sue cache e ricarica: alla
 // riapertura la pagina è quella nuova e il worker nuovo si reinstalla da sé.
-// La ✕ rimanda al prossimo caricamento. Controllo dopo 10 s e poi ogni 30
-// minuti finché la pagina resta aperta, solo con la scheda in primo piano.
+// La ✕ rimanda al prossimo caricamento. Controllo dopo 10 s, poi ogni 5
+// minuti finché la pagina resta aperta (solo con la scheda in primo piano)
+// e ogni volta che si torna sulla scheda/finestra: con i soli 30 minuti di
+// prima chi aveva il sito già aperto durante un deploy non vedeva l'avviso.
 const FIRST_CHECK_DELAY_MS = 10_000;
-const CHECK_EVERY_MS = 30 * 60 * 1000;
+const CHECK_EVERY_MS = 5 * 60 * 1000;
+// Tornando sulla scheda non più di un controllo ogni 30 s.
+const MIN_GAP_MS = 30_000;
 const BUNDLE_RE = /assets\/index-[\w-]+\.js/;
 
 function runningBundle() {
@@ -61,8 +65,11 @@ export default function UpdateToast() {
     const current = runningBundle();
     if (!current) return undefined;
     let stopped = false;
+    let lastCheck = 0;
     const check = async () => {
       if (stopped || document.visibilityState === 'hidden') return;
+      if (Date.now() - lastCheck < MIN_GAP_MS) return;
+      lastCheck = Date.now();
       try {
         const online = await onlineBundle();
         if (!stopped && online && online !== current) setNewVersion(true);
@@ -72,10 +79,17 @@ export default function UpdateToast() {
     };
     const first = setTimeout(check, FIRST_CHECK_DELAY_MS);
     const every = setInterval(check, CHECK_EVERY_MS);
+    const onBack = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', onBack);
+    window.addEventListener('focus', onBack);
     return () => {
       stopped = true;
       clearTimeout(first);
       clearInterval(every);
+      document.removeEventListener('visibilitychange', onBack);
+      window.removeEventListener('focus', onBack);
     };
   }, []);
 
