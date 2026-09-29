@@ -31,6 +31,14 @@
   right: 70px;
 }
 
+/* Pannello unico (TwoColumnSwitcher senza "secondary"): occupa tutto lo
+   spazio fra i due bordi delle colonne normali. */
+.rb-2col-panel.rb-2col-wide {
+  left: 22px;
+  right: 70px;
+  width: auto;
+}
+
 /* "Apertura olografica" (Fase 2): il pannello si materializza invece di
    comparire di scatto — parte da una linea sottile luminosa, si espande e
    sfarfalla un paio di volte prima di stabilizzarsi. Il colore del bagliore
@@ -155,6 +163,13 @@
   height: 100%;
   transform: translateX(0);
   transition: transform 0.35s ease;
+}
+
+.rb-2col-mobile-track.rb-2col-mobile-track-single {
+  width: 100%;
+}
+.rb-2col-mobile-track-single > .rb-2col-mobile-slide {
+  width: 100%;
 }
 
 .rb-2col-mobile-track.show-secondary {
