@@ -199,6 +199,17 @@ let halfFovTan = Math.tan((WEB_FOV_DEG * Math.PI) / 360);
 // sull'altezza del canvas, non sul campo visivo: con un campo visivo più
 // ampio (schermi stretti) resterebbero grossi rispetto a sfere e linee,
 // che invece si rimpiccioliscono. Fattore di correzione: 1 sul web.
+// Velocità di rotazione col dito/mouse: globe.gl a ogni 'change' dei
+// controlli mette rotateSpeed = altitudine * 0.3, tarato per il campo visivo
+// del web (50°). OrbitControls ruota in proporzione ai pixel trascinati
+// sull'altezza del canvas, quindi con un campo visivo più ampio (schermi
+// stretti, vedi startupFov) la superficie scorreva sotto il dito molto più
+// lenta del dito stesso (~0.6 px per px in verticale sul telefono, ~2 sul
+// web). Fattore di correzione: 1 sul web, stessa formula ovunque.
+function rotateSpeedFactor() {
+  return halfFovTan / Math.tan((WEB_FOV_DEG * Math.PI) / 360);
+}
+
 function pointSizeFactor() {
   return Math.tan((WEB_FOV_DEG * Math.PI) / 360) / halfFovTan;
 }
@@ -543,11 +554,126 @@ export default function WorldGlobe({
     if (!shell) return;
     applyEventZoom(shell, altitude ?? g.pointOfView().altitude);
   };
+  // Trascinamento che parte da un marker HTML (avatar, grumo, esagono
+  // evento): i marker stanno sopra il canvas con pointer-events: auto, quindi
+  // OrbitControls non riceveva nulla e il globo non girava. Finché il dito
+  // (o il mouse) resta entro MARKER_DRAG_PX il gesto resta del marker: un
+  // tocco secco lo apre come sempre, col click nativo. Appena si muove oltre,
+  // si passa a OrbitControls un pointerdown sul canvas nel punto di partenza:
+  // lui cattura il puntatore sul canvas e segue i movimenti successivi
+  // (ascolta pointermove/pointerup sul documento), pizzico compreso. Il
+  // pointerdown non si inoltra subito perché il click sul globo di
+  // three-render-objects scatterebbe anche per un semplice tocco. Dopo un
+  // trascinamento il click sul marker viene scartato.
+  useEffect(() => {
+    const g = globeRef.current;
+    const canvas = g?.renderer?.().domElement;
+    if (!canvas) return undefined;
+    const MARKER_DRAG_PX = 8;
+    const MARKER_SELECTOR = '.rb-marker, .rb-marker-cluster, .rb-event-marker';
+    const pending = new Map(); // pointerId -> { init, x, y }
+    const forwarded = new Set();
+    const active = new Set();
+    let suppressClickUntil = 0;
+    const markerOf = (target) => {
+      const el = target?.closest?.(MARKER_SELECTOR);
+      return el && canvas.closest('.rb-globe-shell')?.contains(el) ? el : null;
+    };
+    const forward = (pointerId) => {
+      const p = pending.get(pointerId);
+      if (!p) return;
+      pending.delete(pointerId);
+      forwarded.add(pointerId);
+      canvas.dispatchEvent(new PointerEvent('pointerdown', p.init));
+    };
+    const forwardAll = () => Array.from(pending.keys()).forEach(forward);
+    const onDown = (e) => {
+      const othersDown = active.size > 0;
+      active.add(e.pointerId);
+      if (!markerOf(e.target)) {
+        // Secondo dito sul canvas mentre il primo è su un marker: il primo
+        // passa al globo prima (questo ascoltatore precede OrbitControls),
+        // così il pizzico parte con entrambi.
+        if (pending.size && e.target === canvas) forwardAll();
+        return;
+      }
+      pending.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+        init: {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window,
+          pointerId: e.pointerId,
+          pointerType: e.pointerType,
+          isPrimary: e.isPrimary,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          button: e.button,
+          buttons: e.buttons,
+          pressure: e.pressure,
+          width: e.width,
+          height: e.height,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+        },
+      });
+      // Pizzico con un dito già sul globo o su un altro marker: niente
+      // attesa, il gesto è comunque del globo.
+      if (othersDown) forwardAll();
+    };
+    const onMove = (e) => {
+      const p = pending.get(e.pointerId);
+      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > MARKER_DRAG_PX) forward(e.pointerId);
+    };
+    const onUp = (e) => {
+      active.delete(e.pointerId);
+      pending.delete(e.pointerId);
+      if (forwarded.delete(e.pointerId)) suppressClickUntil = performance.now() + 400;
+    };
+    const onClick = (e) => {
+      if ((forwarded.size > 0 || performance.now() < suppressClickUntil) && markerOf(e.target)) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+    const opts = { capture: true };
+    window.addEventListener('pointerdown', onDown, opts);
+    window.addEventListener('pointermove', onMove, opts);
+    window.addEventListener('pointerup', onUp, opts);
+    window.addEventListener('pointercancel', onUp, opts);
+    window.addEventListener('click', onClick, opts);
+    return () => {
+      window.removeEventListener('pointerdown', onDown, opts);
+      window.removeEventListener('pointermove', onMove, opts);
+      window.removeEventListener('pointerup', onUp, opts);
+      window.removeEventListener('pointercancel', onUp, opts);
+      window.removeEventListener('click', onClick, opts);
+    };
+  }, []);
+
+  // Riapplicata dopo globe.gl (questo ascoltatore di 'change' è registrato
+  // dopo il suo, quindi vince) e quando cambia il campo visivo
+  // (measureStartup). Vedi rotateSpeedFactor.
+  const applyRotateSpeed = () => {
+    const g = globeRef.current;
+    const controls = g?.controls?.();
+    if (!controls) return;
+    controls.rotateSpeed = g.pointOfView().altitude * 0.3 * rotateSpeedFactor();
+  };
   useEffect(() => {
     const g = globeRef.current;
     const controls = g?.controls?.();
     if (!controls) return undefined;
-    const onChange = () => syncEventZoom();
+    const onChange = () => {
+      applyRotateSpeed();
+      syncEventZoom();
+    };
     controls.addEventListener('change', onChange);
     syncEventZoom();
     return () => controls.removeEventListener('change', onChange);
@@ -1469,6 +1595,7 @@ export default function WorldGlobe({
         camera.updateProjectionMatrix();
       }
       halfFovTan = Math.tan((fov * Math.PI) / 360);
+      applyRotateSpeed();
     };
     const applyStartupView = () => {
       measureStartup();

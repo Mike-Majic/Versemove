@@ -372,3 +372,16 @@
   font-weight: 700;
   font-size: 17px;
 }
+
+/* Il trascinamento che parte da un marker deve girare il globo (vedi
+   WorldGlobe.jsx, "Trascinamento che parte da un marker"): senza
+   touch-action: none il browser del telefono si prenderebbe il gesto
+   (pointercancel) prima che arrivi ai controlli. */
+.rb-marker,
+.rb-marker *,
+.rb-marker-cluster,
+.rb-marker-cluster *,
+.rb-event-marker,
+.rb-event-marker * {
+  touch-action: none;
+}
