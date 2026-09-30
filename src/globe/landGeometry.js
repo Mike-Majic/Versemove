@@ -158,3 +158,58 @@ export function concatDashed(list) {
   }
   return { position, lineDistance };
 }
+
+// Livello 50m di tutto il globo in un solo gruppo di array (costruito una
+// volta nel worker, vedi landWorker.js): calotte e coste indicizzate, confini
+// tratteggiati resi indicizzati (indici 0..n-1) per poterli spegnere a pezzi.
+// ranges[key] = { cap, stroke, borders }, ciascuno [primo indice, quanti]:
+// il thread principale spegne un riquadro coperto dal 10m riscrivendo solo
+// quell'intervallo di indici verso il vertice "pozzo" (sink, l'ultimo), che
+// sta al centro della Terra, nascosto dal globo — mai ricostruendo il buffer.
+export function combineTiles(entries) {
+  const caps = [];
+  const strokes = [];
+  const borders = [];
+  const ranges = {};
+  let capIdx = 0;
+  let strokeIdx = 0;
+  let borderIdx = 0;
+  for (const [key, arrays] of entries) {
+    const r = { cap: [capIdx, 0], stroke: [strokeIdx, 0], borders: [borderIdx, 0] };
+    if (arrays.cap) {
+      caps.push(arrays.cap);
+      r.cap[1] = arrays.cap.index.length;
+      capIdx += arrays.cap.index.length;
+    }
+    if (arrays.stroke) {
+      strokes.push(arrays.stroke);
+      r.stroke[1] = arrays.stroke.index.length;
+      strokeIdx += arrays.stroke.index.length;
+    }
+    if (arrays.borders) {
+      borders.push(arrays.borders);
+      r.borders[1] = arrays.borders.lineDistance.length;
+      borderIdx += arrays.borders.lineDistance.length;
+    }
+    ranges[key] = r;
+  }
+  const withSink = ({ position, index }) => {
+    const pos = new Float32Array(position.length + 3);
+    pos.set(position);
+    return { position: pos, index, sink: position.length / 3 };
+  };
+  const dashed = concatDashed(borders);
+  const n = dashed.lineDistance.length;
+  const bPos = new Float32Array((n + 1) * 3);
+  bPos.set(dashed.position);
+  const bDist = new Float32Array(n + 1);
+  bDist.set(dashed.lineDistance);
+  const bIndex = new Uint32Array(n);
+  for (let k = 0; k < n; k += 1) bIndex[k] = k;
+  return {
+    cap: withSink(concatIndexed(caps)),
+    stroke: withSink(concatIndexed(strokes)),
+    borders: { position: bPos, lineDistance: bDist, index: bIndex, sink: n },
+    ranges,
+  };
+}

@@ -1707,6 +1707,12 @@ export default function WorldGlobe({
         rendererConfig={{ antialias: initialAntialias, alpha: true }}
         globeMaterial={globeMaterial}
         backgroundColor="rgba(0,0,0,0)"
+        // Hover/click degli oggetti di globe.gl non usati (categorie e
+        // satelliti hanno i loro raycaster, i marker sono HTML): senza questo
+        // three-render-objects rifaceva ogni 50 ms un raycast su tutta la
+        // scena, continenti compresi (~80% del JavaScript durante un
+        // trascinamento, vedi globe/landLod.js).
+        enablePointerInteraction={false}
         showAtmosphere={quality.atmosphere}
         atmosphereColor={world.atmosphereColor}
         atmosphereAltitude={0.3}
