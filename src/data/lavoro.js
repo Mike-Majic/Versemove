@@ -32,6 +32,17 @@ export async function setLavoroConsent(consenso) {
 // hanno dato il consenso Lavoro (lo garantisce la RPC lato server, non un
 // filtro qui): per chi non ha consentito arriva comunque nickname/avatar,
 // semplicemente senza nome/cognome, mai un errore che romperebbe la UI.
+// Data di nascita completa (gg/mm/aaaa) ed età, per le aziende del mondo
+// Lavoro: '' se la data non c'è (la RPC la manda solo agli account azienda).
+export function lavoroBirthLabel(dataNascita, now = new Date()) {
+  const m = String(dataNascita ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  let age = now.getFullYear() - year;
+  if (now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < day)) age -= 1;
+  return `${m[3]}/${m[2]}/${m[1]} · ${age} anni`;
+}
+
 export async function getLavoroProfiles(ids) {
   const unique = Array.from(new Set((ids ?? []).filter(Boolean)));
   if (!unique.length) return new Map();
@@ -49,6 +60,8 @@ export async function getLavoroProfiles(ids) {
         citta: row.citta || '',
         tipoAccount: row.tipo_account,
         ragioneSociale: row.ragione_sociale || '',
+        // Solo per chi chiama da account azienda (per tutti gli altri null).
+        dataNascita: row.data_nascita ?? null,
       });
     }
     return map;

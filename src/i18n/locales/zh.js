@@ -186,7 +186,7 @@ export default {
       age: '年龄',
     },
     language: {
-      title: '语言',
+      title: '系统语言',
       hint: '随时更改界面语言。',
       saved: '语言已更改并保存至您的账户。',
     },

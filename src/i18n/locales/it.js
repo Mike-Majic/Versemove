@@ -192,7 +192,7 @@ export default {
       age: 'Età',
     },
     language: {
-      title: 'Lingua',
+      title: 'Lingua sistema',
       hint: "Cambia la lingua dell'interfaccia in qualsiasi momento.",
       saved: 'Lingua cambiata e salvata sul tuo account.',
     },

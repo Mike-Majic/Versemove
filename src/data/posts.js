@@ -71,6 +71,9 @@ export async function fetchProfilesMap(ids) {
       genere: p.genere || '',
       pronomi: p.pronomi || '',
       lingueParlate: p.lingue_parlate || [],
+      // null se l'utente non mostra la data nel Profilo Social.
+      giornoNascita: p.giorno_nascita ?? null,
+      meseNascita: p.mese_nascita ?? null,
       zodiaco: zodiacSign(p.giorno_nascita, p.mese_nascita),
     });
   }

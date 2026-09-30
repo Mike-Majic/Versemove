@@ -18,7 +18,7 @@ import {
 } from '../../data/liveStreams';
 import Icon from '../shared/Icon';
 import { formatRelativeDate } from '../social/resolveAuthor';
-import { getLavoroProfiles } from '../../data/lavoro';
+import { getLavoroProfiles, lavoroBirthLabel } from '../../data/lavoro';
 import { supabase } from '../../data/supabaseClient';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import './LiveWorldPanel.css';
@@ -233,6 +233,9 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth, standalone = f
     if (lp?.nome && lp?.cognome) return `${lp.nome} ${lp.cognome}`;
     return host.name;
   };
+  // Data di nascita ed età: solo se chi guarda è un'azienda (la RPC la
+  // manda solo a loro, vedi lavoroBirthLabel).
+  const hostBirth = (host) => lavoroBirthLabel(lavoroProfiles.get(host.id)?.dataNascita);
   const hostShowsNickname = (host) => {
     const lp = lavoroProfiles.get(host.id);
     return Boolean(lp?.nome && lp?.cognome);
@@ -369,6 +372,7 @@ export default function LiveWorldPanel({ mondo, user, onOpenAuth, standalone = f
                   <span className="rb-live-directory-sub">
                     {hostDisplayName(s.host)}
                     {hostShowsNickname(s.host) && <span className="rb-live-directory-nickname"> ({s.host.name})</span>}
+                    {hostBirth(s.host) && <span className="rb-live-directory-nickname"> · {hostBirth(s.host)}</span>}
                   </span>
                 </span>
               </span>

@@ -186,7 +186,7 @@ export default {
       age: 'Edad',
     },
     language: {
-      title: 'Idioma',
+      title: 'Idioma del sistema',
       hint: 'Cambia el idioma de la interfaz en cualquier momento.',
       saved: 'Idioma cambiado y guardado en tu cuenta.',
     },

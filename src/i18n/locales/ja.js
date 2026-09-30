@@ -186,7 +186,7 @@ export default {
       age: '年齢',
     },
     language: {
-      title: '言語',
+      title: 'システム言語',
       hint: 'インターフェースの言語をいつでも変更できます。',
       saved: '言語を変更し、アカウントに保存しました。',
     },

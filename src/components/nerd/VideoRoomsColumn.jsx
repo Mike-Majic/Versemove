@@ -19,7 +19,7 @@ import {
   takePendingRoomFocus,
 } from '../../data/videoRooms';
 import { displayName } from '../../data/posts';
-import { getLavoroProfiles } from '../../data/lavoro';
+import { getLavoroProfiles, lavoroBirthLabel } from '../../data/lavoro';
 import { useMeshCall } from '../../hooks/useMeshCall';
 import { useCalls } from '../../calls/CallProvider';
 import CallSurface, { MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../../calls/CallSurface';
@@ -104,27 +104,32 @@ const NO_ACCESS_RE = /non hai accesso a questo mondo/i;
 
 // Nome e cognome (mondo Lavoro) per una lista di utenti: la RPC li dà solo
 // se entrambe le parti hanno il consenso Lavoro, altrimenti resta il
-// nickname. enabled = false (Nerd): mappa vuota, nessuna chiamata.
+// nickname. enabled = false (Nerd): mappe vuote, nessuna chiamata.
+// births: data di nascita ed età (lavoroBirthLabel), presente solo se chi
+// guarda è un account azienda.
 function useRealNames(ids, enabled) {
-  const [names, setNames] = useState(() => new Map());
+  const [data, setData] = useState(() => ({ names: new Map(), births: new Map() }));
   const key = enabled ? Array.from(new Set(ids.filter(Boolean))).sort().join(',') : '';
   useEffect(() => {
     if (!key) return undefined;
     let cancelled = false;
     getLavoroProfiles(key.split(',')).then((map) => {
       if (cancelled) return;
-      const next = new Map();
+      const names = new Map();
+      const births = new Map();
       map.forEach((p, id) => {
         const full = `${p.nome} ${p.cognome}`.trim();
-        if (full) next.set(id, full);
+        if (full) names.set(id, full);
+        const birth = lavoroBirthLabel(p.dataNascita);
+        if (birth) births.set(id, birth);
       });
-      setNames(next);
+      setData({ names, births });
     });
     return () => {
       cancelled = true;
     };
   }, [key]);
-  return names;
+  return data;
 }
 
 const MSG_KICKED = 'Sei stato espulso dalla stanza';
@@ -395,7 +400,7 @@ function RoomsList({ preset, user, onOpenAuth, onEnter, onNoAccess, notice, onDi
     setRooms(res.rooms);
     if (user) setWaits(await fetchMyRoomWaits());
   }, [preset.mondo, preset.categoria, onNoAccess, user]);
-  const realNames = useRealNames((rooms ?? []).map((r) => r.ownerId), preset.realNames);
+  const { names: realNames, births: realBirths } = useRealNames((rooms ?? []).map((r) => r.ownerId), preset.realNames);
 
   useEffect(() => {
     refresh();
@@ -587,6 +592,7 @@ function RoomsList({ preset, user, onOpenAuth, onEnter, onNoAccess, notice, onDi
                   <p className="rb-vroom-item-meta">
                     <Avatar profile={r.owner} size={20} />
                     <span>{nameOfOwner(r)}</span>
+                    {realBirths.get(r.ownerId) && <span>· {realBirths.get(r.ownerId)}</span>}
                     <span className="rb-vroom-dot">·</span>
                     <span>{openSince(r.createdAt)}</span>
                   </p>
@@ -673,7 +679,7 @@ export function RoomView({ roomId, source, user, onExit }) {
   const [error, setError] = useState('');
   const [menuFor, setMenuFor] = useState(null);
   // Lavoro: nome e cognome al posto del nickname (anche il mio).
-  const realNames = useRealNames([...(members ?? []).map((m) => m.userId), ...bans.map((b) => b.userId)], preset.realNames);
+  const { names: realNames, births: realBirths } = useRealNames([...(members ?? []).map((m) => m.userId), ...bans.map((b) => b.userId)], preset.realNames);
   const myRealName = preset.realNames ? `${user?.nome ?? ''} ${user?.cognome ?? ''}`.trim() : '';
   const nameOf = (id, profile, fallback = 'Utente') => (id === user?.id && myRealName) || realNames.get(id) || displayName(profile, fallback);
   const [confirm, setConfirm] = useState(null); // { text, label, action }
@@ -956,7 +962,7 @@ export function RoomView({ roomId, source, user, onExit }) {
         <div className="rb-vroom-room-title">
           <h3>{room.titolo}</h3>
           <p>
-            <span>👑 {isOwner ? 'Tu' : nameOf(room.ownerId, ownerProfile, 'Proprietario')}</span>
+            <span>👑 {isOwner ? 'Tu' : nameOf(room.ownerId, ownerProfile, 'Proprietario')}{!isOwner && realBirths.get(room.ownerId) ? ` · ${realBirths.get(room.ownerId)}` : ''}</span>
             <span className="rb-vroom-dot">·</span>
             <span>{count}/{room.maxPartecipanti} persone</span>
           </p>

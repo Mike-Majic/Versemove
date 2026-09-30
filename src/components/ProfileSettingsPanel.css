@@ -191,6 +191,13 @@
   font-weight: 700;
 }
 
+/* Compleanno in sola lettura sopra l'interruttore "Mostra giorno e mese". */
+.rb-social-birthday-readonly {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Casella + testo sulla stessa riga: .rb-field è in colonna (vedi
    SettingsPanel.css) e la casella restava da sola, col testo che usciva
    dalla scheda lasciando un grande spazio vuoto sotto le lingue. */

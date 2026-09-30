@@ -19,6 +19,7 @@ import {
 import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
 import { getFamily, familyRelationLabel } from '../../data/family';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
+import { birthdayLabel } from '../../data/zodiac';
 import { fetchGamertagsMap } from '../../data/gaming';
 import GamertagChips from '../shared/GamertagChips';
 import './SocialProfileModal.css';
@@ -179,7 +180,13 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
             {(profile.cittaOrigine || profile.statoRelazionale || profile.genere || profile.pronomi || profile.zodiaco || profile.lingueParlate?.length > 0) && (
               <ul className="rb-social-profile-info-list">
                 {profile.cittaOrigine && <li>🏠 Di {profile.cittaOrigine}</li>}
-                {profile.zodiaco && <li>{profile.zodiaco.emoji} {profile.zodiaco.name}</li>}
+                {(profile.zodiaco || (profile.giornoNascita && profile.meseNascita)) && (
+                  <li>
+                    {profile.giornoNascita && profile.meseNascita && `🎂 ${birthdayLabel(profile.giornoNascita, profile.meseNascita)}`}
+                    {profile.giornoNascita && profile.meseNascita && profile.zodiaco && ' '}
+                    {profile.zodiaco && `${profile.zodiaco.emoji} ${profile.zodiaco.name}`}
+                  </li>
+                )}
                 {profile.statoRelazionale && <li>💞 {STATO_LABELS[profile.statoRelazionale] ?? profile.statoRelazionale}</li>}
                 {(profile.genere || profile.pronomi) && (
                   <li>

@@ -186,7 +186,7 @@ export default {
       age: '나이',
     },
     language: {
-      title: '언어',
+      title: '시스템 언어',
       hint: '언제든지 인터페이스 언어를 변경할 수 있습니다.',
       saved: '언어가 변경되어 계정에 저장되었습니다.',
     },

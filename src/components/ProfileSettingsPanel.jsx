@@ -37,7 +37,7 @@ import {
   removeIstruzione,
   updateLavoroContatti,
 } from '../data/lavoroProfile';
-import { zodiacSign } from '../data/zodiac';
+import { zodiacSign, birthdayLabel } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
 import { SUPPORTED_LANGUAGES } from '../i18n';
@@ -886,16 +886,16 @@ function SocialExtraCard({ user, onUpdateUser }) {
     onUpdateUser?.({ ...user, cittaOrigine: nome, cittaOrigineGeo: geo, statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
   };
 
-  // Anteprima calcolata dal proprio dataNascita (dato privato ma già in
-  // mano al client per sé stessi): mostra cosa vedrebbero gli altri se
-  // l'interruttore è acceso, mai l'anno.
+  // Compleanno calcolato dal proprio dataNascita (dato privato ma già in
+  // mano al client per sé stessi): giorno, mese e segno, mai l'anno. È
+  // quello che vedono gli altri se l'interruttore è acceso.
   const nascitaPreview = (() => {
     if (!user?.dataNascita) return null;
     const d = new Date(user.dataNascita);
     const day = d.getUTCDate();
     const month = d.getUTCMonth() + 1;
     const sign = zodiacSign(day, month);
-    const label = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const label = birthdayLabel(day, month);
     return sign ? `${label} ${sign.emoji} ${sign.name}` : label;
   })();
 
@@ -943,10 +943,11 @@ function SocialExtraCard({ user, onUpdateUser }) {
         )}
       </div>
 
+      {nascitaPreview && <p className="rb-social-birthday-readonly">Compleanno: {nascitaPreview}</p>}
       <label className="rb-field rb-social-birthday-toggle">
         <input type="checkbox" checked={mostraData} onChange={(e) => setMostraData(e.target.checked)} />
         <span>
-          Mostra giorno e mese di nascita nel Profilo Social{nascitaPreview ? ` — ${nascitaPreview}` : ''}
+          Mostra giorno e mese di nascita nel Profilo Social
           <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>L'anno resta sempre privato.</span>
         </span>
       </label>
@@ -1415,7 +1416,7 @@ function LavoroProfileSection({ user, onUpdateUser }) {
   return (
     <CollapsibleSection
       title="Profilo di Lavoro"
-      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Il mondo Lavoro non ha ancora una schermata che li mostra ad altri: per ora restano salvati, pronti per quando ci sarà."
+      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Nel mondo Lavoro, oltre a nome e cognome, la tua data di nascita completa è visibile alle aziende. Il mondo Lavoro non ha ancora una schermata che li mostra ad altri: per ora restano salvati, pronti per quando ci sarà."
       open={open}
       onToggle={() => setOpen((v) => !v)}
     >
