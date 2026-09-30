@@ -608,6 +608,17 @@ const GOTHIC_LETTERS = {
   },
 };
 const GOTHIC_RENDER_ORDER = 2;
+// Uscita/rientro delle lettere sul bordo del globo (facing = coseno fra la
+// normale della lettera e la direzione della camera). L'uscita parte a
+// ~81° (0.15): con la rotazione automatica (3°/s) i 2,2 s dell'animazione
+// al contrario coprono ~7°, quindi finisce a ~88°, con la lettera ancora
+// in vista (spariva di colpo a ~104°, facing -0.25, che resta il limite
+// oltre il quale è spenta comunque). Il rientro parte a ~72° (0.3): due
+// soglie diverse, così ferma vicino al bordo non si accende e spegne.
+const GOTHIC_EXIT_FACING = 0.15;
+const GOTHIC_ENTER_FACING = 0.3;
+const GOTHIC_HIDDEN_FACING = -0.25;
+const GOTHIC_HIDDEN_ANGLE = Math.acos(GOTHIC_HIDDEN_FACING);
 
 // Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
 // all'indice della categoria dentro il proprio mondo — un unico punto da
@@ -1165,7 +1176,7 @@ export function buildCategoryShell(
         t.sprite.renderOrder = GOTHIC_RENDER_ORDER + 3;
 
         letter.setEmphasis(t.id === lastActiveId ? 1 : 0);
-        gothicItems.push({ id: t.id, letter, pivot });
+        gothicItems.push({ id: t.id, letter, pivot, sprite: t.sprite, flatMesh: t.flatMesh, shown: null, prevAngle: null });
       });
       if (gothicItems.length > 0) onAnimatedReady?.();
     });
@@ -1209,19 +1220,58 @@ export function buildCategoryShell(
     if (gothicItems.length > 0) {
       for (let i = 0; i < gothicItems.length; i++) {
         const item = gothicItems[i];
-        // Sul retro del globo non serve animarla (la copre il globo).
+        const { letter } = item;
+        let speed = 1;
         if (camera) {
+          // Quanto la lettera guarda la camera: 1 di fronte, 0 di taglio,
+          // negativo sul retro.
           item.pivot.getWorldPosition(worldPos);
           worldNormal.copy(worldPos).normalize();
           toCamera.copy(camera.position).sub(worldPos).normalize();
-          const visible = worldNormal.dot(toCamera) > -0.25;
-          if (item.pivot.visible !== visible) item.pivot.visible = visible;
-          if (!visible) continue;
+          const facing = worldNormal.dot(toCamera);
+          const angle = Math.acos(Math.max(-1, Math.min(1, facing)));
+          if (item.shown === null) {
+            // Primo fotogramma: sul lato nascosto resta spenta, senza
+            // animazione; davanti prosegue l'entrata iniziale.
+            item.shown = facing > GOTHIC_EXIT_FACING;
+            if (!item.shown) letter.setShown(false, { instant: true });
+          } else if (facing < GOTHIC_HIDDEN_FACING) {
+            // Già dietro al globo: mai lettera visibile a metà.
+            if (item.shown || !letter.isHidden()) letter.setShown(false, { instant: true });
+            item.shown = false;
+          } else if (item.shown && facing < GOTHIC_EXIT_FACING) {
+            item.shown = false;
+            letter.setShown(false, { instant: reduceMotion });
+          } else if (!item.shown && facing > GOTHIC_ENTER_FACING) {
+            item.shown = true;
+            letter.setShown(true, { instant: reduceMotion });
+          }
+          // Rotazione a mano più veloce dell'uscita: si accelera perché
+          // finisca prima che la lettera arrivi dietro al globo.
+          if (!item.shown && item.prevAngle !== null && deltaSec > 0) {
+            const omega = (angle - item.prevAngle) / deltaSec; // rad/s verso il retro
+            if (omega > 0) {
+              const timeToHidden = (GOTHIC_HIDDEN_ANGLE - angle) / omega;
+              speed = Math.max(1, letter.exitSecondsLeft() / Math.max(timeToHidden, 0.05));
+            }
+          }
+          item.prevAngle = angle;
         }
-        item.letter.update(elapsed, deltaSec, {
+        const hidden = letter.isHidden();
+        if (item.pivot.visible === hidden) item.pivot.visible = !hidden;
+        // Durante l'uscita (e da spenta) la categoria non si clicca.
+        const noHit = !item.shown;
+        letter.mesh.userData.noHit = noHit;
+        item.flatMesh.userData.noHit = noHit;
+        // L'etichetta segue la lettera (entrata/uscita).
+        const labelOpacity = letter.presence();
+        if (item.sprite.material.opacity !== labelOpacity) item.sprite.material.opacity = labelOpacity;
+        if (hidden) continue;
+        letter.update(elapsed, deltaSec, {
           reduceMotion,
           pixelHeight: viewportSize ? viewportSize.y * pixelRatio : 0,
           viewportSize,
+          speed,
         });
       }
     }

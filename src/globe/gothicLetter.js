@@ -576,8 +576,15 @@ export function createGothicLetter({
   root.add(particles);
   disposables.push(pGeo, pMat);
 
+  // Entrata a particelle come linea del tempo t (0 → INTRO_TOTAL_S):
+  // particelle dalla sfera di partenza ai vertici (0 → INTRO_S, ease-out),
+  // lettera accesa all'85%, poi particelle che svaniscono (INTRO_FADE_S).
+  // L'uscita è la stessa linea percorsa all'indietro (dir -1), quindi
+  // un'interruzione inverte solo il verso dal punto in cui si trova.
+  // t = 0 con dir 0: lettera spenta del tutto (isHidden).
+  const INTRO_TOTAL_S = INTRO_S + INTRO_FADE_S;
   let introT = 0;
-  let introActive = false;
+  let introDir = 0; // +1 entrata, -1 uscita, 0 ferma
   let emphasis = 0;
   let spinAngle = 0;
   const setVisible = (v) => {
@@ -591,48 +598,76 @@ export function createGothicLetter({
     });
     if (holoGroup) holoGroup.visible = v;
   };
-  function finishIntro() {
-    introActive = false;
-    particles.visible = false;
-    setVisible(true);
+  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+  let lastK = -1;
+  function applyTimeline() {
+    if (introT >= INTRO_TOTAL_S || pCount === 0) {
+      // Fine dell'entrata (o nessuna particella: solo acceso/spento).
+      particles.visible = false;
+      setVisible(introT > 0);
+      return;
+    }
+    if (introT <= 0 && introDir <= 0) {
+      particles.visible = false;
+      setVisible(false);
+      return;
+    }
+    const k = easeOut(Math.min(1, introT / INTRO_S));
+    if (k !== lastK) {
+      lastK = k;
+      for (let i = 0; i < pCount * 3; i++) pCur[i] = pStart[i] + (pTarget[i] - pStart[i]) * k;
+      pAttr.needsUpdate = true;
+    }
+    const meshOn = introT > INTRO_S * 0.85;
+    if (mesh.visible !== meshOn) setVisible(meshOn);
+    particles.visible = true;
+    pMat.opacity = introT <= INTRO_S ? 1 : Math.max(0, 1 - (introT - INTRO_S) / INTRO_FADE_S);
+  }
+  // shown: true = entrata (o rientro), false = uscita. instant: salta
+  // l'animazione (primo caricamento sul lato nascosto, "riduci animazioni",
+  // lettera già dietro al globo).
+  function setShown(shown, { instant = false } = {}) {
+    if (instant || pCount === 0) {
+      introT = shown ? INTRO_TOTAL_S : 0;
+      introDir = 0;
+    } else {
+      const done = shown ? introT >= INTRO_TOTAL_S : introT <= 0;
+      introDir = done ? 0 : shown ? 1 : -1;
+    }
+    applyTimeline();
   }
   function startIntro({ instant = false } = {}) {
-    if (instant || pCount === 0) {
-      finishIntro();
+    if (instant) {
+      setShown(true, { instant: true });
       return;
     }
     introT = 0;
-    introActive = true;
-    setVisible(false);
-    particles.visible = true;
-    pMat.opacity = 1;
-    pCur.set(pStart);
-    pAttr.needsUpdate = true;
+    introDir = 1;
+    applyTimeline();
   }
+  // Presenza 0..1 (per l'etichetta), secondi d'animazione che mancano alla
+  // fine dell'uscita a velocità 1, lettera spenta del tutto.
+  const presence = () => Math.min(1, Math.max(0, introT / INTRO_TOTAL_S));
+  const exitSecondsLeft = () => introT;
+  const isHidden = () => introT <= 0 && introDir <= 0;
 
-  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
-  function update(time, dt, { reduceMotion = false, pixelHeight = 0, viewportSize = null } = {}) {
+  function update(time, dt, { reduceMotion = false, pixelHeight = 0, viewportSize = null, speed = 1 } = {}) {
     setResolution(viewportSize);
     if (sparkUniforms) {
       // Con "riduci animazioni" i brillantini restano fermi ma visibili.
       sparkUniforms.uTime.value = reduceMotion ? 1.0 : time;
       if (pixelHeight > 0) sparkUniforms.uPx.value = pixelHeight;
     }
-    if (introActive) {
+    if (introDir !== 0) {
       if (reduceMotion) {
-        finishIntro();
+        setShown(introDir > 0, { instant: true });
       } else {
-        introT += Math.min(dt, 0.05);
-        const k = easeOut(Math.min(1, introT / INTRO_S));
-        for (let i = 0; i < pCount * 3; i++) pCur[i] = pStart[i] + (pTarget[i] - pStart[i]) * k;
-        pAttr.needsUpdate = true;
-        if (introT > INTRO_S * 0.85 && !mesh.visible) setVisible(true);
-        if (introT > INTRO_S) {
-          pMat.opacity = Math.max(0, 1 - (introT - INTRO_S) / INTRO_FADE_S);
-          if (pMat.opacity === 0) finishIntro();
-        }
+        introT = Math.min(INTRO_TOTAL_S, Math.max(0, introT + introDir * Math.min(dt, 0.05) * Math.max(1, speed)));
+        if ((introDir > 0 && introT >= INTRO_TOTAL_S) || (introDir < 0 && introT <= 0)) introDir = 0;
+        applyTimeline();
       }
     }
+    if (isHidden()) return;
     if (reduceMotion) {
       root.position.y = 0;
       root.rotation.y = 0;
@@ -682,6 +717,10 @@ export function createGothicLetter({
     halfDepth: (bb.max.z - bb.min.z) / 2,
     update,
     startIntro,
+    setShown,
+    presence,
+    exitSecondsLeft,
+    isHidden,
     setEmphasis,
     dispose,
   };

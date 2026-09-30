@@ -1105,8 +1105,9 @@ export default function WorldGlobe({
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
-      const hits = raycaster.intersectObjects(categoryShellRef.current?.faceMeshes ?? []);
-      if (hits.length > 0) onCategorySelect(hits[0].object.userData.categoryId);
+      // noHit: lettera gotica in uscita o spenta (vedi categoryShell).
+      const hit = raycaster.intersectObjects(categoryShellRef.current?.faceMeshes ?? []).find((h) => !h.object.userData.noHit);
+      if (hit) onCategorySelect(hit.object.userData.categoryId);
     };
 
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -1146,8 +1147,8 @@ export default function WorldGlobe({
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
-      const hits = raycaster.intersectObjects(shell.faceMeshes);
-      setHovered(hits.length > 0 ? hits[0].object.userData.categoryId : null);
+      const hit = raycaster.intersectObjects(shell.faceMeshes).find((h) => !h.object.userData.noHit);
+      setHovered(hit ? hit.object.userData.categoryId : null);
     };
     const onPointerLeave = () => setHovered(null);
 
