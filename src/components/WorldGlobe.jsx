@@ -8,6 +8,7 @@ import { createLandLod } from '../globe/landLod';
 import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
+import { makeEventMarkerEl, applyEventZoom } from '../globe/eventMarkers';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
@@ -127,41 +128,6 @@ function makeMarkerEl(user, world, onOpen) {
   el.addEventListener('click', (e) => {
     e.stopPropagation();
     onOpen(user);
-  });
-  return el;
-}
-
-// Marker quadrato di un evento (diverso apposta dai marker rotondi degli
-// utenti, per non confonderli): la foto che l'utente ha caricato, con un
-// badge del numero di like sopra se ce n'è almeno uno. Un click apre
-// sempre la lista di chi ha messo like (vedi EventLikersModal), anche a
-// zero like — è lì che si vede il dettaglio dell'evento.
-function makeEventMarkerEl(event, world, onOpen) {
-  const el = document.createElement('div');
-  el.className = 'rb-event-marker';
-  const likeCount = event.mi_piace.length;
-  const photo = document.createElement('div');
-  photo.className = 'rb-event-marker-photo';
-  const foto = safeUrl(event.fotoUrl);
-  if (foto) photo.style.backgroundImage = `url(${JSON.stringify(foto)})`;
-  else {
-    // Evento senza foto: un calendario, così non sembra un quadrato vuoto.
-    photo.style.background = world.color;
-    photo.classList.add('rb-event-marker-photo-empty');
-    photo.textContent = '📅';
-  }
-  photo.style.borderColor = world.color;
-  el.append(photo);
-  if (likeCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'rb-event-marker-badge';
-    badge.textContent = String(likeCount);
-    el.append(badge);
-  }
-  el.title = `${event.titolo} · ${event.citta}`;
-  el.addEventListener('click', (e) => {
-    e.stopPropagation();
-    onOpen(event.id);
   });
   return el;
 }
@@ -421,11 +387,36 @@ export default function WorldGlobe({
   // ogni 250ms).
   const [view, setView] = useState({ altitude: defaultAltitude(), lat: 0, lng: 0 });
 
+  // Grandezza dei marker evento legata allo zoom (globe/eventMarkers.js):
+  // una variabile CSS e un attributo sul contenitore del globo, mai i
+  // marker uno per uno. Chiamata dal polling qui sotto (copre anche i voli
+  // programmati) e dall'evento "change" dei controlli (zoom a mano, subito).
+  const syncEventZoom = (altitude) => {
+    const g = globeRef.current;
+    const canvas = g?.renderer?.().domElement;
+    const shell = canvas?.closest('.rb-globe-shell');
+    if (!shell) return;
+    const rect = shell.getBoundingClientRect();
+    const aspect = rect.width > 0 ? rect.height / rect.width : 1;
+    applyEventZoom(shell, altitude ?? g.pointOfView().altitude, aspect);
+  };
+  useEffect(() => {
+    const g = globeRef.current;
+    const controls = g?.controls?.();
+    if (!controls) return undefined;
+    const onChange = () => syncEventZoom();
+    controls.addEventListener('change', onChange);
+    syncEventZoom();
+    return () => controls.removeEventListener('change', onChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const g = globeRef.current;
       if (!g) return;
       const pov = g.pointOfView();
+      syncEventZoom(pov.altitude);
       // Livello di dettaglio dei continenti (110m / 50m / riquadri 10m).
       landLodRef.current?.update(pov, g.camera());
       setView((prev) => {
@@ -1349,7 +1340,7 @@ export default function WorldGlobe({
             item.kind === 'cluster'
               ? makeClusterEl(item, world, expandCluster)
               : item.kind === 'event'
-              ? makeEventMarkerEl(item, world, onSelectEvent)
+              ? makeEventMarkerEl(item, onSelectEvent)
               : makeMarkerEl(item, world, onSelectUser)
           )
         }

@@ -106,47 +106,7 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-/* Marker di un evento: quadrato (angoli leggermente arrotondati, non
-   rotondo) apposta per distinguerlo a colpo d'occhio dagli utenti, che
-   restano tutti rotondi. */
-.rb-event-marker {
-  position: relative;
-  cursor: pointer;
-  transform: translate(-50%, -100%);
-}
-
-.rb-event-marker-photo {
-  width: 40px;
-  height: 40px;
-  border-radius: 9px;
-  border: 2px solid #fff;
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-  transition: transform 0.15s ease;
-}
-
-.rb-event-marker:hover .rb-event-marker-photo {
-  transform: scale(1.1);
-}
-
-.rb-event-marker-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #ff3860;
-  border: 2px solid #0a0a0f;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Marker degli eventi: esagono con la data, vedi globe/eventMarkers.css. */
 
 /* Nomi di città, regioni, stati e mari (globe/placeLabels.js): livello
    sopra il canvas e sotto i marker, mai cliccabile. I colori arrivano dal
@@ -341,13 +301,4 @@
   color: #fff;
   font-weight: 700;
   font-size: 17px;
-}
-
-/* Evento senza foto: icona calendario al centro del quadrato. */
-.rb-event-marker-photo-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  line-height: 1;
 }
