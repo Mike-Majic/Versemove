@@ -1126,7 +1126,6 @@ export function buildCategoryShell(
     const fontLoads = [...new Set(gothicTargets.map((t) => GOTHIC_LETTERS[t.id].fontLoad))];
     Promise.all(fontLoads.map((f) => loadGothicFont(f))).then(() => {
       if (disposed) return;
-      const small = typeof window !== 'undefined' && window.innerWidth < 600;
       gothicTargets.forEach((t) => {
         const cfg = GOTHIC_LETTERS[t.id];
         const size = t.shapeScale * GOTHIC_M_SIZE_FACTOR;
@@ -1136,10 +1135,10 @@ export function buildCategoryShell(
             char: cfg.char,
             font: cfg.font,
             scaleMode: cfg.scaleMode,
-            sparkleCount: small ? Math.min(cfg.sparkles, 300) : cfg.sparkles,
+            sparkleCount: cfg.sparkles,
             size,
-            particleCount: small ? 900 : 2600,
-            pulseCount: small ? 4 : 6,
+            particleCount: 2600,
+            pulseCount: 6,
             // Partenza delle particelle più raccolta del riferimento: qui la
             // lettera è grande e la camera vicina, non devono passarle dietro.
             introRadius: [4, 7],

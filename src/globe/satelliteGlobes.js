@@ -41,8 +41,6 @@ const CONTINENT_RESOLUTION_DEG = 6;
 // non si vede (è per questo che lì ci va il mondo Work in progress).
 const RING_RADIUS_WIDE = 330; // raggio dell'anello in unità di scena
 const RING_SWING_WIDE = 105; // quanto sale e scende il zigzag
-const RING_RADIUS_TALL = 250; // telefono
-const RING_SWING_TALL = 95;
 // Il posto 1 sta davanti al centro (il più grande, in primo piano) e i numeri
 // crescono verso destra. Il giro va all'indietro (segno meno in wavePoint),
 // così il posto 6 finisce esattamente dietro al globo.
@@ -64,52 +62,17 @@ const RING_START_DEG = 90;
 // quindi si sistema da sé.
 const PROJECTION_PX = 957;
 const BEAD_PX_WIDE = 46;
-const BEAD_PX_TALL = 36;
 
-function isNarrow() {
-  return typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
-}
-
-// Area 3D più alta che larga (telefono in verticale): la taglia si calcola
-// dalla LARGHEZZA dello schermo — diametro visibile (sfera + rete, ~1,5
-// raggi) pari al 17,5% della larghezza nella vista iniziale. Calibrata
-// sull'altezza, come in orizzontale, su uno schermo stretto e alto i
-// satelliti venivano giganti (26% della larghezza, etichette fino al 51%)
-// e coprivano il globo. BEAD_PX_TALL resta solo come ripiego senza window.
-const TALL_DIAMETER_FRAC = 0.175;
-const SATELLITE_VISUAL_RADIUS = 1.5;
+// Un solo percorso per web e telefono: stesse posizioni e stessa taglia
+// dappertutto (la vista iniziale del telefono è quella del web vista da
+// più lontano, vedi WorldGlobe startupCameraDistance).
 function targetBeadPx() {
-  if (!isNarrow()) return BEAD_PX_WIDE;
-  if (typeof window === 'undefined') return BEAD_PX_TALL;
-  const radiusPx = (TALL_DIAMETER_FRAC * window.innerWidth) / 2 / SATELLITE_VISUAL_RADIUS;
-  // Inversa di: raggio a schermo = beadPx · altezza / (2 · PROJECTION_PX · tan(fov/2)), fov 50°.
-  return (radiusPx * 2 * PROJECTION_PX * Math.tan(25 * DEG2RAD)) / window.innerHeight;
+  return BEAD_PX_WIDE;
 }
-
-// In verticale: quattro righe (due sopra e due sotto il globo) invece dello
-// zigzag a due righe, che su uno schermo stretto metteva i satelliti sopra
-// al globo. Stesso anello (i satelliti girano sempre attorno al globo),
-// raggio più stretto e un'altezza per ogni posto: davanti si leggono
-// 3 + 2 sopra e 2 + 2 sotto, con almeno il 6% della larghezza di spazio
-// dalla rete del globo (vedi WorldGlobe startupCameraDistance).
-const TALL_RING_RADIUS = 125;
-const TALL_ROW_OUTER = 345;
-const TALL_ROW_INNER = 205;
-// Posto → altezza (posti come RING_ORDER: 0 arte, 1 bambini, 2 nerd,
-// 3 animali, 4 incontri, 5 wip, 6 annunci, 7 vetrina, 8 lavoro, 9 faq).
-const TALL_SLOT_Y = [
-  TALL_ROW_OUTER, -TALL_ROW_OUTER, TALL_ROW_OUTER, -TALL_ROW_INNER, TALL_ROW_INNER,
-  0, TALL_ROW_INNER, -TALL_ROW_INNER, TALL_ROW_OUTER, -TALL_ROW_OUTER,
-];
 
 function wavePoint(index, total) {
-  const narrow = isNarrow();
-  if (narrow && total === TALL_SLOT_Y.length) {
-    const a = (RING_START_DEG - (index * 360) / total) * DEG2RAD;
-    return { pos: new THREE.Vector3(Math.cos(a) * TALL_RING_RADIUS, TALL_SLOT_Y[index], Math.sin(a) * TALL_RING_RADIUS) };
-  }
-  const R = narrow ? RING_RADIUS_TALL : RING_RADIUS_WIDE;
-  const swing = narrow ? RING_SWING_TALL : RING_SWING_WIDE;
+  const R = RING_RADIUS_WIDE;
+  const swing = RING_SWING_WIDE;
   const a = (RING_START_DEG - (index * 360) / Math.max(total, 1)) * DEG2RAD;
   // Cerchio orizzontale attorno al globo (piano XZ) + zigzag su e giù.
   const pos = new THREE.Vector3(
@@ -399,7 +362,12 @@ function buildSatelliteMesh(world) {
 // che mostra/nasconde e riposiziona gli stessi oggetti già pronti.
 // Ricreare geometrie/materiali (quindi ricompilare gli shader) ad ogni
 // warp era il vero costo del blocco misurato durante il volo.
-export function buildSatelliteGlobes({ worlds }) {
+// referenceDistance: distanza della camera "di riferimento" su cui si tara
+// la taglia (vedi update). Fissa (quella della vista iniziale del web), non
+// la prima distanza della camera: sul telefono la camera parte più
+// lontana, e tarando lì i satelliti venivano costruiti più grandi — giganti
+// rispetto al globo.
+export function buildSatelliteGlobes({ worlds, referenceDistance = null }) {
   const group = new THREE.Group();
   group.name = 'rb-satellite-globes';
 
@@ -439,7 +407,7 @@ export function buildSatelliteGlobes({ worlds }) {
   // iniziale e dalla formula interna di react-globe.gl, che non si vuole
   // indovinare qui), la calibrazione visiva già scelta con beadPx resta
   // quella, e lo zoom dell'utente scala naturalmente sopra/sotto da lì.
-  let referenceCamDist = null;
+  let referenceCamDist = referenceDistance;
 
   function setWarpTarget(worldId, durationMs = 0) {
     warpState.targetWorldId = worldId;

@@ -157,15 +157,14 @@ export function makeEventMarkerEl(event, onOpen) {
 
 // --- Grandezza legata allo zoom --------------------------------------------
 // Altitudine della camera (unità di pointOfView: distanza dalla superficie
-// in raggi del globo). Soglie per uno schermo orizzontale; su uno schermo
-// verticale il globo riempie prima la larghezza, quindi si moltiplicano per
-// il rapporto altezza/larghezza (al massimo 2.2).
+// in raggi del globo), soglie del web:
 //   far   (> 2.2)          globo intero: solo il punto magenta
 //   mid   (2.2 → ~0.58)    continente: pin compatto (solo il giorno), scala 0.55 → 0.85
 //   near  (~0.58 → 0.12)   nazione: pin pieno (mese + giorno), scala 0.85 → 1 (1 da 0.3)
 //   close (< 0.12)         regione/città: scala 1 → 1.3 (a 0.03), titolo sotto
 // Fra una fascia e l'altra la scala è interpolata sul logaritmo
 // dell'altitudine (lo zoom si percepisce in proporzione, non in unità).
+// Stesse fasce su web e telefono.
 const ALT_FAR = 2.2;
 const ALT_FULL_SIZE = 0.3;
 const ALT_CLOSE = 0.12;
@@ -179,26 +178,21 @@ function logLerp(alt, fromAlt, toAlt, fromScale, toScale) {
   return fromScale + (toScale - fromScale) * t;
 }
 
-export function eventZoomFor(altitude, aspect = 1) {
-  const k = Math.min(2.2, Math.max(1, aspect));
+export function eventZoomFor(altitude) {
   const alt = Math.max(altitude, 0.001);
-  if (alt > ALT_FAR * k) return { band: 'far', scale: SCALE_MID_MIN };
-  if (alt < ALT_CLOSE * k) {
-    return { band: 'close', scale: logLerp(alt, ALT_CLOSE * k, ALT_MIN * k, 1, SCALE_CLOSE_MAX) };
+  if (alt > ALT_FAR) return { band: 'far', scale: SCALE_MID_MIN };
+  if (alt < ALT_CLOSE) {
+    return { band: 'close', scale: logLerp(alt, ALT_CLOSE, ALT_MIN, 1, SCALE_CLOSE_MAX) };
   }
-  const scale = logLerp(alt, ALT_FAR * k, ALT_FULL_SIZE * k, SCALE_MID_MIN, 1);
+  const scale = logLerp(alt, ALT_FAR, ALT_FULL_SIZE, SCALE_MID_MIN, 1);
   return { band: scale < SCALE_FULL_VERSION ? 'mid' : 'near', scale };
 }
 
 // Scrive --ev-scale e data-ev-zoom sul contenitore solo se cambiano.
-export function applyEventZoom(container, altitude, aspect) {
+export function applyEventZoom(container, altitude) {
   if (!container) return;
-  const { band, scale } = eventZoomFor(altitude, aspect);
+  const { band, scale } = eventZoomFor(altitude);
   const scaleStr = scale.toFixed(3);
   if (container.dataset.evZoom !== band) container.dataset.evZoom = band;
-  // Area 3D più alta che larga: anche i marker degli utenti seguono le
-  // fasce (vedi WorldGlobe.css, solo in verticale).
-  const portrait = aspect > 1 ? '1' : '0';
-  if (container.dataset.portrait !== portrait) container.dataset.portrait = portrait;
   if (container.style.getPropertyValue('--ev-scale') !== scaleStr) container.style.setProperty('--ev-scale', scaleStr);
 }
