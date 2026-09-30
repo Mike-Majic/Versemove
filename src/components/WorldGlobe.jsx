@@ -171,14 +171,19 @@ function defaultAltitude() {
 }
 // Vista iniziale (a ogni avvio, mai salvata): panoramica con il mondo
 // attivo al centro e tutti gli altri intorno. Camera dal lato +Z (dove
-// sta il satellite al posto 1, Intrattenimento), azimut 0, 10° sopra il
+// sta il satellite al posto 1, Intrattenimento), azimut 0, STARTUP_ELEVATION_DEG sopra il
 // piano orizzontale, rivolta all'origine; il globo parte con rotazione 0
 // (Golfo di Guinea verso la camera). Distanza: la più piccola, da
 // STARTUP_MIN_DIST in su, a cui tutti i satelliti con le etichette stanno
 // dentro lo schermo con i margini sotto (barra in alto, pulsanti di lato);
 // su un telefono in verticale viene più lontana da sola.
-const STARTUP_ELEVATION_DEG = 10;
-const STARTUP_MIN_DIST = 600;
+// Web (puntatore preciso): elevazione e distanza ricavate dalla schermata
+// di riferimento (desktop 1908×898), 4° e 615 riproducono le posizioni dei
+// mondi con ~11 px di scarto medio. Dispositivi touch (telefono/tablet):
+// valori di prima, 10° e 600 (la vista da telefono si sistema a parte).
+const IS_FINE_POINTER = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches;
+const STARTUP_ELEVATION_DEG = IS_FINE_POINTER ? 4 : 10;
+const STARTUP_MIN_DIST = IS_FINE_POINTER ? 615 : 600;
 const STARTUP_MAX_DIST = 4000;
 const GLOBE_RADIUS = 100;
 // Margini dai bordi (px). I controlli sopra al globo occupano solo gli
@@ -188,7 +193,10 @@ const GLOBE_RADIUS = 100;
 function startupMargins(width) {
   const phone = width < 600;
   return {
-    top: phone ? 64 : 72, // barra in alto
+    top: phone ? 64 : 72, // barra in alto (solo negli angoli, vedi sotto)
+    topFree: 8, // al centro in alto la barra non c'è
+    topLeftZone: phone ? width : 320, // logo + mondo attivo
+    topRightZone: phone ? width : 400, // notifiche, chat, profilo, Esci
     bottom: phone ? 24 : 28,
     side: phone ? 10 : 24,
     rightZoneHeight: 270,
@@ -255,7 +263,9 @@ function startupCameraDistance(width, height, fovDeg, layout) {
       const bottom = sy + SATELLITE_VISUAL_RADIUS * r;
       const leftLimit = bottom > height - m.leftZoneHeight ? m.left : m.side;
       const rightLimit = bottom > height - m.rightZoneHeight ? m.right : m.side;
-      return sx - halfW >= leftLimit && sx + halfW <= width - rightLimit && sy - top >= m.top && bottom <= height - m.bottom;
+      const underBar = sx - halfW < m.topLeftZone || sx + halfW > width - m.topRightZone;
+      const topLimit = underBar ? m.top : m.topFree;
+      return sx - halfW >= leftLimit && sx + halfW <= width - rightLimit && sy - top >= topLimit && bottom <= height - m.bottom;
     });
   };
   if (fits(STARTUP_MIN_DIST)) return STARTUP_MIN_DIST;
