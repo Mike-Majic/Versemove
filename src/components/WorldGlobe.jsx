@@ -166,16 +166,9 @@ function makeEventMarkerEl(event, world, onOpen) {
   return el;
 }
 
-// Quando un gruppo ha più utenti della soglia, invece di un marker per
-// persona (che a migliaia diventerebbe illeggibile, oltre che lento) si
-// mostra un solo "grumo" col conteggio. Un click vola dentro e affina il
-// raggruppamento (vedi sotto): il livello di dettaglio dipende da quanto
-// sei zoomato, non da un click "ricordato" per sempre.
-const CLUSTER_THRESHOLD = 8;
-
-// Tre livelli, scelti in base all'altitudine della camera (stessa unità di
-// pointOfView: più alta = più lontano). Lontanissimo raggruppa per nazione,
-// medio raggruppa per città, vicino mostra le persone una per una.
+// Soglie di zoom (unità di pointOfView: più alta = più lontano) usate dalle
+// pillole delle città (globe/placeLabels.js, onZoomTo). I marker degli
+// utenti si raggruppano invece per distanza sullo schermo (clusterUsers).
 const ZOOM_TIER_COUNTRY = 1.4;
 const ZOOM_TIER_CITY = 0.55;
 
@@ -194,14 +187,6 @@ function makeClusterEl(cluster, world, onExpand) {
   });
   return el;
 }
-
-// Quanto vicino (in gradi lat/lng, molto approssimativo ma sufficiente qui)
-// deve essere il centro del gruppo al punto che la camera sta guardando,
-// perché a zoom ravvicinato quel gruppo si apra nei singoli individui.
-// Senza questo, a zoom vicino si mostrerebbero TUTTI gli individui di TUTTE
-// le città anche lontanissime dalla vista attuale: con centinaia o migliaia
-// di profili sarebbe di nuovo il problema di partenza (e anche lento).
-const NEARBY_DEGREES = 1;
 
 // Mondi con i nomi di città, regioni, stati e mari (globe/placeLabels.js).
 const PLACE_LABEL_WORLDS = new Set(['lavoro']);
@@ -242,38 +227,98 @@ const FRAME_MS_COVERED = 95;
 const WARP_DIVE_MS = 550;
 const WARP_FLASH_MS = 150;
 
-// Raggruppa gli utenti secondo il livello adatto all'altitudine attuale:
-// per nazione se sei molto lontano, per città a media/vicina distanza. Solo
-// il gruppo (città) su cui la camera è effettivamente centrata si apre nei
-// singoli individui quando sei abbastanza vicino — gli altri restano
-// raggruppati, anche a zoom ravvicinato, perché sono fuori vista. Zoomando
-// (rotellina/pizzico) o volando su un grumo il livello si ricalcola da
-// solo, non serve "ricordare" cosa hai aperto.
-function clusterUsers(users, view) {
-  const { altitude, lat: viewLat, lng: viewLng } = view;
-  const isCountryTier = altitude >= ZOOM_TIER_COUNTRY;
-  const groupKey = (u) => (isCountryTier ? u.country || 'Altro' : u.city || `${u.lat},${u.lng}`);
-  const targetAltitude = isCountryTier ? ZOOM_TIER_COUNTRY - 0.15 : ZOOM_TIER_CITY - 0.15;
+// Raggruppamento per DISTANZA SULLO SCHERMO, uguale in tutto il mondo (non
+// più per nome di nazione/città: città vicine con pochi utenti ciascuna
+// restavano "aperte" e i marker finivano uno sopra l'altro). Due marker più
+// vicini di CLUSTER_PX pixel finiscono nello stesso grumo col numero;
+// avvicinandosi (zoom o click sul grumo) il grumo si divide finché ogni
+// persona torna col suo avatar.
+//
+// Pixel → gradi: la camera sta a raggio*(1+altitude) dal centro, quindi a
+// raggio*altitude dalla superficie sotto di lei; con il campo visivo
+// verticale di ~50° (tan 25° ≈ 0.466) lo schermo alto H px copre
+// 0.93*raggio*altitude unità, e 1° sulla superficie vale raggio*π/180.
+// Il raggio si semplifica: gradi per pixel = 0.93*altitude*180/(π*H).
+const CLUSTER_PX = 46;
+// Sotto questa altitudine la camera non si avvicina più (limite dei
+// controlli): chi è ancora raggruppato (stessa città, coordinate quasi
+// uguali) si apre a ventaglio attorno al centro del grumo.
+const CLUSTER_MIN_ALTITUDE = 0.03;
 
-  const groups = new Map();
-  for (const u of users) {
-    const key = groupKey(u);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(u);
+function clusterCellDegrees(altitude, viewportHeight) {
+  const h = Math.max(200, viewportHeight || 800);
+  return (CLUSTER_PX * 0.93 * altitude * 180) / (Math.PI * h);
+}
+
+function degDistance(aLat, aLng, bLat, bLng) {
+  const dLng = (((bLng - aLng + 540) % 360) - 180) * Math.cos(((aLat + bLat) / 2) * (Math.PI / 180));
+  return Math.hypot(bLat - aLat, dLng);
+}
+
+function clusterUsers(users, view, viewportHeight) {
+  const altitude = Math.max(view.altitude, 0.001);
+  const cell = clusterCellDegrees(altitude, viewportHeight);
+  const degPerAltitude = cell / altitude;
+  // Ordine fisso (non quello di arrivo): stessi grumi a ogni ricalcolo.
+  const sorted = [...users].sort((a, b) => a.lat - b.lat || a.lng - b.lng || String(a.id).localeCompare(String(b.id)));
+
+  // Griglia su lat e lng "schiacciata" dal coseno: si cercano grumi solo
+  // nelle 9 celle vicine, non fra tutti (migliaia di utenti restano veloci).
+  const grid = new Map();
+  const clusters = [];
+  const cellKey = (cy, cx) => `${cy}:${cx}`;
+  for (const u of sorted) {
+    const cy = Math.floor(u.lat / cell);
+    const cx = Math.floor((u.lng * Math.cos((u.lat * Math.PI) / 180)) / cell);
+    let target = null;
+    for (let dy = -1; dy <= 1 && !target; dy++) {
+      for (let dx = -1; dx <= 1 && !target; dx++) {
+        const list = grid.get(cellKey(cy + dy, cx + dx));
+        if (!list) continue;
+        target = list.find((c) => degDistance(c.seedLat, c.seedLng, u.lat, u.lng) < cell) ?? null;
+      }
+    }
+    if (target) {
+      target.members.push(u);
+    } else {
+      const c = { seedLat: u.lat, seedLng: u.lng, members: [u] };
+      clusters.push(c);
+      const key = cellKey(cy, cx);
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(c);
+    }
   }
 
   const items = [];
-  for (const [key, group] of groups) {
-    const lat = group.reduce((sum, u) => sum + u.lat, 0) / group.length;
-    const lng = group.reduce((sum, u) => sum + u.lng, 0) / group.length;
-    const isNearbyAndClose =
-      !isCountryTier && altitude < ZOOM_TIER_CITY && Math.hypot(lat - viewLat, lng - viewLng) < NEARBY_DEGREES;
-
-    if (group.length > CLUSTER_THRESHOLD && !isNearbyAndClose) {
-      items.push({ kind: 'cluster', label: key, lat, lng, count: group.length, targetAltitude });
-    } else {
-      for (const u of group) items.push({ kind: 'user', ...u });
+  for (const c of clusters) {
+    const { members } = c;
+    if (members.length === 1) {
+      items.push({ kind: 'user', ...members[0] });
+      continue;
     }
+    const lat = members.reduce((sum, u) => sum + u.lat, 0) / members.length;
+    const lng = members.reduce((sum, u) => sum + u.lng, 0) / members.length;
+    if (altitude <= CLUSTER_MIN_ALTITUDE * 1.2) {
+      // Più vicino di così non si va: ventaglio attorno al centro.
+      const radius = cell * (0.7 + members.length * 0.08);
+      members.forEach((u, i) => {
+        const angle = (i / members.length) * Math.PI * 2;
+        items.push({
+          kind: 'user',
+          ...u,
+          lat: lat + radius * Math.sin(angle),
+          lng: lng + (radius * Math.cos(angle)) / Math.max(0.2, Math.cos((lat * Math.PI) / 180)),
+        });
+      });
+      continue;
+    }
+    // Quanto avvicinarsi al click: abbastanza perché il membro più lontano
+    // dal centro si stacchi, mai meno del limite dei controlli.
+    const spread = Math.max(...members.map((u) => degDistance(lat, lng, u.lat, u.lng)));
+    const targetAltitude = Math.min(altitude * 0.55, Math.max(CLUSTER_MIN_ALTITUDE, (spread / degPerAltitude) * 0.9));
+    const cities = [...new Set(members.map((u) => u.city).filter(Boolean))];
+    const label = cities.length === 1 ? cities[0] : cities.slice(0, 2).join(', ') + (cities.length > 2 ? '…' : '');
+    items.push({ kind: 'cluster', label, lat, lng, count: members.length, targetAltitude });
   }
   return items;
 }
@@ -384,14 +429,13 @@ export default function WorldGlobe({
       // Livello di dettaglio dei continenti (110m / 50m / riquadri 10m).
       landLodRef.current?.update(pov, g.camera());
       setView((prev) => {
-        const altChanged = Math.abs(prev.altitude - pov.altitude) > 0.03;
-        // La posizione (lat/lng) conta solo a zoom ravvicinato, dove serve
-        // per capire quale città è "sotto" la camera (vedi clusterUsers).
-        // A zoom lontano/medio ignorarla evita di ricalcolare/rimontare i
-        // marker ad ogni frame solo perché il globo sta ruotando da solo.
-        const closeZoom = pov.altitude < ZOOM_TIER_CITY;
-        const posChanged = closeZoom && (Math.abs(prev.lat - pov.lat) > 0.5 || Math.abs(prev.lng - pov.lng) > 0.5);
-        return altChanged || posChanged ? { altitude: pov.altitude, lat: pov.lat, lng: pov.lng } : prev;
+        // Variazione relativa: a zoom ravvicinato (altitudine 0.03-0.5) una
+        // soglia fissa non scatterebbe mai e i grumi non si dividerebbero.
+        const altChanged = Math.abs(prev.altitude - pov.altitude) > Math.max(0.004, prev.altitude * 0.06);
+        // La posizione non conta più (i grumi dipendono solo dalla distanza
+        // sullo schermo, cioè dall'altitudine): ruotare il globo non
+        // ricalcola/rimonta i marker.
+        return altChanged ? { altitude: pov.altitude, lat: pov.lat, lng: pov.lng } : prev;
       });
       // Etichette delle categorie: nascoste (non tolte, solo sprite.visible)
       // quando sono sul retro del globo, troppo vicine al bordo dello
@@ -409,7 +453,7 @@ export default function WorldGlobe({
 
   const displayItems = useMemo(() => {
     const eventItems = events.map((e) => ({ kind: 'event', ...e }));
-    return [...clusterUsers(users, view), ...eventItems];
+    return [...clusterUsers(users, view, typeof window !== 'undefined' ? window.innerHeight : 800), ...eventItems];
   }, [users, view, events]);
 
   const expandCluster = (cluster) => {
