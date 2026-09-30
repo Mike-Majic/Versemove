@@ -39,8 +39,9 @@ const ALT_FAR = 1.6;
 const ALT_CLOSE = 0.6;
 const RELAYOUT_MS = 100;
 const MAX_LABELS = 100;
-// Raggio a cui stanno le etichette: appena sopra i continenti (0.006).
-const LABEL_RADIUS = 100 * 1.007;
+// Raggio a cui stanno le etichette: sulla superficie, come le linee dei
+// continenti (landGeometry.js) e i marker.
+const LABEL_RADIUS = 100;
 // Un punto è sul lato visibile se l'angolo fra lui e la camera (visti dal
 // centro) è sotto quello dell'orizzonte, acos(raggio / distanza della
 // camera); si tiene solo questa frazione dell'orizzonte per scartare anche
@@ -52,9 +53,9 @@ const HORIZON_FRACTION = 0.92;
 // a destra. Un'etichetta non ci finisce mai sotto.
 const MARGIN = { top: 60, bottom: 56, left: 6, right: 70 };
 
-// Marker di react-globe.gl: stanno ad altitudine 0.03 (vedi htmlAltitude in
-// WorldGlobe).
-const MARKER_RADIUS = 100 * 1.03;
+// Marker di react-globe.gl: stanno sulla superficie, altitudine 0 (vedi
+// htmlAltitude in WorldGlobe).
+const MARKER_RADIUS = 100;
 // Un marker entro questa distanza (px) dal punto di una città con etichetta
 // finisce nella sua pillola.
 const PILL_RADIUS_PX = 40;

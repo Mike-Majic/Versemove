@@ -270,6 +270,10 @@ function startupCameraDistance(width, height, fovDeg, layout) {
   return Math.ceil(hi);
 }
 
+// Raggio della superficie del globo (sfera e continenti), dove stanno i
+// marker HTML (htmlAltitude 0).
+const MARKER_SURFACE_RADIUS = 100;
+
 // Piano di clipping lontano della camera: di serie (vedi
 // three-render-objects) è troppo vicino per le posizioni assolute dei
 // satelliti (fino a ~450-500 unità dal centro, più l'orbita lenta), che
@@ -363,8 +367,20 @@ function clusterUsers(users, view, viewportHeight) {
       items.push({ kind: 'user', ...members[0] });
       continue;
     }
-    const lat = members.reduce((sum, u) => sum + u.lat, 0) / members.length;
-    const lng = members.reduce((sum, u) => sum + u.lng, 0) / members.length;
+    // Il grumo sta sul membro più vicino alla media, non sulla media: la
+    // media di utenti su due coste può cadere in mare, un membro vero no.
+    const meanLat = members.reduce((sum, u) => sum + u.lat, 0) / members.length;
+    const meanLng = members.reduce((sum, u) => sum + u.lng, 0) / members.length;
+    let anchor = members[0];
+    let anchorDist = Infinity;
+    for (const u of members) {
+      const d = degDistance(meanLat, meanLng, u.lat, u.lng);
+      if (d < anchorDist) {
+        anchorDist = d;
+        anchor = u;
+      }
+    }
+    const { lat, lng } = anchor;
     if (altitude <= CLUSTER_MIN_ALTITUDE * 1.2) {
       // Più vicino di così non si va: ventaglio attorno al centro.
       const radius = cell * (0.7 + members.length * 0.08);
@@ -521,6 +537,9 @@ export default function WorldGlobe({
       if (!g) return;
       const pov = g.pointOfView();
       syncEventZoom(pov.altitude);
+      // Il globo gira da solo senza che la camera si muova: la libreria
+      // ricontrolla il retro solo quando cambia la camera, qui anche così.
+      markerElsRef.current.forEach((el) => setMarkerVisibility(el));
       // Livello di dettaglio dei continenti (110m / 50m / riquadri 10m).
       landLodRef.current?.update(pov, g.camera());
       setView((prev) => {
@@ -572,9 +591,41 @@ export default function WorldGlobe({
   }, [displayItems]);
   const registerMarkerEl = (item, el) => {
     markerElsRef.current.set(item, el);
+    el.__rbMarkerItem = item;
     placeLabelsRef.current?.invalidate();
     return el;
   };
+  // Marker nascosti quando stanno sul retro del globo. Il controllo della
+  // libreria (three-globe isBehindGlobe) con i marker a quota 0 sbaglia
+  // proprio sul punto opposto alla camera: un arcocoseno riceve un valore
+  // appena sopra 1 per arrotondamento, dà NaN e il marker resta visibile
+  // attraverso il globo. Qui un test geometrico semplice: un punto della
+  // superficie p (raggio R, centro nell'origine) è rivolto verso la camera
+  // c se p·c > R². La rotazione del globo (globeRootRef) è inclusa.
+  const markerFacingVec = useMemo(() => new THREE.Vector3(), []);
+  const markerFacesCamera = (item) => {
+    const g = globeRef.current;
+    const root = globeRootRef.current;
+    if (!g || !item || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)) return true;
+    const phi = ((90 - item.lat) * Math.PI) / 180;
+    const theta = ((90 - item.lng) * Math.PI) / 180;
+    const v = markerFacingVec.set(
+      MARKER_SURFACE_RADIUS * Math.sin(phi) * Math.cos(theta),
+      MARKER_SURFACE_RADIUS * Math.cos(phi),
+      MARKER_SURFACE_RADIUS * Math.sin(phi) * Math.sin(theta)
+    );
+    if (root) v.applyMatrix4(root.matrixWorld);
+    return v.dot(g.camera().position) > MARKER_SURFACE_RADIUS * MARKER_SURFACE_RADIUS;
+  };
+  // Con htmlElementVisibilityModifier la libreria lascia l'oggetto visibile
+  // e passa a noi l'elemento: si nasconde con visibility (display lo
+  // riscrive il renderer HTML a ogni fotogramma).
+  const setMarkerVisibility = (el) => {
+    const visible = markerFacesCamera(el.__rbMarkerItem);
+    const next = visible ? '' : 'hidden';
+    if (el.style.visibility !== next) el.style.visibility = next;
+  };
+
   // Puntatore "grezzo" (touch) = dispositivo mobile: li' il globo deve stare
   // fermo di default e muoversi solo con le dita (trascinamento/pizzico),
   // mai da solo. Su desktop invece ruota da solo finche' il mouse non ci
@@ -1487,7 +1538,12 @@ export default function WorldGlobe({
         htmlElementsData={displayItems}
         htmlLat="lat"
         htmlLng="lng"
-        htmlAltitude={0.03}
+        // Marker sulla superficie (raggio 100, come continenti e sfera): a
+        // quota 0.03 (raggio 103) da vicino la parallasse li faceva
+        // scivolare rispetto alla costa ruotando il globo. Il controllo
+        // "dietro al globo" della libreria funziona anche a quota 0.
+        htmlAltitude={0}
+        htmlElementVisibilityModifier={(el) => setMarkerVisibility(el)}
         htmlElement={(item) =>
           registerMarkerEl(
             item,
