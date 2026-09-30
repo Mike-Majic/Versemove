@@ -52,28 +52,62 @@ async function onlineBundle() {
   return (await res.text()).match(BUNDLE_RE)?.[0] ?? null;
 }
 
+// Parametro aggiunto all'indirizzo per la ricarica (vedi sotto): tolto
+// appena la pagina nuova è aperta.
+const RELOAD_PARAM = 'rbv';
+
+async function clearServiceWorkerAndCaches() {
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+  }
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  }
+}
+
+// Toglie service worker e cache e apre la pagina nuova. Due difetti della
+// versione di prima (sul telefono "Ricarica" sembrava non fare nulla):
+// - la pulizia poteva restare in sospeso (getRegistrations/unregister
+//   nell'app installata): ora ha al massimo 1,5 s, poi si ricarica lo stesso;
+// - location.reload() riapriva lo stesso indirizzo, e il telefono poteva
+//   ridare l'index.html vecchio dalla sua cache HTTP (stesso avviso di
+//   nuovo): ora si apre un indirizzo mai visto (?rbv=<ora>), che deve per
+//   forza arrivare dalla rete.
 async function reloadToNewVersion() {
   try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    }
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    }
+    await Promise.race([clearServiceWorkerAndCaches(), new Promise((resolve) => setTimeout(resolve, 1500))]);
   } catch {
     // Anche senza riuscire a pulire, la ricarica prova comunque.
   }
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.set(RELOAD_PARAM, String(Date.now()));
+  window.location.replace(url.toString());
+}
+
+// Pagina aperta da reloadToNewVersion: toglie ?rbv= dall'indirizzo.
+function cleanReloadParam() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(RELOAD_PARAM)) return;
+    url.searchParams.delete(RELOAD_PARAM);
+    window.history.replaceState(window.history.state, '', url.toString());
+  } catch {
+    // indirizzo non modificabile: resta com'è, non fa danni
+  }
 }
 
 export default function UpdateToast() {
   const { t } = useTranslation();
   const [newVersion, setNewVersion] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  // Tocco su "Ricarica" registrato: il pulsante si spegne subito, così si
+  // vede che qualcosa sta succedendo.
+  const [reloading, setReloading] = useState(false);
 
   useEffect(() => {
+    cleanReloadParam();
     // In sviluppo (vite dev) non c'è un bundle con hash: niente controllo.
     const current = runningBundle();
     if (!current) return undefined;
@@ -136,8 +170,16 @@ export default function UpdateToast() {
     <div className="rb-update-toast" style={TOAST_STYLE} role="status" aria-live="polite">
       <div className="rb-update-inner">
         <span className="rb-update-text">{t('common.updateAvailable')}</span>
-        <button type="button" className="rb-update-btn" onClick={reloadToNewVersion}>
-          {t('common.reload')}
+        <button
+          type="button"
+          className="rb-update-btn"
+          disabled={reloading}
+          onClick={() => {
+            setReloading(true);
+            reloadToNewVersion();
+          }}
+        >
+          {reloading ? '…' : t('common.reload')}
         </button>
         <button type="button" className="rb-update-close" aria-label={t('common.close')} onClick={() => setDismissed(true)}>
           ✕
