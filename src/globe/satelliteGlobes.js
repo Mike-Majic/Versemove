@@ -70,12 +70,44 @@ function isNarrow() {
   return typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
 }
 
+// Area 3D più alta che larga (telefono in verticale): la taglia si calcola
+// dalla LARGHEZZA dello schermo — diametro visibile (sfera + rete, ~1,5
+// raggi) pari al 17,5% della larghezza nella vista iniziale. Calibrata
+// sull'altezza, come in orizzontale, su uno schermo stretto e alto i
+// satelliti venivano giganti (26% della larghezza, etichette fino al 51%)
+// e coprivano il globo. BEAD_PX_TALL resta solo come ripiego senza window.
+const TALL_DIAMETER_FRAC = 0.175;
+const SATELLITE_VISUAL_RADIUS = 1.5;
 function targetBeadPx() {
-  return isNarrow() ? BEAD_PX_TALL : BEAD_PX_WIDE;
+  if (!isNarrow()) return BEAD_PX_WIDE;
+  if (typeof window === 'undefined') return BEAD_PX_TALL;
+  const radiusPx = (TALL_DIAMETER_FRAC * window.innerWidth) / 2 / SATELLITE_VISUAL_RADIUS;
+  // Inversa di: raggio a schermo = beadPx · altezza / (2 · PROJECTION_PX · tan(fov/2)), fov 50°.
+  return (radiusPx * 2 * PROJECTION_PX * Math.tan(25 * DEG2RAD)) / window.innerHeight;
 }
+
+// In verticale: quattro righe (due sopra e due sotto il globo) invece dello
+// zigzag a due righe, che su uno schermo stretto metteva i satelliti sopra
+// al globo. Stesso anello (i satelliti girano sempre attorno al globo),
+// raggio più stretto e un'altezza per ogni posto: davanti si leggono
+// 3 + 2 sopra e 2 + 2 sotto, con almeno il 6% della larghezza di spazio
+// dalla rete del globo (vedi WorldGlobe startupCameraDistance).
+const TALL_RING_RADIUS = 125;
+const TALL_ROW_OUTER = 345;
+const TALL_ROW_INNER = 205;
+// Posto → altezza (posti come RING_ORDER: 0 arte, 1 bambini, 2 nerd,
+// 3 animali, 4 incontri, 5 wip, 6 annunci, 7 vetrina, 8 lavoro, 9 faq).
+const TALL_SLOT_Y = [
+  TALL_ROW_OUTER, -TALL_ROW_OUTER, TALL_ROW_OUTER, -TALL_ROW_INNER, TALL_ROW_INNER,
+  0, TALL_ROW_INNER, -TALL_ROW_INNER, TALL_ROW_OUTER, -TALL_ROW_OUTER,
+];
 
 function wavePoint(index, total) {
   const narrow = isNarrow();
+  if (narrow && total === TALL_SLOT_Y.length) {
+    const a = (RING_START_DEG - (index * 360) / total) * DEG2RAD;
+    return { pos: new THREE.Vector3(Math.cos(a) * TALL_RING_RADIUS, TALL_SLOT_Y[index], Math.sin(a) * TALL_RING_RADIUS) };
+  }
   const R = narrow ? RING_RADIUS_TALL : RING_RADIUS_WIDE;
   const swing = narrow ? RING_SWING_TALL : RING_SWING_WIDE;
   const a = (RING_START_DEG - (index * 360) / Math.max(total, 1)) * DEG2RAD;

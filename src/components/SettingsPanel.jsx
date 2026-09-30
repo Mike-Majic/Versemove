@@ -1122,6 +1122,11 @@ export default function SettingsPanel({
         </CollapsibleSection>
 
         <DeleteAccountSection user={user} onAccountDeleted={onAccountDeleted} />
+
+        {/* Versione in esecuzione (commit + data della build, vedi
+            vite.config.js): per verificare che l'app installata abbia preso
+            l'ultima pubblicazione. */}
+        <p className="rb-settings-version">Versione {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</p>
       </aside>
     </ModalOverlay>
   );

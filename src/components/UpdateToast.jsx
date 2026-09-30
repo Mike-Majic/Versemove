@@ -23,7 +23,15 @@ const TOAST_STYLE = { '--update-conic': `conic-gradient(${[...WORLD_COLORS, WORL
 // minuti finché la pagina resta aperta (solo con la scheda in primo piano)
 // e ogni volta che si torna sulla scheda/finestra: con i soli 30 minuti di
 // prima chi aveva il sito già aperto durante un deploy non vedeva l'avviso.
-const FIRST_CHECK_DELAY_MS = 10_000;
+// Primo controllo subito dopo l'avvio: se online c'è già una versione più
+// nuova (tipico dell'app installata, servita dal service worker con i file
+// vecchi) la si prende da sola, senza chiedere.
+const FIRST_CHECK_DELAY_MS = 1_500;
+// Aggiornamento automatico anche tornando all'app dopo almeno un minuto in
+// background (l'app installata spesso non viene mai chiusa del tutto).
+const AUTO_UPDATE_AFTER_HIDDEN_MS = 60_000;
+// Contro i giri infiniti: una sola ricarica automatica per versione online.
+const AUTO_KEY = 'rb-auto-updated-to';
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 // Tornando sulla scheda non più di un controllo ogni 30 s.
 const MIN_GAP_MS = 30_000;
@@ -71,21 +79,45 @@ export default function UpdateToast() {
     if (!current) return undefined;
     let stopped = false;
     let lastCheck = 0;
-    const check = async () => {
+    let hiddenAt = 0;
+    const check = async ({ auto = false } = {}) => {
       if (stopped || document.visibilityState === 'hidden') return;
-      if (Date.now() - lastCheck < MIN_GAP_MS) return;
+      if (!auto && Date.now() - lastCheck < MIN_GAP_MS) return;
       lastCheck = Date.now();
       try {
         const online = await onlineBundle();
-        if (!stopped && online && online !== current) setNewVersion(true);
+        if (stopped || !online || online === current) return;
+        let already = null;
+        try {
+          already = sessionStorage.getItem(AUTO_KEY);
+        } catch {
+          // sessionStorage non disponibile: niente ricarica automatica.
+          already = online;
+        }
+        if (auto && already !== online) {
+          try {
+            sessionStorage.setItem(AUTO_KEY, online);
+          } catch {
+            // ignorato
+          }
+          reloadToNewVersion();
+          return;
+        }
+        setNewVersion(true);
       } catch {
         // Offline o rete che non risponde: si riprova al prossimo giro.
       }
     };
-    const first = setTimeout(check, FIRST_CHECK_DELAY_MS);
+    const first = setTimeout(() => check({ auto: true }), FIRST_CHECK_DELAY_MS);
     const every = setInterval(check, CHECK_EVERY_MS);
     const onBack = () => {
-      if (document.visibilityState === 'visible') check();
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+      const longAway = hiddenAt && Date.now() - hiddenAt >= AUTO_UPDATE_AFTER_HIDDEN_MS;
+      hiddenAt = 0;
+      check({ auto: Boolean(longAway) });
     };
     document.addEventListener('visibilitychange', onBack);
     window.addEventListener('focus', onBack);

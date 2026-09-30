@@ -196,5 +196,9 @@ export function applyEventZoom(container, altitude, aspect) {
   const { band, scale } = eventZoomFor(altitude, aspect);
   const scaleStr = scale.toFixed(3);
   if (container.dataset.evZoom !== band) container.dataset.evZoom = band;
+  // Area 3D più alta che larga: anche i marker degli utenti seguono le
+  // fasce (vedi WorldGlobe.css, solo in verticale).
+  const portrait = aspect > 1 ? '1' : '0';
+  if (container.dataset.portrait !== portrait) container.dataset.portrait = portrait;
   if (container.style.getPropertyValue('--ev-scale') !== scaleStr) container.style.setProperty('--ev-scale', scaleStr);
 }

@@ -475,3 +475,12 @@
 .rb-field-note--warn {
   color: #ffd166;
 }
+
+/* Numero di versione in fondo alle Impostazioni. */
+.rb-settings-version {
+  margin: 18px 0 4px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.45);
+  user-select: all;
+}

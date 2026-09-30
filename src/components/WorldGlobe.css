@@ -302,3 +302,27 @@
   font-weight: 700;
   font-size: 17px;
 }
+
+/* Solo in verticale (data-portrait, vedi globe/eventMarkers.js
+   applyEventZoom): nella vista panoramica (fascia "far") i marker degli
+   utenti e dei gruppi non si vedono, e avvicinandosi crescono con la
+   stessa scala degli esagoni evento. `scale` è una proprietà a parte da
+   `transform`, che la libreria del globo riscrive a ogni fotogramma. */
+[data-portrait='1'] .rb-marker-photo,
+[data-portrait='1'] .rb-marker-cluster {
+  scale: var(--ev-scale, 1);
+  transition: scale 0.18s ease-out, opacity 0.18s ease-out;
+}
+
+[data-portrait='1'][data-ev-zoom='far'] .rb-marker,
+[data-portrait='1'][data-ev-zoom='far'] .rb-marker-cluster {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-portrait='1'] .rb-marker-photo,
+  [data-portrait='1'] .rb-marker-cluster {
+    transition: none;
+  }
+}

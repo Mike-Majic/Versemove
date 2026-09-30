@@ -221,8 +221,10 @@ const SATELLITE_VISUAL_RADIUS = 1.5; // sfera + rete/nodi attorno, in raggi
 const SAT_RADIUS = 30;
 const SAT_PROJECTION_PX = 957;
 function satelliteScreenRadiusPx(width, height, fovDeg) {
-  const beadPx = height > width ? 36 : 46;
-  return (beadPx * height) / (2 * SAT_PROJECTION_PX * Math.tan((fovDeg * Math.PI) / 360));
+  // In verticale la taglia segue la larghezza (17,5% di diametro visibile,
+  // vedi satelliteGlobes targetBeadPx).
+  if (height > width) return (0.175 * width) / 2 / SATELLITE_VISUAL_RADIUS;
+  return (46 * height) / (2 * SAT_PROJECTION_PX * Math.tan((fovDeg * Math.PI) / 360));
 }
 // Posizione nell'anello ed etichetta (in raggi del satellite) dei
 // satelliti visibili, letti dal pool già costruito.
