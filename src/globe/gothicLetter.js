@@ -22,7 +22,9 @@ const LETTER_SIZE = 5.6;
 const INTRO_S = 1.6;
 const INTRO_FADE_S = 0.6;
 const EDGE_HUE_SPEED = 0.12;
-const PULSE_SPEED = 0.09; // giri del contorno al secondo
+const PULSE_SPEED = 0.045; // giri del contorno al secondo (un giro ogni ~22 s)
+// Velocità del luccichio dei brillantini della V (1 = originale, più veloce).
+const SPARKLE_TIME_SCALE = 0.5;
 const EDGE_WIDTH_PX = 1.6;
 const SIDE_EDGE_ANGLE = 60;
 const EDGE_GLOW_WIDTH_PX = 4;
@@ -655,7 +657,7 @@ export function createGothicLetter({
     setResolution(viewportSize);
     if (sparkUniforms) {
       // Con "riduci animazioni" i brillantini restano fermi ma visibili.
-      sparkUniforms.uTime.value = reduceMotion ? 1.0 : time;
+      sparkUniforms.uTime.value = reduceMotion ? 1.0 : time * SPARKLE_TIME_SCALE;
       if (pixelHeight > 0) sparkUniforms.uPx.value = pixelHeight;
     }
     if (introDir !== 0) {
