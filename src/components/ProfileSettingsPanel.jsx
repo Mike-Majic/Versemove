@@ -26,6 +26,8 @@ import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
 import { updateOwnDatingProfile } from '../data/incontri';
+import CityAutocomplete from './shared/CityAutocomplete';
+import { setMyProfileCity } from '../data/citta';
 import {
   listEsperienze,
   addEsperienza,
@@ -52,7 +54,6 @@ import { NERD_CATEGORIES } from '../data/nerdCategories';
 import { LAVORO_CATEGORIES } from '../data/lavoroCategories';
 import AvatarImg from './shared/AvatarImg';
 
-const CITTA_MAX = 80;
 const BIO_MAX = 300;
 
 const NICKNAME_RULE_TEXT =
@@ -741,41 +742,80 @@ function AccountLinkPanel({ user, onClose }) {
   );
 }
 
+// Campo città di un profilo: si scrive e dopo 2 lettere compaiono le città
+// vere (GeoNames, vedi CityAutocomplete); vale solo una città scelta
+// dall'elenco, perché è quella a posizionare il marker sui mondi (un testo
+// qualunque non saprebbe dove andare). value = { text, geo }: geo è il
+// geoname_id della città scelta, null finché non se ne sceglie una.
+function ProfileCityField({ label, value, onChange, initialText = '' }) {
+  const text = value.text ?? '';
+  return (
+    <div className="rb-field">
+      <span className="rb-field-label-row">{label}</span>
+      <CityAutocomplete
+        value={text}
+        pickedValue={value.geo ? initialText : ''}
+        placeholder="Scrivi e scegli la città dall'elenco"
+        onChange={(t) => onChange({ text: t, geo: null })}
+        onPick={(c) => onChange({ text: c.nomeMostrato, geo: c.geonameId })}
+      />
+      {text.trim() && !value.geo && (
+        <small className="rb-field-note rb-field-note--warn">Scegli la città dall'elenco che compare mentre scrivi.</small>
+      )}
+    </div>
+  );
+}
+
+const CITY_NOT_PICKED = "Scegli la città dall'elenco che compare mentre scrivi: serve a mettere il tuo segnaposto nel punto giusto.";
+
+// Salva la città scelta (o la toglie, se il campo è vuoto) e restituisce il
+// nome ufficiale che il server ha salvato come testo.
+async function saveProfileCity(campo, city) {
+  const hasText = Boolean(city.text.trim());
+  if (hasText && !city.geo) return { error: CITY_NOT_PICKED };
+  return setMyProfileCity(campo, hasText ? city.geo : null);
+}
+
 // Coppia Città+Bio con salvataggio immediato (come nickname/nome, niente
 // "Applica"): stessa card per i tre profili sotto (Social/Lavoro/Incontri),
 // parametrizzata coi valori iniziali e la funzione di salvataggio — invece
-// di ripetere lo stesso modulo tre volte.
-function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMessage }) {
-  const [citta, setCitta] = useState(initialCitta ?? '');
+// di ripetere lo stesso modulo tre volte. campo: quale città del profilo
+// ('social' | 'lavoro' | 'incontri', vedi setMyProfileCity). onSave(citta,
+// bio, geo) riceve il nome ufficiale della città già salvata.
+function CittaBioCard({ campo, citta: initialCitta, cittaGeo: initialGeo, bio: initialBio, onSave, successMessage }) {
+  const [city, setCity] = useState({ text: initialCitta ?? '', geo: initialGeo ?? null });
   const [bio, setBio] = useState(initialBio ?? '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
-  const [, markSaved] = useFormDirty({ citta, bio });
+  const [, markSaved] = useFormDirty({ city, bio });
 
   const save = async () => {
     setError('');
     setSuccess('');
     setBusy(true);
-    const { error: err } = await onSave(citta.trim(), bio.trim());
+    const cityRes = await saveProfileCity(campo, city);
+    if (cityRes.error) {
+      setBusy(false);
+      setError(cityRes.error);
+      return;
+    }
+    const nome = cityRes.nome ?? '';
+    const geo = nome ? city.geo : null;
+    const { error: err } = await onSave(nome, bio.trim(), geo);
     setBusy(false);
     if (err) {
       setError(err);
       return;
     }
+    setCity({ text: nome, geo });
     setSuccess(successMessage);
     markSaved();
   };
 
   return (
     <div className="rb-profile-field-group">
-      <label className="rb-field">
-        <span className="rb-field-label-row">
-          Città
-          <span className="rb-profile-link-hint" style={{ margin: 0 }}>{citta.length}/{CITTA_MAX}</span>
-        </span>
-        <input type="text" value={citta} maxLength={CITTA_MAX} onChange={(e) => setCitta(e.target.value)} />
-      </label>
+      <ProfileCityField label="Città" value={city} onChange={setCity} initialText={initialCitta ?? ''} />
       <label className="rb-field">
         <span className="rb-field-label-row">
           Bio
@@ -808,7 +848,8 @@ const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario'
 // giorno+mese di nascita (mai l'anno). Il campo "citta"/"bio" di base resta
 // in CittaBioCard sopra: qui gli altri dati richiesti per il Profilo Social.
 function SocialExtraCard({ user, onUpdateUser }) {
-  const [cittaOrigine, setCittaOrigine] = useState(user?.cittaOrigine ?? '');
+  const [cittaOrigine, setCittaOrigine] = useState({ text: user?.cittaOrigine ?? '', geo: user?.cittaOrigineGeo ?? null });
+  const [lingueOpen, setLingueOpen] = useState(false);
   const [statoRelazionale, setStatoRelazionale] = useState(user?.statoRelazionale ?? '');
   const [lingue, setLingue] = useState(user?.lingueParlate ?? []);
   const [mostraData, setMostraData] = useState(user?.mostraDataNascitaSocial ?? false);
@@ -825,15 +866,24 @@ function SocialExtraCard({ user, onUpdateUser }) {
     setError('');
     setSuccess('');
     setBusy(true);
-    const { error: err } = await updateOwnSocialExtra(cittaOrigine.trim(), statoRelazionale, lingue, mostraData);
+    const cityRes = await saveProfileCity('origine', cittaOrigine);
+    if (cityRes.error) {
+      setBusy(false);
+      setError(cityRes.error);
+      return;
+    }
+    const nome = cityRes.nome ?? '';
+    const geo = nome ? cittaOrigine.geo : null;
+    const { error: err } = await updateOwnSocialExtra(nome, statoRelazionale, lingue, mostraData);
     setBusy(false);
     if (err) {
       setError(err);
       return;
     }
+    setCittaOrigine({ text: nome, geo });
     setSuccess('Informazioni aggiornate.');
     markSaved();
-    onUpdateUser?.({ ...user, cittaOrigine: cittaOrigine.trim(), statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
+    onUpdateUser?.({ ...user, cittaOrigine: nome, cittaOrigineGeo: geo, statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
   };
 
   // Anteprima calcolata dal proprio dataNascita (dato privato ma già in
@@ -851,19 +901,34 @@ function SocialExtraCard({ user, onUpdateUser }) {
 
   return (
     <div className="rb-profile-field-group">
-      <label className="rb-field">
-        <span>Città di origine</span>
-        <input type="text" value={cittaOrigine} maxLength={CITTA_MAX} onChange={(e) => setCittaOrigine(e.target.value)} />
-      </label>
+      <ProfileCityField label="Città di origine" value={cittaOrigine} onChange={setCittaOrigine} initialText={user?.cittaOrigine ?? ''} />
 
       <label className="rb-field">
         <span>Stato</span>
         <CustomSelect ariaLabel="Stato" value={statoRelazionale} onChange={setStatoRelazionale} options={STATO_RELAZIONALE_OPTIONS} />
       </label>
 
+      {/* Menu a tendina: chiuso mostra solo quelle scelte, aperto l'elenco
+          completo (80 lingue) in un riquadro che scorre. */}
       <div className="rb-field">
         <span>Lingue parlate</span>
-        <div className="rb-social-lingue-list">
+        <button
+          type="button"
+          className={`rb-social-lingue-toggle ${lingueOpen ? 'open' : ''}`}
+          aria-expanded={lingueOpen}
+          onClick={() => setLingueOpen((o) => !o)}
+        >
+          <span className="rb-social-lingue-summary">
+            {lingue.length === 0
+              ? 'Nessuna lingua scelta'
+              : SUPPORTED_LANGUAGES.filter((l) => lingue.includes(l.code))
+                  .map((l) => l.nativeLabel)
+                  .join(', ')}
+          </span>
+          <span className="rb-social-lingue-chevron" aria-hidden="true">{lingueOpen ? '▲' : '▼'}</span>
+        </button>
+        {lingueOpen && (
+        <div className="rb-social-lingue-list rb-social-lingue-list--menu">
           {SUPPORTED_LANGUAGES.map((l) => (
             <button
               type="button"
@@ -875,6 +940,7 @@ function SocialExtraCard({ user, onUpdateUser }) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       <label className="rb-field rb-social-birthday-toggle">
@@ -974,12 +1040,14 @@ function SocialProfileSection({ user, onUpdateUser }) {
       onToggle={() => setOpen((v) => !v)}
     >
       <CittaBioCard
+        campo="social"
         citta={user?.cittaSocial}
+        cittaGeo={user?.cittaSocialGeo}
         bio={user?.bioSocial}
         successMessage="Profilo Social aggiornato."
-        onSave={async (citta, bio) => {
+        onSave={async (citta, bio, geo) => {
           const { error } = await updateOwnSocialProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, cittaSocial: citta, bioSocial: bio });
+          if (!error) onUpdateUser?.({ ...user, cittaSocial: citta, cittaSocialGeo: geo, bioSocial: bio });
           return { error };
         }}
       />
@@ -1352,12 +1420,14 @@ function LavoroProfileSection({ user, onUpdateUser }) {
       onToggle={() => setOpen((v) => !v)}
     >
       <CittaBioCard
+        campo="lavoro"
         citta={user?.cittaLavoro}
+        cittaGeo={user?.cittaLavoroGeo}
         bio={user?.bioLavoro}
         successMessage="Profilo di Lavoro aggiornato."
-        onSave={async (citta, bio) => {
+        onSave={async (citta, bio, geo) => {
           const { error } = await updateOwnLavoroProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, cittaLavoro: citta, bioLavoro: bio });
+          if (!error) onUpdateUser?.({ ...user, cittaLavoro: citta, cittaLavoroGeo: geo, bioLavoro: bio });
           return { error };
         }}
       />
@@ -1378,12 +1448,14 @@ function IncontriProfileSection({ user, onUpdateUser }) {
       onToggle={() => setOpen((v) => !v)}
     >
       <CittaBioCard
+        campo="incontri"
         citta={user?.citta}
+        cittaGeo={user?.cittaIncontriGeo}
         bio={user?.bio}
         successMessage="Profilo Incontri aggiornato."
-        onSave={async (citta, bio) => {
+        onSave={async (citta, bio, geo) => {
           const { error } = await updateOwnDatingProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, citta, bio });
+          if (!error) onUpdateUser?.({ ...user, citta, cittaIncontriGeo: geo, bio });
           return { error };
         }}
       />

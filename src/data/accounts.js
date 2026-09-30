@@ -45,6 +45,12 @@ function mapProfile(row) {
     genere: row.genere ?? '',
     pronomi: row.pronomi ?? '',
     citta: row.citta ?? '',
+    // Riferimenti alle città vere (public.citta) dei campi città del
+    // profilo: senza, il testo non è una città scelta dall'elenco.
+    cittaIncontriGeo: row.citta_incontri_geo ?? null,
+    cittaSocialGeo: row.citta_social_geo ?? null,
+    cittaLavoroGeo: row.citta_lavoro_geo ?? null,
+    cittaOrigineGeo: row.citta_origine_geo ?? null,
     bio: row.bio ?? '',
     cittaSocial: row.citta_social ?? '',
     bioSocial: row.bio_social ?? '',

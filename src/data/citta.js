@@ -46,6 +46,19 @@ export async function setMyCittaGeo(geonameId) {
   }
 }
 
+// Città di un campo del profilo ('social' | 'origine' | 'lavoro' |
+// 'incontri'): salva il riferimento alla città scelta dall'elenco e, come
+// testo, il suo nome ufficiale (RPC set_my_profile_city). null la toglie.
+// È questo riferimento, non il testo, a posizionare il marker sul globo.
+export async function setMyProfileCity(campo, geonameId) {
+  try {
+    const { data, error } = await supabase.rpc('set_my_profile_city', { p_campo: campo, p_geoname_id: geonameId ?? null });
+    return error ? { error: error.message } : { nome: data ?? '' };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
 let displayNames = null;
 export function countryName(code) {
   const c = String(code ?? '').trim().toUpperCase();

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import { useTranslation } from 'react-i18next';
-import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
+import { CONTINENTS, REGIONS, MAX_DISTANCE_KM, continentOfCountry } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
 import { hasLavoroConsent, setLavoroConsent } from '../data/lavoro';
@@ -27,7 +27,7 @@ import InfoBadge from './InfoBadge';
 import CustomSelect from './shared/CustomSelect';
 import CollapsibleSection from './shared/CollapsibleSection';
 import CityAutocomplete from './shared/CityAutocomplete';
-import { CITY_DATA_CREDIT, locationHasCoords, setMyCittaGeo } from '../data/citta';
+import { CITY_DATA_CREDIT, locationHasCoords, setMyCittaGeo, countryName } from '../data/citta';
 import { disablePush, enablePush, getPushState, needsHomeScreenInstall } from '../data/push';
 import './SettingsPanel.css';
 
@@ -819,6 +819,23 @@ export default function SettingsPanel({
 
   const updateFilter = (key, value) => setDraftFilters((f) => ({ ...f, [key]: value }));
   const updateLocation = (key, value) => setDraftLocationFilters((f) => ({ ...f, [key]: value }));
+  // Continente, regione e città devono andare d'accordo: scelta una città
+  // dall'elenco, regione e continente si allineano a lei; cambiando a mano
+  // regione o continente in uno che non la contiene, la città si svuota.
+  const CLEARED_CITY = { city: '', lat: null, lng: null, geonameId: null, paese: '', regione: '' };
+  const cityRegions = (f) => [f.regione, f.paese ? countryName(f.paese) : ''].filter(Boolean);
+  const changeContinent = (value) =>
+    setDraftLocationFilters((f) => {
+      const next = { ...f, continent: value };
+      if (value && f.paese && continentOfCountry(f.paese) !== value) return { ...next, ...CLEARED_CITY, region: '' };
+      return next;
+    });
+  const changeRegion = (value) =>
+    setDraftLocationFilters((f) => {
+      const next = { ...f, region: value };
+      if (value && f.geonameId && !cityRegions(f).includes(value)) return { ...next, ...CLEARED_CITY };
+      return next;
+    });
   const togglePersonalizzaSub = (name) => setPersonalizzaSub((s) => (s === name ? '' : name));
   const distanzaUnlimited = draftLocationFilters.distance >= MAX_DISTANCE_KM;
 
@@ -977,7 +994,7 @@ export default function SettingsPanel({
           >
             <label className="rb-field">
               <span>{t('settings.luogo.continent')}</span>
-              <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
+              <select value={draftLocationFilters.continent} onChange={(e) => changeContinent(e.target.value)}>
                 <option value="">{t('settings.luogo.allContinents')}</option>
                 {CONTINENTS.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -987,9 +1004,14 @@ export default function SettingsPanel({
 
             <label className="rb-field">
               <span>{t('settings.luogo.region')}</span>
-              <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
+              <select value={draftLocationFilters.region} onChange={(e) => changeRegion(e.target.value)}>
                 <option value="">{t('settings.luogo.allRegions')}</option>
-                {REGIONS.map((r) => (
+                {/* La regione della città scelta, anche se non è fra quelle
+                    dell'elenco fisso. */}
+                {(draftLocationFilters.region && !REGIONS.includes(draftLocationFilters.region)
+                  ? [draftLocationFilters.region, ...REGIONS]
+                  : REGIONS
+                ).map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
@@ -1002,20 +1024,27 @@ export default function SettingsPanel({
                   distanza (eventi e annunci vicini). */}
               <CityAutocomplete
                 value={draftLocationFilters.city}
+                pickedValue={draftLocationFilters.geonameId ? draftLocationFilters.city : ''}
                 placeholder={t('settings.luogo.cityPlaceholder')}
                 onChange={(text) =>
                   setDraftLocationFilters((f) => ({ ...f, city: text, lat: null, lng: null, geonameId: null, paese: '', regione: '' }))
                 }
                 onPick={(c) =>
-                  setDraftLocationFilters((f) => ({
-                    ...f,
-                    city: c.nomeMostrato,
-                    lat: c.lat,
-                    lng: c.lng,
-                    geonameId: c.geonameId,
-                    paese: c.paese,
-                    regione: c.regione,
-                  }))
+                  setDraftLocationFilters((f) => {
+                    const continent = continentOfCountry(c.paese);
+                    return {
+                      ...f,
+                      city: c.nomeMostrato,
+                      lat: c.lat,
+                      lng: c.lng,
+                      geonameId: c.geonameId,
+                      paese: c.paese,
+                      regione: c.regione,
+                      // Regione e continente seguono la città scelta.
+                      region: c.regione || countryName(c.paese) || f.region,
+                      continent: CONTINENTS.includes(continent) ? continent : f.continent,
+                    };
+                  })
                 }
               />
               {draftLocationFilters.city && !locationHasCoords(draftLocationFilters) && (
