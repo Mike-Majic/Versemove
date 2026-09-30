@@ -1132,9 +1132,9 @@ export function buildCategoryShell(
             // Partenza delle particelle più raccolta del riferimento: qui la
             // lettera è grande e la camera vicina, non devono passarle dietro.
             introRadius: [4, 7],
-            // Oscillazione lieve invece del giro completo: girando di 90°
-            // metà lettera entrerebbe nel globo.
-            spin: 'sway',
+            // Lettere ferme nella posa di riposo: si muovono solo insieme
+            // al globo (restano colori, impulsi, brillantini e alone).
+            spin: 'none',
             renderOrder: GOTHIC_RENDER_ORDER,
           });
         } catch {
@@ -1221,6 +1221,7 @@ export function buildCategoryShell(
         item.letter.update(elapsed, deltaSec, {
           reduceMotion,
           pixelHeight: viewportSize ? viewportSize.y * pixelRatio : 0,
+          viewportSize,
         });
       }
     }

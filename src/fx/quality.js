@@ -17,10 +17,15 @@ const MODES = ['auto', 'high', 'medium', 'low'];
 // tenuto sotto controllo è la leva col maggior impatto sulla GPU (ogni pixel
 // del canvas costa), antialias/atmosfera sono le prossime più a buon mercato
 // da spegnere.
+// Antialias sempre acceso e pixel ratio mai sotto quello reale dello
+// schermo fino a 1.5 (anche su "low"): a 1 con antialias spento le linee
+// sottili (bordi delle lettere gotiche, rete del guscio) venivano sgranate
+// e ingrandite dal browser. Il tetto a 2 non carica troppo la GPU sugli
+// schermi ad alta densità; "low" resta a 1.5 per i dispositivi deboli.
 export const GLOBE_QUALITY = {
   high: { pixelRatioCap: 2, antialias: true, atmosphere: true },
-  medium: { pixelRatioCap: 1.5, antialias: true, atmosphere: true },
-  low: { pixelRatioCap: 1, antialias: false, atmosphere: false },
+  medium: { pixelRatioCap: 2, antialias: true, atmosphere: true },
+  low: { pixelRatioCap: 1.5, antialias: true, atmosphere: false },
 };
 
 export function getQualityMode() {

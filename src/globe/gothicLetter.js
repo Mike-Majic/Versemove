@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 // Lettera gotica 3D (per ora solo la "M" della categoria World, mondo
 // Social): stesso aspetto e stesse animazioni di
@@ -20,6 +23,9 @@ const INTRO_S = 1.6;
 const INTRO_FADE_S = 0.6;
 const EDGE_HUE_SPEED = 0.12;
 const PULSE_SPEED = 0.09; // giri del contorno al secondo
+const EDGE_WIDTH_PX = 1.6;
+const SIDE_EDGE_ANGLE = 60;
+const EDGE_GLOW_WIDTH_PX = 4;
 
 // Tinta arcobaleno in un punto della lettera, che scorre nel tempo.
 export function gothicHueAt(x, y, time) {
@@ -225,8 +231,9 @@ function buildShapes(char, font, fixedScaleBase, scaleMode) {
 // partenza delle particelle (unità lettera). sparkleCount: brillantini
 // sul fianco destro esterno (la V di Verse; 0 = niente). holo: anelli/tacche/staffe HUD
 // (spenti di default). spin: 'full' come il riferimento (giro continuo
-// sull'asse Y) oppure 'sway' (oscillazione lieve, per quando dietro la
-// lettera c'è qualcosa in cui non deve entrare, es. il globo).
+// sull'asse Y), 'sway' (oscillazione lieve) oppure 'none': lettera ferma
+// nella posa di riposo, niente rotazione, galleggiamento né "respiro"
+// (il globo usa 'none': si muove solo insieme al globo).
 export function createGothicLetter({
   char = 'M',
   font = '440px "UnifrakturMaguntia", "Old English Text MT", serif',
@@ -269,56 +276,109 @@ export function createGothicLetter({
   group.add(root);
 
   // Facce: vetro nero ossidiana; fianchi: metallo scuro laccato.
+  // polygonOffset: la superficie viene spinta appena indietro nel depth
+  // buffer, così le linee dei bordi (che stanno esattamente sopra di lei)
+  // vincono sempre e non si spezzano a trattini (z-fighting).
+  const surfaceOffset = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
   const faceMat = new THREE.MeshPhysicalMaterial({
     color: 0x070f1e, metalness: 0.35, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.1,
-    emissive: 0x061a33, emissiveIntensity: 0.6, side: THREE.DoubleSide,
+    emissive: 0x061a33, emissiveIntensity: 0.6, side: THREE.DoubleSide, ...surfaceOffset,
   });
   const sideMat = new THREE.MeshPhysicalMaterial({
     color: 0x0b1c36, metalness: 0.7, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.12,
-    emissive: 0x0a3d66, emissiveIntensity: 0.7, side: THREE.DoubleSide,
+    emissive: 0x0a3d66, emissiveIntensity: 0.7, side: THREE.DoubleSide, ...surfaceOffset,
   });
   disposables.push(faceMat, sideMat);
   const mesh = new THREE.Mesh(geo, [faceMat, sideMat]);
   mesh.renderOrder = renderOrder;
   root.add(mesh);
 
-  // Bordi arcobaleno: colori per vertice aggiornati a ogni fotogramma.
-  const edgeGeo = new THREE.EdgesGeometry(geo, 25);
-  const ePos = edgeGeo.attributes.position;
-  const eCount = ePos.count;
+  // Bordi arcobaleno: colori per segmento aggiornati a ogni fotogramma.
+  // Una sola linea pulita per spigolo:
+  // - contorno frontale e posteriore presi direttamente dal disegno della
+  //   lettera (i contorni delle facce piane, esterni e fori). Dall'
+  //   EdgesGeometry non arrivano: con lo smusso a 3 segmenti il primo
+  //   gradino piega di ~20°, sotto la soglia di 25°, e il contorno usciva a
+  //   pezzetti; i gradini successivi invece facevano 3-4 anelli paralleli a
+  //   pochi centesimi l'uno dall'altro (linee doppie, moiré);
+  // - dall'EdgesGeometry si tengono solo gli spigoli "verticali" dei
+  //   fianchi (quasi paralleli a z e lunghi quanto lo spessore), con una
+  //   soglia di 60°: il contorno del glifo è un poligono fitto e a 25°
+  //   quasi ogni vertice diventava uno spigolo, visto di fronte un puntino.
+  const zFront = bb.max.z;
+  const zBack = bb.min.z;
+  const offX = (preBB.min.x + preBB.max.x) / 2;
+  const offY = (preBB.min.y + preBB.max.y) / 2;
+  const kept = [];
+  const pushLoop = (pts) => {
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (a.x === b.x && a.y === b.y) continue;
+      for (const z of [zFront, zBack]) kept.push(a.x - offX, a.y - offY, z, b.x - offX, b.y - offY, z);
+    }
+  };
+  shapes.forEach((sh) => {
+    const { shape: outer, holes } = sh.extractPoints(2);
+    pushLoop(outer);
+    holes.forEach(pushLoop);
+  });
+  const rawEdges = new THREE.EdgesGeometry(geo, SIDE_EDGE_ANGLE);
+  const rawPos = rawEdges.attributes.position.array;
+  for (let i = 0; i < rawPos.length; i += 6) {
+    const dz = Math.abs(rawPos[i + 5] - rawPos[i + 2]);
+    const dxy = Math.hypot(rawPos[i + 3] - rawPos[i], rawPos[i + 4] - rawPos[i + 1]);
+    if (dz >= depth * 0.9 && dxy < dz * 0.2) for (let k = 0; k < 6; k++) kept.push(rawPos[i + k]);
+  }
+  rawEdges.dispose();
+  const ePosArr = new Float32Array(kept);
+  const eCount = ePosArr.length / 3; // vertici (2 per segmento)
   const eCol = new Float32Array(eCount * 3);
-  const eColAttr = new THREE.BufferAttribute(eCol, 3);
-  eColAttr.setUsage(THREE.DynamicDrawUsage);
-  edgeGeo.setAttribute('color', eColAttr);
-  const edgeMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
-  const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+
+  // Linee "grosse" (LineSegments2): in WebGL linewidth viene ignorato e le
+  // LineSegments normali restano a 1 px. Spessore in pixel dello schermo;
+  // la risoluzione la aggiorna update() (viewportSize). Il bagliore è la
+  // stessa geometria più larga e additiva, sotto: stessa posizione, quindi
+  // si legge come un alone della linea e non come una seconda linea.
+  const edgeGeo = new LineSegmentsGeometry();
+  edgeGeo.setPositions(ePosArr);
+  edgeGeo.setColors(eCol);
+  // setColors copia l'array: i colori si scrivono direttamente nel buffer
+  // interno (stesso formato, r g b di inizio e fine di ogni segmento).
+  const eColBuffer = edgeGeo.attributes.instanceColorStart.data;
+  const eColArr = eColBuffer.array;
+  const edgeMat = new LineMaterial({
+    vertexColors: true, linewidth: EDGE_WIDTH_PX, transparent: true, opacity: 0.95,
+  });
+  const edges = new LineSegments2(edgeGeo, edgeMat);
   edges.renderOrder = renderOrder + 1;
   root.add(edges);
-  // Seconda passata più larga e additiva: il "bagliore" (niente bloom in scena).
-  const edgeGlowMat = new THREE.LineBasicMaterial({
-    vertexColors: true, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false,
+  const edgeGlowMat = new LineMaterial({
+    vertexColors: true, linewidth: EDGE_GLOW_WIDTH_PX, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   });
-  const edgesGlow = new THREE.LineSegments(edgeGeo, edgeGlowMat);
-  edgesGlow.scale.setScalar(1.03);
-  edgesGlow.renderOrder = renderOrder + 1;
+  const edgesGlow = new LineSegments2(edgeGeo, edgeGlowMat);
+  edgesGlow.renderOrder = renderOrder;
   root.add(edgesGlow);
   disposables.push(edgeGeo, edgeMat, edgeGlowMat);
+  const lastResolution = new THREE.Vector2(-1, -1);
+  function setResolution(viewportSize) {
+    if (!viewportSize || lastResolution.equals(viewportSize)) return;
+    lastResolution.copy(viewportSize);
+    edgeMat.resolution.copy(viewportSize);
+    edgeGlowMat.resolution.copy(viewportSize);
+  }
+  if (typeof window !== 'undefined') setResolution(new THREE.Vector2(window.innerWidth, window.innerHeight));
 
   const tmpC = new THREE.Color();
-  // Le x/y dei vertici non cambiano: si leggono una volta sola.
-  const eXY = new Float32Array(eCount * 2);
-  for (let i = 0; i < eCount; i++) {
-    eXY[i * 2] = ePos.getX(i);
-    eXY[i * 2 + 1] = ePos.getY(i);
-  }
   function paintEdges(time) {
     for (let i = 0; i < eCount; i++) {
-      tmpC.setHSL(gothicHueAt(eXY[i * 2], eXY[i * 2 + 1], time), 1, 0.6);
-      eCol[i * 3] = tmpC.r;
-      eCol[i * 3 + 1] = tmpC.g;
-      eCol[i * 3 + 2] = tmpC.b;
+      tmpC.setHSL(gothicHueAt(ePosArr[i * 3], ePosArr[i * 3 + 1], time), 1, 0.6);
+      eColArr[i * 3] = tmpC.r;
+      eColArr[i * 3 + 1] = tmpC.g;
+      eColArr[i * 3 + 2] = tmpC.b;
     }
-    eColAttr.needsUpdate = true;
+    eColBuffer.needsUpdate = true;
   }
   paintEdges(0);
 
@@ -551,7 +611,8 @@ export function createGothicLetter({
   }
 
   const easeOut = (x) => 1 - Math.pow(1 - x, 3);
-  function update(time, dt, { reduceMotion = false, pixelHeight = 0 } = {}) {
+  function update(time, dt, { reduceMotion = false, pixelHeight = 0, viewportSize = null } = {}) {
+    setResolution(viewportSize);
     if (sparkUniforms) {
       // Con "riduci animazioni" i brillantini restano fermi ma visibili.
       sparkUniforms.uTime.value = reduceMotion ? 1.0 : time;
@@ -580,13 +641,15 @@ export function createGothicLetter({
       faceMat.emissiveIntensity = 0.6 + emphasis * 0.4;
       return;
     }
-    if (spin === 'sway') root.rotation.y = Math.sin(time * 0.35) * swayAmount;
-    else {
-      spinAngle += 0.0025 * Math.min(dt * 60, 3);
-      root.rotation.y = spinAngle;
+    if (spin !== 'none') {
+      if (spin === 'sway') root.rotation.y = Math.sin(time * 0.35) * swayAmount;
+      else {
+        spinAngle += 0.0025 * Math.min(dt * 60, 3);
+        root.rotation.y = spinAngle;
+      }
+      root.position.y = Math.sin(time * 0.8) * 0.12;
+      root.scale.setScalar(1 + Math.sin(time * 1.6) * 0.012);
     }
-    root.position.y = Math.sin(time * 0.8) * 0.12;
-    root.scale.setScalar(1 + Math.sin(time * 1.6) * 0.012);
     paintEdges(time);
     haloMat.opacity = 0.06 + Math.sin(time * 2.2) * 0.03 + emphasis * 0.05;
     faceMat.emissiveIntensity = 0.5 + Math.sin(time * 2.2) * 0.15 + emphasis * 0.4;

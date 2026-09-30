@@ -644,10 +644,29 @@ export default function WorldGlobe({
     };
   }, []);
 
+  // Pixel ratio = quello reale dello schermo, col tetto del livello di
+  // qualità; riapplicato anche al resize e quando cambia il
+  // devicePixelRatio (zoom del browser, finestra spostata su un altro
+  // monitor), che il resize da solo non sempre segnala.
   useEffect(() => {
     const g = globeRef.current;
-    if (!g) return;
-    g.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
+    if (!g) return undefined;
+    let dprQuery = null;
+    const apply = () => {
+      const renderer = g.renderer();
+      const next = Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap);
+      // setPixelRatio ridimensiona già il buffer del canvas.
+      if (renderer.getPixelRatio() !== next) renderer.setPixelRatio(next);
+      dprQuery?.removeEventListener('change', apply);
+      dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+      dprQuery?.addEventListener('change', apply);
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => {
+      window.removeEventListener('resize', apply);
+      dprQuery?.removeEventListener('change', apply);
+    };
   }, [quality.pixelRatioCap]);
 
   // Materiale opaco (non trasparente): evitiamo che il globo finisca nel canale di
