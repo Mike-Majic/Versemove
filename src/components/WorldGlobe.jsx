@@ -9,7 +9,7 @@ import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
 import { makeEventMarkerEl, applyEventZoom } from '../globe/eventMarkers';
-import { buildSatelliteGlobes, satelliteScreenRadiusPx } from '../globe/satelliteGlobes';
+import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
 import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor, createAdaptiveFrameCap } from '../fx/quality';
@@ -207,9 +207,33 @@ function startupMargins(width) {
 // centri stanno abbastanza dentro. Il satellite esattamente dietro al
 // globo (Work in progress) resta nascosto e non conta.
 const SATELLITE_VISUAL_RADIUS = 1.5; // sfera + rete/nodi attorno, in raggi
+// Stessi valori di globe/satelliteGlobes.js (SATELLITE_RADIUS, PROJECTION_PX,
+// BEAD_PX_WIDE/TALL), qui solo letti per stimare la taglia a schermo dei
+// satelliti nella vista iniziale: i satelliti non si toccano.
+const SAT_RADIUS = 30;
+const SAT_PROJECTION_PX = 957;
+function satelliteScreenRadiusPx(width, height, fovDeg) {
+  const beadPx = height > width ? 36 : 46;
+  return (beadPx * height) / (2 * SAT_PROJECTION_PX * Math.tan((fovDeg * Math.PI) / 360));
+}
+// Posizione nell'anello ed etichetta (in raggi del satellite) dei
+// satelliti visibili, letti dal pool già costruito.
+function satelliteLayout(sats) {
+  return (sats?.satellites ?? [])
+    .filter((sat) => sat.visible && sat.userData.basePosRef)
+    .map((sat) => {
+      const base = sat.userData.labelBase;
+      return {
+        pos: sat.userData.basePosRef,
+        labelW: base ? base.sx / SAT_RADIUS : 4,
+        labelH: base ? base.sy / SAT_RADIUS : 1,
+        labelY: base ? base.y / SAT_RADIUS : 1.6,
+      };
+    });
+}
 function startupCameraDistance(width, height, fovDeg, layout) {
   if (!width || !height || !layout?.length) return STARTUP_MIN_DIST;
-  const r = satelliteScreenRadiusPx(height, fovDeg);
+  const r = satelliteScreenRadiusPx(width, height, fovDeg);
   const m = startupMargins(width);
   const e = (STARTUP_ELEVATION_DEG * Math.PI) / 180;
   const tan = Math.tan((fovDeg * Math.PI) / 360);
@@ -408,8 +432,6 @@ export default function WorldGlobe({
   // Nomi di città/regioni/stati/mari (globe/placeLabels.js).
   const placeLabelsRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
-  const worldIdRef = useRef(world.id);
-  worldIdRef.current = world.id;
   // true finché la camera è ancora nella vista iniziale (nessun
   // trascinamento/zoom/volo): solo allora il resize la ricalcola.
   const startupViewActiveRef = useRef(true);
@@ -1353,20 +1375,12 @@ export default function WorldGlobe({
     // Vista iniziale panoramica (vedi startupCameraDistance): a ogni
     // avvio, e di nuovo al resize/rotazione del telefono finché l'utente
     // non ha mosso la camera (trascinamento, zoom, voli).
-    const applyStartupView = ({ relayout = false } = {}) => {
-      const sats = satellitesRef.current;
-      // Dopo una rotazione del telefono l'anello cambia forma (verticale/
-      // orizzontale, vedi satelliteGlobes wavePoint) e la taglia va
-      // ricalibrata sulla nuova distanza.
-      if (relayout && sats) {
-        sats.setActiveWorld(worldIdRef.current, { animateSpawn: false });
-        sats.recalibrate();
-      }
+    const applyStartupView = () => {
       // Stesse misure dello stato `size` (il canvas può non essere ancora
       // stato ridimensionato quando arriva l'evento resize).
       const w = window.visualViewport?.width ?? window.innerWidth;
       const h = window.visualViewport?.height ?? window.innerHeight;
-      const dist = startupCameraDistance(w, h, g.camera().fov, satellitesRef.current?.layout());
+      const dist = startupCameraDistance(w, h, g.camera().fov, satelliteLayout(satellitesRef.current));
       const controls = g.controls();
       if (controls.maxDistance < dist * 1.2) controls.maxDistance = dist * 1.2;
       g.pointOfView({ lat: STARTUP_ELEVATION_DEG, lng: 0, altitude: dist / GLOBE_RADIUS - 1 }, 0);
@@ -1379,7 +1393,7 @@ export default function WorldGlobe({
     const onResize = () => {
       if (!startupViewActiveRef.current) return;
       // dopo il resize del canvas (setSize parte dallo stesso evento)
-      window.requestAnimationFrame(() => applyStartupView({ relayout: true }));
+      window.requestAnimationFrame(applyStartupView);
     };
     window.addEventListener('resize', onResize);
     if (isTouchDevice) globeActivity.wake();
