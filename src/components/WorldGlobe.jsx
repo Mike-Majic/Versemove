@@ -96,6 +96,16 @@ function safeUrl(url) {
   return '';
 }
 
+// Puntino della vista panoramica (fascia far) per avatar e grumi, come
+// .rb-ev-dot degli eventi ma del colore del mondo. Il click risale
+// all'elemento esterno (stesso gestore dell'avatar o del grumo).
+function makeFarDot(world) {
+  const dot = document.createElement('div');
+  dot.className = 'rb-marker-far-dot';
+  dot.style.setProperty('--far-dot-color', world.color);
+  return dot;
+}
+
 function makeMarkerEl(user, world, onOpen) {
   const el = document.createElement('div');
   el.className = 'rb-marker';
@@ -123,7 +133,14 @@ function makeMarkerEl(user, world, onOpen) {
   dot.style.background = dotColor;
   photo.append(img, dot);
   if (!src) showInitial();
-  el.append(photo);
+  // Stesse fasce di zoom degli esagoni evento (data-ev-zoom / --ev-scale su
+  // .rb-globe-shell, vedi globe/eventMarkers.js): l'esterno è solo l'ancora
+  // sulla coordinata (il suo transform lo riscrive la libreria), scala il
+  // figlio; da lontano (fascia far) resta un puntino del colore del mondo.
+  const scaleWrap = document.createElement('div');
+  scaleWrap.className = 'rb-marker-scale';
+  scaleWrap.append(photo);
+  el.append(scaleWrap, makeFarDot(world));
   el.title = `${user.name} · ${user.city}`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -141,11 +158,16 @@ const ZOOM_TIER_CITY = 0.55;
 function makeClusterEl(cluster, world, onExpand) {
   const el = document.createElement('div');
   el.className = 'rb-marker-cluster';
-  el.style.borderColor = world.color;
-  el.style.background = `color-mix(in srgb, ${world.color} 28%, rgba(0,0,0,0.55))`;
+  // Cerchio, bordo e sfondo su un figlio che scala con lo zoom (come gli
+  // avatar, vedi makeMarkerEl); l'esterno resta l'ancora sulla coordinata.
+  const body = document.createElement('div');
+  body.className = 'rb-marker-cluster-body';
+  body.style.borderColor = world.color;
+  body.style.background = `color-mix(in srgb, ${world.color} 28%, rgba(0,0,0,0.55))`;
   const count = document.createElement('span');
   count.textContent = String(cluster.count);
-  el.append(count);
+  body.append(count);
+  el.append(body, makeFarDot(world));
   el.title = `${cluster.label} · ${cluster.count} persone`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();

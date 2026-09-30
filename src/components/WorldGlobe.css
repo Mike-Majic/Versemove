@@ -30,7 +30,71 @@
 
 .rb-marker {
   cursor: pointer;
-  transform: translate(-50%, -100%);
+  /* Ancora sulla coordinata, larga e alta 0 (come .rb-event-marker): il
+     transform lo riscrive la libreria del globo a ogni fotogramma. */
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+/* Figlio che scala con lo zoom, con le stesse fasce degli esagoni evento
+   (data-ev-zoom e --ev-scale su .rb-globe-shell, vedi globe/eventMarkers.js).
+   Il livello HTML del globo ha pointer-events: none: qui si riattiva. */
+.rb-marker-scale,
+.rb-marker-cluster-body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%) scale(var(--ev-scale, 1));
+  transform-origin: 50% 50%;
+  transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+  pointer-events: auto;
+}
+
+/* Vista panoramica (fascia far): al posto di avatar e grumi un puntino
+   del colore del mondo, con alone (come .rb-ev-dot). */
+.rb-marker-far-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--far-dot-color, #1d9bf0);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--far-dot-color, #1d9bf0) 25%, transparent),
+    0 0 9px 3px color-mix(in srgb, var(--far-dot-color, #1d9bf0) 85%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+  cursor: pointer;
+}
+
+/* Area di click/tocco più grande del puntino. */
+.rb-marker-far-dot::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+[data-ev-zoom='far'] .rb-marker-scale,
+[data-ev-zoom='far'] .rb-marker-cluster-body {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-ev-zoom='far'] .rb-marker-far-dot {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-marker-scale,
+  .rb-marker-cluster-body,
+  .rb-marker-far-dot {
+    transition: none;
+  }
 }
 
 .rb-marker-photo {
@@ -83,20 +147,26 @@
    singoli, altrimenti una città affollata diventerebbe illeggibile. */
 .rb-marker-cluster {
   cursor: pointer;
-  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.rb-marker-cluster-body {
   width: 44px;
   height: 44px;
+  box-sizing: border-box;
   border-radius: 50%;
   border: 2px solid #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-  transition: transform 0.15s ease;
 }
 
-.rb-marker-cluster:hover {
-  transform: translate(-50%, -50%) scale(1.1);
+/* Hover con la proprietà scale (a parte da transform, già usato per lo zoom). */
+.rb-marker-cluster-body:hover {
+  scale: 1.1;
 }
 
 .rb-marker-cluster span {
