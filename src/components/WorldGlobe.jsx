@@ -467,18 +467,30 @@ export default function WorldGlobe({
   // Rotazione ferma durante il volo verso una categoria e finché la
   // categoria resta aperta: la sua stella deve restare al centro.
   const spinFrozenRef = useRef(false);
-  // Globo, marker, eventi e stelle delle categorie ruotano tutti insieme
-  // (globeSpinAngleRef, attorno all'asse Y): un punto a lat/lng "sul
-  // globo" in questo momento si trova a lng + angolo. Ogni volo della
-  // camera verso un punto del globo passa da qui, altrimenti dopo qualche
-  // secondo di rotazione la camera arriva dove il punto ERA (bug: clic su
-  // Cinema -> inquadrata Fotografia). Verso verificato a runtime:
-  // rotation.y = a sposta il punto da lng L a L + a (in gradi).
-  const toWorldLatLng = (lat, lng) => {
-    const deg = (globeSpinAngleRef.current * 180) / Math.PI;
-    let out = (((lng + deg + 180) % 360) + 360) % 360 - 180;
-    if (out === -180) out = 180;
-    return { lat, lng: out };
+  // Ogni volo della camera verso un punto del globo passa da qui: lat/lng
+  // sono coordinate LOCALI dell'oggetto che contiene il punto, e il punto
+  // d'arrivo si ricava dalla rotazione reale di quell'oggetto in questo
+  // momento (matrixWorld), non da un contatore a parte. Di default è
+  // l'oggetto radice di react-globe.gl (marker HTML, continenti, pillole
+  // delle città); per le stelle delle categorie si passa il loro gruppo.
+  // Bug di prima: si aggiungeva sempre globeSpinAngleRef, ma l'oggetto dei
+  // marker non ruota (globeRootRef resta null, vedi l'effetto dei
+  // continenti più giù): dopo 40 s di rotazione il clic su un grumo in
+  // Italia portava la camera oltre 100° più a est.
+  const globeObjectRef = useRef(null);
+  const getGlobeObject = () => {
+    const g = globeRef.current;
+    if (!g) return null;
+    if (!globeObjectRef.current?.parent) globeObjectRef.current = findGlobeRootObject(g.scene());
+    return globeObjectRef.current;
+  };
+  const toWorldLatLng = (lat, lng, container = getGlobeObject()) => {
+    const g = globeRef.current;
+    if (!g || !container) return { lat, lng };
+    container.updateWorldMatrix(true, false);
+    const p = new THREE.Vector3().copy(g.getCoords(lat, lng, 0)).applyMatrix4(container.matrixWorld);
+    const geo = g.toGeoCoords(p);
+    return { lat: geo.lat, lng: geo.lng };
   };
   const categoryPositionsRef = useRef({});
   const idleTargetRef = useRef(0);
@@ -1543,7 +1555,10 @@ export default function WorldGlobe({
     // precisa dell'anchor passata da App), poi riportata alla rotazione del
     // momento (vedi toWorldLatLng).
     const local = (flyTo.categoryId && categoryPositionsRef.current[flyTo.categoryId]) || (flyTo.lat !== undefined ? flyTo : null);
-    if (local && local.lat !== undefined && local.lng !== undefined) Object.assign(pov, toWorldLatLng(local.lat, local.lng));
+    if (local && local.lat !== undefined && local.lng !== undefined) {
+      const container = flyTo.categoryId ? categoryShellRef.current?.group : undefined;
+      Object.assign(pov, toWorldLatLng(local.lat, local.lng, container));
+    }
     g.pointOfView(pov, CATEGORY_FLY_MS);
 
     // Su mobile il globo resta sempre fermo (si muove solo con le dita), quindi
