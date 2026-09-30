@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { LAVORO_CATEGORIES, resolveCategoryQuery } from '../../data/lavoroCategories';
+import { useMemo, useState } from 'react';
+import { getLavoroCategories, canSearchCandidates, resolveCategoryQuery } from '../../data/lavoroCategories';
 import VideoRoomsColumn from '../nerd/VideoRoomsColumn';
+import CandidatiSearchColumn from './CandidatiSearchColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import SponsorCard from '../ads/SponsorCard';
 import '../shared/categoryExplorerShell.css';
 
 // Guscio di navigazione del mondo Lavoro: stesso pattern di ArteExplorer/
 // IncontriLiveExplorer (X + ricerca in alto, chiuso finché non si sceglie
-// la categoria). Per ora solo "Stanza conferenze".
+// la categoria). "Stanza conferenze" per tutti, "Cerca candidati" solo
+// per le aziende verificate e l'owner (getLavoroCategories).
 export default function LavoroWorldExplorer({
   world,
   activeCategory,
@@ -21,11 +23,13 @@ export default function LavoroWorldExplorer({
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const category = LAVORO_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
+  const canRecruit = canSearchCandidates(user);
+  const categories = useMemo(() => getLavoroCategories(canRecruit), [canRecruit]);
+  const category = categories.find((c) => c.id === activeCategory) ?? null;
 
   const submitSearch = (e) => {
     e.preventDefault();
-    const found = resolveCategoryQuery(query);
+    const found = resolveCategoryQuery(query, categories);
     if (found) {
       setInvalid(false);
       onSearchCategory(found);
@@ -77,7 +81,11 @@ export default function LavoroWorldExplorer({
 
           {/* Stanze video del Nerd con i testi e i nomi del Lavoro (nome e
               cognome); "Non hai accesso a questo mondo" -> consenso Lavoro. */}
-          <VideoRoomsColumn key={category.id} preset="conferenze" user={user} onOpenAuth={onOpenAuth} onNoAccess={onNoAccess} />
+          {category.id === 'candidati' ? (
+            <CandidatiSearchColumn key={category.id} />
+          ) : (
+            <VideoRoomsColumn key={category.id} preset="conferenze" user={user} onOpenAuth={onOpenAuth} onNoAccess={onNoAccess} />
+          )}
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
           <SponsorCard mondo="lavoro" categoria={category.id} formato="banner_pannello" />
         </>

@@ -10,6 +10,7 @@ import { computeAge } from '../data/age';
 import { ROLES } from '../data/roles';
 import ModalOverlay from './ModalOverlay';
 import './AdminPanel.css';
+import { aziendaVerificaTesto } from '../data/lavoro';
 
 const ROLE_LABELS = { [ROLES.OWNER]: 'Owner', [ROLES.MODERATOR]: 'Moderatore', [ROLES.USER]: 'Utente' };
 
@@ -676,6 +677,14 @@ export default function AdminPanel({ user, onClose }) {
                           >
                             {a.verificato ? '✓ Verificato' : 'Non verificato'}
                           </button>
+                          {/* Aziende: esito della verifica automatica della P.IVA
+                              (VIES) e nome trovato nel registro. */}
+                          {a.tipoAccount === 'azienda' && a.aziendaVerifica?.stato && (
+                            <div className="rb-admin-piva-stato" title={aziendaVerificaTesto(a.aziendaVerifica.stato, a.aziendaVerifica.nome_registro)}>
+                              P.IVA: {a.aziendaVerifica.stato}
+                              {a.aziendaVerifica.nome_registro ? ` · ${a.aziendaVerifica.nome_registro}` : ''}
+                            </div>
+                          )}
                         </td>
                         <td>
                           {isOwner && !isOwnerRow ? (

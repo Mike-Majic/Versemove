@@ -1,4 +1,5 @@
-// Categorie del mondo Lavoro (bianco): per ora solo "Stanza conferenze"
+// Categorie del mondo Lavoro (bianco): "Stanza conferenze" e "Cerca
+// candidati" (solo aziende verificate, vedi getLavoroCategories). Stanza conferenze
 // (videoconferenze fino a 8 persone con condivisione schermo, stesse stanze
 // video del mondo Nerd — vedi nerd/VideoRoomsColumn.jsx, preset
 // 'conferenze'). Ha preso il posto di "Live" (dirette incorporate), che
@@ -17,16 +18,41 @@ export const LAVORO_CATEGORIES = [
     aliases: ['stanza conferenze', 'conferenze', 'conferenza', 'riunione', 'riunioni', 'meeting', 'videoconferenza', 'call'],
     subfamilies: [],
   },
+  {
+    id: 'candidati',
+    label: 'Cerca candidati',
+    icon: '🔎',
+    anchor: { lat: -25, lng: 80 }, // Oceano Indiano
+    aliases: ['cerca candidati', 'candidati', 'candidato', 'cerca personale', 'personale', 'curriculum', 'cv', 'recruiting', 'selezione'],
+    subfamilies: [],
+    // Solo aziende verificate e owner: filtrata via getLavoroCategories,
+    // stesso meccanismo di staffOnly nel mondo FAQ.
+    recruiterOnly: true,
+  },
 ];
 
-export function resolveCategoryQuery(query) {
+// Può cercare candidati: azienda verificata oppure owner. Il server
+// (is_lavoro_recruiter) controlla comunque a ogni chiamata.
+export function canSearchCandidates(user) {
+  return Boolean(user && ((user.tipoAccount === 'azienda' && user.verificato) || user.ruolo === 'owner'));
+}
+
+// Solo le categorie visibili per QUESTO utente ("Cerca candidati" esclusa
+// per chi non può cercare) — usato ovunque al posto dell'array completo,
+// così la categoria nascosta non compare né sul globo né nella lista né
+// nella ricerca testuale né nei preferiti.
+export function getLavoroCategories(canRecruit) {
+  return canRecruit ? LAVORO_CATEGORIES : LAVORO_CATEGORIES.filter((c) => !c.recruiterOnly);
+}
+
+export function resolveCategoryQuery(query, categories = getLavoroCategories(false)) {
   const q = query.trim().toLowerCase();
   if (!q) return null;
   return (
-    LAVORO_CATEGORIES.find(
+    categories.find(
       (c) => c.label.toLowerCase() === q || c.aliases.some((a) => a.toLowerCase() === q)
     ) ??
-    LAVORO_CATEGORIES.find(
+    categories.find(
       (c) => c.label.toLowerCase().includes(q) || c.aliases.some((a) => a.toLowerCase().includes(q))
     ) ??
     null

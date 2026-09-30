@@ -37,6 +37,7 @@ import {
   removeIstruzione,
   updateLavoroContatti,
 } from '../data/lavoroProfile';
+import { setOwnLavoroVisibilita, richiediVerificaAzienda, esitoVerificaAzienda, aziendaVerificaTesto } from '../data/lavoro';
 import { zodiacSign, birthdayLabel } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
 import { WORLDS } from '../data/worlds';
@@ -51,7 +52,7 @@ import './ProfileSettingsPanel.css';
 import { ANIMALI_CATEGORIES } from '../data/animaliCategories';
 import { ARTE_CATEGORIES } from '../data/arteCategories';
 import { NERD_CATEGORIES } from '../data/nerdCategories';
-import { LAVORO_CATEGORIES } from '../data/lavoroCategories';
+import { LAVORO_CATEGORIES, canSearchCandidates } from '../data/lavoroCategories';
 import AvatarImg from './shared/AvatarImg';
 
 const BIO_MAX = 300;
@@ -559,11 +560,20 @@ function currentCategoryLabel(f) {
   return RENAMED_CATEGORY_LABELS.get(`${f.worldId}:${f.categoryId}`) ?? f.categoryLabel;
 }
 
-function FavoriteCategoriesList({ favoriteCategories }) {
+// Categorie riservate (Lavoro "Cerca candidati"): un preferito rimasto da
+// quando l'azienda era verificata non si mostra a chi non può più aprirla.
+const RECRUITER_CATEGORIES = new Set(LAVORO_CATEGORIES.filter((c) => c.recruiterOnly).map((c) => `lavoro:${c.id}`));
+
+function FavoriteCategoriesList({ favoriteCategories, user }) {
   const { t } = useTranslation();
+  const canRecruit = canSearchCandidates(user);
+  const hidden = (f) => {
+    const key = `${f.worldId}:${f.categoryId}`;
+    return REMOVED_CATEGORIES.has(key) || (!canRecruit && RECRUITER_CATEGORIES.has(key));
+  };
   const byWorld = WORLDS.map((w) => ({
     world: w,
-    items: favoriteCategories.filter((f) => f.worldId === w.id && !REMOVED_CATEGORIES.has(`${f.worldId}:${f.categoryId}`)),
+    items: favoriteCategories.filter((f) => f.worldId === w.id && !hidden(f)),
   })).filter((g) => g.items.length > 0);
 
   if (byWorld.length === 0) {
@@ -1411,12 +1421,136 @@ function LavoroContattiCard({ user, onUpdateUser }) {
   );
 }
 
+// Candidato: "Visibile alle aziende (cerco lavoro)". Si salva subito al
+// clic (niente "Salva"); se il server rifiuta (es. manca il consenso
+// Lavoro) l'interruttore torna com'era e si mostra il suo messaggio.
+function LavoroVisibilitaCard({ user, onUpdateUser }) {
+  const [visibile, setVisibile] = useState(user?.lavoroVisibileAziende ?? false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (next) => {
+    setError('');
+    setBusy(true);
+    setVisibile(next);
+    const { error: err } = await setOwnLavoroVisibilita(next);
+    setBusy(false);
+    if (err) {
+      setVisibile(!next);
+      setError(err);
+      return;
+    }
+    onUpdateUser?.({ ...user, lavoroVisibileAziende: next });
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <label className="rb-field rb-social-birthday-toggle">
+        <input type="checkbox" checked={visibile} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>
+          Visibile alle aziende (cerco lavoro)
+          <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>
+            Le aziende verificate del mondo Lavoro possono trovarti nella ricerca "Cerca candidati" e vedere: nome,
+            cognome, data di nascita, città, esperienze, titolo di studio, lingue, telefono, e-mail e curriculum.
+          </span>
+        </span>
+      </label>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+    </div>
+  );
+}
+
+// Azienda: verifica della partita IVA sul registro europeo VIES. Il server
+// avvia il controllo (richiedi_verifica_azienda) e ne dà l'esito
+// (esito_verifica_azienda): qui si chiede l'esito ogni 2 s finché non è più
+// 'in_corso' (al massimo 30 s), poi si ricarica l'account.
+const VERIFICA_POLL_MS = 2000;
+const VERIFICA_MAX_MS = 30000;
+
+function AziendaVerificaSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  const [esito, setEsito] = useState(() => (user?.verificato ? { stato: 'verificata', nome_registro: user?.aziendaVerifica?.nome_registro } : user?.aziendaVerifica ?? null));
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const verifica = async () => {
+    setError('');
+    setBusy(true);
+    const started = Date.now();
+    const req = await richiediVerificaAzienda();
+    if (!aliveRef.current) return;
+    if (req.error) {
+      setBusy(false);
+      setError(req.error);
+      return;
+    }
+    let current = req.esito;
+    setEsito(current);
+    while (current?.stato === 'in_corso' && Date.now() - started < VERIFICA_MAX_MS) {
+      await new Promise((resolve) => setTimeout(resolve, VERIFICA_POLL_MS));
+      if (!aliveRef.current) return;
+      const res = await esitoVerificaAzienda();
+      if (!aliveRef.current) return;
+      if (res.error) {
+        setError(res.error);
+        break;
+      }
+      current = res.esito;
+      setEsito(current);
+    }
+    const fresh = await getCurrentAccount();
+    if (!aliveRef.current) return;
+    setBusy(false);
+    if (fresh) onUpdateUser?.(fresh);
+  };
+
+  const stato = esito?.stato ?? (user?.verificato ? 'verificata' : null);
+  const verificata = stato === 'verificata' || user?.verificato;
+  const testo = aziendaVerificaTesto(verificata ? 'verificata' : stato, esito?.nome_registro);
+
+  return (
+    <CollapsibleSection
+      title="Verifica azienda"
+      infoText="Controlliamo la partita IVA sul registro europeo VIES. Solo le aziende verificate possono cercare candidati nel mondo Lavoro."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <div className="rb-profile-field-group">
+        <p className="rb-azienda-verifica-dati">
+          {user?.ragioneSociale || '—'}
+          {user?.partitaIva ? ` · P.IVA ${user.partitaIva}` : ''}
+        </p>
+        {testo && (
+          <p className={`rb-azienda-verifica-stato ${verificata ? 'ok' : ''}`}>
+            {verificata ? '✓ ' : ''}
+            {testo}
+            {verificata && esito?.nome_registro ? ` — ${esito.nome_registro}` : ''}
+          </p>
+        )}
+        {error && <p className="rb-profile-field-error">{error}</p>}
+        {!verificata && (
+          <button type="button" className="rb-profile-save-btn" onClick={verifica} disabled={busy}>
+            {busy ? 'Controllo in corso...' : 'Verifica partita IVA'}
+          </button>
+        )}
+      </div>
+    </CollapsibleSection>
+  );
+}
+
 function LavoroProfileSection({ user, onUpdateUser }) {
   const [open, setOpen] = useState(false);
   return (
     <CollapsibleSection
       title="Profilo di Lavoro"
-      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Nel mondo Lavoro, oltre a nome e cognome, la tua data di nascita completa è visibile alle aziende. Il mondo Lavoro non ha ancora una schermata che li mostra ad altri: per ora restano salvati, pronti per quando ci sarà."
+      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Nel mondo Lavoro, oltre a nome e cognome, la tua data di nascita completa è visibile alle aziende. Con «Visibile alle aziende» acceso, le aziende verificate possono trovarti e vedere il tuo profilo di Lavoro completo."
       open={open}
       onToggle={() => setOpen((v) => !v)}
     >
@@ -1435,6 +1569,7 @@ function LavoroProfileSection({ user, onUpdateUser }) {
       <LavoroEsperienzeCard />
       <LavoroIstruzioneCard />
       <LavoroContattiCard user={user} onUpdateUser={onUpdateUser} />
+      {user?.tipoAccount !== 'azienda' && <LavoroVisibilitaCard user={user} onUpdateUser={onUpdateUser} />}
     </CollapsibleSection>
   );
 }
@@ -1642,7 +1777,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
           <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
         </div>
 
-        {tab === 'preferiti' && <FavoriteCategoriesList favoriteCategories={favoriteCategories} />}
+        {tab === 'preferiti' && <FavoriteCategoriesList favoriteCategories={favoriteCategories} user={user} />}
 
         {tab === 'profilo' && (
           <>
@@ -1650,6 +1785,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
             <ProfilePreviewCard user={user} />
             <SocialProfileSection user={user} onUpdateUser={onUpdateUser} />
             <GamertagSection user={user} onUpdateUser={onUpdateUser} />
+            {user.tipoAccount === 'azienda' && <AziendaVerificaSection user={user} onUpdateUser={onUpdateUser} />}
             <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
             <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} />
           </>

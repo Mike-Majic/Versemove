@@ -33,7 +33,7 @@ import {
 import { BAMBINI_CATEGORIES, resolveCategoryQuery as resolveBambiniCategoryQuery } from './games/registry';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQuery } from './data/incontriCategories';
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
-import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
+import { getLavoroCategories, canSearchCandidates, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
@@ -118,8 +118,10 @@ const CATEGORY_WORLDS = {
   incontri: { categories: INCONTRI_CATEGORIES, resolveQuery: resolveIncontriCategoryQuery },
   // Social: solo "World", apre il feed esistente invece di CategoryColumn.
   social: { categories: SOCIAL_CATEGORIES, resolveQuery: resolveSocialCategoryQuery },
-  // Lavoro: solo "Live" per ora, apre il pannello delle dirette invece di CategoryColumn.
-  lavoro: { categories: LAVORO_CATEGORIES, resolveQuery: resolveLavoroCategoryQuery },
+  // Lavoro: "Stanza conferenze" per tutti; "Cerca candidati" solo per le
+  // aziende verificate, aggiunta sotto con getLavoroCategories(...) come la
+  // Stanza MOD del mondo FAQ.
+  lavoro: { categories: getLavoroCategories(false), resolveQuery: resolveLavoroCategoryQuery },
   // Vetrina: solo "Novità" per ora, nessun contenuto editoriale ancora —
   // CategoryColumn mostra da sé lo stato vuoto con featured/results vuoti.
   vetrina: { categories: VETRINA_CATEGORIES, featured: {}, results: {}, resolveQuery: resolveVetrinaCategoryQuery },
@@ -195,11 +197,16 @@ export default function App() {
   // ricalcola la lista categorie in base al ruolo, così il triangolo/nuvola
   // sul globo e la lista sotto al mondo non la mostrano mai a chi non deve
   // vederla (vedi anche FaqWorldExplorer, che rifà lo stesso filtro per sé).
+  // Stesso filtro per "Cerca candidati" del mondo Lavoro (solo aziende
+  // verificate e owner, vedi canSearchCandidates).
+  const canRecruit = canSearchCandidates(user);
   const categorySet = useMemo(() => {
-    if (!baseCategorySet || world.id !== 'faq') return baseCategorySet;
-    return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
+    if (!baseCategorySet) return baseCategorySet;
+    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
+    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit) };
+    return baseCategorySet;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseCategorySet, world.id, user?.ruolo]);
+  }, [baseCategorySet, world.id, user?.ruolo, canRecruit]);
   // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
   // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
   // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
@@ -916,7 +923,8 @@ export default function App() {
   const navigateToCategory = (worldId, categoryId, initialSubfamily = '') => {
     const targetIndex = WORLDS.findIndex((w) => w.id === worldId);
     if (targetIndex === -1) return;
-    const cat = CATEGORY_WORLDS[worldId]?.categories.find((c) => c.id === categoryId);
+    const worldCategories = worldId === 'lavoro' ? getLavoroCategories(canRecruit) : CATEGORY_WORLDS[worldId]?.categories;
+    const cat = worldCategories?.find((c) => c.id === categoryId);
     if (!cat) return;
     const sameWorld = targetIndex === index;
 
@@ -1468,6 +1476,13 @@ export default function App() {
                     {translateCategoryLabel(t, world.id, c)}
                   </button>
                 ))}
+              {/* Azienda non ancora verificata: al posto di "Cerca candidati"
+                  l'invito a verificarsi (Il mio profilo → Verifica azienda). */}
+              {world.id === 'lavoro' && user?.tipoAccount === 'azienda' && !canRecruit && (
+                <button type="button" className="rb-tagline-cat-btn rb-tagline-cat-btn--invite" onClick={() => setProfileSettingsOpen(true)}>
+                  🔎 Verifica l'azienda per cercare candidati
+                </button>
+              )}
             </div>
           </>
         ) : (

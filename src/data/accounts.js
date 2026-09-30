@@ -62,6 +62,10 @@ function mapProfile(row) {
     mostraDataNascitaSocial: row.mostra_data_nascita_social ?? false,
     lavoroSocialMedia: row.lavoro_social_media ?? '',
     lavoroTelefono: row.lavoro_telefono ?? '',
+    // Candidato: compare nella ricerca "Cerca candidati" delle aziende.
+    lavoroVisibileAziende: row.lavoro_visibile_aziende ?? false,
+    // Azienda: esito della verifica della partita IVA ({ stato, nome_registro, ... }).
+    aziendaVerifica: row.azienda_verifica ?? null,
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
