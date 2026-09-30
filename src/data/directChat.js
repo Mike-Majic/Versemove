@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
 import i18n from '../i18n';
+import { prepareUpload } from './mediaCompress';
 
 // Apre (o riusa, se già esiste) la conversazione diretta con un altro
 // utente reale — la funzione lato server aggiunge entrambi come
@@ -332,10 +333,15 @@ export async function getDirectConversationsMap() {
 // pubblici, si aprono con URL firmati a scadenza.
 export const CHAT_MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-export async function uploadChatAttachment(conversationId, file) {
+export async function uploadChatAttachment(conversationId, original) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
+    // Compressione prima del controllo di peso: un video da 30 MB può
+    // scendere sotto i 20 MB.
+    const prepared = await prepareUpload(original, { allowWebm: false });
+    if (prepared.error) return { error: prepared.error };
+    const file = prepared.file;
     if (file.size > CHAT_MAX_FILE_BYTES) return { error: 'Il file supera i 20 MB.' };
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80) || 'file';
     const path = `${conversationId}/${auth.user.id}/${Date.now()}-${safeName}`;

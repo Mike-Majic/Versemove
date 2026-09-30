@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { rememberDeviceSession } from './accountSwitcher';
 import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // Il bucket "attachments" accetta solo certi tipi di file e una dimensione
 // massima (vedi accept sull'input allegati in AuthModal): un upload respinto
@@ -435,8 +436,11 @@ export async function deleteOwnAccount(password) {
 // imposto dalle policy di storage) e lo registra nel profilo tramite la
 // funzione add_own_attachment. `file` è un File/Blob del browser.
 export async function uploadAttachment(userId, file) {
-  const path = `${userId}/${Date.now()}-${safeFileName(file.name)}`;
-  const { error: uploadError } = await supabase.storage.from('attachments').upload(path, file);
+  const prepared = await prepareUpload(file);
+  if (prepared.error) return { error: prepared.error };
+  const upload = prepared.file;
+  const path = `${userId}/${Date.now()}-${safeFileName(upload.name)}`;
+  const { error: uploadError } = await supabase.storage.from('attachments').upload(path, upload);
   if (uploadError) return { error: translateUploadError(uploadError) };
   const { error: rpcError } = await supabase.rpc('add_own_attachment', { p_name: file.name, p_path: path });
   if (rpcError) return { error: rpcError.message };
@@ -514,8 +518,11 @@ export async function uploadAvatar(file) {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/avatar-${Date.now()}-${safeFileName(file.name)}`;
-    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
+    const prepared = await prepareUpload(file);
+    if (prepared.error) return { error: prepared.error };
+    const upload = prepared.file;
+    const path = `${auth.user.id}/avatar-${Date.now()}-${safeFileName(upload.name)}`;
+    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
     if (uploadError) return { error: translateUploadError(uploadError) };
 
     const { data } = supabase.storage.from('content-media').getPublicUrl(path);

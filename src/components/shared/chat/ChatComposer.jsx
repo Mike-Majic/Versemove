@@ -3,7 +3,8 @@ import MentionInput from '../MentionInput';
 import EmojiPicker from '../../social/EmojiPicker';
 import { mentionIdsInText } from '../../../data/mentions';
 import useVoiceRecorder from './useVoiceRecorder';
-import { MAX_FILES, MAX_VOICE_SECONDS, formatDuration, kindOfMime, mimeOf, newId, validateFile } from './chatMedia';
+import { MAX_FILES, MAX_FILE_BYTES, MAX_VOICE_SECONDS, formatDuration, formatSize, kindOfMime, mimeOf, newId, validateFile } from './chatMedia';
+import { prepareUpload } from '../../../data/mediaCompress';
 
 // Barra di scrittura condivisa (Stanza MOD e chat dirette):
 // - 📎 con "Foto/Video", "Documento" e le voci extra (es. "Posizione");
@@ -149,7 +150,21 @@ export default function ChatComposer({
     if (pending.length) {
       setBusy(true);
       for (const item of pending) {
-        const res = await upload(item.file, (p) =>
+        // Foto e video compressi prima dell'invio (webm no: la chat non lo
+        // accetta), con il controllo dello spazio dell'utente.
+        const prepared = await prepareUpload(item.file, { allowWebm: false });
+        if (prepared.error) {
+          setBusy(false);
+          setError(`${item.file.name}: ${prepared.error}`);
+          return;
+        }
+        const file = prepared.file;
+        if (file.size > MAX_FILE_BYTES) {
+          setBusy(false);
+          setError(`${item.file.name}: anche compresso pesa ${formatSize(file.size)}, il massimo è 20 MB.`);
+          return;
+        }
+        const res = await upload(file, (p) =>
           setPending((prev) => prev.map((x) => (x.id === item.id ? { ...x, progress: p } : x)))
         );
         if (res.error) {
@@ -157,7 +172,7 @@ export default function ChatComposer({
           setError(`${item.file.name}: ${res.error}`);
           return;
         }
-        allegati.push({ tipo: item.kind, path: res.path, nome: item.file.name, mime: mimeOf(item.file), dimensione: item.file.size });
+        allegati.push({ tipo: item.kind, path: res.path, nome: file.name, mime: mimeOf(file), dimensione: file.size });
       }
       setBusy(false);
       pending.forEach((p) => p.url && URL.revokeObjectURL(p.url));

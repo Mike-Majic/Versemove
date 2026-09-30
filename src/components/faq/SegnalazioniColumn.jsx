@@ -7,6 +7,7 @@ import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import { safeFileName } from '../../data/storagePath';
 import PublishedAt from '../shared/PublishedAt';
+import { prepareUpload } from '../../data/mediaCompress';
 
 const CATEGORIE = [
   { value: 'Bug', label: 'Bug' },
@@ -55,8 +56,9 @@ export default function SegnalazioniColumn({ user, onOpenAuth, closing = false }
     setError('');
     let dettagli = descrizione.trim();
     if (screenshot) {
-      const path = `${user.id}/report-${Date.now()}-${safeFileName(screenshot.name)}`;
-      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, screenshot);
+      const { file: upload = screenshot } = await prepareUpload(screenshot);
+      const path = `${user.id}/report-${Date.now()}-${safeFileName(upload.name)}`;
+      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
       if (!uploadError) {
         const { data } = supabase.storage.from('content-media').getPublicUrl(path);
         dettagli += `\n\nScreenshot: ${data.publicUrl}`;
