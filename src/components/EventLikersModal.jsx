@@ -38,7 +38,7 @@ export default function EventLikersModal({
     <ModalOverlay onClose={onClose}>
       <div className="rb-event-likers-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-        <h3>Mi piace</h3>
+        <h3>Partecipanti</h3>
         <p className="rb-event-likers-subtitle">{event.titolo}</p>
         {error && <p className="rb-privacy-error">⚠️ {error}</p>}
 
@@ -63,7 +63,7 @@ export default function EventLikersModal({
               </li>
             );
           })}
-          {likers.length === 0 && <p className="rb-event-likers-empty">Nessun mi piace ancora.</p>}
+          {likers.length === 0 && <p className="rb-event-likers-empty">Nessun partecipante ancora.</p>}
         </ul>
       </div>
     </ModalOverlay>

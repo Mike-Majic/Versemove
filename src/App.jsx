@@ -17,7 +17,7 @@ import { usersForWorld } from './data/mockUsers';
 import { fetchGlobeUsers } from './data/globeUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
-import { getCityInfo, findCityMatch } from './data/geo';
+import { getCityInfo, findCityMatch, distanceKm, isUnlimitedDistance } from './data/geo';
 import {
   ARTE_CATEGORIES,
   FEATURED_SEARCHES as ARTE_FEATURED,
@@ -345,6 +345,9 @@ export default function App() {
   const [notifToast, setNotifToast] = useState(null);
   // Post da mostrare nel feed Social (clic su una notifica di menzione).
   const [focusPost, setFocusPost] = useState(null);
+  // Evento cliccato sul globo: si apre il feed Social sulla scheda Eventi,
+  // con l'evento in vista (vedi SocialFeed focusEvent).
+  const [focusEvent, setFocusEvent] = useState(null);
   // Profilo aperto cliccando una "@menzione" fuori dal feed Social.
   const [mentionProfileId, setMentionProfileId] = useState(null);
   // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
@@ -775,11 +778,27 @@ export default function App() {
     const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
     const base = [...usersForWorld(world.id), ...fromDb];
 
+    // Città scelta dall'elenco (con coordinate): per gli utenti veri vale
+    // anche la distanza impostata ("entro X km"), come per eventi e annunci.
+    const cityLat = Number(locationFilters.lat);
+    const cityLng = Number(locationFilters.lng);
+    const hasCityPoint = locationFilters.lat != null && Number.isFinite(cityLat) && Number.isFinite(cityLng);
+    const nearFilterCity = (u) =>
+      u.fromDb &&
+      hasCityPoint &&
+      !isUnlimitedDistance(locationFilters.distance ?? 0) &&
+      distanceKm(cityLat, cityLng, u.cityLat, u.cityLng) <= (locationFilters.distance ?? 0);
+
     const matchesLocation = (u) => {
-      if (locationFilters.city && !u.city.toLowerCase().includes(locationFilters.city.toLowerCase())) return false;
-      const info = getCityInfo(u.city);
+      if (locationFilters.city && !u.city.toLowerCase().includes(locationFilters.city.toLowerCase()) && !nearFilterCity(u)) return false;
+      // Utenti veri: continente/regione dal paese GeoNames (data/globeUsers.js);
+      // quelli finti dall'anagrafica CITIES.
+      const info = u.fromDb ? { continent: u.continent, regions: u.regions } : getCityInfo(u.city);
       if (locationFilters.continent && info?.continent !== locationFilters.continent) return false;
-      if (locationFilters.region && info?.region !== locationFilters.region) return false;
+      if (locationFilters.region) {
+        const regions = info?.regions ?? [info?.region];
+        if (!regions.includes(locationFilters.region)) return false;
+      }
       return true;
     };
 
@@ -1212,7 +1231,10 @@ export default function App() {
           onCategorySelect={toggleArteCategory}
           onCategoryPositionsReady={setArteCategoryPositions}
           events={world.id === 'social' ? visibleEvents : []}
-          onSelectEvent={(eventId) => setEventLikersId(eventId)}
+          onSelectEvent={(eventId) => {
+            setFocusEvent({ eventId, seq: Date.now() });
+            navigateToCategory('social', 'world');
+          }}
           warpRequest={warpRequest}
           disabledWorlds={globeDisabledWorlds}
           onDisabledWorldClick={user ? setDisabledWorldPopover : undefined}
@@ -1381,6 +1403,7 @@ export default function App() {
             onToggleEventLike={toggleEventLike}
             onOpenEventLikers={(eventId) => setEventLikersId(eventId)}
             focusPost={focusPost}
+            focusEvent={focusEvent}
           />
         </Suspense>
       )}

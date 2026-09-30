@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { continentOfCountry } from './geo';
 
 // Utenti veri sui marker rotondi del globo (al posto di MOCK_USERS, vuoto):
 // RPC globe_users(p_mondo) sul database. La posizione è SOLO il centro
@@ -41,6 +42,13 @@ export async function fetchGlobeUsers(mondo) {
       avatar: r.avatar_url || '',
       city: r.citta || '',
       country: countryName(r.paese),
+      // Per i filtri "Continente" / "Regione" delle Impostazioni: la regione
+      // vale sia come regione italiana (GeoNames la dà già in italiano) sia
+      // come nome del paese (le voci estere del filtro sono paesi).
+      continent: continentOfCountry(r.paese),
+      regions: [r.regione, countryName(r.paese)].filter(Boolean),
+      cityLat: r.lat,
+      cityLng: r.lng,
       gender: r.genere || '',
       bio: r.bio || '',
       lat: r.lat + jitter(r.id, 1),

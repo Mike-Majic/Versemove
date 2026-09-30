@@ -125,6 +125,7 @@ export default function SocialFeed({
   onOpenEventLikers,
   // { postId, seq }: post da mostrare (clic su una notifica di menzione).
   focusPost = null,
+  focusEvent = null,
 }) {
   const [showEventComposer, setShowEventComposer] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(null);
@@ -596,6 +597,29 @@ export default function SocialFeed({
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPost?.seq, loading, focusFetched]);
+
+  // Evento cliccato sul globo: scheda Eventi, evento in vista ed evidenziato.
+  useEffect(() => {
+    if (!focusEvent) return undefined;
+    setMobileView('primary');
+    setActiveGroupId(null);
+    setFeedTab('eventi');
+    let tries = 0;
+    let timer;
+    const reveal = () => {
+      const el = document.querySelector(`[data-event-id="${focusEvent.eventId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('rb-event-card--focus');
+        timer = window.setTimeout(() => el.classList.remove('rb-event-card--focus'), 2600);
+      } else if (tries++ < 10) {
+        timer = window.setTimeout(reveal, 150);
+      }
+    };
+    timer = window.setTimeout(reveal, 100);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusEvent?.seq]);
 
   const isGroupView = Boolean(activeGroupId);
   const activeGroup = isGroupView ? groupsList.find((g) => g.id === activeGroupId) ?? null : null;
