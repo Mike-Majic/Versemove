@@ -837,8 +837,17 @@ export default function App() {
 
   // Quando la città cercata nei filtri (globali, validi per tutti i mondi) corrisponde
   // a una città nota, il globo ci "vola" sopra.
+  // Solo quando l'utente CAMBIA la città: il valore salvato in localStorage
+  // non deve far volare la camera all'avvio (la vista iniziale è sempre la
+  // panoramica di tutti i mondi, vedi WorldGlobe startupPointOfView).
   const debouncedCityQuery = useDebouncedValue(locationFilters.city, 500);
+  // (Confronto col valore iniziale, non un "primo giro": in sviluppo
+  // StrictMode esegue gli effect due volte.)
+  const startupCityRef = useRef(locationFilters.city);
+  const cityChangedRef = useRef(false);
   useEffect(() => {
+    if (debouncedCityQuery !== startupCityRef.current) cityChangedRef.current = true;
+    if (!cityChangedRef.current) return;
     const match = findCityMatch(debouncedCityQuery);
     if (match) setFlyTo({ lat: match.lat, lng: match.lng, key: `city-${match.name}` });
   }, [debouncedCityQuery]);

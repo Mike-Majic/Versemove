@@ -70,8 +70,16 @@ function isNarrow() {
   return typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
 }
 
+// In verticale la taglia (calibrata sull'altezza dello schermo) si riduce
+// in proporzione alla larghezza: su un telefono stretto l'anello deve
+// entrare per intero nella vista iniziale senza che i satelliti si
+// ammucchino sopra al globo (vedi WorldGlobe startupCameraDistance).
+const TALL_WIDTH_FACTOR = 1.25;
+const TALL_MIN_SCALE = 0.5;
 function targetBeadPx() {
-  return isNarrow() ? BEAD_PX_TALL : BEAD_PX_WIDE;
+  if (!isNarrow()) return BEAD_PX_WIDE;
+  const aspect = window.innerWidth / window.innerHeight;
+  return BEAD_PX_TALL * Math.min(1, Math.max(TALL_MIN_SCALE, aspect * TALL_WIDTH_FACTOR));
 }
 
 function wavePoint(index, total) {
@@ -86,6 +94,15 @@ function wavePoint(index, total) {
     Math.sin(a) * R
   );
   return { pos };
+}
+
+// Raggio a schermo (px) di un satellite alla distanza della vista iniziale:
+// la taglia è calibrata sulla prima distanza della camera (referenceCamDist,
+// vedi update), quindi lì vale beadPx rispetto a PROJECTION_PX, in
+// proporzione all'altezza dello schermo. Serve a WorldGlobe per la vista
+// iniziale che inquadra tutti i satelliti (startupCameraDistance).
+export function satelliteScreenRadiusPx(viewportHeight, fovDeg = 50) {
+  return (targetBeadPx() * viewportHeight) / (2 * PROJECTION_PX * Math.tan((fovDeg * DEG2RAD) / 2));
 }
 
 // Dissolvenza legata allo ZOOM, non a una distanza fissa: conta quanto è
@@ -746,9 +763,35 @@ export function buildSatelliteGlobes({ worlds }) {
     });
   }
 
+  // Satelliti visibili con la posizione nell'anello e l'ingombro
+  // dell'etichetta in raggi del satellite (larghezza, altezza, centro sopra
+  // la sfera): la vista iniziale li usa per inquadrarli tutti.
+  function layout() {
+    return satellites
+      .filter((sat) => sat.visible && sat.userData.basePosRef)
+      .map((sat) => {
+        const base = sat.userData.labelBase;
+        return {
+          pos: sat.userData.basePosRef,
+          labelW: base ? base.sx / SATELLITE_RADIUS : 4,
+          labelH: base ? base.sy / SATELLITE_RADIUS : 1,
+          labelY: base ? base.y / SATELLITE_RADIUS : 1.6,
+        };
+      });
+  }
+
+  // La vista iniziale è stata ricalcolata (resize/rotazione prima che
+  // l'utente muovesse la camera): la taglia si ricalibra sulla nuova
+  // distanza al prossimo update.
+  function recalibrate() {
+    referenceCamDist = null;
+  }
+
   return {
     group,
     satellites,
+    layout,
+    recalibrate,
     setActiveWorld,
     update,
     getHitMeshes,

@@ -9,7 +9,7 @@ import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
 import { makeEventMarkerEl, applyEventZoom } from '../globe/eventMarkers';
-import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
+import { buildSatelliteGlobes, satelliteScreenRadiusPx } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
 import { getGlobeQuality, subscribeQualityMode, startAutoQualityMonitor, createAdaptiveFrameCap } from '../fx/quality';
@@ -169,6 +169,83 @@ function defaultAltitude() {
   if (typeof window === 'undefined') return DEFAULT_ALTITUDE_WIDE;
   return window.innerHeight > window.innerWidth ? DEFAULT_ALTITUDE_TALL : DEFAULT_ALTITUDE_WIDE;
 }
+// Vista iniziale (a ogni avvio, mai salvata): panoramica con il mondo
+// attivo al centro e tutti gli altri intorno. Camera dal lato +Z (dove
+// sta il satellite al posto 1, Intrattenimento), azimut 0, 10° sopra il
+// piano orizzontale, rivolta all'origine; il globo parte con rotazione 0
+// (Golfo di Guinea verso la camera). Distanza: la più piccola, da
+// STARTUP_MIN_DIST in su, a cui tutti i satelliti con le etichette stanno
+// dentro lo schermo con i margini sotto (barra in alto, pulsanti di lato);
+// su un telefono in verticale viene più lontana da sola.
+const STARTUP_ELEVATION_DEG = 10;
+const STARTUP_MIN_DIST = 600;
+const STARTUP_MAX_DIST = 4000;
+const GLOBE_RADIUS = 100;
+// Margini dai bordi (px). I controlli sopra al globo occupano solo gli
+// angoli in basso: la colonna dei mondi a destra (WorldSelectorColumn,
+// ~260 px d'altezza) e l'elenco testuale delle categorie a sinistra; lì
+// il margine laterale è più largo, altrove basta un piccolo bordo.
+function startupMargins(width) {
+  const phone = width < 600;
+  return {
+    top: phone ? 64 : 72, // barra in alto
+    bottom: phone ? 24 : 28,
+    side: phone ? 10 : 24,
+    rightZoneHeight: 270,
+    right: phone ? 64 : 76,
+    leftZoneHeight: 120,
+    left: phone ? 96 : 110,
+  };
+}
+
+// Distanza della camera che inquadra tutti i satelliti (sfera ed etichetta
+// sopra di essa) nello schermo width×height con campo visivo verticale
+// fovDeg. Proiezione fatta a mano con la stessa camera della scena:
+// posizione (0, D·sin e, D·cos e), rivolta all'origine. La taglia a schermo
+// dei satelliti alla vista iniziale non dipende da D (è calibrata lì, vedi
+// satelliteScreenRadiusPx), quindi basta allontanare la camera finché i
+// centri stanno abbastanza dentro. Il satellite esattamente dietro al
+// globo (Work in progress) resta nascosto e non conta.
+const SATELLITE_VISUAL_RADIUS = 1.5; // sfera + rete/nodi attorno, in raggi
+function startupCameraDistance(width, height, fovDeg, layout) {
+  if (!width || !height || !layout?.length) return STARTUP_MIN_DIST;
+  const r = satelliteScreenRadiusPx(height, fovDeg);
+  const m = startupMargins(width);
+  const e = (STARTUP_ELEVATION_DEG * Math.PI) / 180;
+  const tan = Math.tan((fovDeg * Math.PI) / 360);
+  const aspect = width / height;
+  const items = layout.filter((it) => !(Math.abs(it.pos.x) < 1 && it.pos.z < 0));
+  const fits = (D) => {
+    const cy = D * Math.sin(e);
+    const cz = D * Math.cos(e);
+    return items.every(({ pos, labelW, labelH, labelY }) => {
+      const dy = pos.y - cy;
+      const dz = pos.z - cz;
+      const depth = -(dy * Math.sin(e) + dz * Math.cos(e)); // lungo lo sguardo
+      if (depth <= 0) return false;
+      const upY = dy * Math.cos(e) - dz * Math.sin(e);
+      const sx = ((pos.x / (depth * tan * aspect)) * 0.5 + 0.5) * width;
+      const sy = (0.5 - (upY / (depth * tan)) * 0.5) * height;
+      const halfW = Math.max(SATELLITE_VISUAL_RADIUS, labelW / 2) * r;
+      const top = (labelY + labelH / 2) * r;
+      const bottom = sy + SATELLITE_VISUAL_RADIUS * r;
+      const leftLimit = bottom > height - m.leftZoneHeight ? m.left : m.side;
+      const rightLimit = bottom > height - m.rightZoneHeight ? m.right : m.side;
+      return sx - halfW >= leftLimit && sx + halfW <= width - rightLimit && sy - top >= m.top && bottom <= height - m.bottom;
+    });
+  };
+  if (fits(STARTUP_MIN_DIST)) return STARTUP_MIN_DIST;
+  let lo = STARTUP_MIN_DIST;
+  let hi = STARTUP_MAX_DIST;
+  if (!fits(hi)) return hi;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  return Math.ceil(hi);
+}
+
 // Piano di clipping lontano della camera: di serie (vedi
 // three-render-objects) è troppo vicino per le posizioni assolute dei
 // satelliti (fino a ~450-500 unità dal centro, più l'orbita lenta), che
@@ -331,6 +408,11 @@ export default function WorldGlobe({
   // Nomi di città/regioni/stati/mari (globe/placeLabels.js).
   const placeLabelsRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
+  const worldIdRef = useRef(world.id);
+  worldIdRef.current = world.id;
+  // true finché la camera è ancora nella vista iniziale (nessun
+  // trascinamento/zoom/volo): solo allora il resize la ricalcola.
+  const startupViewActiveRef = useRef(true);
   // Rotazione ferma durante il volo verso una categoria e finché la
   // categoria resta aperta: la sua stella deve restare al centro.
   const spinFrozenRef = useRef(false);
@@ -448,6 +530,7 @@ export default function WorldGlobe({
   }, [users, view, events]);
 
   const expandCluster = (cluster) => {
+    startupViewActiveRef.current = false;
     const g = globeRef.current;
     if (g) g.pointOfView({ ...toWorldLatLng(cluster.lat, cluster.lng), altitude: cluster.targetAltitude }, 1200);
   };
@@ -823,6 +906,7 @@ export default function WorldGlobe({
       // vicino); chip "+N" di un centro piccolo: ancora più vicino, così gli
       // avatar si aprono.
       onZoomTo: (lat, lng, closer) => {
+        startupViewActiveRef.current = false;
         const altitude = g.pointOfView().altitude;
         const target = closer
           ? Math.max(0.02, altitude * 0.45)
@@ -1153,6 +1237,7 @@ export default function WorldGlobe({
   // sopra). Rispetta prefers-reduced-motion: in quel caso passa dritto al
   // nuovo mondo, senza volo né flash.
   const runWarp = (worldId) => {
+    startupViewActiveRef.current = false;
     if (warpingRef.current || !onWarpArrived) return;
     const g = globeRef.current;
     const sats = satellitesRef.current;
@@ -1265,9 +1350,44 @@ export default function WorldGlobe({
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
-    g.pointOfView({ altitude: defaultAltitude() }, 0);
+    // Vista iniziale panoramica (vedi startupCameraDistance): a ogni
+    // avvio, e di nuovo al resize/rotazione del telefono finché l'utente
+    // non ha mosso la camera (trascinamento, zoom, voli).
+    const applyStartupView = ({ relayout = false } = {}) => {
+      const sats = satellitesRef.current;
+      // Dopo una rotazione del telefono l'anello cambia forma (verticale/
+      // orizzontale, vedi satelliteGlobes wavePoint) e la taglia va
+      // ricalibrata sulla nuova distanza.
+      if (relayout && sats) {
+        sats.setActiveWorld(worldIdRef.current, { animateSpawn: false });
+        sats.recalibrate();
+      }
+      // Stesse misure dello stato `size` (il canvas può non essere ancora
+      // stato ridimensionato quando arriva l'evento resize).
+      const w = window.visualViewport?.width ?? window.innerWidth;
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      const dist = startupCameraDistance(w, h, g.camera().fov, satellitesRef.current?.layout());
+      const controls = g.controls();
+      if (controls.maxDistance < dist * 1.2) controls.maxDistance = dist * 1.2;
+      g.pointOfView({ lat: STARTUP_ELEVATION_DEG, lng: 0, altitude: dist / GLOBE_RADIUS - 1 }, 0);
+    };
+    applyStartupView();
+    const markMoved = () => {
+      startupViewActiveRef.current = false;
+    };
+    g.controls().addEventListener('start', markMoved);
+    const onResize = () => {
+      if (!startupViewActiveRef.current) return;
+      // dopo il resize del canvas (setSize parte dallo stesso evento)
+      window.requestAnimationFrame(() => applyStartupView({ relayout: true }));
+    };
+    window.addEventListener('resize', onResize);
     if (isTouchDevice) globeActivity.wake();
     else globeActivity.startAutoRotate();
+    return () => {
+      g.controls().removeEventListener('start', markMoved);
+      window.removeEventListener('resize', onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1310,6 +1430,7 @@ export default function WorldGlobe({
   useEffect(() => {
     const g = globeRef.current;
     if (!g || !flyTo) return undefined;
+    startupViewActiveRef.current = false;
 
     globeActivity.stopAutoRotate();
     // Volo verso una categoria: rotazione ferma subito (non con la rampa di
