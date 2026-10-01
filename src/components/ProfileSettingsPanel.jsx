@@ -24,6 +24,7 @@ import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
 import DatingProfileEditor from './incontri/DatingProfileEditor';
+import VistaPreferenzeCard from './VistaPreferenzeCard';
 import { isAdult } from '../data/age';
 import { isSocialProfileComplete } from '../data/profileOnboarding';
 import CityAutocomplete from './shared/CityAutocomplete';
@@ -1045,6 +1046,7 @@ function SocialProfileSection({ user, onUpdateUser, defaultOpen = false, require
         }}
       />
       <SocialExtraCard user={user} onUpdateUser={onUpdateUser} />
+      <VistaPreferenzeCard ambito="social" />
       {(user?.genere || user?.pronomi) && (
         <div className="rb-profile-field-group">
           <div className="rb-profile-field-title"><strong>Genere e pronomi</strong></div>
@@ -1552,6 +1554,7 @@ function LavoroProfileSection({ user, onUpdateUser }) {
       <LavoroIstruzioneCard />
       <LavoroContattiCard user={user} onUpdateUser={onUpdateUser} />
       {user?.tipoAccount !== 'azienda' && <LavoroVisibilitaCard user={user} onUpdateUser={onUpdateUser} />}
+      <VistaPreferenzeCard ambito="lavoro" />
     </CollapsibleSection>
   );
 }
@@ -1810,7 +1813,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
           <>
             <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
             <ProfilePreviewCard user={user} />
-            <SocialProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <SocialProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen={initialSection === 'social'} />
             <GamertagSection user={user} onUpdateUser={onUpdateUser} />
             {user.tipoAccount === 'azienda' && <AziendaVerificaSection user={user} onUpdateUser={onUpdateUser} />}
             <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />

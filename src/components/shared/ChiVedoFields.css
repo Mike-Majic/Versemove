@@ -1,0 +1,41 @@
+/* "Chi vedo" nel Profilo Social e nel Profilo di Lavoro (il Profilo
+   Incontri usa le sue classi rb-dpe-*). */
+.rb-cv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.rb-cv-field > span:first-child {
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-cv-field input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent, #1d9bf0);
+}
+
+.rb-cv-range2 {
+  display: flex;
+  gap: 10px;
+}
+
+.rb-cv-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.rb-cv-check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.rb-cv-credit {
+  font-size: 10.5px;
+  opacity: 0.55;
+}

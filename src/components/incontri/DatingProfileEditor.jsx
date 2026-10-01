@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CityAutocomplete from '../shared/CityAutocomplete';
 import ModalOverlay from '../ModalOverlay';
 import CustomSelect from '../shared/CustomSelect';
+import ChiVedoFields, { ETA_MIN } from '../shared/ChiVedoFields';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { setMyProfileCity } from '../../data/citta';
 import { hasFace } from '../../data/faceCheck';
@@ -41,10 +42,6 @@ import './DatingProfileEditor.css';
 // Le foto si salvano subito (aggiunta, rimozione, ordine), il resto con Salva.
 
 const BIO_MAX = 500;
-const DIST_MIN = 5;
-const DIST_MAX = 300;
-const ETA_MIN = 18;
-const ETA_MAX = 99;
 const MIN_FOTO_OPTIONS = [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }));
 const FACE_MISSING = 'Nella prima foto non si vede un viso: scegline una in cui si veda bene il tuo volto.';
 
@@ -478,55 +475,25 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
       </Section>
 
       <Section title="Chi vedo" hint="Le persone che ti proponiamo nel mazzo.">
-        <div className="rb-dpe-field">
-          <span>Zona di ricerca</span>
-          <CityAutocomplete
-            value={zona.text}
-            pickedValue={zona.geo ? zona.text : ''}
-            placeholder={profile.citta ? `Vuoto = ${profile.citta}` : 'Vuoto = la mia città'}
-            onChange={(t) => setZona({ text: t, geo: null })}
-            onPick={(c) => setZona({ text: c.nomeMostrato, geo: c.geonameId })}
-          />
-        </div>
-        <div className="rb-dpe-field">
-          <span>Distanza massima: {ovunque ? 'ovunque' : `${distanza} km`}</span>
-          <input type="range" min={DIST_MIN} max={DIST_MAX} step={5} value={distanza} disabled={ovunque} onChange={(e) => setDistanza(Number(e.target.value))} />
-          <label className="rb-dpe-check">
-            <input type="checkbox" checked={ovunque} onChange={(e) => setOvunque(e.target.checked)} />
-            <span>Ovunque</span>
-          </label>
-          <label className="rb-dpe-check">
-            <input type="checkbox" checked={espandiDistanza} onChange={(e) => setEspandiDistanza(e.target.checked)} />
-            <span>Se finiscono i profili vicini mostra persone più lontane</span>
-          </label>
-        </div>
-        <div className="rb-dpe-field">
-          <span>
-            Età: {etaMin}–{etaMax}
-          </span>
-          <div className="rb-dpe-range2">
-            <input
-              type="range"
-              min={ETA_MIN}
-              max={ETA_MAX}
-              value={etaMin}
-              aria-label="Età minima"
-              onChange={(e) => setEtaMin(Math.min(Number(e.target.value), etaMax))}
-            />
-            <input
-              type="range"
-              min={ETA_MIN}
-              max={ETA_MAX}
-              value={etaMax}
-              aria-label="Età massima"
-              onChange={(e) => setEtaMax(Math.max(Number(e.target.value), etaMin))}
-            />
-          </div>
-          <label className="rb-dpe-check">
-            <input type="checkbox" checked={espandiEta} onChange={(e) => setEspandiEta(e.target.checked)} />
-            <span>Mostra persone leggermente fuori fascia</span>
-          </label>
-        </div>
+        <ChiVedoFields
+          classes={{ field: 'rb-dpe-field', check: 'rb-dpe-check', range2: 'rb-dpe-range2' }}
+          zonaPlaceholder={profile.citta ? `Vuoto = ${profile.citta}` : 'Vuoto = la mia città'}
+          value={{ zona, ovunque, distanza, etaMin, etaMax, espandiEta }}
+          onChange={(patch) => {
+            if ('zona' in patch) setZona(patch.zona);
+            if ('ovunque' in patch) setOvunque(patch.ovunque);
+            if ('distanza' in patch) setDistanza(patch.distanza);
+            if ('etaMin' in patch) setEtaMin(patch.etaMin);
+            if ('etaMax' in patch) setEtaMax(patch.etaMax);
+            if ('espandiEta' in patch) setEspandiEta(patch.espandiEta);
+          }}
+          distanceExtra={
+            <label className="rb-dpe-check">
+              <input type="checkbox" checked={espandiDistanza} onChange={(e) => setEspandiDistanza(e.target.checked)} />
+              <span>Se finiscono i profili vicini mostra persone più lontane</span>
+            </label>
+          }
+        />
         <div className="rb-dpe-field">
           <span>Numero minimo di foto</span>
           <CustomSelect ariaLabel="Numero minimo di foto" value={String(minFoto)} onChange={(v) => setMinFoto(Number(v))} options={MIN_FOTO_OPTIONS} />

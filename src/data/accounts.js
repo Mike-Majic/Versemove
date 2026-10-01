@@ -77,6 +77,10 @@ function mapProfile(row) {
     bannato: row.bannato ?? false,
     banMotivo: row.ban_motivo,
     banFinoAl: row.ban_fino_al,
+    // Sospensione volontaria (30 giorni) ed eliminazione richiesta (si
+    // può annullare rientrando entro la data prevista).
+    sospesoFinoAl: row.sospeso_fino_al ?? null,
+    eliminazionePrevistaAt: row.eliminazione_prevista_at ?? null,
     avatar: row.avatar_url,
     createdAt: row.created_at,
     lastNicknameChangeAt: row.last_nickname_change_at,
@@ -401,35 +405,50 @@ export async function resendConfirmationEmail(email) {
 // italiano sugli errori attesi (password sbagliata, conferma mancante,
 // owner, ecc.): qui va recuperato indipendentemente da come supabase-js
 // incapsula un errore HTTP non-2xx.
-export async function deleteOwnAccount(password) {
+// Elimina l'account: il profilo sparisce subito, si hanno 30 giorni per
+// ripensarci rientrando, poi tutto viene cancellato per sempre (lato server).
+export async function requestAccountDeletion(password) {
   try {
-    const { data, error } = await supabase.functions.invoke('delete-account', {
-      body: { password, conferma: 'ELIMINA' },
-    });
-    if (error) {
-      let message = '';
-      const ctx = error.context;
-      if (ctx && typeof ctx.json === 'function') {
-        try {
-          message = (await ctx.json())?.error ?? '';
-        } catch {
-          // risposta non-JSON o già letta: si passa al messaggio generico sotto
-        }
-      } else if (ctx?.error) {
-        message = ctx.error;
-      }
-      return { error: message || error.message || 'Errore durante l\'eliminazione dell\'account.' };
-    }
-    if (data?.error) return { error: data.error };
+    const { data, error } = await supabase.rpc('richiedi_eliminazione_account', { p_password: password, p_conferma: 'ELIMINA' });
+    // "invalid salt": password salvata in un formato che non si può
+    // confrontare (account di prova vecchi) — per chi usa l'app è comunque
+    // una password non valida.
+    if (error) return { error: /invalid salt/i.test(error.message) ? 'Password errata' : error.message };
+    return { eliminazionePrevistaAt: data?.eliminazione_prevista_at ?? null };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
 
-    await supabase.auth.signOut();
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith('rb-'))
-      .forEach((key) => localStorage.removeItem(key));
+// Sospende l'account per 30 giorni: il profilo sparisce per gli altri e si
+// riattiva rientrando o da solo alla scadenza.
+export async function suspendOwnAccount() {
+  try {
+    const { data, error } = await supabase.rpc('sospendi_account');
+    if (error) return { error: error.message };
+    return { sospesoFinoAl: data?.sospeso_fino_al ?? null };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+export async function reactivateOwnAccount() {
+  try {
+    const { error } = await supabase.rpc('riattiva_account');
+    if (error) return { error: error.message };
     return {};
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
+}
+
+// Account sospeso (fino a una data futura) o in attesa di eliminazione:
+// { tipo: 'sospeso' | 'eliminazione', data } oppure null.
+export function accountPause(account) {
+  if (!account) return null;
+  if (account.eliminazionePrevistaAt) return { tipo: 'eliminazione', data: account.eliminazionePrevistaAt };
+  if (account.sospesoFinoAl && new Date(account.sospesoFinoAl) > new Date()) return { tipo: 'sospeso', data: account.sospesoFinoAl };
+  return null;
 }
 
 // Carica un file nel bucket privato "attachments" (sotto il proprio uid,

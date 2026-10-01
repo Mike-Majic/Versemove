@@ -17,7 +17,8 @@ import { usersForWorld } from './data/mockUsers';
 import { fetchGlobeUsers } from './data/globeUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
-import { getCityInfo, findCityMatch, distanceKm, isUnlimitedDistance } from './data/geo';
+import { findCityMatch } from './data/geo';
+import { getVistaPreferenze, locationFiltersFrom, EMPTY_LOCATION_FILTERS, VISTA_SAVED_EVENT } from './data/vista';
 import {
   ARTE_CATEGORIES,
   FEATURED_SEARCHES as ARTE_FEATURED,
@@ -49,7 +50,7 @@ import { incontriNoticeText } from './data/datingLabels';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
-import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice } from './data/accounts';
+import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice, accountPause, reactivateOwnAccount } from './data/accounts';
 import {
   getFriends,
   getSentRequests,
@@ -101,8 +102,6 @@ const PasswordRecoveryModal = lazyWithRetry(() => import('./components/PasswordR
 const NotificationsPanel = lazyWithRetry(() => import('./components/NotificationsPanel'));
 const FavoritesPanel = lazyWithRetry(() => import('./components/FavoritesPanel'));
 
-const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
-const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
 const DEFAULT_ARTE_FILTER = { category: '', subfamily: '' };
 const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
 
@@ -244,7 +243,9 @@ export default function App() {
   // Conferma dopo l'eliminazione definitiva dell'account (Impostazioni ->
   // Elimina account): a quel punto user è già null e tutti i pannelli si
   // sono chiusi, serve solo un avviso temporaneo.
-  const [accountDeletedNotice, setAccountDeletedNotice] = useState(false);
+  const [accountDeletedNotice, setAccountDeletedNotice] = useState('');
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [pauseError, setPauseError] = useState('');
   // Modale "Scegli una nuova password", apre solo sull'evento
   // PASSWORD_RECOVERY di Supabase Auth (link "Password dimenticata?"
   // cliccato dalla mail) — mai su richiesta diretta dell'utente.
@@ -282,8 +283,12 @@ export default function App() {
   const [disabledWorldPopover, setDisabledWorldPopover] = useState(null);
   const closeDisabledWorldPopover = useCallback(() => setDisabledWorldPopover(null), []);
 
-  const [filters, setFilters] = useState(() => loadStored('rb-filters', DEFAULT_FILTERS));
-  const [locationFilters, setLocationFilters] = useState(() => loadStored('rb-location-filters', DEFAULT_LOCATION_FILTERS));
+  // "Chi vedo" del Profilo Social e del Profilo di Lavoro (data/vista.js),
+  // salvato sul server: sostituisce i vecchi filtri Luogo/Mostrami delle
+  // Impostazioni. globe_users applica già zona, distanza ed età; qui serve
+  // solo il "centro" per eventi, annunci e simili (locationFilters).
+  const [vista, setVista] = useState(null);
+  const [globeUsersVersion, setGlobeUsersVersion] = useState(0);
   const [activeArteCategory, setActiveArteCategory] = useState(null);
   // Vero solo quando il pannello categoria appena aperto arriva da un volo
   // di camera completo (vedi flyToCategoryThenOpen): governa il morph
@@ -583,14 +588,42 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [accountDeletedNotice]);
 
-  useEffect(() => localStorage.setItem('rb-filters', JSON.stringify(filters)), [filters]);
+  // Vecchi filtri locali (Luogo/Mostrami), sostituiti da "Chi vedo".
   useEffect(() => {
     try {
-      localStorage.setItem('rb-location-filters', JSON.stringify(locationFilters));
+      localStorage.removeItem('rb-filters');
+      localStorage.removeItem('rb-location-filters');
     } catch {
-      // localStorage pieno o bloccato: il filtro resta in memoria.
+      // storage non disponibile: niente da togliere
     }
-  }, [locationFilters]);
+  }, []);
+  useEffect(() => {
+    if (!user) {
+      setVista(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const load = () =>
+      getVistaPreferenze().then((v) => {
+        if (!cancelled) setVista(v);
+      });
+    load();
+    const onSaved = () => {
+      load();
+      setGlobeUsersVersion((n) => n + 1);
+    };
+    window.addEventListener(VISTA_SAVED_EVENT, onSaved);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(VISTA_SAVED_EVENT, onSaved);
+    };
+  }, [user?.id]);
+  // Mondo Lavoro -> preferenze lavoro; tutti gli altri -> social (Incontri
+  // ha le sue, vedi Profilo Incontri). Stessa forma dei vecchi filtri.
+  const locationFilters = useMemo(
+    () => (vista ? locationFiltersFrom(world.id === 'lavoro' ? vista.lavoro : vista.social) : EMPTY_LOCATION_FILTERS),
+    [vista, world.id]
+  );
   useEffect(() => localStorage.setItem('rb-arte-filter', JSON.stringify(arteFilter)), [arteFilter]);
   useEffect(() => localStorage.setItem('rb-visibility', JSON.stringify(visibility)), [visibility]);
   useEffect(() => {
@@ -826,44 +859,14 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [world.id, user?.id]);
+  }, [world.id, user?.id, globeUsersVersion]);
 
+  // Nessun filtro qui: zona, distanza ed età le applica già globe_users sul
+  // server ("Chi vedo" del Profilo Social/Lavoro, Profilo Incontri).
   const worldUsers = useMemo(() => {
     const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
-    const base = [...usersForWorld(world.id), ...fromDb];
-
-    // Città scelta dall'elenco (con coordinate): per gli utenti veri vale
-    // anche la distanza impostata ("entro X km"), come per eventi e annunci.
-    const cityLat = Number(locationFilters.lat);
-    const cityLng = Number(locationFilters.lng);
-    const hasCityPoint = locationFilters.lat != null && Number.isFinite(cityLat) && Number.isFinite(cityLng);
-    const nearFilterCity = (u) =>
-      u.fromDb &&
-      hasCityPoint &&
-      !isUnlimitedDistance(locationFilters.distance ?? 0) &&
-      distanceKm(cityLat, cityLng, u.cityLat, u.cityLng) <= (locationFilters.distance ?? 0);
-
-    const matchesLocation = (u) => {
-      if (locationFilters.city && !u.city.toLowerCase().includes(locationFilters.city.toLowerCase()) && !nearFilterCity(u)) return false;
-      // Utenti veri: continente/regione dal paese GeoNames (data/globeUsers.js);
-      // quelli finti dall'anagrafica CITIES.
-      const info = u.fromDb ? { continent: u.continent, regions: u.regions } : getCityInfo(u.city);
-      if (locationFilters.continent && info?.continent !== locationFilters.continent) return false;
-      if (locationFilters.region) {
-        const regions = info?.regions ?? [info?.region];
-        if (!regions.includes(locationFilters.region)) return false;
-      }
-      return true;
-    };
-
-    return base.filter((u) => {
-      if (filters.gender !== 'Tutti' && u.gender !== filters.gender.toLowerCase()) return false;
-      // Nel mondo Incontri l'età la decidono le preferenze del Profilo
-      // Incontri ("Chi vedo"), non questo filtro.
-      if (world.id !== 'incontri' && u.age && (u.age < filters.ageMin || u.age > filters.ageMax)) return false;
-      return matchesLocation(u);
-    });
-  }, [world.id, filters, locationFilters, dbWorldUsers]);
+    return [...usersForWorld(world.id), ...fromDb];
+  }, [world.id, dbWorldUsers]);
 
   // Il proprio marker (quando si condivide la posizione in tempo reale) si
   // aggiunge SOPRA ai risultati già filtrati, non dentro: i propri filtri
@@ -1016,6 +1019,13 @@ export default function App() {
     window.addEventListener('vm:open-profile', onOpenProfile);
     window.addEventListener('vm:open-chat', onOpenChat);
     const onOpenSettings = (e) => {
+      // "Luogo" non è più nelle Impostazioni: zona e distanza stanno in
+      // "Chi vedo" del Profilo Social (Il mio profilo).
+      if (e.detail?.section === 'luogo') {
+        setProfileSettingsSection('social');
+        setProfileSettingsOpen(true);
+        return;
+      }
       setSettingsInitialSection(e.detail?.section ?? null);
       setSettingsOpen(true);
     };
@@ -1261,6 +1271,60 @@ export default function App() {
     segnaAvvisoIncontri();
   }, [incontriNoticeVisible, incontriNotice]);
 
+  // Account sospeso o in eliminazione: al posto dell'app una schermata per
+  // riattivarlo (riattiva_account) o uscire. Stesso momento del controllo
+  // del ban (account caricato all'avvio o all'accesso), ma senza
+  // disconnettere.
+  const pause = accountPause(user);
+  if (pause) {
+    const quando = new Date(pause.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    return (
+      <div className="rb-adult-gate-overlay">
+        <div className="rb-adult-gate-card">
+          <h2>{pause.tipo === 'sospeso' ? 'Account sospeso' : 'Account in eliminazione'}</h2>
+          <p>
+            {pause.tipo === 'sospeso'
+              ? `Il tuo account è sospeso fino al ${quando}. Finché è sospeso il tuo profilo non è visibile agli altri.`
+              : `Il tuo account verrà eliminato il ${quando}. Fino ad allora puoi ancora ripensarci.`}
+          </p>
+          {pauseError && <p className="rb-privacy-error">{pauseError}</p>}
+          <div className="rb-adult-gate-actions">
+            <button
+              type="button"
+              className="rb-adult-gate-decline"
+              onClick={async () => {
+                await logoutAccount();
+                setUser(null);
+              }}
+            >
+              Esci
+            </button>
+            <button
+              type="button"
+              className="rb-adult-gate-confirm"
+              disabled={pauseBusy}
+              onClick={async () => {
+                setPauseBusy(true);
+                setPauseError('');
+                const res = await reactivateOwnAccount();
+                if (res.error) {
+                  setPauseError(res.error);
+                  setPauseBusy(false);
+                  return;
+                }
+                const account = await getCurrentAccount();
+                setPauseBusy(false);
+                if (account) setUser(account);
+              }}
+            >
+              {pauseBusy ? 'Un attimo…' : 'Riattiva il mio account'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     // Chiamate che restano attive cambiando mondo o pagina (stanze video,
     // Stanza MOD, 1:1 dalla chat): vedi calls/CallProvider.jsx.
@@ -1299,7 +1363,7 @@ export default function App() {
       )}
 
       {accountDeletedNotice && (
-        <div className="rb-email-confirmed-banner">✅ Account eliminato.</div>
+        <div className="rb-email-confirmed-banner">✅ {accountDeletedNotice}</div>
       )}
 
       {eventActionError && (
@@ -1596,15 +1660,9 @@ export default function App() {
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
             onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-            filters={filters}
-            setFilters={setFilters}
-            locationFilters={locationFilters}
-            setLocationFilters={setLocationFilters}
             visibility={visibility}
             setVisibility={setVisibility}
             onResetFilters={() => {
-              setFilters(DEFAULT_FILTERS);
-              setLocationFilters(DEFAULT_LOCATION_FILTERS);
               setArteFilter(DEFAULT_ARTE_FILTER);
               setVisibility(DEFAULT_VISIBILITY);
             }}
@@ -1613,7 +1671,7 @@ export default function App() {
               removeFriendApi(id);
               setFriends((prev) => prev.filter((f) => f !== id));
             }}
-            onAccountDeleted={() => {
+            onAccountDeleted={(message) => {
               setUser(null);
               setAuthOpen(false);
               setSettingsOpen(false);
@@ -1623,7 +1681,7 @@ export default function App() {
               setActiveFriendChatId(null);
               setEventLikersId(null);
               setSelectedUser(null);
-              setAccountDeletedNotice(true);
+              setAccountDeletedNotice(message || 'Account eliminato.');
             }}
             onLavoroConsentRevoked={() => {
               setLavoroConsentState(false);
