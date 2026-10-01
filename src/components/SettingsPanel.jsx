@@ -94,7 +94,11 @@ function WorldsSubsection({ user, onOpenAuth, onUpdateUser }) {
           <label key={w.id} className="rb-settings-world-row">
             <input type="checkbox" checked={selected.includes(w.id)} onChange={() => toggle(w.id)} />
             <span className="rb-settings-world-dot" style={{ background: w.color }} />
-            <span>{translateWorld(t, w).label}</span>
+            <span>
+              {translateWorld(t, w).label}
+              {/* Chi è nel mondo Lavoro è sempre visibile alle aziende verificate. */}
+              {w.id === 'lavoro' && <small className="rb-settings-world-note">{t('lavoroVisibility.worldToggleNote')}</small>}
+            </span>
           </label>
         ))}
         <label className="rb-settings-world-row rb-settings-world-row-fixed">

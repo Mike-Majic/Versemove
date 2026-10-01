@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Icon from './shared/Icon';
 import CollapsibleSection from './shared/CollapsibleSection';
 import CustomSelect from './shared/CustomSelect';
@@ -38,7 +39,7 @@ import {
   removeIstruzione,
   updateLavoroContatti,
 } from '../data/lavoroProfile';
-import { setOwnLavoroVisibilita, richiediVerificaAzienda, esitoVerificaAzienda, aziendaVerificaTesto } from '../data/lavoro';
+import { richiediVerificaAzienda, esitoVerificaAzienda, aziendaVerificaTesto } from '../data/lavoro';
 import { zodiacSign, birthdayLabel } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
 import { SUPPORTED_LANGUAGES } from '../i18n';
@@ -1405,41 +1406,16 @@ function LavoroContattiCard({ user, onUpdateUser }) {
   );
 }
 
-// Candidato: "Visibile alle aziende (cerco lavoro)". Si salva subito al
-// clic (niente "Salva"); se il server rifiuta (es. manca il consenso
-// Lavoro) l'interruttore torna com'era e si mostra il suo messaggio.
-function LavoroVisibilitaCard({ user, onUpdateUser }) {
-  const [visibile, setVisibile] = useState(user?.lavoroVisibileAziende ?? false);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const toggle = async (next) => {
-    setError('');
-    setBusy(true);
-    setVisibile(next);
-    const { error: err } = await setOwnLavoroVisibilita(next);
-    setBusy(false);
-    if (err) {
-      setVisibile(!next);
-      setError(err);
-      return;
-    }
-    onUpdateUser?.({ ...user, lavoroVisibileAziende: next });
-  };
-
+// Candidato: riga informativa al posto del vecchio interruttore "Visibile
+// alle aziende (cerco lavoro)". Chi è nel mondo Lavoro è sempre visibile
+// alle aziende verificate; per non comparire si disattiva il mondo.
+function LavoroVisibilitaInfo() {
+  const { t } = useTranslation();
   return (
     <div className="rb-profile-field-group">
-      <label className="rb-field rb-social-birthday-toggle">
-        <input type="checkbox" checked={visibile} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
-        <span>
-          Visibile alle aziende (cerco lavoro)
-          <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>
-            Le aziende verificate del mondo Lavoro possono trovarti nella ricerca "Cerca candidati" e vedere: nome,
-            cognome, data di nascita, città, esperienze, titolo di studio, lingue, telefono, e-mail e curriculum.
-          </span>
-        </span>
-      </label>
-      {error && <p className="rb-profile-field-error">{error}</p>}
+      <p className="rb-profile-link-hint" style={{ margin: 0 }}>
+        ● {t('lavoroVisibility.profileInfo')}
+      </p>
     </div>
   );
 }
@@ -1529,9 +1505,6 @@ function AziendaVerificaSection({ user, onUpdateUser }) {
   );
 }
 
-const LAVORO_INFO =
-  "Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Nel mondo Lavoro, oltre a nome e cognome, la tua data di nascita completa è visibile alle aziende. Con «Visibile alle aziende» acceso, le aziende verificate possono trovarti e vedere il tuo profilo di Lavoro completo.";
-
 function LavoroProfileForms({ user, onUpdateUser }) {
   return (
     <>
@@ -1550,16 +1523,17 @@ function LavoroProfileForms({ user, onUpdateUser }) {
       <LavoroEsperienzeCard />
       <LavoroIstruzioneCard />
       <LavoroContattiCard user={user} onUpdateUser={onUpdateUser} />
-      {user?.tipoAccount !== 'azienda' && <LavoroVisibilitaCard user={user} onUpdateUser={onUpdateUser} />}
+      {user?.tipoAccount !== 'azienda' && <LavoroVisibilitaInfo />}
       <VistaPreferenzeCard ambito="lavoro" />
     </>
   );
 }
 
 function LavoroProfileSection({ user, onUpdateUser }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
-    <CollapsibleSection title="Profilo di Lavoro" infoText={LAVORO_INFO} open={open} onToggle={() => setOpen((v) => !v)}>
+    <CollapsibleSection title="Profilo di Lavoro" infoText={t('lavoroVisibility.profileIntro')} open={open} onToggle={() => setOpen((v) => !v)}>
       <LavoroProfileForms user={user} onUpdateUser={onUpdateUser} />
     </CollapsibleSection>
   );
@@ -1673,6 +1647,7 @@ const PROFILE_ITEMS = [
 // Finestra di modifica di un profilo, sopra la sua anteprima: i moduli che
 // esistono già. Chiudendola si torna all'anteprima, che si ricarica.
 function ProfileEditWindow({ profilo, user, onUpdateUser, onClose }) {
+  const { t } = useTranslation();
   return (
     <ModalOverlay onClose={onClose}>
       <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
@@ -1685,7 +1660,7 @@ function ProfileEditWindow({ profilo, user, onUpdateUser, onClose }) {
         {profilo === 'social' && <SocialProfileForms user={user} onUpdateUser={onUpdateUser} />}
         {profilo === 'lavoro' && (
           <>
-            <p className="rb-profile-link-hint">{LAVORO_INFO}</p>
+            <p className="rb-profile-link-hint">{t('lavoroVisibility.profileIntro')}</p>
             {user.tipoAccount === 'azienda' && <AziendaVerificaSection user={user} onUpdateUser={onUpdateUser} />}
             <LavoroProfileForms user={user} onUpdateUser={onUpdateUser} />
           </>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchProfilesMap } from '../../data/posts';
 import { getFamily } from '../../data/family';
 import { getMyCandidatoPreview } from '../../data/lavoro';
@@ -73,7 +74,8 @@ function SocialPreview({ user, onEdit }) {
 }
 
 function LavoroPreview({ user, onEdit }) {
-  const { loading, error, candidato, visibile } = useLoad(getMyCandidatoPreview, [user.id]);
+  const { t } = useTranslation();
+  const { loading, error, candidato } = useLoad(getMyCandidatoPreview, [user.id]);
   if (loading) return <Skeleton lines={4} />;
   if (error) return <p className="rb-myprof-msg">{error}</p>;
   const c = candidato;
@@ -89,9 +91,9 @@ function LavoroPreview({ user, onEdit }) {
   return (
     <>
       {user.tipoAccount !== 'azienda' && (
-        <p className={`rb-myprof-status ${visibile ? 'ok' : ''}`}>
-          {visibile ? '● ' : '○ '}Visibile alle aziende verificate: {visibile ? 'sì' : 'no'}
-        </p>
+        // Sempre visibile alle aziende verificate (niente più interruttore):
+        // per non comparire si disattiva il mondo Lavoro.
+        <p className="rb-myprof-status ok">● {t('lavoroVisibility.previewVisible')}</p>
       )}
       <div className="rb-myprof-lavoro">
         <CandidatoView candidato={c} data={c} hideEmpty />
