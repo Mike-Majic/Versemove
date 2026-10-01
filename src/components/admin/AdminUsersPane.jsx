@@ -619,7 +619,7 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
                   </td>
                   <td>
                     {isOwner && !isOwnerRow ? (
-                      <select value={a.ruolo} onChange={(e) => changeRole(a, e.target.value)}>
+                      <select className={`rb-admin-role-select ${a.ruolo}`} value={a.ruolo} onChange={(e) => changeRole(a, e.target.value)}>
                         <option value={ROLES.USER}>{ROLE_LABELS[ROLES.USER]}</option>
                         <option value={ROLES.MODERATOR}>{ROLE_LABELS[ROLES.MODERATOR]}</option>
                       </select>

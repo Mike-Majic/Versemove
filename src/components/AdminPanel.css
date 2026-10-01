@@ -77,9 +77,11 @@
   color: #ffb020;
 }
 
+/* Ruoli a colpo d'occhio: Owner giallo, Moderatore verde (badge e menu
+   del ruolo nella tabella Utenti, vedi AdminUsersPane.css). */
 .rb-admin-role-badge.moderatore {
-  background: color-mix(in srgb, var(--accent, #1d9bf0) 25%, transparent);
-  color: var(--accent, #1d9bf0);
+  background: color-mix(in srgb, #22c55e 25%, transparent);
+  color: #4ade80;
 }
 
 .rb-admin-banned-badge {
