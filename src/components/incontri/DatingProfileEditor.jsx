@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CityAutocomplete from '../shared/CityAutocomplete';
 import ModalOverlay from '../ModalOverlay';
+import CustomSelect from '../shared/CustomSelect';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { setMyProfileCity } from '../../data/citta';
 import { hasFace } from '../../data/faceCheck';
@@ -44,6 +45,7 @@ const DIST_MIN = 5;
 const DIST_MAX = 300;
 const ETA_MIN = 18;
 const ETA_MAX = 99;
+const MIN_FOTO_OPTIONS = [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }));
 const FACE_MISSING = 'Nella prima foto non si vede un viso: scegline una in cui si veda bene il tuo volto.';
 
 function Chips({ options, value, onToggle, max }) {
@@ -126,7 +128,6 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
   const [espandiEta, setEspandiEta] = useState(false);
   const [minFoto, setMinFoto] = useState(1);
   const [soloConBio, setSoloConBio] = useState(false);
-  const [prefInteressi, setPrefInteressi] = useState([]);
 
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -157,7 +158,6 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
       setEspandiEta(Boolean(pr.espandi_eta));
       setMinFoto(pr.min_foto ?? 1);
       setSoloConBio(Boolean(pr.solo_con_bio));
-      setPrefInteressi(pr.interessi ?? []);
     }
   };
 
@@ -310,7 +310,9 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
         espandi_eta: espandiEta,
         min_foto: minFoto,
         solo_con_bio: soloConBio,
-        interessi: prefInteressi,
+        // Gli interessi restano solo nel proprio profilo (Dettagli): i filtri
+        // per interesse salvati in passato si azzerano.
+        interessi: [],
       });
       if (r2.error) return fail(r2.error);
     }
@@ -525,24 +527,14 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
             <span>Mostra persone leggermente fuori fascia</span>
           </label>
         </div>
-        <label className="rb-dpe-field">
+        <div className="rb-dpe-field">
           <span>Numero minimo di foto</span>
-          <select value={minFoto} onChange={(e) => setMinFoto(Number(e.target.value))}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
+          <CustomSelect ariaLabel="Numero minimo di foto" value={String(minFoto)} onChange={(v) => setMinFoto(Number(v))} options={MIN_FOTO_OPTIONS} />
+        </div>
         <label className="rb-dpe-check">
           <input type="checkbox" checked={soloConBio} onChange={(e) => setSoloConBio(e.target.checked)} />
           <span>Solo chi ha una bio</span>
         </label>
-        <div className="rb-dpe-field">
-          <span>Con almeno uno di questi interessi (fino a {INTERESSI_MAX})</span>
-          <Chips options={interessiOptions} value={prefInteressi} onToggle={(id) => setPrefInteressi((l) => toggleIn(l, id, INTERESSI_MAX))} max={INTERESSI_MAX} />
-        </div>
       </Section>
 
       {error && <p className="rb-dpe-error">{error}</p>}

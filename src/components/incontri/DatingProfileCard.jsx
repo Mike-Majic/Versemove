@@ -11,9 +11,9 @@ import {
 import './DatingProfileCard.css';
 
 // Scheda di un profilo del mondo Incontri: la stessa per il mazzo
-// (MatchColumn, mode="deck": Passo, Super mi piace, Mi piace) e per il
-// profilo aperto dal globo o da un elenco (DatingCardModal, mode="single":
-// Super mi piace e Mi piace). Foto a tutta scheda con le tacche in alto
+// (MatchColumn, mode="deck") e per il profilo aperto dal globo o da un
+// elenco (DatingCardModal, mode="single"): in entrambe X (passo), stella
+// (super mi piace, il pulsante grande) e cuore. Foto a tutta scheda con le tacche in alto
 // (tocco a destra/sinistra o trascinamento per cambiarla), dati essenziali
 // in basso, freccia "su" per tutti i dettagli.
 //
@@ -133,7 +133,7 @@ export default function DatingProfileCard({ card, mode = 'single', isSelf = fals
           </span>
         )}
         <h2 className="rb-dpc-name">
-          {card.nickname}
+          <span className="rb-dpc-nick">{card.nickname}</span>
           {card.eta ? <span className="rb-dpc-age">{card.eta}</span> : null}
         </h2>
         {luogo && <p className="rb-dpc-place">📍 {luogo}</p>}
@@ -153,11 +153,9 @@ export default function DatingProfileCard({ card, mode = 'single', isSelf = fals
 
         {!isSelf && onDecision && (
           <div className={`rb-dpc-actions ${mode}`}>
-            {mode === 'deck' && (
-              <button type="button" className="rb-dpc-btn pass" onClick={() => decide('passo')} disabled={busy} aria-label="Passo" title="Passo">
-                ✕
-              </button>
-            )}
+            <button type="button" className="rb-dpc-btn pass" onClick={() => decide('passo')} disabled={busy} aria-label="Passo" title="Passo">
+              ✕
+            </button>
             <button
               type="button"
               className="rb-dpc-btn super"

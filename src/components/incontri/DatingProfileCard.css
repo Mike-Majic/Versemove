@@ -175,16 +175,27 @@
 }
 
 .rb-dpc-name {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
   margin: 2px 0 2px;
   font-size: 30px;
   font-weight: 800;
   line-height: 1.1;
   padding-right: 44px;
-  overflow-wrap: anywhere;
+}
+
+/* Nickname lungo: si tronca coi puntini, l'età resta accanto. */
+.rb-dpc-nick {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rb-dpc-age {
-  margin-left: 10px;
+  flex-shrink: 0;
   font-weight: 400;
 }
 
@@ -283,18 +294,18 @@
 }
 
 .rb-dpc-btn.super {
-  color: #ffd166;
-  border-color: rgba(255, 209, 102, 0.75);
-  box-shadow: 0 0 12px rgba(255, 209, 102, 0.3);
-}
-
-.rb-dpc-btn.like {
   width: 70px;
   height: 70px;
   font-size: 32px;
+  color: #ffd166;
+  border: 2px solid rgba(255, 209, 102, 0.85);
+  box-shadow: 0 0 16px rgba(255, 209, 102, 0.35), inset 0 0 10px rgba(255, 209, 102, 0.2);
+}
+
+.rb-dpc-btn.like {
   color: var(--dpc-red);
-  border: 2px solid var(--dpc-red);
-  box-shadow: 0 0 16px var(--dpc-red-soft), inset 0 0 10px rgba(255, 45, 85, 0.25);
+  border: 1.5px solid var(--dpc-red);
+  box-shadow: 0 0 12px var(--dpc-red-soft);
 }
 
 .rb-dpc-btn.like.liked {

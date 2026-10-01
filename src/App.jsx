@@ -44,8 +44,8 @@ import UpdateToast from './components/UpdateToast';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
 import { needsProfileOnboarding, clearProfileOnboarding } from './data/profileOnboarding';
-import { getMyDatingProfile } from './data/incontri';
-import { INCONTRI_INCOMPLETE_NOTICE } from './data/datingLabels';
+import { getMyDatingProfile, segnaAvvisoIncontri } from './data/incontri';
+import { incontriNoticeText } from './data/datingLabels';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
@@ -400,7 +400,10 @@ export default function App() {
   // "Completa il tuo profilo" dopo la registrazione (vedi profileOnboarding.js).
   const [profileOnboardingOpen, setProfileOnboardingOpen] = useState(false);
   // Mondo rosso: avviso finché il Profilo Incontri non è visibile.
-  const [incontriNotice, setIncontriNotice] = useState(false);
+  // Avviso "completa il Profilo Incontri": lo decide il server
+  // (get_my_dating_profile.avviso, già spento per 14 giorni dopo che è stato
+  // mostrato). { avviso, mancano } finché non si chiude.
+  const [incontriNotice, setIncontriNotice] = useState(null);
   const [incontriCheck, setIncontriCheck] = useState(0);
   // Dopo "Completa il tuo profilo": l'avviso vale anche fuori dal mondo rosso.
   const [incontriNoticeAfterOnboarding, setIncontriNoticeAfterOnboarding] = useState(false);
@@ -410,17 +413,15 @@ export default function App() {
   const incontriEnabled = Boolean(user) && (user.mondiAbilitati ?? []).includes('incontri') && isAdult(user.dataNascita);
   useEffect(() => {
     const wanted = (world.id === 'incontri' || incontriNoticeAfterOnboarding) && incontriEnabled && !profileOnboardingOpen && !profileSettingsOpen;
-    if (!wanted) {
-      setIncontriNotice(false);
-      return undefined;
-    }
+    if (!wanted || incontriNotice) return undefined;
     let cancelled = false;
     getMyDatingProfile().then((r) => {
-      if (!cancelled) setIncontriNotice(Boolean(r.profile && !r.profile.visibile));
+      if (!cancelled && r.profile?.avviso) setIncontriNotice({ avviso: r.profile.avviso, mancano: r.profile.mancano });
     });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.id, incontriEnabled, user?.id, incontriCheck, profileOnboardingOpen, profileSettingsOpen, incontriNoticeAfterOnboarding]);
   // Categorie preferite (stellina accanto alla X di ogni pannello categoria,
   // vedi FavoriteStarButton): caricate una volta per sessione, aggiornate
@@ -1228,6 +1229,34 @@ export default function App() {
     !ageBlockedForWorld &&
     !(user.mondiAbilitati ?? []).includes(world.id);
 
+  // L'avviso Incontri non compare mai sopra una scheda, un pannello o una
+  // finestra aperti: aspetta che siano chiusi. Appena compare davvero si
+  // avvisa il server (segna_avviso_incontri), che non lo ripropone per 14
+  // giorni.
+  const somethingOpen = Boolean(
+    authOpen ||
+      settingsOpen ||
+      profileSettingsOpen ||
+      profileOnboardingOpen ||
+      passwordRecoveryOpen ||
+      adminOpen ||
+      notificationsOpen ||
+      friendsModalOpen ||
+      datingCardId ||
+      mentionProfileId ||
+      selectedUser ||
+      activeFriendChatId ||
+      activeArteCategory ||
+      document.querySelector('.rb-modal-overlay')
+  );
+  const incontriNoticeVisible = Boolean(incontriNotice) && !somethingOpen;
+  const incontriNoticeMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!incontriNoticeVisible || incontriNoticeMarkedRef.current === incontriNotice) return;
+    incontriNoticeMarkedRef.current = incontriNotice;
+    segnaAvvisoIncontri();
+  }, [incontriNoticeVisible, incontriNotice]);
+
   return (
     // Chiamate che restano attive cambiando mondo o pagina (stanze video,
     // Stanza MOD, 1:1 dalla chat): vedi calls/CallProvider.jsx.
@@ -1797,15 +1826,15 @@ export default function App() {
         </Suspense>
       )}
 
-      {incontriNotice && !profileSettingsOpen && !profileOnboardingOpen && (
+      {incontriNoticeVisible && (
         <div className="rb-incontri-notice" role="status">
-          <span>{INCONTRI_INCOMPLETE_NOTICE}</span>
+          <span>{incontriNoticeText(incontriNotice.avviso, incontriNotice.mancano)}</span>
           <div className="rb-incontri-notice-actions">
             <button
               type="button"
               className="ghost"
               onClick={() => {
-                setIncontriNotice(false);
+                setIncontriNotice(null);
                 setIncontriNoticeAfterOnboarding(false);
               }}
             >
@@ -1814,7 +1843,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                setIncontriNotice(false);
+                setIncontriNotice(null);
                 setIncontriNoticeAfterOnboarding(false);
                 setProfileSettingsSection('incontri');
                 setProfileSettingsOpen(true);

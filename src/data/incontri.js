@@ -258,6 +258,9 @@ export async function getMyDatingProfile() {
       preferenze: data.preferenze ?? null,
       visibile: Boolean(data.visibile),
       mancano: data.mancano ?? [],
+      // Avviso da mostrare adesso: 'essenziali' | 'facoltativi' | null (il
+      // server lo spegne per 14 giorni dopo segna_avviso_incontri).
+      avviso: data.avviso ?? null,
     },
   };
 }
@@ -268,6 +271,10 @@ export const saveDatingProfile = ({ genere, cercaGeneri, cosaCerca, consenso }) 
   rpc('save_dating_profile', { p_genere: genere, p_cerca_generi: cercaGeneri, p_cosa_cerca: cosaCerca, p_consenso: Boolean(consenso) });
 
 export const completeDatingOnboarding = () => rpc('complete_dating_onboarding');
+
+// L'avviso "completa il Profilo Incontri" è stato mostrato: il server non
+// lo ripropone per 14 giorni, su tutti i dispositivi.
+export const segnaAvvisoIncontri = () => rpc('segna_avviso_incontri');
 
 // Sostituisce TUTTI i dettagli (anche mostra_zodiaco); lingue null = invariate.
 export const saveDatingDettagli = (dettagli, lingue = null) => rpc('save_dating_dettagli', { p_dettagli: dettagli, p_lingue: lingue });

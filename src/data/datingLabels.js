@@ -232,8 +232,21 @@ export const MANCANO_LABELS = {
   conferma: 'la conferma del profilo',
 };
 
-export const INCONTRI_INCOMPLETE_NOTICE =
-  'Per comparire nel mondo rosso completa il tuo Profilo Incontri (Il mio profilo > Profilo Incontri). Senza foto e dati il tuo profilo non viene mostrato e non riceverai match.';
+const NOTICE_START = 'Per avere più possibilità nel mondo rosso completa il tuo Profilo Incontri (Il mio profilo > Profilo Incontri).';
+const NOTICE_TIP = 'Consiglio: se hai già compilato tutto e hai avuto pochi match, prova ad aggiornare la bio.';
+
+// Testo dell'avviso secondo get_my_dating_profile.avviso ('' se null).
+export function incontriNoticeText(avviso, mancano = []) {
+  if (avviso === 'facoltativi') return `${NOTICE_START} ${NOTICE_TIP}`;
+  if (avviso === 'essenziali') {
+    const elenco = mancano
+      .filter((m) => m !== 'conferma' || mancano.length === 1)
+      .map((m) => MANCANO_LABELS[m] ?? m)
+      .join(', ');
+    return `${NOTICE_START} Ti manca: ${elenco}. Finché non lo aggiungi il tuo profilo non viene mostrato agli altri. ${NOTICE_TIP}`;
+  }
+  return '';
+}
 
 // Riga di stato in cima al Profilo Incontri.
 export function datingStatusText(profile) {
