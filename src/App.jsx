@@ -43,6 +43,9 @@ import CookieConsentBanner from './components/CookieConsentBanner';
 import UpdateToast from './components/UpdateToast';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
+import { needsProfileOnboarding, clearProfileOnboarding } from './data/profileOnboarding';
+import { getMyDatingProfile } from './data/incontri';
+import { INCONTRI_INCOMPLETE_NOTICE } from './data/datingLabels';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
@@ -392,6 +395,33 @@ export default function App() {
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  // 'incontri' = Il mio profilo aperto sul Profilo Incontri (avviso del mondo rosso).
+  const [profileSettingsSection, setProfileSettingsSection] = useState(null);
+  // "Completa il tuo profilo" dopo la registrazione (vedi profileOnboarding.js).
+  const [profileOnboardingOpen, setProfileOnboardingOpen] = useState(false);
+  // Mondo rosso: avviso finché il Profilo Incontri non è visibile.
+  const [incontriNotice, setIncontriNotice] = useState(false);
+  const [incontriCheck, setIncontriCheck] = useState(0);
+  // Dopo "Completa il tuo profilo": l'avviso vale anche fuori dal mondo rosso.
+  const [incontriNoticeAfterOnboarding, setIncontriNoticeAfterOnboarding] = useState(false);
+  useEffect(() => {
+    if (user && needsProfileOnboarding(user)) setProfileOnboardingOpen(true);
+  }, [user?.id]);
+  const incontriEnabled = Boolean(user) && (user.mondiAbilitati ?? []).includes('incontri') && isAdult(user.dataNascita);
+  useEffect(() => {
+    const wanted = (world.id === 'incontri' || incontriNoticeAfterOnboarding) && incontriEnabled && !profileOnboardingOpen && !profileSettingsOpen;
+    if (!wanted) {
+      setIncontriNotice(false);
+      return undefined;
+    }
+    let cancelled = false;
+    getMyDatingProfile().then((r) => {
+      if (!cancelled) setIncontriNotice(Boolean(r.profile && !r.profile.visibile));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [world.id, incontriEnabled, user?.id, incontriCheck, profileOnboardingOpen, profileSettingsOpen, incontriNoticeAfterOnboarding]);
   // Categorie preferite (stellina accanto alla X di ogni pannello categoria,
   // vedi FavoriteStarButton): caricate una volta per sessione, aggiornate
   // subito quando l'utente ne aggiunge/togliene una.
@@ -824,7 +854,9 @@ export default function App() {
 
     return base.filter((u) => {
       if (filters.gender !== 'Tutti' && u.gender !== filters.gender.toLowerCase()) return false;
-      if (u.age && (u.age < filters.ageMin || u.age > filters.ageMax)) return false;
+      // Nel mondo Incontri l'età la decidono le preferenze del Profilo
+      // Incontri ("Chi vedo"), non questo filtro.
+      if (world.id !== 'incontri' && u.age && (u.age < filters.ageMin || u.age > filters.ageMax)) return false;
       return matchesLocation(u);
     });
   }, [world.id, filters, locationFilters, dbWorldUsers]);
@@ -1330,7 +1362,6 @@ export default function App() {
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
-            matchFilters={{ citta: locationFilters.city, etaMin: filters.ageMin, etaMax: filters.ageMax }}
           />
         </Suspense>
       )}
@@ -1737,12 +1768,62 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <ProfileSettingsPanel
             open={profileSettingsOpen}
-            onClose={() => setProfileSettingsOpen(false)}
+            onClose={() => {
+              setProfileSettingsOpen(false);
+              setProfileSettingsSection(null);
+              setIncontriCheck((n) => n + 1);
+            }}
+            initialSection={profileSettingsSection}
             user={user}
             onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
             favoriteCategories={favoriteCategories}
           />
         </Suspense>
+      )}
+
+      {profileOnboardingOpen && user && (
+        <Suspense fallback={<PageLoading />}>
+          <ProfileSettingsPanel
+            open
+            variant="onboarding"
+            user={user}
+            onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+            onClose={() => {
+              clearProfileOnboarding();
+              setProfileOnboardingOpen(false);
+              setIncontriNoticeAfterOnboarding(true);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {incontriNotice && !profileSettingsOpen && !profileOnboardingOpen && (
+        <div className="rb-incontri-notice" role="status">
+          <span>{INCONTRI_INCOMPLETE_NOTICE}</span>
+          <div className="rb-incontri-notice-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setIncontriNotice(false);
+                setIncontriNoticeAfterOnboarding(false);
+              }}
+            >
+              Più tardi
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIncontriNotice(false);
+                setIncontriNoticeAfterOnboarding(false);
+                setProfileSettingsSection('incontri');
+                setProfileSettingsOpen(true);
+              }}
+            >
+              Apri il Profilo Incontri
+            </button>
+          </div>
+        </div>
       )}
 
       {authOpen && (

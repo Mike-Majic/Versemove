@@ -1098,6 +1098,9 @@ export default function SettingsPanel({
                   onChange={(e) => updateFilter('ageMax', Math.max(Number(e.target.value), draftFilters.ageMin))} />
               </div>
             </label>
+            <p className="rb-field-note">
+              {t('settings.mostrami.ageIncontri', 'Nel mondo Incontri valgono le preferenze del Profilo Incontri (Il mio profilo › Profilo Incontri › Chi vedo).')}
+            </p>
           </CollapsibleSection>
 
           <CollapsibleSection

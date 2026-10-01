@@ -403,3 +403,23 @@
   height: 100%;
   min-height: 0;
 }
+
+/* Mazzo: la scheda del profilo (DatingProfileCard) occupa lo spazio della
+   colonna, con la forma da telefono come limite massimo. */
+.rb-match-deck-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.rb-match-deck-card .rb-dpc {
+  width: min(400px, 100%);
+  height: min(86vh, 720px, 100%);
+  min-height: 420px;
+}
+
+.rb-match-deck-card .rb-match-fav-btn {
+  position: static;
+}

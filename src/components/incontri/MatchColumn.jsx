@@ -17,6 +17,7 @@ import {
   subscribeToOwnMatches,
   INCONTRI_DECISION_EVENT,
 } from '../../data/incontri';
+import DatingProfileCard from './DatingProfileCard';
 import './MatchColumn.css';
 import AvatarImg from '../shared/AvatarImg';
 import SponsorCard from '../ads/SponsorCard';
@@ -63,7 +64,7 @@ function ContactButton({ profile, onOpen, children }) {
   );
 }
 
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab, matchFilters }) {
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -147,7 +148,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
     setFavoritesLoading(true);
     setGiaVistoBannerShown(false);
     setGiaVistoBannerVisible(false);
-    Promise.all([getMatchCandidates(20, matchFilters), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
+    Promise.all([getMatchCandidates(20), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
       ([deckRes, likesRes, matchesRes, favRes]) => {
         if (cancelled) return;
         setDeck(deckRes.candidates ?? []);
@@ -172,7 +173,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
   useEffect(() => {
     if (!eligible || deckLoading || deck.length >= 3) return;
     let cancelled = false;
-    getMatchCandidates(20, matchFilters).then(({ candidates }) => {
+    getMatchCandidates(20).then(({ candidates }) => {
       if (cancelled || !candidates) return;
       setDeck((prev) => {
         const known = new Set(prev.map((p) => p.id));
@@ -366,25 +367,26 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
           </button>
         </SponsorCard>
       ) : current ? (
-        <div className={`rb-match-card ${swiping ? `leaving-${swiping.direction}` : ''}`}>
-          <button
-            type="button"
-            className={`rb-match-fav-btn ${isFavorite(current.id) ? 'active' : ''}`}
-            onClick={() => toggleFavorite(current)}
-            aria-label="Aggiungi ai preferiti"
-            title="Aggiungi ai preferiti"
-          >
-            {isFavorite(current.id) ? '⭐' : '☆'}
-          </button>
-          <button type="button" className="rb-match-card-photo-btn" onClick={() => onOpenProfile?.(current.id)} aria-label={`Apri il profilo di ${current.name}`}>
-            <AvatarImg className="rb-match-card-photo" src={current.avatar} name={current?.name || current?.nickname} seed={current?.id} alt={current.name} />
-          </button>
-          <div className="rb-match-card-info">
-            <strong>{current.name}{current.age ? `, ${current.age}` : ''}</strong>
-            <span>{current.city}</span>
-            <ActivityBadge attivita={current.attivita} />
-            {current.bio && <p>{current.bio}</p>}
-          </div>
+        <div className="rb-match-deck-card">
+          <DatingProfileCard
+            key={current.id}
+            card={current.card ?? { id: current.id, nickname: current.name, avatar: current.avatar, eta: current.age, citta: current.city, bio: current.bio, attivita: current.attivita }}
+            mode="deck"
+            busy={!!swiping}
+            leaving={swiping?.direction ?? null}
+            onDecision={(d) => decide(d === 'passo' ? 'passed' : d === 'super_mi_piace' ? 'super' : 'liked')}
+            topRight={
+              <button
+                type="button"
+                className={`rb-match-fav-btn ${isFavorite(current.id) ? 'active' : ''}`}
+                onClick={() => toggleFavorite(current)}
+                aria-label="Aggiungi ai preferiti"
+                title="Aggiungi ai preferiti"
+              >
+                {isFavorite(current.id) ? '⭐' : '☆'}
+              </button>
+            }
+          />
         </div>
       ) : (
         <EmptyState
@@ -392,13 +394,6 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
           title="Nessun profilo in questa zona"
           subtitle="Prova ad allargare la ricerca dalle Impostazioni → Luogo e Mostrami."
         />
-      )}
-      {eligible && current && !adPending && (
-        <div className="rb-match-actions">
-          <button type="button" className="rb-match-pass-btn" onClick={() => decide('passed')} disabled={!!swiping}>✕ Passa</button>
-          <button type="button" className="rb-match-super-btn" onClick={() => decide('super')} disabled={!!swiping}>⭐ Super Like</button>
-          <button type="button" className="rb-match-like-btn" onClick={() => decide('liked')} disabled={!!swiping}>❤️ Mi piace</button>
-        </div>
       )}
     </div>
   );

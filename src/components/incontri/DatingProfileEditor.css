@@ -1,0 +1,365 @@
+/* Editore del Profilo Incontri: vetro scuro e neon rosso. */
+.rb-dpe {
+  --dpe-red: #ff2d55;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #f5f5f7;
+}
+
+.rb-dpe-status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffc2cf;
+  background: rgba(255, 45, 85, 0.1);
+  border: 1px solid rgba(255, 45, 85, 0.45);
+}
+
+.rb-dpe-status.ok {
+  color: #7cf0a6;
+  background: rgba(62, 224, 122, 0.08);
+  border-color: rgba(62, 224, 122, 0.45);
+}
+
+.rb-dpe-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(20, 8, 12, 0.55);
+  border: 1px solid rgba(255, 45, 85, 0.35);
+  box-shadow: inset 0 0 16px rgba(255, 45, 85, 0.06);
+}
+
+.rb-dpe-section > h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #ff8fa6;
+  text-shadow: 0 0 10px rgba(255, 45, 85, 0.35);
+}
+
+.rb-dpe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.rb-dpe-field > span:first-child {
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-dpe-field textarea,
+.rb-dpe-field select,
+.rb-dpe-field input[type='text'],
+.rb-dpe .rb-dpe-field input:not([type]) {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 14px;
+}
+
+.rb-dpe-field input[type='range'] {
+  width: 100%;
+  accent-color: var(--dpe-red);
+}
+
+.rb-dpe-range2 {
+  display: flex;
+  gap: 10px;
+}
+
+.rb-dpe-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-dpe-error {
+  margin: 0;
+  font-size: 13px;
+  color: #ff8fa6;
+}
+
+.rb-dpe-success {
+  margin: 0;
+  font-size: 13px;
+  color: #7cf0a6;
+}
+
+.rb-dpe-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rb-dpe-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rb-dpe-chip.on {
+  border-color: var(--dpe-red);
+  background: rgba(255, 45, 85, 0.28);
+  box-shadow: 0 0 10px rgba(255, 45, 85, 0.35);
+}
+
+.rb-dpe-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rb-dpe-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.rb-dpe-check input {
+  margin-top: 2px;
+  accent-color: var(--dpe-red);
+  flex-shrink: 0;
+}
+
+.rb-dpe-photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rb-dpe-photo {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 45, 85, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.rb-dpe-photo img,
+.rb-dpe-photo-missing {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rb-dpe-photo.add {
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  color: var(--dpe-red);
+  border-style: dashed;
+  cursor: pointer;
+}
+
+.rb-dpe-photo-main {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--dpe-red);
+}
+
+.rb-dpe-photo-tools {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 4px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+}
+
+.rb-dpe-photo-tools button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+
+.rb-dpe-photo-tools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.rb-dpe-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rb-dpe-rows button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px max-content 1fr 14px;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 2px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-dpe-row-value {
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffc2cf;
+}
+
+.rb-dpe-row-value.empty {
+  color: rgba(245, 245, 247, 0.45);
+}
+
+.rb-dpe-select {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-dpe-select > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-dpe-lingue {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.rb-dpe-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 0 2px;
+  background: linear-gradient(transparent, rgba(12, 5, 8, 0.95) 35%);
+}
+
+.rb-dpe-btn {
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1.5px solid var(--dpe-red);
+  background: rgba(255, 45, 85, 0.3);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(255, 45, 85, 0.35);
+}
+
+.rb-dpe-btn.ghost {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  box-shadow: none;
+}
+
+.rb-dpe-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.rb-dpe-picker-overlay {
+  z-index: 1300;
+}
+
+.rb-dpe-picker {
+  width: min(440px, 92vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(16, 6, 10, 0.96);
+  border: 1.5px solid var(--dpe-red, #ff2d55);
+  box-shadow: 0 0 24px rgba(255, 45, 85, 0.35);
+  color: #f5f5f7;
+  --dpe-red: #ff2d55;
+}
+
+.rb-dpe-picker h3 {
+  margin: 0 0 6px;
+}
+
+.rb-dpe-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Passo facoltativo dopo la registrazione: menu che sale dal basso. */
+.rb-dpe-sheet-overlay {
+  align-items: flex-end;
+}
+
+.rb-dpe-sheet {
+  width: min(560px, 100vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 18px 16px 12px;
+  border-radius: 22px 22px 0 0;
+  background: rgba(12, 5, 8, 0.97);
+  border: 1.5px solid #ff2d55;
+  border-bottom: none;
+  box-shadow: 0 -10px 40px rgba(255, 45, 85, 0.25);
+  animation: rb-dpe-sheet-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.rb-dpe-sheet h2 {
+  margin: 0 0 4px;
+  color: #ff8fa6;
+  text-shadow: 0 0 12px rgba(255, 45, 85, 0.45);
+}
+
+@keyframes rb-dpe-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}

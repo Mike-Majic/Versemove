@@ -24,7 +24,6 @@ export default function IncontriLiveExplorer({
   onConsumeInitialMatchTab,
   favorites = [],
   onToggleFavorite,
-  matchFilters,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -92,7 +91,6 @@ export default function IncontriLiveExplorer({
               onOpenProfile={onOpenProfile}
               initialTab={initialMatchTab}
               onConsumeInitialTab={onConsumeInitialMatchTab}
-              matchFilters={matchFilters}
             />
           )}
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}

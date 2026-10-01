@@ -1,6 +1,9 @@
 import { supabase } from './supabaseClient';
 import { translateInteractionError } from './errors';
 import { displayName } from './posts';
+import { prepareUpload } from './mediaCompress';
+import { translateUploadError } from './contents';
+import { safeFileName } from './storagePath';
 
 // Backend reale del mondo Incontri (RPC dedicate, vedi le funzioni SQL
 // corrispondenti — is_incontri_eligible richiede mondo "incontri" abilitato
@@ -34,22 +37,17 @@ export async function touchLastSeen() {
   }
 }
 
-// I filtri passati sono quelli attivi dell'utente (Impostazioni -> Luogo e
-// Mostrami: città ed età), passati come parametri RPC così il database
-// filtra anche il secondo giro (i profili "passo" recuperati quando i mai
-// visti finiscono) e non solo i primi p_limit mai visti — se restassero
-// lato client, il limite di 20 righe potrebbe tagliare fuori risultati
-// validi della zona scelta.
-export async function getMatchCandidates(limit = 20, { citta, etaMin, etaMax } = {}) {
+// Mazzo del mondo Incontri (get_match_candidates_v2): i filtri sono le
+// preferenze "Chi vedo" salvate sul server (zona, distanza, età, foto, bio,
+// interessi), niente più parametri dal client. Ogni profilo arriva già con
+// foto, dettagli, lingue, segno (se lo mostra), distanza e fuori_preferenze.
+export async function getMatchCandidates(limit = 20) {
   try {
-    const { data, error } = await supabase.rpc('get_match_candidates', {
-      p_limit: limit,
-      p_citta: citta || null,
-      p_eta_min: etaMin ?? null,
-      p_eta_max: etaMax ?? null,
-    });
+    const { data, error } = await supabase.rpc('get_match_candidates_v2', { p_limit: limit });
     if (error) return { error: error.message };
-    return { candidates: (data ?? []).map(mapProfileRow) };
+    const rows = data ?? [];
+    const urls = await datingPhotoUrlMap(rows.flatMap((r) => r.foto ?? []));
+    return { candidates: rows.map((r) => ({ ...mapProfileRow(r), card: datingCardFrom(r, urls) })) };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
@@ -164,32 +162,49 @@ export function subscribeToOwnMatches(onInsert) {
 
 // --- Scheda del Profilo Incontri (mai il profilo Social nel mondo rosso) ---
 
-export const DATING_GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario' };
-export const COSA_CERCA_LABELS = {
-  relazione_seria: 'Relazione seria',
-  relazione_aperta: 'Relazione aperta',
-  qualcosa_di_leggero: 'Qualcosa di leggero',
-  senza_impegno: 'Senza impegno',
-  una_sera: 'Una sera',
-  uscire: 'Uscire',
-  amicizia: 'Amicizia',
-  vediamo: 'Vediamo',
-};
-
 const DATING_PHOTOS_BUCKET = 'dating-photos';
 const DATING_PHOTO_URL_SECONDS = 60 * 60;
 
-// URL delle foto della scheda, nell'ordine: quelle con url esterno così
-// come sono, quelle caricate (bucket privato "dating-photos") con un link
-// firmato di un'ora, chiesto in una sola chiamata.
-async function datingPhotoUrls(foto) {
-  const paths = foto.filter((f) => !f.url && f.path).map((f) => f.path);
-  const signed = new Map();
-  if (paths.length) {
+// Link delle foto caricate (bucket privato "dating-photos"), firmati per
+// un'ora e chiesti in una sola chiamata: Map path -> url. Le foto con url
+// esterno non ne hanno bisogno.
+async function datingPhotoUrlMap(foto) {
+  const paths = [...new Set(foto.filter((f) => !f.url && f.path).map((f) => f.path))];
+  const map = new Map();
+  if (!paths.length) return map;
+  try {
     const { data } = await supabase.storage.from(DATING_PHOTOS_BUCKET).createSignedUrls(paths, DATING_PHOTO_URL_SECONDS);
-    (data ?? []).forEach((d) => d.signedUrl && signed.set(d.path, d.signedUrl));
+    (data ?? []).forEach((d) => d.signedUrl && map.set(d.path, d.signedUrl));
+  } catch {
+    // senza link restano le foto esterne e l'avatar
   }
-  return foto.map((f) => f.url || signed.get(f.path)).filter(Boolean);
+  return map;
+}
+
+const photoSrc = (f, urls) => f.url || urls.get(f.path) || null;
+
+// Forma unica della scheda (DatingProfileCard), da get_dating_card, dal
+// mazzo (get_match_candidates_v2) o dal proprio profilo.
+function datingCardFrom(row, urls) {
+  return {
+    id: row.id,
+    nickname: row.nickname || 'Utente',
+    avatar: row.avatar_url || '',
+    eta: row.eta ?? null,
+    citta: row.citta || '',
+    bio: row.bio || '',
+    attivita: row.attivita ?? null,
+    genere: row.genere || '',
+    cosaCerca: row.cosa_cerca ?? [],
+    foto: (row.foto ?? []).map((f) => photoSrc(f, urls)).filter(Boolean),
+    dettagli: row.dettagli ?? {},
+    lingue: row.lingue ?? [],
+    zodiaco: row.zodiaco ?? null,
+    distanzaKm: row.distanza_km ?? null,
+    fuoriPreferenze: Boolean(row.fuori_preferenze),
+    miaDecisione: row.mia_decisione ?? null,
+    match: Boolean(row.match),
+  };
 }
 
 // Scheda completa di un profilo Incontri (get_dating_card): null dal server
@@ -199,27 +214,110 @@ export async function getDatingCard(id) {
     const { data, error } = await supabase.rpc('get_dating_card', { p_id: id });
     if (error) return { error: error.message };
     if (!data) return { error: 'Profilo non disponibile' };
-    const foto = await datingPhotoUrls(data.foto ?? []);
-    return {
-      card: {
-        id: data.id,
-        nickname: data.nickname || 'Utente',
-        avatar: data.avatar_url || '',
-        eta: data.eta ?? null,
-        citta: data.citta || '',
-        bio: data.bio || '',
-        attivita: data.attivita ?? null,
-        genere: data.genere || '',
-        cosaCerca: data.cosa_cerca ?? [],
-        foto: foto.length ? foto : data.avatar_url ? [data.avatar_url] : [],
-        miaDecisione: data.mia_decisione ?? null,
-        match: Boolean(data.match),
-      },
-    };
+    const urls = await datingPhotoUrlMap(data.foto ?? []);
+    return { card: datingCardFrom(data, urls) };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
 }
+
+// --- Il proprio Profilo Incontri (editor) ----------------------------------
+
+const rpc = async (name, args) => {
+  try {
+    const { data, error } = await supabase.rpc(name, args);
+    if (error) return { error: error.message };
+    return { data };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+};
+
+// Il proprio profilo: essenziali, foto (con link), dettagli, lingue,
+// segno, preferenze "Chi vedo", visibile e cosa manca per comparire.
+export async function getMyDatingProfile() {
+  const { data, error } = await rpc('get_my_dating_profile');
+  if (error) return { error };
+  if (!data) return { error: 'Profilo non disponibile' };
+  const urls = await datingPhotoUrlMap(data.foto ?? []);
+  return {
+    profile: {
+      idoneo: Boolean(data.idoneo),
+      genere: data.genere || '',
+      cercaGeneri: data.cerca_generi ?? [],
+      cosaCerca: data.cosa_cerca ?? [],
+      consensoAt: data.consenso_orientamento_at ?? null,
+      completatoAt: data.completato_at ?? null,
+      citta: data.citta || '',
+      cittaGeo: data.citta_incontri_geo ?? null,
+      bio: data.bio || '',
+      foto: (data.foto ?? []).map((f) => ({ id: f.id, posizione: f.posizione, path: f.path, src: photoSrc(f, urls) })),
+      dettagli: data.dettagli ?? {},
+      lingue: data.lingue ?? [],
+      zodiaco: data.zodiaco ?? null,
+      preferenze: data.preferenze ?? null,
+      visibile: Boolean(data.visibile),
+      mancano: data.mancano ?? [],
+    },
+  };
+}
+
+// Come ti definisci / chi vuoi incontrare / cosa cerchi. consenso: true
+// al primo salvataggio (dato sull'orientamento).
+export const saveDatingProfile = ({ genere, cercaGeneri, cosaCerca, consenso }) =>
+  rpc('save_dating_profile', { p_genere: genere, p_cerca_generi: cercaGeneri, p_cosa_cerca: cosaCerca, p_consenso: Boolean(consenso) });
+
+export const completeDatingOnboarding = () => rpc('complete_dating_onboarding');
+
+// Sostituisce TUTTI i dettagli (anche mostra_zodiaco); lingue null = invariate.
+export const saveDatingDettagli = (dettagli, lingue = null) => rpc('save_dating_dettagli', { p_dettagli: dettagli, p_lingue: lingue });
+
+// Solo le chiavi passate; distanza_km null = nessun limite.
+export const saveDatingPreferenze = (prefs) => rpc('save_dating_preferenze', { p: prefs });
+
+let schemaPromise = null;
+export function getDatingDettagliSchema() {
+  schemaPromise = schemaPromise ?? rpc('dating_dettagli_schema').then((r) => {
+    if (r.error) schemaPromise = null;
+    return r.data ?? null;
+  });
+  return schemaPromise;
+}
+
+export const DATING_PHOTOS_MIN = 2;
+export const DATING_PHOTOS_MAX = 6;
+
+// Foto: compressa, caricata in dating-photos/<uid>/..., poi registrata con
+// add_dating_photo. Se la registrazione fallisce il file si toglie.
+export async function addDatingPhoto(file) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    const prepared = await prepareUpload(file);
+    if (prepared.error) return { error: prepared.error };
+    const upload = prepared.file;
+    const path = `${auth.user.id}/${Date.now()}-${safeFileName(upload.name)}`;
+    const { error: upErr } = await supabase.storage.from(DATING_PHOTOS_BUCKET).upload(path, upload);
+    if (upErr) return { error: translateUploadError(upErr) };
+    const res = await rpc('add_dating_photo', { p_path: path });
+    if (res.error) {
+      await supabase.storage.from(DATING_PHOTOS_BUCKET).remove([path]).catch(() => {});
+      return { error: res.error };
+    }
+    return { id: res.data, path };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+export async function removeDatingPhoto(id) {
+  const res = await rpc('remove_dating_photo', { p_id: id });
+  if (res.error) return res;
+  if (res.data) await supabase.storage.from(DATING_PHOTOS_BUCKET).remove([res.data]).catch(() => {});
+  return {};
+}
+
+export const reorderDatingPhotos = (ids) => rpc('reorder_dating_photos', { p_ids: ids });
 
 // Avviso fra la scheda (DatingCardModal) e la colonna Match: una decisione
 // presa dalla scheda toglie il profilo da "A chi piaci"/mazzo e, se nasce

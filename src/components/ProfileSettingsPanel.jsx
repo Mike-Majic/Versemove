@@ -25,7 +25,9 @@ import {
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
-import { updateOwnDatingProfile } from '../data/incontri';
+import DatingProfileEditor from './incontri/DatingProfileEditor';
+import { isAdult } from '../data/age';
+import { isSocialProfileComplete } from '../data/profileOnboarding';
 import CityAutocomplete from './shared/CityAutocomplete';
 import { setMyProfileCity } from '../data/citta';
 import {
@@ -1041,11 +1043,11 @@ function GamertagSection({ user, onUpdateUser }) {
 // reale, nessun elenco colleghi/candidati — struttura pronta, si aggancia
 // quando costruiremo quella parte. Incontri resta il campo già esistente
 // (get_match_candidates), invariato.
-function SocialProfileSection({ user, onUpdateUser }) {
-  const [open, setOpen] = useState(false);
+function SocialProfileSection({ user, onUpdateUser, defaultOpen = false, required = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <CollapsibleSection
-      title="Profilo Social"
+      title={required ? 'Profilo Social (obbligatorio)' : 'Profilo Social'}
       infoText="Mostrato agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
       open={open}
       onToggle={() => setOpen((v) => !v)}
@@ -1574,28 +1576,28 @@ function LavoroProfileSection({ user, onUpdateUser }) {
   );
 }
 
-function IncontriProfileSection({ user, onUpdateUser }) {
-  const [open, setOpen] = useState(false);
+// Profilo Incontri completo (essenziali, foto, dettagli, "Chi vedo"): vedi
+// incontri/DatingProfileEditor.jsx. In registrazione (onboarding) è tutto
+// facoltativo, con Salta e Salva.
+function IncontriProfileSection({ user, onUpdateUser, defaultOpen = false, onboarding = false, sectionRef }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <CollapsibleSection
-      title="Profilo Incontri"
-      infoText="Città e bio mostrate agli altri nel mazzo del mondo Incontri, visibili solo da lì."
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-    >
-      <CittaBioCard
-        campo="incontri"
-        citta={user?.citta}
-        cittaGeo={user?.cittaIncontriGeo}
-        bio={user?.bio}
-        successMessage="Profilo Incontri aggiornato."
-        onSave={async (citta, bio, geo) => {
-          const { error } = await updateOwnDatingProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, citta, cittaIncontriGeo: geo, bio });
-          return { error };
-        }}
-      />
-    </CollapsibleSection>
+    <div ref={sectionRef}>
+      <CollapsibleSection
+        title="Profilo Incontri"
+        infoText="Il tuo profilo nel mondo rosso: foto, chi sei, chi vuoi incontrare, dettagli e chi vedere nel mazzo. Visibile solo da lì."
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      >
+        <DatingProfileEditor
+          user={user}
+          onUpdateUser={onUpdateUser}
+          variant={onboarding ? 'onboarding' : 'settings'}
+          onSkip={() => setOpen(false)}
+          onDone={() => setOpen(false)}
+        />
+      </CollapsibleSection>
+    </div>
   );
 }
 
@@ -1695,7 +1697,19 @@ function ProfilePreviewCard({ user }) {
   );
 }
 
-export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [] }) {
+// variant="onboarding": dopo la registrazione, stessa schermata del profilo
+// (Social, Gamertag, Lavoro, Incontri) senza schede; si chiude solo col
+// Profilo Social compilato. initialSection="incontri" apre e mostra il
+// Profilo Incontri (avviso del mondo rosso).
+export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [], variant = 'settings', initialSection = null }) {
+  const onboarding = variant === 'onboarding';
+  const [onboardingWarn, setOnboardingWarn] = useState(false);
+  const incontriRef = useRef(null);
+  useEffect(() => {
+    if (open && initialSection === 'incontri') {
+      window.setTimeout(() => incontriRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }, [open, initialSection]);
   const [tab, setTab] = useState('profilo');
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [nickErr, setNickErr] = useState('');
@@ -1763,6 +1777,42 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
     if (!error) setUrgentSent(true);
   };
 
+  const socialDone = isSocialProfileComplete(user);
+  const incontriWanted = (user.mondiAbilitati ?? []).includes('incontri') && isAdult(user.dataNascita);
+  const close = () => {
+    if (onboarding && !socialDone) {
+      setOnboardingWarn(true);
+      return;
+    }
+    onClose();
+  };
+
+  if (onboarding) {
+    return (
+      <ModalOverlay onClose={close}>
+        <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
+          <h2>Completa il tuo profilo</h2>
+          <p className="rb-profile-link-hint">
+            Il <strong>Profilo Social</strong> è obbligatorio: scegli la città dall'elenco, scrivi la bio e premi Salva. Gli altri
+            profili sono facoltativi e puoi completarli quando vuoi da Il mio profilo.
+          </p>
+          <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
+          <ProfilePreviewCard user={user} />
+          <SocialProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen required />
+          <GamertagSection user={user} onUpdateUser={onUpdateUser} />
+          <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
+          <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen={incontriWanted} onboarding sectionRef={incontriRef} />
+          {onboardingWarn && !socialDone && (
+            <p className="rb-profile-field-error">Prima di continuare completa il Profilo Social: città e bio, poi Salva.</p>
+          )}
+          <button type="button" className="rb-profile-save-btn rb-profile-onboarding-done" onClick={close}>
+            {socialDone ? 'Fine' : 'Fine (manca il Profilo Social)'}
+          </button>
+        </div>
+      </ModalOverlay>
+    );
+  }
+
   return (
     <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
@@ -1787,7 +1837,7 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
             <GamertagSection user={user} onUpdateUser={onUpdateUser} />
             {user.tipoAccount === 'azienda' && <AziendaVerificaSection user={user} onUpdateUser={onUpdateUser} />}
             <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
-            <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} />
+            <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen={initialSection === 'incontri'} sectionRef={incontriRef} />
           </>
         )}
 

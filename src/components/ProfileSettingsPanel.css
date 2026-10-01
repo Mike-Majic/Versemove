@@ -884,3 +884,9 @@
 .rb-azienda-verifica-stato.ok {
   color: #5ee6a0;
 }
+
+/* Completa il tuo profilo (dopo la registrazione): pulsante finale. */
+.rb-profile-onboarding-done {
+  width: 100%;
+  margin-top: 14px;
+}

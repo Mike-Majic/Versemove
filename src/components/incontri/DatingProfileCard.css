@@ -1,0 +1,434 @@
+/* Scheda del mondo Incontri: vetro scuro e neon rosso. */
+.rb-dpc {
+  --dpc-red: #ff2d55;
+  --dpc-red-soft: rgba(255, 45, 85, 0.35);
+  position: relative;
+  width: min(400px, 94vw);
+  height: min(86vh, 720px);
+  border-radius: 24px;
+  overflow: hidden;
+  background: #0a0508;
+  border: 1.5px solid var(--dpc-red);
+  box-shadow: 0 0 18px var(--dpc-red-soft), 0 0 42px rgba(255, 45, 85, 0.18), inset 0 0 22px rgba(255, 45, 85, 0.12);
+  color: #fff;
+  user-select: none;
+  animation: rb-dpc-in 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  touch-action: pan-y;
+}
+
+@keyframes rb-dpc-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rb-dpc.leaving-left {
+  transition: transform 0.32s ease-in, opacity 0.32s ease-in;
+  transform: translateX(-120%) rotate(-14deg);
+  opacity: 0;
+}
+
+.rb-dpc.leaving-right {
+  transition: transform 0.32s ease-in, opacity 0.32s ease-in;
+  transform: translateX(120%) rotate(14deg);
+  opacity: 0;
+}
+
+.rb-dpc-photos {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.rb-dpc-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.28s ease;
+}
+
+.rb-dpc-photo {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rb-dpc-photo > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+/* Avatar o immagine piccola: mai ingrandita a tutta scheda. */
+.rb-dpc-photo-bg {
+  position: absolute;
+  inset: -30px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(26px) saturate(1.3) brightness(0.55);
+}
+
+.rb-dpc-photo.small > img {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  width: 160px;
+  height: 160px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--dpc-red);
+  box-shadow: 0 0 24px var(--dpc-red-soft);
+}
+
+.rb-dpc-initial {
+  background: radial-gradient(circle at 50% 34%, rgba(255, 45, 85, 0.45), #120609 70%);
+}
+
+.rb-dpc-initial span {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 72px;
+  font-weight: 800;
+  border: 2px solid var(--dpc-red);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.rb-dpc-ticks {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.rb-dpc-ticks span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.rb-dpc-ticks span.active {
+  background: #fff;
+  box-shadow: 0 0 6px var(--dpc-red);
+}
+
+.rb-dpc-top-right {
+  position: absolute;
+  top: 20px;
+  right: 12px;
+  z-index: 2;
+}
+
+.rb-dpc-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 70px 18px 16px;
+  background: linear-gradient(180deg, transparent 0%, rgba(8, 2, 5, 0.72) 32%, rgba(8, 2, 5, 0.95) 100%);
+  pointer-events: none;
+}
+
+.rb-dpc-info > * {
+  pointer-events: auto;
+}
+
+.rb-dpc-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rb-dpc-activity.online {
+  color: #3ee07a;
+  font-weight: 700;
+}
+
+.rb-dpc-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3ee07a;
+  box-shadow: 0 0 6px #3ee07a;
+}
+
+.rb-dpc-name {
+  margin: 2px 0 2px;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  padding-right: 44px;
+  overflow-wrap: anywhere;
+}
+
+.rb-dpc-age {
+  margin-left: 10px;
+  font-weight: 400;
+}
+
+.rb-dpc-place {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.rb-dpc-bio {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rb-dpc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rb-dpc-tags span {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  background: rgba(255, 45, 85, 0.16);
+  border: 1px solid rgba(255, 45, 85, 0.6);
+  box-shadow: 0 0 8px rgba(255, 45, 85, 0.2);
+}
+
+.rb-dpc-more {
+  position: absolute;
+  right: 14px;
+  top: 70px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 8, 12, 0.6);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.rb-dpc-more:hover {
+  border-color: var(--dpc-red);
+  box-shadow: 0 0 12px var(--dpc-red-soft);
+}
+
+.rb-dpc-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.rb-dpc-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(20, 8, 12, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rb-dpc-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.rb-dpc-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.rb-dpc-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.rb-dpc-btn.pass {
+  color: #ffb3c1;
+}
+
+.rb-dpc-btn.super {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.75);
+  box-shadow: 0 0 12px rgba(255, 209, 102, 0.3);
+}
+
+.rb-dpc-btn.like {
+  width: 70px;
+  height: 70px;
+  font-size: 32px;
+  color: var(--dpc-red);
+  border: 2px solid var(--dpc-red);
+  box-shadow: 0 0 16px var(--dpc-red-soft), inset 0 0 10px rgba(255, 45, 85, 0.25);
+}
+
+.rb-dpc-btn.like.liked {
+  opacity: 1;
+  background: var(--dpc-red);
+  color: #fff;
+}
+
+/* Cuore (o stella) che esplode al mi piace. */
+.rb-dpc-burst {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 120px;
+  color: var(--dpc-red);
+  text-shadow: 0 0 24px var(--dpc-red), 0 0 60px var(--dpc-red-soft);
+  pointer-events: none;
+  animation: rb-dpc-burst 0.7s ease-out forwards;
+  z-index: 3;
+}
+
+.rb-dpc-burst.super {
+  color: #ffd166;
+  text-shadow: 0 0 24px #ffd166, 0 0 60px rgba(255, 209, 102, 0.5);
+}
+
+@keyframes rb-dpc-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.9);
+  }
+}
+
+/* Pannello dei dettagli che sale sopra la foto. */
+.rb-dpc-details {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 4, 7, 0.86);
+  backdrop-filter: blur(16px);
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1);
+  visibility: hidden;
+}
+
+.rb-dpc-details.open {
+  transform: none;
+  visibility: visible;
+}
+
+.rb-dpc-details-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px 10px;
+  border-bottom: 1px solid rgba(255, 45, 85, 0.35);
+  font-size: 18px;
+}
+
+.rb-dpc-details-head button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.rb-dpc-details-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 18px 22px;
+}
+
+.rb-dpc-details-bio {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.rb-dpc-details-body ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.rb-dpc-details-body li {
+  display: grid;
+  grid-template-columns: 28px max-content 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+}
+
+.rb-dpc-row-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.rb-dpc-row-text {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.rb-dpc-details-body h3 {
+  margin: 8px 0 8px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-dpc,
+  .rb-dpc-burst {
+    animation: none;
+  }
+  .rb-dpc-track,
+  .rb-dpc-details,
+  .rb-dpc.leaving-left,
+  .rb-dpc.leaving-right {
+    transition: none;
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { registerAccount, loginAccount, resendConfirmationEmail, isNicknameTaken, resetAccountPassword } from '../data/accounts';
+import { markProfileOnboarding } from '../data/profileOnboarding';
 import { setRememberMe } from '../data/supabaseClient';
 import { computeAge } from '../data/age';
 import { WORLDS } from '../data/worlds';
@@ -305,6 +306,9 @@ export default function AuthModal({ open, onClose, onLogin }) {
       setError(err);
       return;
     }
+    // Al primo accesso con questo account: "Completa il tuo profilo"
+    // (Profilo Social obbligatorio, gli altri facoltativi), vedi App.jsx.
+    markProfileOnboarding(email);
     if (needsEmailConfirmation) {
       setInfo(t('auth.info.accountCreated'));
       setPendingConfirmEmail(email);
