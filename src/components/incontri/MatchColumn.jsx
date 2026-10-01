@@ -16,7 +16,9 @@ import {
   removeFavorite,
   subscribeToOwnMatches,
   INCONTRI_DECISION_EVENT,
+  getMyDatingProfile,
 } from '../../data/incontri';
+import { missingItems } from '../../data/datingLabels';
 import DatingProfileCard from './DatingProfileCard';
 import './MatchColumn.css';
 import AvatarImg from '../shared/AvatarImg';
@@ -64,7 +66,7 @@ function ContactButton({ profile, onOpen, children }) {
   );
 }
 
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab }) {
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, onOpenMyDatingProfile, myDatingProfileVersion = 0, initialTab, onConsumeInitialTab }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -235,6 +237,23 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
     return () => window.removeEventListener(INCONTRI_DECISION_EVENT, onDecision);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Il proprio Profilo Incontri: finché mancano gli essenziali (foto,
+  // città, domande) non si entra nel mondo rosso: al posto del mazzo un
+  // pannello dice esattamente cosa manca. Si ricontrolla quando si chiude
+  // Il mio profilo (myDatingProfileVersion).
+  const [myDating, setMyDating] = useState(null);
+  useEffect(() => {
+    if (!eligible) return undefined;
+    let cancelled = false;
+    getMyDatingProfile().then((r) => {
+      if (!cancelled && r.profile) setMyDating(r.profile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eligible, user?.id, myDatingProfileVersion]);
+  const datingGate = eligible && myDating && !myDating.visibile && myDating.mancano.length > 0 ? myDating : null;
 
   const current = deck[0] ?? null;
 
@@ -514,6 +533,29 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
       {rightTab === 'favorites' && favoritesPane}
     </div>
   );
+
+  if (datingGate) {
+    const items = missingItems(datingGate.mancano, datingGate.foto.length);
+    return (
+      <div className="rb-match-column">
+        <div className="rb-match-gate" role="alert">
+          <h3>Per entrare nel mondo rosso completa il tuo Profilo Incontri</h3>
+          <p>Finché non lo completi il tuo profilo non viene mostrato agli altri e non puoi vedere i profili. Ti manca:</p>
+          <ul>
+            {items.map((it) => (
+              <li key={it}>
+                <span aria-hidden="true">✗</span> {it}
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="rb-match-gate-btn" onClick={() => onOpenMyDatingProfile?.()}>
+            Completa il Profilo Incontri
+          </button>
+          <p className="rb-match-gate-hint">Il mio profilo › Profilo Incontri</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rb-match-column">

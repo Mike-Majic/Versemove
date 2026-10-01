@@ -232,17 +232,29 @@ export const MANCANO_LABELS = {
   conferma: 'la conferma del profilo',
 };
 
+// Elenco preciso di cosa manca per comparire (e per entrare nel mondo
+// rosso), con il numero di foto già caricate se lo si conosce.
+export function missingItems(mancano = [], fotoCount = null) {
+  return mancano
+    .filter((m) => m !== 'conferma' || mancano.length === 1)
+    .map((m) => {
+      if (m === 'foto' && fotoCount != null) {
+        return fotoCount === 0 ? 'almeno 2 foto (non ne hai ancora caricata nessuna)' : `almeno 2 foto (ne hai caricata ${fotoCount})`;
+      }
+      if (m === 'citta') return "la città, scelta dall'elenco";
+      if (m === 'conferma') return 'salvare il profilo (premi Salva)';
+      return MANCANO_LABELS[m] ?? m;
+    });
+}
+
 const NOTICE_START = 'Per avere più possibilità nel mondo rosso completa il tuo Profilo Incontri (Il mio profilo > Profilo Incontri).';
 const NOTICE_TIP = 'Consiglio: se hai già compilato tutto e hai avuto pochi match, prova ad aggiornare la bio.';
 
 // Testo dell'avviso secondo get_my_dating_profile.avviso ('' se null).
-export function incontriNoticeText(avviso, mancano = []) {
+export function incontriNoticeText(avviso, mancano = [], fotoCount = null) {
   if (avviso === 'facoltativi') return `${NOTICE_START} ${NOTICE_TIP}`;
   if (avviso === 'essenziali') {
-    const elenco = mancano
-      .filter((m) => m !== 'conferma' || mancano.length === 1)
-      .map((m) => MANCANO_LABELS[m] ?? m)
-      .join(', ');
+    const elenco = missingItems(mancano, fotoCount).join(', ');
     return `${NOTICE_START} Ti manca: ${elenco}. Finché non lo aggiungi il tuo profilo non viene mostrato agli altri. ${NOTICE_TIP}`;
   }
   return '';

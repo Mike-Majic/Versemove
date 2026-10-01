@@ -20,6 +20,8 @@ export default function IncontriLiveExplorer({
   onOpenAuth,
   onOpenChat,
   onOpenProfile,
+  onOpenMyDatingProfile,
+  myDatingProfileVersion,
   initialMatchTab,
   onConsumeInitialMatchTab,
   favorites = [],
@@ -89,6 +91,8 @@ export default function IncontriLiveExplorer({
               onOpenAuth={onOpenAuth}
               onOpenChat={onOpenChat}
               onOpenProfile={onOpenProfile}
+              onOpenMyDatingProfile={onOpenMyDatingProfile}
+              myDatingProfileVersion={myDatingProfileVersion}
               initialTab={initialMatchTab}
               onConsumeInitialTab={onConsumeInitialMatchTab}
             />

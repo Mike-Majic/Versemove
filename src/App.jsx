@@ -416,7 +416,7 @@ export default function App() {
     if (!wanted || incontriNotice) return undefined;
     let cancelled = false;
     getMyDatingProfile().then((r) => {
-      if (!cancelled && r.profile?.avviso) setIncontriNotice({ avviso: r.profile.avviso, mancano: r.profile.mancano });
+      if (!cancelled && r.profile?.avviso) setIncontriNotice({ avviso: r.profile.avviso, mancano: r.profile.mancano, foto: r.profile.foto.length });
     });
     return () => {
       cancelled = true;
@@ -1387,6 +1387,11 @@ export default function App() {
             onOpenAuth={() => setAuthOpen(true)}
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
             onOpenProfile={(id) => setDatingCardId(id)}
+            onOpenMyDatingProfile={() => {
+              setProfileSettingsSection('incontri');
+              setProfileSettingsOpen(true);
+            }}
+            myDatingProfileVersion={incontriCheck}
             initialMatchTab={incontriInitialTab}
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
@@ -1828,7 +1833,7 @@ export default function App() {
 
       {incontriNoticeVisible && (
         <div className="rb-incontri-notice" role="status">
-          <span>{incontriNoticeText(incontriNotice.avviso, incontriNotice.mancano)}</span>
+          <span>{incontriNoticeText(incontriNotice.avviso, incontriNotice.mancano, incontriNotice.foto)}</span>
           <div className="rb-incontri-notice-actions">
             <button
               type="button"
