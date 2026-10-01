@@ -403,3 +403,24 @@
   color: #ffd6d6;
   font-size: 12.5px;
 }
+
+/* Menu del ruolo (solo l'owner lo vede): verde se Moderatore, giallo se
+   Owner, neutro se Utente. Due classi per vincere su .rb-admin-table select. */
+.rb-admin-users-table select.rb-admin-role-select.moderatore {
+  background: color-mix(in srgb, #22c55e 22%, rgba(255, 255, 255, 0.04));
+  border-color: #22c55e;
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.rb-admin-users-table select.rb-admin-role-select.owner {
+  background: color-mix(in srgb, #ffb020 22%, rgba(255, 255, 255, 0.04));
+  border-color: #ffb020;
+  color: #ffb020;
+  font-weight: 700;
+}
+
+.rb-admin-users-table select.rb-admin-role-select option {
+  background: #16161f;
+  color: #f5f5f7;
+}
