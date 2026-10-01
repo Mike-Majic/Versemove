@@ -1,6 +1,8 @@
 // Português: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: 'Publicado em {{date}} às {{time}}',
+    publishedAgo: 'Publicado {{ago}}',
     close: 'Fechar',
     save: 'Salvar',
     cancel: 'Cancelar',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'Mais categorias',
     scrollWorldsUp: 'Rolar mundos para cima',
     scrollWorldsDown: 'Rolar mundos para baixo',
+    updateAvailable: 'Nova versão disponível, recarregue.',
+    reload: 'Recarregar',
   },
   topbar: {
     notifications: 'Notificações',
@@ -58,6 +62,12 @@ export default {
       mail: 'E-mail',
       password: 'Senha',
       rememberMe: 'Lembrar de mim neste dispositivo',
+      forgotLink: 'Esqueceu a senha?',
+      forgotTitle: 'Redefinir a senha',
+      forgotHint: 'Escreva o e-mail da conta: enviaremos um link para escolher uma nova.',
+      forgotSubmit: 'Enviar link',
+      forgotSent: 'Se o e-mail estiver registrado, o link chegará em breve. Verifique também o spam.',
+      backToLogin: 'Voltar ao login',
       username: 'Nome de usuário',
       nickname: 'Apelido',
       nicknameChecking: 'Verificando disponibilidade…',
@@ -176,7 +186,7 @@ export default {
       age: 'Idade',
     },
     language: {
-      title: 'Idioma',
+      title: 'Idioma do sistema',
       hint: 'Altere o idioma da interface a qualquer momento.',
       saved: 'Idioma alterado e salvo na sua conta.',
     },

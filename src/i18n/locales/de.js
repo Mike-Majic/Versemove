@@ -1,6 +1,8 @@
 // Deutsch. Gleiche Schlüsselstruktur wie it.js — siehe Kommentar dort.
 export default {
   common: {
+    publishedAt: 'Veröffentlicht am {{date}} um {{time}}',
+    publishedAgo: 'Veröffentlicht {{ago}}',
     close: 'Schließen',
     save: 'Speichern',
     cancel: 'Abbrechen',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'Weitere Kategorien',
     scrollWorldsUp: 'Welten nach oben scrollen',
     scrollWorldsDown: 'Welten nach unten scrollen',
+    updateAvailable: 'Neue Version verfügbar, neu laden.',
+    reload: 'Neu laden',
   },
   topbar: {
     notifications: 'Benachrichtigungen',
@@ -58,6 +62,12 @@ export default {
       mail: 'E-Mail',
       password: 'Passwort',
       rememberMe: 'Auf diesem Gerät merken',
+      forgotLink: 'Passwort vergessen?',
+      forgotTitle: 'Passwort zurücksetzen',
+      forgotHint: 'Gib die E-Mail deines Kontos ein: Wir senden dir einen Link, um ein neues zu wählen.',
+      forgotSubmit: 'Link senden',
+      forgotSent: 'Wenn die E-Mail registriert ist, kommt der Link gleich. Sieh auch im Spam nach.',
+      backToLogin: 'Zurück zur Anmeldung',
       username: 'Benutzername',
       nickname: 'Spitzname',
       nicknameChecking: 'Verfügbarkeit wird geprüft…',
@@ -176,7 +186,7 @@ export default {
       age: 'Alter',
     },
     language: {
-      title: 'Sprache',
+      title: 'Systemsprache',
       hint: 'Ändere die Sprache der Oberfläche jederzeit.',
       saved: 'Sprache geändert und im Konto gespeichert.',
     },

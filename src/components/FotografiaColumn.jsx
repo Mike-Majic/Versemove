@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import MediaEditor from './social/MediaEditor';
 import { MOCK_USERS } from '../data/mockUsers';
 import { GROUPS } from '../data/groupsCategories';
-import { publishContent, listContentsForPlacement, toggleContentLike } from '../data/contents';
+import { publishContent } from '../data/contents';
+import { createPost } from '../data/posts';
 import { analyzeImageElement } from '../data/localVision';
+import Icon from './shared/Icon';
+import SocialGallery from './arte/SocialGallery';
 import './FotografiaColumn.css';
 
 const SOCIAL_USERS = MOCK_USERS.filter((u) => u.worlds.includes('social'));
@@ -60,7 +63,7 @@ function TagPicker({ selectedUserIds, selectedGroupIds, onToggleUser, onToggleGr
             className={`rb-foto-tag-chip ${selectedUserIds.includes(u.id) ? 'active' : ''}`}
             onClick={() => onToggleUser(u.id)}
           >
-            👤 {u.name}
+            <Icon name="users" size={14} className="rb-icon--inline" /> {u.name}
           </button>
         ))}
         {groups.map((g) => (
@@ -70,7 +73,7 @@ function TagPicker({ selectedUserIds, selectedGroupIds, onToggleUser, onToggleGr
             className={`rb-foto-tag-chip ${selectedGroupIds.includes(g.id) ? 'active' : ''}`}
             onClick={() => onToggleGroup(g.id)}
           >
-            {g.icon} {g.name}
+            <Icon name="grid" size={14} className="rb-icon--inline" /> {g.name}
           </button>
         ))}
         {users.length === 0 && groups.length === 0 && <span className="rb-foto-tag-empty">Nessun risultato</span>}
@@ -79,15 +82,17 @@ function TagPicker({ selectedUserIds, selectedGroupIds, onToggleUser, onToggleGr
   );
 }
 
-// Fotografia in stile Pinterest (mondo Arte & Musica): griglia a mattoni di
-// foto vere, caricate su Supabase (data/contents.js) e condivise con le
-// altre posizioni dello stesso contenuto (stesso like ovunque compaia). Al
+// Galleria immagini (mondo Intrattenimento): la griglia mostra le foto dei
+// post pubblici del mondo Social (arte/SocialGallery.jsx, RPC
+// galleria_social). Chi carica una foto da qui pubblica un post nel Social
+// (contenuto su Supabase, data/contents.js, più la riga in posts), così
+// compare nella galleria come tutte le altre. Al
 // caricamento, un'analisi gratuita nel browser (data/localVision.js)
 // suggerisce tag e — se riconosce un tramonto — la sottofamiglia "Tramonti";
 // se la foto viene taggata a persone/gruppi del mondo Social, compare anche
 // nella sua bacheca (un vero posizionamento condiviso, non solo una copia).
 export default function FotografiaColumn({ user, onOpenAuth }) {
-  const [photos, setPhotos] = useState([]);
+  const [galleryKey, setGalleryKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [draftSrc, setDraftSrc] = useState(null);
   const [caption, setCaption] = useState('');
@@ -104,11 +109,6 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
   const [publishError, setPublishError] = useState(null);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-
-  const refresh = () => {
-    listContentsForPlacement({ world: 'arte', category: 'fotografia' }).then(setPhotos);
-  };
-  useEffect(refresh, []);
 
   const openPicker = (ref) => {
     if (!user) {
@@ -183,26 +183,22 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
       placements.push({ world: 'social' });
     }
     const file = dataUrlToFile(draftSrc, `foto-${Date.now()}.png`);
-    const { error } = await publishContent({ file, type: 'foto', caption: caption.trim(), tags: allTags, placements });
-    setPublishing(false);
+    const { content, url, error } = await publishContent({ file, type: 'foto', caption: caption.trim(), tags: allTags, placements });
     if (error) {
+      setPublishing(false);
       setPublishError(error);
       return;
     }
-    resetForm();
-    refresh();
-  };
-
-  const handleLike = async (photo) => {
-    if (!user) {
-      onOpenAuth();
+    // Post pubblico nel mondo Social con la foto: è da lì che la galleria
+    // (e il feed Social, che non la duplica: stesso contentId) la prende.
+    const post = await createPost({ testo: caption.trim(), contentId: content.id, mediaUrl: url, mediaType: 'foto', tags: allTags, mondo: 'social' });
+    setPublishing(false);
+    if (post.error) {
+      setPublishError(post.error);
       return;
     }
-    const { liked, error } = await toggleContentLike(photo.id, photo.likedByMe);
-    if (error) return;
-    setPhotos((prev) =>
-      prev.map((p) => (p.id === photo.id ? { ...p, likedByMe: liked, likeCount: p.likeCount + (liked ? 1 : -1) } : p))
-    );
+    resetForm();
+    setGalleryKey((k) => k + 1);
   };
 
   return (
@@ -219,26 +215,32 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
 
       <div className="rb-foto-header">
         <div>
-          <h3>Fotografia</h3>
-          <p>Scatti della community, taggabili a persone e gruppi del mondo Social.</p>
+          <h3>Galleria immagini</h3>
+          <p>Le foto pubblicate nel mondo Social, votate dalla community.</p>
         </div>
         <div className="rb-foto-upload-btns">
-          <button type="button" className="rb-foto-upload-btn" onClick={() => openPicker(cameraInputRef)}>📸 Scatta</button>
-          <button type="button" className="rb-foto-upload-btn" onClick={() => openPicker(fileInputRef)}>🖼️ Galleria</button>
+          <button type="button" className="rb-foto-upload-btn" onClick={() => openPicker(cameraInputRef)}>
+            <Icon name="camera" size={17} className="rb-icon--inline" /> Scatta
+          </button>
+          <button type="button" className="rb-foto-upload-btn" onClick={() => openPicker(fileInputRef)}>
+            <Icon name="image" size={17} className="rb-icon--inline" /> Galleria
+          </button>
         </div>
       </div>
 
       {showForm && draftSrc && (
         <div className="rb-foto-form">
           <img className="rb-foto-form-preview" src={draftSrc} alt="Anteprima" />
-          <button type="button" className="rb-foto-edit-btn" onClick={() => setEditing(true)}>✏️ Modifica</button>
+          <button type="button" className="rb-foto-edit-btn" onClick={() => setEditing(true)}>
+            <Icon name="pencil" size={16} className="rb-icon--inline" /> Modifica
+          </button>
 
           {analyzing && <p className="rb-foto-form-hint">Sto analizzando il contenuto (gratis, nel browser)...</p>}
           {!analyzing && suggestedTags.length > 0 && (
             <p className="rb-foto-form-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>
           )}
           {!analyzing && suggestedSubfamily && (
-            <p className="rb-foto-form-hint">Riconosciuto: Fotografia · {suggestedSubfamily}</p>
+            <p className="rb-foto-form-hint">Riconosciuto: Galleria immagini · {suggestedSubfamily}</p>
           )}
           {!analyzing &&
             extraPlacements.map((p) => {
@@ -271,7 +273,11 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
             onToggleGroup={(id) => setTagGroupIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
           />
           <p className="rb-foto-form-hint">Questa foto comparirà anche nella bacheca del mondo Social.</p>
-          {publishError && <p className="rb-foto-form-error">⚠️ {publishError}</p>}
+          {publishError && (
+            <p className="rb-foto-form-error">
+              <Icon name="info" size={16} className="rb-icon--inline" /> {publishError}
+            </p>
+          )}
           <div className="rb-foto-form-actions">
             <button type="button" className="rb-foto-form-cancel" onClick={resetForm}>Annulla</button>
             <button type="button" className="rb-foto-form-publish" onClick={publish} disabled={publishing}>
@@ -281,21 +287,7 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
         </div>
       )}
 
-      <div className="rb-foto-masonry">
-        {photos.map((p, i) => (
-          <figure key={p.id} className="rb-foto-card" style={{ height: 220 + (i % 4) * 40 }}>
-            <img src={p.url} alt={p.caption || 'Foto'} />
-            <figcaption>
-              {p.caption && <span className="rb-foto-caption">{p.caption}</span>}
-              {p.subfamily && <span className="rb-foto-caption">{p.subfamily}</span>}
-              <button type="button" className="rb-foto-like-btn" onClick={() => handleLike(p)}>
-                {p.likedByMe ? '❤️' : '🤍'} {p.likeCount}
-              </button>
-            </figcaption>
-          </figure>
-        ))}
-        {photos.length === 0 && <p className="rb-foto-empty">Nessuna foto ancora in questa categoria.</p>}
-      </div>
+      <SocialGallery key={galleryKey} tipo="foto" user={user} onOpenAuth={onOpenAuth} />
 
       {editing && (
         <MediaEditor

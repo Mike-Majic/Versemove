@@ -1,0 +1,112 @@
+.rb-score-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0 4px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1a1446 0%, #3b1d6e 45%, #a3226b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(120, 40, 170, 0.35);
+}
+
+.rb-score-card-glow {
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 214, 90, 0.45), transparent 65%);
+  pointer-events: none;
+}
+
+.rb-score-card-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 32px;
+}
+
+.rb-score-card-body {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rb-score-card-game {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-score-card-points {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 2.1rem;
+  font-weight: 900;
+  line-height: 1.05;
+  background: linear-gradient(180deg, #fff6c8, #ffc83d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rb-score-card-points small {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.85);
+}
+
+.rb-score-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.rb-score-card-level {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.rb-score-card-trophy {
+  position: relative;
+  margin-left: auto;
+  font-size: 34px;
+  animation: rb-score-trophy 2.4s ease-in-out infinite;
+}
+
+@keyframes rb-score-trophy {
+  0%, 100% { transform: rotate(-8deg) scale(1); }
+  50% { transform: rotate(8deg) scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-score-card-trophy { animation: none; }
+}
+
+@media (max-width: 420px) {
+  .rb-score-card { padding: 12px 14px; gap: 10px; }
+  .rb-score-card-icon { width: 46px; height: 46px; font-size: 26px; }
+  .rb-score-card-points { font-size: 1.7rem; }
+  .rb-score-card-trophy { font-size: 26px; }
+}

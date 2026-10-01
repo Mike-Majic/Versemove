@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listDeals } from '../../data/vetrinaDeals';
+import { getDealCountry, recordDealInterest } from '../../data/dealsRegion';
 import { translateCategoryLabel } from '../../i18n/categoryLabels';
 import DealCard from './DealCard';
 import SponsorCard from '../ads/SponsorCard';
@@ -8,9 +9,10 @@ import SubmitDealModal from './SubmitDealModal';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
-import { useIsDesktopLayout } from '../../hooks/useIsDesktopLayout';
+import { useBackLayer } from '../../hooks/useBackLayer';
 import CustomSelect from '../shared/CustomSelect';
 import './vetrinaOfferte.css';
+import { AFFILIATE_ACTIVE, AFFILIATE_DISCLOSURE } from '../../data/affiliate';
 
 const ORDER_OPTIONS = [
   { value: 'caldo', label: 'Più calde' },
@@ -32,19 +34,21 @@ const ONLINE_OPTIONS = [
   { value: 'negozio', label: 'Solo in negozio' },
 ];
 
-// Categoria "Offerte" del mondo Vetrina: una sola colonna (feed), non le
-// due dell'esploratore standard (CategoryColumn) — un'offerta non ha
-// bisogno di una colonna di ricerca a fianco, il filtro in alto basta.
+// Categoria "Offerte" del mondo Vetrina: un solo pannello largo (feed a
+// griglia, tante card quante ne entrano), non le due colonne
+// dell'esploratore standard — filtri e ordinamento stanno in un menu a
+// tendina sotto il pulsante "Filtri e ordinamento".
 // Stesso componente per tutte e 12 le sotto-categorie (vedi
 // VETRINA_OFFERTE_CATEGORY_IDS in data/vetrinaCategories.js), parametrizzato
 // da `category`.
 export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locationFilters, closing = false }) {
-  const isDesktop = useIsDesktopLayout();
-  const [mobileView, setMobileView] = useState('primary');
   const { t } = useTranslation();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
   const [deals, setDeals] = useState(null);
   const [error, setError] = useState('');
-  const [negozio, setNegozio] = useState('');
+  const [cerca, setCerca] = useState('');
+  const [cercaDebounced, setCercaDebounced] = useState('');
   const [scontoMin, setScontoMin] = useState('');
   const [onlineFiltro, setOnlineFiltro] = useState('');
   const [vicinoAMe, setVicinoAMe] = useState(false);
@@ -53,12 +57,34 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
 
   const citta = vicinoAMe ? locationFilters?.city || '' : '';
   const online = onlineFiltro === 'online' ? true : onlineFiltro === 'negozio' ? false : undefined;
+  // Offerte del paese di chi guarda (città del filtro "Dove", altrimenti
+  // fuso orario/lingua del dispositivo): a New York niente offerte italiane.
+  const paese = getDealCountry(locationFilters);
+  // Codici sconto: quelli scaduti da meno di una settimana restano visibili
+  // con la barra rossa "Scaduto" (vedi DealCard), gli altri spariscono.
+  const mostraScadute = category.id === 'offerte-codici-sconto' ? 7 : 0;
+
+  // Categoria aperta = interesse (per le offerte mostrate come pubblicità
+  // nel resto dell'app, vedi getHouseDeal).
+  useEffect(() => {
+    recordDealInterest({ categoria: category.id });
+  }, [category.id]);
+
+  // Ricerca: si parte mezzo secondo dopo l'ultima lettera, e la parola
+  // cercata diventa un interesse.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setCercaDebounced(cerca.trim());
+      if (cerca.trim()) recordDealInterest({ termine: cerca, peso: 0 });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [cerca]);
 
   useEffect(() => {
     let cancelled = false;
     setDeals(null);
     setError('');
-    listDeals({ categoria: category.id, negozio: negozio || undefined, scontoMin: scontoMin ? Number(scontoMin) : undefined, online, citta: citta || undefined, ordinamento })
+    listDeals({ categoria: category.id, cerca: cercaDebounced || undefined, scontoMin: scontoMin ? Number(scontoMin) : undefined, online, citta: citta || undefined, paese, mostraScadute, ordinamento })
       .then((list) => {
         if (!cancelled) setDeals(list);
       })
@@ -72,13 +98,42 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category.id, negozio, scontoMin, online, citta, ordinamento]);
+  }, [category.id, cercaDebounced, scontoMin, online, citta, paese, mostraScadute, ordinamento]);
+
+  // Menu dei filtri: si chiude cliccando fuori, con Esc o con Indietro del
+  // telefono (vedi hooks/useBackLayer.js).
+  useBackLayer(filtersOpen && !closing, () => setFiltersOpen(false), 'vetrina:filtri');
+  useEffect(() => {
+    if (!filtersOpen) return undefined;
+    const onDown = (e) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target)) setFiltersOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setFiltersOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [filtersOpen]);
+
+  // Quanti filtri sono diversi dal default (numerino sul pulsante).
+  const activeFilters = [cerca.trim(), scontoMin, onlineFiltro, vicinoAMe, ordinamento !== 'caldo'].filter(Boolean).length;
+  const resetFilters = () => {
+    setCerca('');
+    setScontoMin('');
+    setOnlineFiltro('');
+    setVicinoAMe(false);
+    setOrdinamento('caldo');
+  };
 
   // listDeals filtra già lato query su stato='attiva' e scadenza (vedi
   // vetrinaDeals.js, condizione esatta indicata da Cowork); "scaduta" dalla
   // vista vetrina_deal_stats resta solo come ultima rete di sicurezza, per
   // un'offerta arrivata giusto mentre scadeva.
-  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => !d.scaduta), [deals]);
+  const visibleDeals = useMemo(() => (deals ?? []).filter((d) => mostraScadute || !d.scaduta), [deals, mostraScadute]);
 
   const dealsPanel = (
     <div className="rb-deal-column">
@@ -94,11 +149,55 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
         </button>
       </div>
 
-      {!isDesktop && (
-        <button type="button" className="rb-reset-filters-btn rb-deal-filters-open" onClick={() => setMobileView('secondary')}>
+      <div className="rb-deal-filters-anchor" ref={filtersRef}>
+        <button
+          type="button"
+          className={`rb-deal-filters-toggle${filtersOpen ? ' open' : ''}`}
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          aria-haspopup="true"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+            <circle cx="16" cy="6" r="2" />
+            <circle cx="10" cy="12" r="2" />
+            <circle cx="18" cy="18" r="2" />
+          </svg>
           Filtri e ordinamento
+          {activeFilters > 0 && <span className="rb-deal-filters-count">{activeFilters}</span>}
+          <svg className="rb-deal-filters-chevron" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
+            <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
-      )}
+
+        {filtersOpen && (
+          <div className="rb-deal-filters-menu" role="dialog" aria-label="Filtri e ordinamento">
+            <input
+              type="search"
+              className="rb-deal-filter-input"
+              placeholder="Cerca prodotto o negozio"
+              value={cerca}
+              onChange={(e) => setCerca(e.target.value)}
+              autoFocus
+            />
+            <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
+            <CustomSelect value={scontoMin} options={SCONTO_OPTIONS} onChange={setScontoMin} ariaLabel="Sconto minimo" />
+            <CustomSelect value={onlineFiltro} options={ONLINE_OPTIONS} onChange={setOnlineFiltro} ariaLabel="Online o in negozio" />
+            <label className="rb-deal-filter-chip">
+              <input type="checkbox" checked={vicinoAMe} onChange={(e) => setVicinoAMe(e.target.checked)} disabled={onlineFiltro === 'online'} />
+              Vicino a me
+            </label>
+            <div className="rb-deal-filters-actions">
+              <button type="button" className="rb-deal-filters-reset" onClick={resetFilters} disabled={activeFilters === 0}>
+                Azzera
+              </button>
+              <button type="button" className="rb-btn-primary" onClick={() => setFiltersOpen(false)}>
+                Mostra offerte
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {error && <p className="rb-deal-status rb-deal-error">{error}</p>}
 
@@ -131,56 +230,20 @@ export default function VetrinaOfferteColumn({ category, user, onOpenAuth, locat
           ))}
         </ul>
       )}
-
-    </div>
-  );
-
-  const filtersPanel = (
-    <div className="rb-deal-column">
-      <h3 className="rb-deal-panel-title">Filtri e ordinamento</h3>
-      <div className="rb-deal-filters rb-deal-filters-stack">
-        <input
-          type="text"
-          className="rb-deal-filter-input"
-          placeholder="Negozio"
-          value={negozio}
-          onChange={(e) => setNegozio(e.target.value)}
-        />
-        <CustomSelect value={scontoMin} options={SCONTO_OPTIONS} onChange={setScontoMin} ariaLabel="Sconto minimo" />
-        <CustomSelect value={onlineFiltro} options={ONLINE_OPTIONS} onChange={setOnlineFiltro} ariaLabel="Online o in negozio" />
-        <label className="rb-deal-filter-chip">
-          <input type="checkbox" checked={vicinoAMe} onChange={(e) => setVicinoAMe(e.target.checked)} disabled={onlineFiltro === 'online'} />
-          Vicino a me
-        </label>
-        <CustomSelect value={ordinamento} options={ORDER_OPTIONS} onChange={setOrdinamento} ariaLabel="Ordina per" />
-      </div>
-
-      {!isDesktop && (
-        <button type="button" className="rb-btn-primary rb-deal-show-results" onClick={() => setMobileView('primary')}>
-          Mostra offerte
-        </button>
-      )}
+      {AFFILIATE_ACTIVE && <p className="rb-deal-affiliate-note">{AFFILIATE_DISCLOSURE}</p>}
     </div>
   );
 
   return (
     <div style={{ '--accent': '#ec4899', display: 'contents' }}>
-      <TwoColumnSwitcher
-        primary={dealsPanel}
-        secondary={filtersPanel}
-        primaryLabel="Offerte"
-        secondaryLabel="Filtri"
-        mobileView={mobileView}
-        onMobileViewChange={setMobileView}
-        closing={closing}
-      />
+      <TwoColumnSwitcher primary={dealsPanel} closing={closing} />
       {submitOpen && (
         <SubmitDealModal
           categoria={category.id}
           onClose={() => setSubmitOpen(false)}
           onPublished={() => {
             setSubmitOpen(false);
-            listDeals({ categoria: category.id, ordinamento }).then(setDeals);
+            listDeals({ categoria: category.id, paese, mostraScadute, ordinamento }).then(setDeals);
           }}
         />
       )}

@@ -5,6 +5,7 @@ import { getReceivedRequests } from '../data/friends';
 import { getReceivedFamilyRequests, familyRelationLabel } from '../data/family';
 import ModalOverlay from './ModalOverlay';
 import './NotificationsPanel.css';
+import AvatarImg from './shared/AvatarImg';
 
 function NotificationLabel({ n }) {
   const { who, text } = describeNotification(n, n.tipo === 'family_request' ? familyRelationLabel(n.relazione) : undefined);
@@ -75,7 +76,7 @@ export default function NotificationsPanel({ onClose, onRead, onNavigate }) {
                   className={`rb-notifications-row ${n.letta ? '' : 'unread'}`}
                   onClick={() => onNavigate(n)}
                 >
-                  <img src={n.actor.avatar} alt="" />
+                  <AvatarImg src={n.actor.avatar} name={n.actor?.name || n.actor?.nickname} seed={n.actor?.id} alt="" />
                   <span className="rb-notifications-row-text">
                     <NotificationLabel n={n} />
                     {n.tipo === 'menzione' && n.anteprima && <span className="rb-notifications-row-preview">“{n.anteprima}”</span>}

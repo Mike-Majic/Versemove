@@ -8,6 +8,7 @@ import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import CustomSelect from '../shared/CustomSelect';
 import './cultural.css';
+import Icon from '../shared/Icon';
 
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'Rilevanza' },
@@ -53,7 +54,7 @@ function MovieCard({ movie, summary, onToggle, onShowReactors, trailer, trailerL
           )}
         </div>
       ) : (
-        <div className="rb-cinema-poster-empty">🎬</div>
+        <div className="rb-cinema-poster-empty"><Icon name="film" size={28} /></div>
       )}
       <div className="rb-cultural-card-info">
         <strong>{movie.title}</strong>
@@ -147,7 +148,7 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
     <div className="rb-cultural-column">
       <div className="rb-cultural-header">
         <div>
-          <h3>Cinema</h3>
+          <h3>Sala cinema</h3>
           <p>Film al cinema ora e in uscita prossimamente — reagisci per organizzarti con chi ci vuole andare.</p>
         </div>
         <label className="rb-cultural-sort">
@@ -166,7 +167,7 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
           <Skeleton lines={2} />
         </div>
       ) : nowPlaying.length === 0 && !error ? (
-        <EmptyState icon="🎬" title="Nessun film disponibile ora" subtitle="Riprova più tardi." />
+        <EmptyState icon={<Icon name="film" size={30} />} title="Nessun film disponibile ora" subtitle="Riprova più tardi." />
       ) : (
         <ul className="rb-cultural-list">
           {sortedNowPlaying.map((m) => (
@@ -191,7 +192,7 @@ export default function CinemaColumn({ user, onOpenAuth, onShowReactors }) {
           <Skeleton lines={2} />
         </div>
       ) : upcoming.length === 0 && !error ? (
-        <EmptyState icon="🍿" title="Nessuna anteprima disponibile ora" subtitle="Riprova più tardi." />
+        <EmptyState icon={<Icon name="ticket" size={30} />} title="Nessuna anteprima disponibile ora" subtitle="Riprova più tardi." />
       ) : (
         <ul className="rb-cultural-list">
           {sortedUpcoming.map((m) => (

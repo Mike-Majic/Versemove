@@ -9,8 +9,9 @@ import i18n from '../i18n';
 // array con al massimo un item per "tipo" (content = foto/video caricata
 // col sistema contents.js già esistente, gif, link) così non servivano
 // nuove colonne per gif/link_esterno.
-function mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags }) {
+function mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags, punteggio }) {
   const items = [];
+  if (punteggio) items.push({ kind: 'punteggio', ...punteggio });
   if (contentId) items.push({ kind: 'content', content_id: contentId, media_type: mediaType, url: mediaUrl, tags: tags ?? [] });
   if (gif) items.push({ kind: 'gif', url: gif });
   if (link_esterno?.url) items.push({ kind: 'link', url: link_esterno.url });
@@ -22,7 +23,9 @@ function fieldsFromMedia(media) {
   const content = arr.find((m) => m.kind === 'content');
   const gifItem = arr.find((m) => m.kind === 'gif');
   const linkItem = arr.find((m) => m.kind === 'link');
+  const scoreItem = arr.find((m) => m.kind === 'punteggio');
   return {
+    punteggio: scoreItem ? { gioco: scoreItem.gioco, icona: scoreItem.icona, punti: scoreItem.punti, livello: scoreItem.livello, dettaglio: scoreItem.dettaglio } : null,
     contentId: content?.content_id ?? null,
     mediaUrl: content?.url ?? null,
     mediaType: content?.media_type ?? null,
@@ -59,6 +62,7 @@ export async function fetchProfilesMap(ids) {
     map.set(p.id, {
       id: p.id,
       name: displayName(p),
+      nickname: p.nickname || '',
       avatar: p.avatar_url || '',
       citta: p.citta_social || '',
       bio: p.bio_social || '',
@@ -67,6 +71,9 @@ export async function fetchProfilesMap(ids) {
       genere: p.genere || '',
       pronomi: p.pronomi || '',
       lingueParlate: p.lingue_parlate || [],
+      // null se l'utente non mostra la data nel Profilo Social.
+      giornoNascita: p.giorno_nascita ?? null,
+      meseNascita: p.mese_nascita ?? null,
       zodiaco: zodiacSign(p.giorno_nascita, p.mese_nascita),
     });
   }
@@ -91,7 +98,13 @@ async function fetchGroupsMap(ids) {
 // tutto il mondo.
 // categoria/tag: post di categoria del mondo Nerd (Gaming PC/PS/Xbox, vedi
 // data/gaming.js): posts.categoria, posts.tag, posts.title_id, posts.extra.
-export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null } = {}) {
+// Post a pagine: FEED_PAGE_SIZE alla volta, i più recenti prima; before
+// (data ISO dell'ultimo post già mostrato) chiede la pagina successiva.
+// ids: solo quei post (link condiviso a un post fuori dal feed caricato).
+// -> { posts, hasMore } | { error }
+export const FEED_PAGE_SIZE = 30;
+
+export async function fetchFeed({ mondo = 'social', authorId = null, categoria = null, tag = null, ids = null, before = null, limit = FEED_PAGE_SIZE } = {}) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
@@ -100,9 +113,14 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
     if (authorId) query = query.eq('author_id', authorId);
     if (categoria) query = query.eq('categoria', categoria);
     if (tag) query = query.eq('tag', tag);
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(200);
+    if (ids?.length) query = query.in('id', ids);
+    if (before) query = query.lt('created_at', before);
+    // Uno in più del necessario: dice se c'è un'altra pagina.
+    const { data: rows, error } = await query.order('created_at', { ascending: false }).limit(limit + 1);
     if (error) return { error: error.message };
-    if (!data) return { posts: [] };
+    if (!rows) return { posts: [], hasMore: false };
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
 
     const postIds = data.map((p) => p.id);
     const authorIds = data.map((p) => p.author_id);
@@ -111,18 +129,21 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
     const [profilesMap, groupsMap, likesRes, savedRes] = await Promise.all([
       fetchProfilesMap(authorIds),
       fetchGroupsMap(groupIds),
-      postIds.length
-        ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-        : Promise.resolve({ data: [] }),
+      // Conteggio e "l'ho messo io" calcolati dal DB (post_like_stats),
+      // non tutte le righe di post_likes.
+      postIds.length ? supabase.rpc('post_like_stats', { p_ids: postIds }) : Promise.resolve({ data: [] }),
       myId && postIds.length
         ? supabase.from('saved_posts').select('post_id').eq('user_id', myId).in('post_id', postIds)
         : Promise.resolve({ data: [] }),
     ]);
 
+    // mi_piace resta un array (chi lo usa guarda solo length e includes
+    // del mio id): il mio id se c'è, poi segnaposto null per gli altri.
     const likesByPost = new Map();
     for (const l of likesRes.data ?? []) {
-      if (!likesByPost.has(l.post_id)) likesByPost.set(l.post_id, []);
-      likesByPost.get(l.post_id).push(l.user_id);
+      const n = Number(l.n) || 0;
+      const mine = Boolean(l.mine) && myId;
+      likesByPost.set(l.post_id, [...(mine ? [myId] : []), ...Array(Math.max(0, n - (mine ? 1 : 0))).fill(null)]);
     }
     const savedSet = new Set((savedRes.data ?? []).map((r) => r.post_id));
 
@@ -148,7 +169,7 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
       extra: row.extra ?? null,
       ...fieldsFromMedia(row.media),
     }));
-    return { posts };
+    return { posts, hasMore };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
@@ -156,6 +177,64 @@ export async function fetchFeed({ mondo = 'social', authorId = null, categoria =
 
 // Commenti (non cancellati) di uno o più post, più vecchi prima, con
 // l'autore già risolto.
+// Reazioni emoji ai commenti (tabella comment_reactions): per ogni
+// commento i conteggi per emoji e quelle messe da me.
+export const COMMENT_REACTION_EMOJIS = ['❤️', '😂', '👍'];
+
+async function fetchCommentReactions(commentIds) {
+  const out = new Map();
+  if (!commentIds?.length) return out;
+  try {
+    const [{ data: auth }, { data }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('comment_reactions').select('comment_id, user_id, emoji').in('comment_id', commentIds),
+    ]);
+    const me = auth?.user?.id ?? null;
+    for (const r of data ?? []) {
+      const entry = out.get(r.comment_id) ?? { counts: {}, mine: [] };
+      entry.counts[r.emoji] = (entry.counts[r.emoji] ?? 0) + 1;
+      if (me && r.user_id === me) entry.mine.push(r.emoji);
+      out.set(r.comment_id, entry);
+    }
+  } catch {
+    // Senza reazioni i commenti si mostrano lo stesso.
+  }
+  return out;
+}
+
+// Mette o toglie la mia reazione `emoji` al commento. -> {} | { error }
+export async function toggleCommentReaction(commentId, emoji, alreadyMine) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Devi essere loggato.' };
+    if (alreadyMine) {
+      const { error } = await supabase.from('comment_reactions').delete().eq('comment_id', commentId).eq('user_id', auth.user.id).eq('emoji', emoji);
+      return error ? { error: error.message } : {};
+    }
+    const { error } = await supabase.from('comment_reactions').insert({ comment_id: commentId, user_id: auth.user.id, emoji });
+    if (error && error.code !== '23505') return { error: translateInteractionError(error) };
+    return {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// Aggiornamento ottimistico della lista commenti dopo un tocco su una
+// reazione (stesso calcolo per tutti i feed).
+export function applyCommentReaction(comments, commentId, emoji) {
+  return comments.map((c) => {
+    if (c.id !== commentId) return c;
+    const mine = c.mieReazioni ?? [];
+    const had = mine.includes(emoji);
+    const count = Math.max(0, (c.reazioni?.[emoji] ?? 0) + (had ? -1 : 1));
+    return {
+      ...c,
+      reazioni: { ...c.reazioni, [emoji]: count },
+      mieReazioni: had ? mine.filter((e) => e !== emoji) : [...mine, emoji],
+    };
+  });
+}
+
 export async function fetchComments(postIds) {
   try {
     if (!postIds?.length) return { comments: [] };
@@ -168,7 +247,10 @@ export async function fetchComments(postIds) {
     if (error) return { error: error.message };
     if (!data) return { comments: [] };
 
-    const profilesMap = await fetchProfilesMap(data.map((c) => c.author_id));
+    const [profilesMap, reactions] = await Promise.all([
+      fetchProfilesMap(data.map((c) => c.author_id)),
+      fetchCommentReactions(data.map((c) => c.id)),
+    ]);
     const comments = data.map((row) => {
       const media = Array.isArray(row.media) ? row.media : [];
       const gifItem = media.find((m) => m.kind === 'gif');
@@ -181,7 +263,8 @@ export async function fetchComments(postIds) {
         menzioni: row.menzioni ?? [],
         data: row.created_at,
         gif: gifItem?.url ?? null,
-        reazioni: {},
+        reazioni: reactions.get(row.id)?.counts ?? {},
+        mieReazioni: reactions.get(row.id)?.mine ?? [],
       };
     });
     return { comments };
@@ -192,11 +275,11 @@ export async function fetchComments(postIds) {
 
 // categoria/tag/titleId/extra solo per i post di categoria del mondo Nerd
 // (il server accetta tag solo insieme a una categoria gaming e mondo nerd).
-export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, mondo = 'social', menzioni = [], categoria = null, tag = null, titleId = null, extra = null }) {
+export async function createPost({ testo, gif, link_esterno, gruppoId, contentId, mediaUrl, mediaType, tags, punteggio, mondo = 'social', menzioni = [], categoria = null, tag = null, titleId = null, extra = null }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
-    const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags });
+    const media = mediaFromFields({ gif, link_esterno, contentId, mediaUrl, mediaType, tags, punteggio });
     const { data, error } = await supabase
       .from('posts')
       .insert({

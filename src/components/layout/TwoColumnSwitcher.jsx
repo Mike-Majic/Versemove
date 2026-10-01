@@ -22,6 +22,11 @@ function SwitchIcon() {
 // della vista mobile resta interno (utile quando nessun altro elemento del
 // pannello deve leggerlo o cambiarlo); passarli permette invece a un
 // pulsante dentro "secondary" di tornare a "primary" (es. "← Torna a...").
+//
+// Senza "secondary" diventa un pannello unico largo quanto lo spazio fra i
+// bordi dello schermo (desktop) o a piena larghezza senza maniglia (mobile):
+// per le colonne che non hanno una seconda colonna (es. le offerte della
+// Vetrina, con i filtri in un menu a tendina).
 export default function TwoColumnSwitcher({
   primary,
   secondary,
@@ -39,6 +44,18 @@ export default function TwoColumnSwitcher({
   // prima (vedi hooks/useBackLayer.js). Su desktop sono affiancate, niente
   // da chiudere.
   useBackLayer(!isDesktop && view === 'secondary' && !closing, () => setView('primary'), 'subpage:2col');
+
+  if (!secondary) {
+    return isDesktop ? (
+      <aside className={`rb-2col-panel rb-2col-wide ${closing ? 'closing' : ''}`}>{primary}</aside>
+    ) : (
+      <div className={`rb-2col-mobile-stage ${closing ? 'closing' : ''}`}>
+        <div className="rb-2col-mobile-track rb-2col-mobile-track-single">
+          <div className="rb-2col-mobile-slide">{primary}</div>
+        </div>
+      </div>
+    );
+  }
 
   if (isDesktop) {
     return (

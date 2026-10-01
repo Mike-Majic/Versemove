@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
 import PostComposer from './PostComposer';
 import PostCard from './PostCard';
@@ -26,6 +26,8 @@ import {
   addComment as addCommentApi,
   deleteComment as deleteCommentApi,
   displayName,
+  applyCommentReaction,
+  toggleCommentReaction,
 } from '../../data/posts';
 import { listGroups, getMyGroupIds, createGroup as createGroupApi, joinGroup, leaveGroup } from '../../data/groups';
 import { isStaff } from '../../data/roles';
@@ -37,6 +39,7 @@ import {
   deleteContent,
   updateContentCaption,
 } from '../../data/contents';
+import { getCityInfo } from '../../data/geo';
 import './SocialFeed.css';
 
 // Ogni tot post "di zona" (tab Per te, con un filtro Dove attivo), si
@@ -46,17 +49,23 @@ import './SocialFeed.css';
 const TRENDING_EVERY = 3;
 
 // Una card sponsorizzata ogni 8 post del feed, mai la prima — richiesta esplicita.
-const SPONSOR_FEED_EVERY = 8;
+const SPONSOR_FEED_EVERY = 7;
 
-// Un post è "della zona" se il suo autore ha una città nota che rispetta i
-// filtri Dove di Impostazioni. I profili reali (vedi public_profiles) non
-// hanno un campo città: per ora questo filtro non ha dati da confrontare e
-// il tab "Per te" con zona attiva resta vuoto — limite noto, non introdotto
-// da questa migrazione (era già così quando gli autori erano finti).
+// Un post è "della zona" se il suo autore ha una città nel Profilo Social
+// (public_profiles.citta_social, in author.citta) che rispetta i filtri
+// Dove di Impostazioni: la città per testo (senza accenti né maiuscole),
+// regione e continente dall'anagrafica di data/geo.js quando la città è
+// nota. Autore senza città = non è della zona.
+const fold = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 function matchesLocation(post, locationFilters) {
-  const city = post.author?.city;
+  const city = post.author?.citta || post.author?.city;
   if (!city) return false;
-  if (locationFilters.city && !city.toLowerCase().includes(locationFilters.city.toLowerCase())) return false;
+  if (locationFilters.city && !fold(city).includes(fold(locationFilters.city))) return false;
+  if (locationFilters.region || locationFilters.continent) {
+    const info = getCityInfo(city);
+    if (locationFilters.region && info?.region !== locationFilters.region) return false;
+    if (locationFilters.continent && info?.continent !== locationFilters.continent) return false;
+  }
   return true;
 }
 
@@ -116,6 +125,7 @@ export default function SocialFeed({
   onOpenEventLikers,
   // { postId, seq }: post da mostrare (clic su una notifica di menzione).
   focusPost = null,
+  focusEvent = null,
 }) {
   const [showEventComposer, setShowEventComposer] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(null);
@@ -135,6 +145,14 @@ export default function SocialFeed({
     setActionError(message);
     window.setTimeout(() => setActionError(''), 4000);
   };
+
+  // Pagine del feed (fetchFeed a FEED_PAGE_SIZE): cursore = data
+  // dell'ultimo post della pagina più vecchia già caricata (non del post
+  // più vecchio in lista: uno aperto da un link salterebbe le pagine in mezzo).
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorRef = useRef(null);
+  const sentinelRef = useRef(null);
 
   const [feedTab, setFeedTab] = useState('foryou');
   const [activeGroupId, setActiveGroupId] = useState(null);
@@ -158,6 +176,8 @@ export default function SocialFeed({
     }
 
     let feedPosts = feedRes.posts ?? [];
+    setHasMore(Boolean(feedRes.hasMore));
+    cursorRef.current = feedPosts.length ? feedPosts[feedPosts.length - 1].data : null;
 
     // Contenuti condivisi ripubblicati anche nel mondo Social da un altro
     // punto dell'app (senza una riga in posts): recuperati a parte e uniti.
@@ -206,7 +226,10 @@ export default function SocialFeed({
     const realPostIds = feedPosts.filter((p) => p.fromPostsTable).map((p) => p.id);
     if (realPostIds.length) {
       const { comments: fetchedComments, error } = await fetchComments(realPostIds);
-      if (!error) setComments(fetchedComments);
+      // Si tengono i commenti di un post aggiunto a parte (link condiviso)
+      // arrivati prima di questi.
+      const loaded = new Set(realPostIds);
+      if (!error) setComments((prev) => [...fetchedComments, ...prev.filter((c) => !loaded.has(c.post_id))]);
     } else {
       setComments([]);
     }
@@ -216,6 +239,46 @@ export default function SocialFeed({
     loadFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Pagina successiva: post, salvati e commenti dei soli post nuovi.
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || !cursorRef.current) return;
+    setLoadingMore(true);
+    const res = await fetchFeed({ mondo: 'social', before: cursorRef.current });
+    setLoadingMore(false);
+    if (res.error) {
+      showActionError(res.error);
+      return;
+    }
+    const fresh = res.posts ?? [];
+    setHasMore(Boolean(res.hasMore));
+    if (fresh.length) cursorRef.current = fresh[fresh.length - 1].data;
+    setPosts((prev) => {
+      const known = new Set(prev.map((p) => p.id));
+      return [...prev, ...fresh.filter((p) => !known.has(p.id))];
+    });
+    setSavedPosts((prev) => [...new Set([...prev, ...fresh.filter((p) => p.savedByMe).map((p) => p.id)])]);
+    if (fresh.length) {
+      const { comments: more } = await fetchComments(fresh.map((p) => p.id));
+      if (more?.length) {
+        setComments((prev) => {
+          const known = new Set(prev.map((c) => c.id));
+          return [...prev, ...more.filter((c) => !known.has(c.id))];
+        });
+      }
+    }
+  };
+
+  // Scorrimento infinito: la pagina dopo arriva quando si vede la fine.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) loadMore();
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  });
 
   const authorFromUser = () => ({ id: user.id, name: displayName(user, 'Tu'), avatar: user.avatar || '' });
 
@@ -401,18 +464,20 @@ export default function SocialFeed({
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   };
 
-  // Le reazioni emoji ai commenti restano solo un contatore locale a questa
-  // sessione (non c'è una tabella per salvarle condivise tra utenti/
-  // dispositivi): si azzerano ricaricando la pagina, invariato rispetto a
-  // prima per il resto dell'interazione.
-  const reactToComment = (commentId, emoji) => {
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c.id !== commentId) return c;
-        const current = c.reazioni?.[emoji] ?? 0;
-        return { ...c, reazioni: { ...c.reazioni, [emoji]: current + 1 } };
-      })
-    );
+  // Reazioni ai commenti: salvate in comment_reactions (una per emoji per
+  // utente), aggiornamento ottimistico e ritorno indietro se il server dice no.
+  const reactToComment = async (commentId, emoji) => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    const had = (comments.find((c) => c.id === commentId)?.mieReazioni ?? []).includes(emoji);
+    setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+    const { error: reactErr } = await toggleCommentReaction(commentId, emoji, had);
+    if (reactErr) {
+      setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+      setFeedError(reactErr);
+    }
   };
 
   const toggleFollow = async (userId) => {
@@ -477,14 +542,36 @@ export default function SocialFeed({
     setMobileView('primary');
   };
 
-  // Notifica di menzione: apre il gruppo del post se serve (altrimenti il
-  // tab "Per te"), lo porta in vista e lo evidenzia per qualche secondo.
+  // Notifica di menzione o link condiviso: apre il gruppo del post se
+  // serve (altrimenti il tab "Per te"), lo porta in vista e lo evidenzia
+  // per qualche secondo. Se il post non è tra quelli caricati (più vecchio,
+  // o di un link) lo si chiede da solo e lo si aggiunge al feed: l'effect
+  // riparte appena arriva (focusFetchRef evita un secondo tentativo).
+  const focusFetchRef = useRef(null);
+  const [focusFetched, setFocusFetched] = useState(0);
   useEffect(() => {
     if (!focusPost || loading) return undefined;
     const target = posts.find((p) => p.id === focusPost.postId);
     if (!target) {
-      showActionError('Questo post non è più disponibile.');
-      return undefined;
+      if (focusFetchRef.current === focusPost.seq) {
+        showActionError('Questo post non è più disponibile.');
+        return undefined;
+      }
+      focusFetchRef.current = focusPost.seq;
+      let cancelled = false;
+      fetchFeed({ mondo: 'social', ids: [focusPost.postId] }).then(async (res) => {
+        if (cancelled) return;
+        const found = res.posts?.[0];
+        if (found) {
+          setPosts((prev) => (prev.some((p) => p.id === found.id) ? prev : [...prev, found].sort((a, b) => new Date(b.data) - new Date(a.data))));
+          const { comments: extra } = await fetchComments([found.id]);
+          if (extra?.length) setComments((prev) => [...prev.filter((c) => c.post_id !== found.id), ...extra]);
+        }
+        setFocusFetched((n) => n + 1);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     setMobileView('primary');
     if (target.gruppo_id) setActiveGroupId(target.gruppo_id);
@@ -509,7 +596,30 @@ export default function SocialFeed({
     timer = window.setTimeout(reveal, 100);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusPost?.seq, loading]);
+  }, [focusPost?.seq, loading, focusFetched]);
+
+  // Evento cliccato sul globo: scheda Eventi, evento in vista ed evidenziato.
+  useEffect(() => {
+    if (!focusEvent) return undefined;
+    setMobileView('primary');
+    setActiveGroupId(null);
+    setFeedTab('eventi');
+    let tries = 0;
+    let timer;
+    const reveal = () => {
+      const el = document.querySelector(`[data-event-id="${focusEvent.eventId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('rb-event-card--focus');
+        timer = window.setTimeout(() => el.classList.remove('rb-event-card--focus'), 2600);
+      } else if (tries++ < 10) {
+        timer = window.setTimeout(reveal, 150);
+      }
+    };
+    timer = window.setTimeout(reveal, 100);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusEvent?.seq]);
 
   const isGroupView = Boolean(activeGroupId);
   const activeGroup = isGroupView ? groupsList.find((g) => g.id === activeGroupId) ?? null : null;
@@ -770,15 +880,22 @@ export default function SocialFeed({
                   onToggleSave={toggleSavePost}
                   onOpenGroup={openGroup}
                 />
-                {/* Una card sponsorizzata ogni 8 post, mai la prima (richiesta
+                {/* Una pubblicità ogni 7 post, mai la prima (richiesta
                     esplicita): SPONSOR_FEED_EVERY posti dopo l'inizio, poi si
                     ripete. */}
                 {(i + 1) % SPONSOR_FEED_EVERY === 0 && (
-                  <SponsorCard as="li" mondo="social" formato="card_feed" />
+                  <SponsorCard as="li" mondo="social" formato="card_feed" fallbackDeal />
                 )}
               </Fragment>
             ))}
           </ul>
+          {hasMore && !loading && !isGroupView && (feedTab === 'foryou' || feedTab === 'following') && (
+            <div ref={sentinelRef} className="rb-feed-more">
+              <button type="button" className="rb-feed-more-btn" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Carico altri post…' : 'Carica altri post'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </>

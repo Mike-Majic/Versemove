@@ -6,10 +6,11 @@
 export const DOG_PLACE_TYPES = {
   area_cani: { emoji: '🐕', label: 'Area cani', color: '#22c55e' },
   autogrill: { emoji: '⛽', label: 'Autogrill', color: '#f59e0b' },
-  hotel: { emoji: '🏨', label: 'Hotel pet-friendly', color: '#3b82f6' },
+  hotel: { emoji: '🏨', label: 'Hotel e B&B', color: '#3b82f6' },
   spiaggia: { emoji: '🏖️', label: 'Spiaggia', color: '#06b6d4' },
   sentiero: { emoji: '🥾', label: 'Sentiero', color: '#84cc16' },
-  rifugio: { emoji: '🛖', label: 'Rifugio', color: '#a855f7' },
+  // 🏔️ e non 🛖: la capanna su Windows 10 non esiste e si vedeva un quadratino.
+  rifugio: { emoji: '🏔️', label: 'Rifugio', color: '#a855f7' },
 };
 
 export function placeTypeMeta(tipo) {

@@ -1,0 +1,151 @@
+/* Marker degli eventi sul globo (vedi eventMarkers.js). L'elemento esterno
+   è largo/alto 0: la sua origine è la coordinata dell'evento, e il suo
+   transform lo riscrive la libreria del globo (qui mai toccato). */
+.rb-event-marker {
+  --ev-far: #ff8fe0;
+  --ev-far-glow: rgba(255, 95, 208, 0.85);
+  --ev-far-ring: rgba(255, 95, 208, 0.25);
+  width: 0;
+  height: 0;
+  overflow: visible;
+  cursor: pointer;
+  outline: none;
+}
+
+/* L'unico elemento che scala: la base (punto luminoso) resta sulla coordinata. */
+.rb-ev-pin {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%) scale(var(--ev-scale, 1));
+  transform-origin: 50% 100%;
+  transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+  cursor: pointer;
+  /* Il livello HTML del globo ha pointer-events: none (ereditato): senza
+     questo il click passerebbe al canvas sotto e l'evento non si aprirebbe. */
+  pointer-events: auto;
+}
+
+.rb-ev-hex {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px rgba(80, 190, 255, 0.85));
+}
+
+.rb-ev-hex text {
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.rb-ev-month {
+  font-size: 7.6px;
+  letter-spacing: 1.3px;
+  fill: #8be9ff;
+}
+
+.rb-ev-day {
+  font-size: 16.5px;
+  fill: #fff;
+  filter: drop-shadow(0 0 2px rgba(95, 224, 255, 0.9));
+}
+
+.rb-ev-day-big {
+  font-size: 21px;
+}
+
+.rb-ev-compact {
+  display: none;
+}
+
+.rb-ev-stem {
+  width: 2px;
+  height: 9px;
+  background: linear-gradient(#38c6ff, rgba(56, 198, 255, 0.2));
+}
+
+.rb-ev-base {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7fe3ff;
+  margin-bottom: -4px;
+  box-shadow: 0 0 0 3px rgba(56, 198, 255, 0.25), 0 0 10px 3px rgba(56, 198, 255, 0.8);
+}
+
+.rb-ev-label {
+  position: absolute;
+  top: calc(100% + 10px);
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: rgba(4, 12, 24, 0.9);
+  border: 1px solid #1d5a86;
+  color: #cfeaff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+
+.rb-ev-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--ev-far);
+  box-shadow: 0 0 0 3px var(--ev-far-ring), 0 0 9px 3px var(--ev-far-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+  cursor: pointer;
+}
+
+/* Area di click/tocco più grande del punto. */
+.rb-ev-dot::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.rb-event-marker:focus-visible .rb-ev-hex {
+  filter: drop-shadow(0 0 6px rgba(80, 190, 255, 0.85)) drop-shadow(0 0 2px #fff);
+}
+
+/* --- Fasce di zoom (data-ev-zoom sul contenitore, vedi applyEventZoom) --- */
+[data-ev-zoom='far'] .rb-ev-pin {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-ev-zoom='far'] .rb-ev-dot {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+[data-ev-zoom='mid'] .rb-ev-full {
+  display: none;
+}
+
+[data-ev-zoom='mid'] .rb-ev-compact {
+  display: inline;
+}
+
+[data-ev-zoom='close'] .rb-ev-label {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-ev-pin,
+  .rb-ev-label,
+  .rb-ev-dot {
+    transition: none;
+  }
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ModalOverlay from './ModalOverlay';
 import './EventLikersModal.css';
+import AvatarImg from './shared/AvatarImg';
 
 // Elenco di chi ha messo "mi piace" a un evento: si apre sia dal badge sul
 // marker quadrato sul globo sia dalla card in colonna, stessa lista in
@@ -37,7 +38,7 @@ export default function EventLikersModal({
     <ModalOverlay onClose={onClose}>
       <div className="rb-event-likers-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-        <h3>Mi piace</h3>
+        <h3>Partecipanti</h3>
         <p className="rb-event-likers-subtitle">{event.titolo}</p>
         {error && <p className="rb-privacy-error">⚠️ {error}</p>}
 
@@ -48,7 +49,7 @@ export default function EventLikersModal({
             const requested = !isMe && friendRequestsSent.includes(l.id);
             return (
               <li key={l.id} className="rb-event-likers-item">
-                <img src={l.avatar} alt="" />
+                <AvatarImg src={l.avatar} name={l?.name || l?.nickname} seed={l?.id} alt="" />
                 <strong>{isMe ? 'Tu' : l.name}</strong>
                 {!isMe && (
                   isFriend ? (
@@ -62,7 +63,7 @@ export default function EventLikersModal({
               </li>
             );
           })}
-          {likers.length === 0 && <p className="rb-event-likers-empty">Nessun mi piace ancora.</p>}
+          {likers.length === 0 && <p className="rb-event-likers-empty">Nessun partecipante ancora.</p>}
         </ul>
       </div>
     </ModalOverlay>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EVENTS_PAGE_SIZE, EVENT_TYPES, EVENT_TYPE_CHIPS, fetchEventiVicini, setEventAttendance } from '../../../data/cosplay';
+import { EVENTS_PAGE_SIZE, EVENT_TYPES, EVENT_TYPE_CHIPS, fetchCosplayEvent, fetchEventiVicini, setEventAttendance } from '../../../data/cosplay';
+import { linkToCosplayEvent } from '../../../data/deepLinks';
 import { CITY_DATA_CREDIT, locationHasCoords } from '../../../data/citta';
 import { isUnlimitedDistance } from '../../../data/geo';
 import EmptyState from '../../EmptyState';
@@ -7,6 +8,7 @@ import Skeleton from '../../Skeleton';
 import CosplayEventCard from './CosplayEventCard';
 import CosplayEventsMap from './CosplayEventsMap';
 import ProposeEventForm from './ProposeEventForm';
+import Icon from '../../shared/Icon';
 
 // Scheda Eventi: RPC eventi_vicini con la città del filtro "Dove"
 // (Impostazioni → Luogo) e la sua distanza, oppure tutto il mondo. In alto
@@ -14,7 +16,23 @@ import ProposeEventForm from './ProposeEventForm';
 // Vicino a me / Tutto il mondo; chip per tipo; Prossimi | Passati; in
 // Prossimi le sezioni "In corso ora" (LIVE) e "In arrivo"; scorrimento
 // infinito a pagine di 30; Lista / Mappa; "+ Proponi evento".
-export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor }) {
+// focusEvent: { eventId, seq } da un link condiviso: l'evento compare in
+// cima ("Evento condiviso") qualunque siano i filtri.
+// config: la stessa interfaccia per altre categorie con eventi (es. Teatro
+// del mondo Arte, vedi data/teatroEvents.js): mondo/categoria della RPC,
+// tipi e chip, se si può proporre un evento e il link da condividere.
+export const COSPLAY_EVENTS_CONFIG = {
+  mondo: 'nerd',
+  categoria: 'cosplay',
+  types: EVENT_TYPES,
+  chips: EVENT_TYPE_CHIPS,
+  canPropose: true,
+  shareLink: linkToCosplayEvent,
+  emptyIcon: '🎪',
+};
+
+export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, onLfgFor, focusEvent = null, config = COSPLAY_EVENTS_CONFIG }) {
+  const { mondo, categoria, types, chips, canPropose, shareLink, emptyIcon } = config;
   const hasCoords = locationHasCoords(locationFilters);
   const unlimited = isUnlimitedDistance(locationFilters?.distance ?? 150);
   const canNearby = hasCoords && !unlimited;
@@ -30,6 +48,19 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState('');
   const seqRef = useRef(0);
+  // Evento aperto da un link: undefined = nessuno, null = non trovato.
+  const [shared, setShared] = useState(undefined);
+
+  useEffect(() => {
+    if (!focusEvent?.eventId) return undefined;
+    let cancelled = false;
+    fetchCosplayEvent(focusEvent.eventId).then((ev) => {
+      if (!cancelled) setShared(ev);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusEvent?.eventId, focusEvent?.seq]);
   const sentinelRef = useRef(null);
 
   // Se il filtro Dove cambia (Impostazioni), l'interruttore segue.
@@ -44,8 +75,10 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       km: nearby && canNearby ? locationFilters.distance : null,
       periodo,
       tipo,
+      mondo,
+      categoria,
     }),
-    [nearby, canNearby, locationFilters?.lat, locationFilters?.lng, locationFilters?.distance, periodo, tipo]
+    [nearby, canNearby, locationFilters?.lat, locationFilters?.lng, locationFilters?.distance, periodo, tipo, mondo, categoria]
   );
 
   const load = useCallback(
@@ -100,18 +133,18 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       return;
     }
     // Aggiornamento locale: stato mio e conteggi.
-    setEvents((prev) =>
-      (prev ?? []).map((e) => {
-        if (e.id !== ev.id) return e;
-        const dec = (k) => Math.max(0, e[k] - 1);
-        let { nPartecipa, nInteressati } = e;
-        if (e.mioStato === 'partecipa') nPartecipa = dec('nPartecipa');
-        if (e.mioStato === 'interessato') nInteressati = dec('nInteressati');
-        if (stato === 'partecipa') nPartecipa += 1;
-        if (stato === 'interessato') nInteressati += 1;
-        return { ...e, mioStato: stato, nPartecipa, nInteressati };
-      })
-    );
+    const update = (e) => {
+      if (e.id !== ev.id) return e;
+      const dec = (k) => Math.max(0, e[k] - 1);
+      let { nPartecipa, nInteressati } = e;
+      if (e.mioStato === 'partecipa') nPartecipa = dec('nPartecipa');
+      if (e.mioStato === 'interessato') nInteressati = dec('nInteressati');
+      if (stato === 'partecipa') nPartecipa += 1;
+      if (stato === 'interessato') nInteressati += 1;
+      return { ...e, mioStato: stato, nPartecipa, nInteressati };
+    };
+    setEvents((prev) => (prev ?? []).map(update));
+    setShared((prev) => (prev ? update(prev) : prev));
   };
 
   const openDove = () => window.dispatchEvent(new CustomEvent('vm:open-settings', { detail: { section: 'luogo' } }));
@@ -122,18 +155,20 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
   const center = canNearby ? [locationFilters.lat, locationFilters.lng] : null;
 
   const renderCards = (arr) =>
-    arr.map((e) => <CosplayEventCard key={e.id} event={e} user={user} busy={busyId === e.id} onAttend={attend} onLfgFor={onLfgFor} />);
+    arr.map((e) => (
+      <CosplayEventCard key={e.id} event={e} user={user} busy={busyId === e.id} onAttend={attend} onLfgFor={onLfgFor} types={types} shareLink={shareLink} />
+    ));
 
   return (
     <>
       <div className="rb-cev-where-bar">
         <button type="button" className="rb-cev-where-btn" onClick={openDove} title="Cambia città e distanza">
           {canNearby && nearby ? (
-            <>📍 {locationFilters.city} · entro {locationFilters.distance} km</>
+            <><Icon name="pin" size={14} className="rb-icon--inline" /> {locationFilters.city} · entro {locationFilters.distance} km</>
           ) : hasCoords ? (
-            <>🌍 Tutto il mondo · <u>{locationFilters.city}</u></>
+            <><Icon name="globe" size={14} className="rb-icon--inline" /> Tutto il mondo · <u>{locationFilters.city}</u></>
           ) : (
-            <>🌍 Tutto il mondo · <u>Imposta la tua città</u></>
+            <><Icon name="globe" size={14} className="rb-icon--inline" /> Tutto il mondo · <u>Imposta la tua città</u></>
           )}
         </button>
         <div className="rb-cev-toggle" role="group" aria-label="Zona">
@@ -154,8 +189,8 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       <div className="rb-gaming-head">
         <div className="rb-gaming-filters rb-cev-chips" role="group" aria-label="Tipo di evento">
           <button type="button" className={tipo === null ? 'is-active' : ''} onClick={() => setTipo(null)}>Tutti</button>
-          {EVENT_TYPE_CHIPS.map((k) => (
-            <button key={k} type="button" className={tipo === k ? 'is-active' : ''} onClick={() => setTipo(k)}>{EVENT_TYPES[k].plural}</button>
+          {chips.map((k) => (
+            <button key={k} type="button" className={tipo === k ? 'is-active' : ''} onClick={() => setTipo(k)}>{types[k].plural}</button>
           ))}
         </div>
       </div>
@@ -168,12 +203,14 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
           <button type="button" className={view === 'lista' ? 'is-active' : ''} onClick={() => setView('lista')}>Lista</button>
           <button type="button" className={view === 'mappa' ? 'is-active' : ''} onClick={() => setView('mappa')}>Mappa</button>
         </div>
-        <button type="button" className="rb-vroom-btn rb-vroom-btn--primary rb-cev-propose" onClick={() => (requireAuth() ? null : setShowForm((v) => !v))}>
-          ＋ Proponi evento
-        </button>
+        {canPropose && (
+          <button type="button" className="rb-vroom-btn rb-vroom-btn--primary rb-cev-propose" onClick={() => (requireAuth() ? null : setShowForm((v) => !v))}>
+            ＋ Proponi evento
+          </button>
+        )}
       </div>
 
-      {showForm && user && (
+      {canPropose && showForm && user && (
         <ProposeEventForm
           onDone={(res, pubblico) => {
             setShowForm(false);
@@ -186,31 +223,51 @@ export default function CosplayEventsTab({ user, onOpenAuth, locationFilters, on
       {notice && (
         <p className="rb-vroom-notice" role="status">
           {notice}
-          <button type="button" onClick={() => setNotice('')} aria-label="Chiudi avviso">✕</button>
+          <button type="button" onClick={() => setNotice('')} aria-label="Chiudi avviso"><Icon name="close" size={15} /></button>
         </p>
       )}
       {error && <p className="rb-gaming-error" role="alert">{error}</p>}
 
+      {shared !== undefined && (
+        <section className="rb-cev-section rb-cev-shared">
+          <div className="rb-gaming-section-title">
+            <Icon name="link" size={16} className="rb-icon--inline" /> Evento condiviso
+            <button type="button" className="rb-cev-shared-close" onClick={() => setShared(undefined)} aria-label="Nascondi evento condiviso"><Icon name="close" size={15} /></button>
+          </div>
+          {shared ? (
+            <ul className="rb-cev-list">{renderCards([shared])}</ul>
+          ) : (
+            <p className="rb-gaming-note">Questo evento non esiste più o non è visibile per il tuo account.</p>
+          )}
+        </section>
+      )}
+
       {events === null ? (
         <Skeleton lines={4} />
       ) : view === 'mappa' ? (
-        <CosplayEventsMap events={list} center={center} />
+        <CosplayEventsMap events={list} center={center} types={types} />
       ) : list.length === 0 ? (
         <EmptyState
-          icon="🎪"
+          icon={typeof emptyIcon === 'string' && /^[a-z]+$/i.test(emptyIcon) ? <Icon name={emptyIcon} size={30} /> : emptyIcon}
           title={periodo === 'passati' ? 'Nessun evento passato' : nearby && canNearby ? `Nessun evento entro ${locationFilters.distance} km` : 'Nessun evento in programma'}
-          subtitle={nearby && canNearby ? 'Prova "Tutto il mondo" o allarga la distanza in Impostazioni.' : 'Proponi tu il primo.'}
+          subtitle={nearby && canNearby ? 'Prova "Tutto il mondo" o allarga la distanza in Impostazioni.' : canPropose ? 'Proponi tu il primo.' : 'Ne arrivano di nuovi ogni giorno.'}
         />
       ) : (
         <>
           {inCorso.length > 0 && (
             <section className="rb-cev-section">
-              <div className="rb-gaming-section-title">🔴 In corso ora</div>
+              <div className="rb-gaming-section-title">
+              <Icon name="broadcast" size={16} className="rb-icon--inline" /> In corso ora
+            </div>
               <ul className="rb-cev-list">{renderCards(inCorso)}</ul>
             </section>
           )}
           <section className="rb-cev-section">
-            {periodo === 'prossimi' && <div className="rb-gaming-section-title">📅 In arrivo</div>}
+            {periodo === 'prossimi' && (
+            <div className="rb-gaming-section-title">
+              <Icon name="calendar" size={16} className="rb-icon--inline" /> In arrivo
+            </div>
+          )}
             {inArrivo.length === 0 ? <p className="rb-gaming-note">Niente altro in arrivo.</p> : <ul className="rb-cev-list">{renderCards(inArrivo)}</ul>}
           </section>
           {hasMore && <div ref={sentinelRef} className="rb-cev-sentinel">{loadingMore ? 'Carico altri eventi…' : ''}</div>}

@@ -182,7 +182,14 @@ export default function DogWorldMap({ user, onOpenAuth }) {
 
   return (
     <div className="rb-dogmap">
-      <div className="rb-dogmap-filters">
+      <div
+        className="rb-dogmap-filters"
+        onWheel={(e) => {
+          // Rotellina verticale -> scorrimento orizzontale dei filtri.
+          const el = e.currentTarget;
+          if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY;
+        }}
+      >
         {Object.entries(DOG_PLACE_TYPES).map(([tipo, meta]) => (
           <button
             key={tipo}

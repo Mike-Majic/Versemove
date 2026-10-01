@@ -3,6 +3,7 @@ import { searchYoutubeVideos, getVideoViewCounts } from '../../data/youtubeSearc
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
 import './MusicaEsplora.css';
+import Icon from '../shared/Icon';
 
 const TILES = [
   { id: 'nuove-uscite', label: 'Nuove uscite', query: 'nuove uscite musicali 2026', color: '#8b5cf6' },
@@ -40,7 +41,7 @@ function SquareCarousel({ items, onSelect }) {
       {items.map((it) => (
         <li key={it.id}>
           <button type="button" onClick={() => onSelect(it)}>
-            {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-carousel-empty">🎵</div>}
+            {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-carousel-empty"><Icon name="music" size={24} /></div>}
             <strong>{it.title}</strong>
             <span>{it.artist}</span>
           </button>
@@ -56,7 +57,7 @@ function WideCarousel({ items, onSelect }) {
       {items.map((it) => (
         <li key={it.id}>
           <button type="button" onClick={() => onSelect(it)}>
-            {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-wide-empty">🎬</div>}
+            {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-wide-empty"><Icon name="film" size={24} /></div>}
             <strong>{it.title}</strong>
             <span>{it.artist}</span>
           </button>
@@ -154,17 +155,17 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
               <Skeleton lines={2} />
             </div>
           )}
-          {error && <EmptyState icon="⚠️" title="Sezione non disponibile" subtitle={error} />}
+          {error && <EmptyState icon={<Icon name="info" size={30} />} title="Sezione non disponibile" subtitle={error} />}
           <ul className="rb-esplora-results-list">
             {results.items.map((it) => (
               <li key={it.id}>
                 <button type="button" onClick={() => onTogglePlay(it)}>
-                  {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-results-empty">🎵</div>}
+                  {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-results-empty"><Icon name="music" size={20} /></div>}
                   <div>
                     <strong>{it.title}</strong>
                     <span>{it.artist}</span>
                   </div>
-                  <span className="rb-esplora-play">{playingId === it.id ? '⏸' : '▶️'}</span>
+                  <span className="rb-esplora-play"><Icon name={playingId === it.id ? 'pause' : 'play'} size={16} /></span>
                 </button>
               </li>
             ))}
@@ -181,7 +182,7 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
           </div>
         )}
         {newReleases && newReleases.length > 0 && <SquareCarousel items={newReleases} onSelect={onTogglePlay} />}
-        {newReleases?.length === 0 && <EmptyState icon="💿" title="Non disponibile ora" subtitle="Riprova più tardi." />}
+        {newReleases?.length === 0 && <EmptyState icon={<Icon name="disc" size={30} />} title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
 
       <section className="rb-esplora-section" id="rb-esplora-mood-anchor">
@@ -219,7 +220,7 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
               <li key={it.id}>
                 <button type="button" onClick={() => onTogglePlay(it)}>
                   <span className="rb-esplora-trending-rank">{i + 1}</span>
-                  {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-trending-empty">🎵</div>}
+                  {it.artworkUrl ? <img src={it.artworkUrl} alt="" /> : <div className="rb-esplora-trending-empty"><Icon name="music" size={20} /></div>}
                   <div>
                     <strong>{it.title}</strong>
                     <span>{it.artist}{it.views != null ? ` · ${formatViews(it.views)}` : ''}</span>
@@ -229,7 +230,7 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
             ))}
           </ol>
         )}
-        {trending?.length === 0 && <EmptyState icon="📈" title="Non disponibile ora" subtitle="Riprova più tardi." />}
+        {trending?.length === 0 && <EmptyState icon={<Icon name="trending" size={30} />} title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
 
       <section className="rb-esplora-section">
@@ -241,7 +242,7 @@ export default function MusicaEsplora({ playingId, onTogglePlay }) {
           </div>
         )}
         {newVideos && newVideos.length > 0 && <WideCarousel items={newVideos} onSelect={onTogglePlay} />}
-        {newVideos?.length === 0 && <EmptyState icon="🎬" title="Non disponibile ora" subtitle="Riprova più tardi." />}
+        {newVideos?.length === 0 && <EmptyState icon={<Icon name="film" size={30} />} title="Non disponibile ora" subtitle="Riprova più tardi." />}
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import { fieldsForCategory } from '../../data/annunciSchema';
 import { toggleFavorite } from '../../data/annunci';
+import PublishedAt from '../shared/PublishedAt';
 
 function formatPrice(listing) {
   if (listing.prezzo == null) return 'Prezzo su richiesta';
@@ -62,6 +63,7 @@ export default function AnnuncioCard({ listing, user, onOpenAuth, onOpen, onFavo
           <span>{listing.citta || '—'}</span>
           {listing.trattabile && <span className="rb-annuncio-card-trattabile">Trattabile</span>}
         </div>
+        <PublishedAt at={listing.createdAt} />
       </div>
     </button>
   );

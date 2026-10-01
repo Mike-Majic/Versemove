@@ -3,6 +3,8 @@ import { EVENT_TYPES, formatEventDates } from '../../../data/cosplay';
 import Skeleton from '../../Skeleton';
 import EmptyState from '../../EmptyState';
 import '../../tattoo/tattoo.css';
+import { iconHtml } from '../../shared/iconHtml';
+import Icon from '../../shared/Icon';
 
 // Mappa degli eventi (scheda Eventi, toggle Lista/Mappa): stessa
 // mappa Leaflet caricata pigramente della categoria Tattoo (TattooMap),
@@ -11,13 +13,13 @@ import '../../tattoo/tattoo.css';
 // città del filtro Dove, altrimenti l'Italia.
 const ITALY = { center: [42.3, 12.6], zoom: 5 };
 
-function popupHtml(ev) {
-  const t = EVENT_TYPES[ev.tipo] ?? EVENT_TYPES.altro;
+function popupHtml(ev, types = EVENT_TYPES) {
+  const t = types[ev.tipo] ?? types.altro ?? EVENT_TYPES.altro;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  return `<strong>${esc(ev.titolo)}</strong><br>${t.icon} ${esc(t.label)} · ${esc(formatEventDates(ev.dataEvento, ev.dataFine))}<br>📍 ${esc(ev.citta)}`;
+  return `<strong>${esc(ev.titolo)}</strong><br>${t.iconName ? iconHtml(t.iconName, 14) : t.icon} ${esc(t.label)} · ${esc(formatEventDates(ev.dataEvento, ev.dataFine))}<br>${iconHtml('pin', 14)} ${esc(ev.citta)}`;
 }
 
-export default function CosplayEventsMap({ events, center = null, onSelect }) {
+export default function CosplayEventsMap({ events, center = null, onSelect, types = EVENT_TYPES }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -67,21 +69,21 @@ export default function CosplayEventsMap({ events, center = null, onSelect }) {
     cluster.clearLayers();
     const pts = events.filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng));
     for (const ev of pts) {
-      const t = EVENT_TYPES[ev.tipo] ?? EVENT_TYPES.altro;
+      const t = types[ev.tipo] ?? types.altro ?? EVENT_TYPES.altro;
       const marker = L.marker([ev.lat, ev.lng], {
-        icon: L.divIcon({ html: `<div class="rb-cevmap-pin ${ev.inCorso ? 'is-live' : ''}">${t.icon}</div>`, className: 'rb-tattoomap-pin-wrap', iconSize: [34, 34] }),
+        icon: L.divIcon({ html: `<div class="rb-cevmap-pin ${ev.inCorso ? 'is-live' : ''}">${t.iconName ? iconHtml(t.iconName, 18) : t.icon}</div>`, className: 'rb-tattoomap-pin-wrap', iconSize: [34, 34] }),
       });
-      marker.bindPopup(popupHtml(ev));
+      marker.bindPopup(popupHtml(ev, types));
       marker.on('click', () => onSelect?.(ev));
       cluster.addLayer(marker);
     }
     if (pts.length > 0 && !center) mapRef.current?.fitBounds(cluster.getBounds().pad(0.2), { maxZoom: 8 });
-  }, [events, ready, center, onSelect]);
+  }, [events, ready, center, onSelect, types]);
 
   return (
     <div className="rb-tattoomap-viewport rb-cevmap">
       {loadError ? (
-        <EmptyState icon="🗺️" title="Mappa non disponibile" subtitle="Controlla la connessione e riprova." />
+        <EmptyState icon={<Icon name="map" size={30} />} title="Mappa non disponibile" subtitle="Controlla la connessione e riprova." />
       ) : !ready ? (
         <div className="rb-tattoomap-loading"><Skeleton height="100%" width="100%" /></div>
       ) : null}

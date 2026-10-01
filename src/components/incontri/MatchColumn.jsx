@@ -15,8 +15,17 @@ import {
   addFavorite,
   removeFavorite,
   subscribeToOwnMatches,
+  INCONTRI_DECISION_EVENT,
+  getMyDatingProfile,
 } from '../../data/incontri';
+import { missingItems } from '../../data/datingLabels';
+import DatingProfileCard from './DatingProfileCard';
 import './MatchColumn.css';
+import AvatarImg from '../shared/AvatarImg';
+import SponsorCard from '../ads/SponsorCard';
+
+const MATCH_AD_EVERY = 5;
+const MATCH_VOTES_KEY = 'rb-match-votes';
 
 const RIGHT_TABS = [
   { id: 'likesYou', label: 'A chi piaci' },
@@ -46,7 +55,18 @@ function ActivityBadge({ attivita }) {
 // subito come nella vecchia demo locale). "Messaggi" apre la chat diretta
 // reale già usata per gli amici (FriendChatModal, via onOpenChat), non ha
 // una sua chat: un match è comunque solo una conversazione come le altre.
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, onConsumeInitialTab, matchFilters }) {
+// Nome + foto di un contatto: aprono la scheda del Profilo Incontri
+// (DatingCardModal via onOpenProfile), mai il profilo Social.
+function ContactButton({ profile, onOpen, children }) {
+  return (
+    <button type="button" className="rb-match-contact-btn" onClick={() => onOpen?.(profile.id)} aria-label={`Apri il profilo di ${profile.name}`}>
+      <AvatarImg src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt="" />
+      {children}
+    </button>
+  );
+}
+
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, onOpenMyDatingProfile, myDatingProfileVersion = 0, initialTab, onConsumeInitialTab }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -130,7 +150,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     setFavoritesLoading(true);
     setGiaVistoBannerShown(false);
     setGiaVistoBannerVisible(false);
-    Promise.all([getMatchCandidates(20, matchFilters), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
+    Promise.all([getMatchCandidates(20), getLikesReceived(), getMyMatches(), getMyFavorites()]).then(
       ([deckRes, likesRes, matchesRes, favRes]) => {
         if (cancelled) return;
         setDeck(deckRes.candidates ?? []);
@@ -155,7 +175,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
   useEffect(() => {
     if (!eligible || deckLoading || deck.length >= 3) return;
     let cancelled = false;
-    getMatchCandidates(20, matchFilters).then(({ candidates }) => {
+    getMatchCandidates(20).then(({ candidates }) => {
       if (cancelled || !candidates) return;
       setDeck((prev) => {
         const known = new Set(prev.map((p) => p.id));
@@ -200,7 +220,58 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // "Mi piace" dato dalla scheda del profilo (DatingCardModal): stesso
+  // effetto di quello dato da qui.
+  useEffect(() => {
+    const onDecision = (e) => {
+      const { id, matched } = e.detail ?? {};
+      if (!id) return;
+      setLikesYou((prev) => prev.filter((p) => p.id !== id));
+      setDeck((prev) => prev.filter((p) => p.id !== id));
+      if (matched) {
+        justMatchedIds.current.add(id);
+        refreshMatches();
+      }
+    };
+    window.addEventListener(INCONTRI_DECISION_EVENT, onDecision);
+    return () => window.removeEventListener(INCONTRI_DECISION_EVENT, onDecision);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Il proprio Profilo Incontri: finché mancano gli essenziali (foto,
+  // città, domande) non si entra nel mondo rosso: al posto del mazzo un
+  // pannello dice esattamente cosa manca. Si ricontrolla quando si chiude
+  // Il mio profilo (myDatingProfileVersion).
+  const [myDating, setMyDating] = useState(null);
+  useEffect(() => {
+    if (!eligible) return undefined;
+    let cancelled = false;
+    getMyDatingProfile().then((r) => {
+      if (!cancelled && r.profile) setMyDating(r.profile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eligible, user?.id, myDatingProfileVersion]);
+  const datingGate = eligible && myDating && !myDating.visibile && myDating.mancano.length > 0 ? myDating : null;
+
   const current = deck[0] ?? null;
+
+  // Una pubblicità ogni MATCH_AD_EVERY voti (richiesta di Mike): il
+  // conteggio resta anche chiudendo e riaprendo Match (localStorage, solo
+  // su questo dispositivo); al 5°, 10°... voto al posto del profilo
+  // successivo compare la card pubblicitaria con "Continua".
+  const [adPending, setAdPending] = useState(false);
+  const countVote = () => {
+    let n = 0;
+    try {
+      n = (Number(localStorage.getItem(MATCH_VOTES_KEY)) || 0) + 1;
+      localStorage.setItem(MATCH_VOTES_KEY, String(n));
+    } catch {
+      n = 0;
+    }
+    if (n > 0 && n % MATCH_AD_EVERY === 0) setAdPending(true);
+  };
 
   const decide = (outcome) => {
     if (!user) {
@@ -219,6 +290,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
         return;
       }
       setDeck((prev) => prev.filter((p) => p.id !== current.id));
+      countVote();
       if (matched) {
         justMatchedIds.current.add(current.id);
         triggerMatchToast(current);
@@ -307,24 +379,33 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
         <p className="rb-match-empty">{eligibilityMessage ?? 'Accedi per scoprire nuovi profili.'}</p>
       ) : deckLoading ? (
         <p className="rb-match-empty">Caricamento...</p>
-      ) : current ? (
-        <div className={`rb-match-card ${swiping ? `leaving-${swiping.direction}` : ''}`}>
-          <button
-            type="button"
-            className={`rb-match-fav-btn ${isFavorite(current.id) ? 'active' : ''}`}
-            onClick={() => toggleFavorite(current)}
-            aria-label="Aggiungi ai preferiti"
-            title="Aggiungi ai preferiti"
-          >
-            {isFavorite(current.id) ? '⭐' : '☆'}
+      ) : adPending ? (
+        <SponsorCard mondo="incontri" categoria="match" formato="card_feed" fallbackDeal className="rb-match-ad" onEmpty={() => setAdPending(false)}>
+          <button type="button" className="rb-match-ad-continue" onClick={() => setAdPending(false)}>
+            Continua con i profili
           </button>
-          <img className="rb-match-card-photo" src={current.avatar} alt={current.name} />
-          <div className="rb-match-card-info">
-            <strong>{current.name}{current.age ? `, ${current.age}` : ''}</strong>
-            <span>{current.city}</span>
-            <ActivityBadge attivita={current.attivita} />
-            {current.bio && <p>{current.bio}</p>}
-          </div>
+        </SponsorCard>
+      ) : current ? (
+        <div className="rb-match-deck-card">
+          <DatingProfileCard
+            key={current.id}
+            card={current.card ?? { id: current.id, nickname: current.name, avatar: current.avatar, eta: current.age, citta: current.city, bio: current.bio, attivita: current.attivita }}
+            mode="deck"
+            busy={!!swiping}
+            leaving={swiping?.direction ?? null}
+            onDecision={(d) => decide(d === 'passo' ? 'passed' : d === 'super_mi_piace' ? 'super' : 'liked')}
+            topRight={
+              <button
+                type="button"
+                className={`rb-match-fav-btn ${isFavorite(current.id) ? 'active' : ''}`}
+                onClick={() => toggleFavorite(current)}
+                aria-label="Aggiungi ai preferiti"
+                title="Aggiungi ai preferiti"
+              >
+                {isFavorite(current.id) ? '⭐' : '☆'}
+              </button>
+            }
+          />
         </div>
       ) : (
         <EmptyState
@@ -332,13 +413,6 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
           title="Nessun profilo in questa zona"
           subtitle="Prova ad allargare la ricerca dalle Impostazioni → Luogo e Mostrami."
         />
-      )}
-      {eligible && current && (
-        <div className="rb-match-actions">
-          <button type="button" className="rb-match-pass-btn" onClick={() => decide('passed')} disabled={!!swiping}>✕ Passa</button>
-          <button type="button" className="rb-match-super-btn" onClick={() => decide('super')} disabled={!!swiping}>⭐ Super Like</button>
-          <button type="button" className="rb-match-like-btn" onClick={() => decide('liked')} disabled={!!swiping}>❤️ Mi piace</button>
-        </div>
       )}
     </div>
   );
@@ -350,12 +424,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {likesYou.length === 0 && <p className="rb-match-pane-empty">Nessuno per ora, torna più tardi.</p>}
       {likesYou.map((u) => (
         <li key={u.id} className="rb-match-likes-item">
-          <img src={u.avatar} alt="" />
-          <span>
-            <strong>{u.super ? '⭐ ' : ''}{u.name}{u.age ? `, ${u.age}` : ''}</strong>
-            <span className="rb-match-list-city">{u.city}</span>
-            <ActivityBadge attivita={u.attivita} />
-          </span>
+          <ContactButton profile={u} onOpen={onOpenProfile}>
+            <span>
+              <strong>{u.super ? '⭐ ' : ''}{u.name}{u.age ? `, ${u.age}` : ''}</strong>
+              <span className="rb-match-list-city">{u.city}</span>
+              <ActivityBadge attivita={u.attivita} />
+            </span>
+          </ContactButton>
           <div className="rb-match-likes-actions">
             <button type="button" onClick={() => decideLikesYou(u, 'passed')} aria-label="Rifiuta">✕</button>
             <button type="button" onClick={() => decideLikesYou(u, 'liked')} aria-label="Accetta">❤️</button>
@@ -372,12 +447,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matches.length === 0 && <p className="rb-match-pane-empty">Metti &quot;Mi piace&quot; a un profilo per iniziare a fare match.</p>}
       {matches.map((m) => (
         <li key={m.id} className="rb-match-likes-item">
-          <img src={m.avatar} alt="" />
-          <span>
-            <strong>{m.name}{m.age ? `, ${m.age}` : ''}</strong>
-            <span className="rb-match-list-city">{m.city}</span>
-            <ActivityBadge attivita={m.attivita} />
-          </span>
+          <ContactButton profile={m} onOpen={onOpenProfile}>
+            <span>
+              <strong>{m.name}{m.age ? `, ${m.age}` : ''}</strong>
+              <span className="rb-match-list-city">{m.city}</span>
+              <ActivityBadge attivita={m.attivita} />
+            </span>
+          </ContactButton>
           <button
             type="button"
             className="rb-reset-filters-btn rb-privacy-inline-btn"
@@ -399,7 +475,7 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matches.map((m) => (
         <li key={m.id}>
           <button type="button" className="rb-match-list-item" onClick={() => onOpenChat(m.id)}>
-            <img src={m.avatar} alt="" />
+            <AvatarImg src={m.avatar} name={m?.name || m?.nickname} seed={m?.id} alt="" />
             <span>
               <strong>{m.name}</strong>
               <span className="rb-match-list-city">Scrivi un messaggio →</span>
@@ -417,12 +493,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {favorites.length === 0 && <p className="rb-match-pane-empty">Tocca la stellina su un profilo per salvarlo qui.</p>}
       {favorites.map((f) => (
         <li key={f.id} className="rb-match-likes-item">
-          <img src={f.avatar} alt="" />
-          <span>
-            <strong>{f.name}</strong>
-            <span className="rb-match-list-city">{f.city}</span>
-            <ActivityBadge attivita={f.attivita} />
-          </span>
+          <ContactButton profile={f} onOpen={onOpenProfile}>
+            <span>
+              <strong>{f.name}</strong>
+              <span className="rb-match-list-city">{f.city}</span>
+              <ActivityBadge attivita={f.attivita} />
+            </span>
+          </ContactButton>
           <button
             type="button"
             className="rb-match-fav-remove"
@@ -456,6 +533,29 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {rightTab === 'favorites' && favoritesPane}
     </div>
   );
+
+  if (datingGate) {
+    const items = missingItems(datingGate.mancano, datingGate.foto.length);
+    return (
+      <div className="rb-match-column">
+        <div className="rb-match-gate" role="alert">
+          <h3>Per entrare nel mondo rosso completa il tuo Profilo Incontri</h3>
+          <p>Finché non lo completi il tuo profilo non viene mostrato agli altri e non puoi vedere i profili. Ti manca:</p>
+          <ul>
+            {items.map((it) => (
+              <li key={it}>
+                <span aria-hidden="true">✗</span> {it}
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="rb-match-gate-btn" onClick={() => onOpenMyDatingProfile?.()}>
+            Completa il Profilo Incontri
+          </button>
+          <p className="rb-match-gate-hint">Il mio profilo › Profilo Incontri</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rb-match-column">

@@ -20,6 +20,7 @@ export default function AnnunciWorldExplorer({
   favorites = [],
   onToggleFavorite,
   isClosing = false,
+  focusListing = null,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -87,6 +88,7 @@ export default function AnnunciWorldExplorer({
               if (target) onSearchCategory(target);
             }}
             closing={isClosing}
+            focusListing={focusListing}
           />
         </>
       )}

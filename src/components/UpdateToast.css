@@ -1,0 +1,104 @@
+/* Avviso "Nuova versione disponibile" (UpdateToast): stesso posto
+   dell'avviso di chiamata in arrivo (IncomingCallToast), sotto di lui
+   (z-index 1290 < 1300). Bordo di 2px coi colori di tutti i mondi che
+   girano, stessa tecnica dell'hub dei messaggi (DMHub.css): contenitore
+   col padding 2px e overflow nascosto, un disco conic-gradient enorme
+   dietro che ruota (transform, lo fa il compositore), interno bianco
+   pieno sopra. Fermo con prefers-reduced-motion. */
+.rb-update-toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1290;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(420px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 2px;
+  border-radius: 18px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  animation: rb-update-in 0.25s ease;
+}
+
+.rb-update-toast::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: max(300%, 1200px);
+  aspect-ratio: 1;
+  background: var(--update-conic);
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: rb-update-spin 6s linear infinite;
+  will-change: transform;
+}
+@keyframes rb-update-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.rb-update-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111118;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rb-update-text {
+  flex: 1;
+  min-width: 0;
+}
+.rb-update-btn {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #111118;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rb-update-btn:hover {
+  background: #2a2a33;
+}
+.rb-update-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #111118;
+  opacity: 0.7;
+  font-size: 14px;
+  cursor: pointer;
+}
+.rb-update-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+@keyframes rb-update-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-update-toast,
+  .rb-update-toast::before {
+    animation: none;
+  }
+}

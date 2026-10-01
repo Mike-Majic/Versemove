@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { createGothicLetter, loadGothicFont } from './gothicLetter.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -38,8 +39,8 @@ function pickDetailLevel(categoryCount) {
 // solo da questo fattore, e non va confusa con la distanza dalle categorie
 // vicine (quella è gestita a parte, scegliendo facce non adiacenti).
 const TRIANGLE_SHRINK = 0.8;
-function shrinkVertex(v, rawCentroid, radius) {
-  return v.clone().sub(rawCentroid).multiplyScalar(TRIANGLE_SHRINK).add(rawCentroid).normalize().multiplyScalar(radius);
+function shrinkVertex(v, rawCentroid, radius, factor = TRIANGLE_SHRINK) {
+  return v.clone().sub(rawCentroid).multiplyScalar(factor).add(rawCentroid).normalize().multiplyScalar(radius);
 }
 
 // Sagoma di un UFO (disco + cupola), presa "solo la forma" da un'immagine di
@@ -400,6 +401,51 @@ function ribbonShape(points, width) {
   return s;
 }
 
+// Sagoma di un cane di profilo (mondo Animali, categoria Cani): muso a
+// destra, orecchio, zampe, coda alzata. Solo il contorno pieno, come le
+// altre sagome; i punti vengono centrati e riportati in [-1, 1].
+function buildDogShape() {
+  const pts = [
+    [-0.72, 0.16], // attacco coda
+    [-0.98, 0.52], // punta coda
+    [-0.9, 0.57],
+    [-0.64, 0.3], // dorso
+    [0.22, 0.28],
+    [0.34, 0.5], // collo
+    [0.38, 0.64], // nuca
+    [0.36, 0.86], // orecchio
+    [0.52, 0.68],
+    [0.66, 0.66], // fronte
+    [0.74, 0.54],
+    [0.98, 0.48], // naso
+    [0.98, 0.34],
+    [0.66, 0.32], // mandibola
+    [0.52, 0.22], // gola
+    [0.46, -0.04], // petto
+    [0.46, -0.62], // zampa anteriore
+    [0.34, -0.62],
+    [0.3, -0.14],
+    [-0.44, -0.14], // pancia
+    [-0.48, -0.62], // zampa posteriore
+    [-0.6, -0.62],
+    [-0.66, -0.04],
+  ];
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const k = 1 / Math.max(Math.max(...xs) - cx, Math.max(...ys) - cy);
+  const shape = new THREE.Shape();
+  pts.forEach(([x, y], i) => {
+    const px = (x - cx) * k;
+    const py = (y - cy) * k;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  });
+  shape.closePath();
+  return shape;
+}
+
 // Sagoma di una "M" (mondo Social), terza versione — le prime due (blocco
 // con tacca, poi pilastri+V pieni) erano venute male entrambe: il problema
 // non era la forma ma il RIEMPIMENTO. Il logo di riferimento mandato
@@ -417,6 +463,17 @@ function buildLetterMShape() {
     new THREE.Vector2(0, -0.13), // valle centrale
     new THREE.Vector2(0.67, 0.62), // punta destra
     new THREE.Vector2(0.62, -0.7), // base destra
+  ];
+  return ribbonShape(points, 0.44);
+}
+
+// V piatta della categoria Verse (mondo Social): stesso nastro della M,
+// ripiego e bersaglio del click sotto la V gotica 3D.
+function buildLetterVShape() {
+  const points = [
+    new THREE.Vector2(-0.62, 0.66), // punta sinistra
+    new THREE.Vector2(0, -0.7), // vertice in basso
+    new THREE.Vector2(0.62, 0.66), // punta destra
   ];
   return ribbonShape(points, 0.44);
 }
@@ -522,6 +579,47 @@ const VIVID_EDGE_WIDTH_PX = 2.5;
 const VIVID_SURFACE_LIFT = 8;
 const VIVID_RENDER_ORDER = 1;
 
+// Mondo Social: le sagome piatte delle due categorie (V di move, M di
+// Verse) sono sostituite da lettere gotiche 3D (vedi gothicLetter.js). La
+// sagoma piatta resta come bersaglio del click (invisibile) e come ripiego
+// finché il font non è pronto.
+// GOTHIC_M_SIZE_FACTOR: lato maggiore della M gotica rispetto alla M piatta
+// (~1.78 × shapeScale), un po' più grande come chiesto.
+// La V: gotica in New Rocker, scalata in altezza (vedi
+// scaleMode in gothicLetter.js) con la stessa scala della M, così le due
+// lettere hanno la stessa altezza; in più i brillantini sul fianco destro.
+const GOTHIC_M_SIZE_FACTOR = 1.78 * 1.1;
+const GOTHIC_LETTERS = {
+  // Scambiate su richiesta: la V (davanti) è di move ('world'), la M
+  // (dietro) di Verse.
+  verse: {
+    char: 'M',
+    font: '440px "UnifrakturMaguntia", "Old English Text MT", serif',
+    fontLoad: '380px "UnifrakturMaguntia"',
+    scaleMode: 'max',
+    sparkles: 0,
+  },
+  world: {
+    char: 'V',
+    font: '440px "New Rocker", "Old English Text MT", serif',
+    fontLoad: '440px "New Rocker"',
+    scaleMode: 'height',
+    sparkles: 700,
+  },
+};
+const GOTHIC_RENDER_ORDER = 2;
+// Uscita/rientro delle lettere sul bordo del globo (facing = coseno fra la
+// normale della lettera e la direzione della camera). L'uscita parte a
+// ~81° (0.15): con la rotazione automatica (3°/s) i 2,2 s dell'animazione
+// al contrario coprono ~7°, quindi finisce a ~88°, con la lettera ancora
+// in vista (spariva di colpo a ~104°, facing -0.25, che resta il limite
+// oltre il quale è spenta comunque). Il rientro parte a ~72° (0.3): due
+// soglie diverse, così ferma vicino al bordo non si accende e spegne.
+const GOTHIC_EXIT_FACING = 0.15;
+const GOTHIC_ENTER_FACING = 0.3;
+const GOTHIC_HIDDEN_FACING = -0.25;
+const GOTHIC_HIDDEN_ANGLE = Math.acos(GOTHIC_HIDDEN_FACING);
+
 // Sceglie geometria (e per il mondo Bambini, colore) in base a shapeType e
 // all'indice della categoria dentro il proprio mondo — un unico punto da
 // cui WorldGlobe.jsx decide "che forma ha questo mondo", vedi sotto.
@@ -534,9 +632,13 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
     case 'briefcase':
       return { shape: buildBriefcaseShape(), color: null };
     case 'letterM':
-      return { shape: buildLetterMShape(), color: null };
+      // Mondo Social: move ('world') è la V, Verse (alle sue spalle) la M. Sono
+      // le sagome piatte di ripiego: sopra ci vanno le lettere gotiche 3D.
+      return { shape: categoryId === 'world' ? buildLetterVShape() : buildLetterMShape(), color: null };
     case 'star':
       return { shape: buildStarShape(), color: null };
+    case 'dog':
+      return { shape: buildDogShape(), color: null };
     case 'cloud':
       // La Stanza MOD (solo staff, vedi faqCategories.js) resta una nuvola
       // ROSSA distinta dalle altre nuvole grigie/bianche del mondo FAQ —
@@ -718,9 +820,24 @@ export function makeLabelSprite(text, spriteScale, textColor = '#ffffff', option
 // due categorie). Usato dal mondo Annunci, che con poche categorie (7 su
 // almeno 80 facce) ha ampiamente spazio per stare più larghe — richiesta
 // esplicita ("le categorie le vedo troppo vicine").
+// sizeFactor: grandezza della sagoma rispetto al triangolo che sostituisce
+// (1 = come sempre; il mondo Bambini, con 16 categorie, le vuole più
+// piccole per lasciare spazio fra l'una e l'altra). fillColor/fillOpacity/
+// activeOpacity: colore e trasparenza delle sagome quando il colore del
+// mondo, a trasparenza 0.2, le rende poco visibili (FAQ nero, Animali).
 export function buildCategoryShell(
   categories,
-  { radius = 122, color = '#8b5cf6', shapeType = 'triangle', marginRings = 1 } = {}
+  {
+    radius = 122,
+    color = '#8b5cf6',
+    shapeType = 'triangle',
+    marginRings = 1,
+    sizeFactor = 1,
+    fillColor = null,
+    fillOpacity = 0.2,
+    activeOpacity = 0.45,
+    onAnimatedReady = null,
+  } = {}
 ) {
   const detail = pickDetailLevel(categories.length);
   const geo = new THREE.IcosahedronGeometry(radius, detail);
@@ -797,6 +914,35 @@ export function buildCategoryShell(
   if (edgeMaterial) disposables.push(edgeMaterial);
   const usedFaces = new Set();
   const blockedFaces = new Set();
+  const gothicM = shapeType === 'letterM';
+  const gothicTargets = [];
+
+  // Le facce dell'icosaedro suddiviso non sono tutte uguali (quelle vicino
+  // ai 12 vertici originali sono più piccole): con la scala presa dalla
+  // faccia scelta, due sagome dello stesso mondo venivano di grandezze
+  // diverse. Per le sagome (cuori, UFO...) si usa la media di tutte le
+  // facce: stessa grandezza per ogni categoria.
+  let uniformShapeRadius = 0;
+  {
+    const ua = new THREE.Vector3();
+    const ub = new THREE.Vector3();
+    const uc = new THREE.Vector3();
+    const uCentroid = new THREE.Vector3();
+    const uCenter = new THREE.Vector3();
+    for (let f = 0; f < faceCount; f++) {
+      ua.fromBufferAttribute(pos, f * 3);
+      ub.fromBufferAttribute(pos, f * 3 + 1);
+      uc.fromBufferAttribute(pos, f * 3 + 2);
+      uCentroid.copy(ua).add(ub).add(uc).divideScalar(3);
+      uCenter.copy(uCentroid).normalize().multiplyScalar(radius);
+      const d =
+        shrinkVertex(ua, uCentroid, radius).distanceTo(uCenter) +
+        shrinkVertex(ub, uCentroid, radius).distanceTo(uCenter) +
+        shrinkVertex(uc, uCentroid, radius).distanceTo(uCenter);
+      uniformShapeRadius += d / 3;
+    }
+    uniformShapeRadius /= faceCount;
+  }
 
   const nearestFace = (targetDir, exclude) => {
     let bestFace = -1;
@@ -836,11 +982,19 @@ export function buildCategoryShell(
     b.fromBufferAttribute(pos, bestFace * 3 + 1);
     c.fromBufferAttribute(pos, bestFace * 3 + 2);
     centroid.copy(a).add(b).add(c).divideScalar(3);
-    const normal = centroid.clone().normalize();
+    // Di norma la sagoma sta al centro del triangolo più vicino all'anchor;
+    // con exactAnchor (mondo Incontri: Match al centro della vista iniziale,
+    // Videochiamata esattamente alle sue spalle) sta proprio sull'anchor. Il
+    // triangolo resta comunque "occupato", per il margine dalle altre.
+    const normal = cat.exactAnchor ? targetDir.clone() : centroid.clone().normalize();
 
-    const sa = shrinkVertex(a, centroid, radius);
-    const sb = shrinkVertex(b, centroid, radius);
-    const sc = shrinkVertex(c, centroid, radius);
+    // Triangoli semplici (niente sagoma): sizeFactor li rimpicciolisce
+    // direttamente (es. Vetrina, 14 categorie: più spazio fra l'una e
+    // l'altra). Con una sagoma la grandezza la decide shapeScale sotto.
+    const triFactor = shapeType === 'triangle' ? TRIANGLE_SHRINK * sizeFactor : TRIANGLE_SHRINK;
+    const sa = shrinkVertex(a, centroid, radius, triFactor);
+    const sb = shrinkVertex(b, centroid, radius, triFactor);
+    const sc = shrinkVertex(c, centroid, radius, triFactor);
 
     triangles.push({
       id: cat.id,
@@ -856,8 +1010,16 @@ export function buildCategoryShell(
     let shapeScale = 0;
     if (face) {
       shapeCenter = normal.clone().multiplyScalar(radius);
-      shapeScale = (sa.distanceTo(shapeCenter) + sb.distanceTo(shapeCenter) + sc.distanceTo(shapeCenter)) / 3;
+      shapeScale = uniformShapeRadius * sizeFactor;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
+      if (cat.exactAnchor) {
+        // Il disegno della sagoma (es. il cuore) non è centrato sulla sua
+        // origine: qui si centra sul suo riquadro, così il centro visivo
+        // cade esattamente sull'anchor.
+        faceGeo.computeBoundingBox();
+        const box = faceGeo.boundingBox;
+        faceGeo.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, 0);
+      }
       if (vivid) {
         // Geometria lasciata LOCALE (piana, centrata nell'origine): la
         // posizione/orientamento sulla sfera li porta il perno (pivot)
@@ -874,13 +1036,13 @@ export function buildCategoryShell(
       faceGeo.computeVertexNormals();
     }
 
-    const faceColor = face?.color ?? color;
+    const faceColor = face?.color ?? fillColor ?? color;
     const material = new THREE.MeshBasicMaterial({
       color: faceColor,
       transparent: true,
       // Vivace: colore pieno (niente "vetro scuro"); MeshBasicMaterial non
       // risente delle luci, quindi resta acceso anche sul lato in ombra.
-      opacity: vivid ? VIVID_OPACITY : 0.2,
+      opacity: vivid ? VIVID_OPACITY : fillOpacity,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -959,7 +1121,77 @@ export function buildCategoryShell(
     group.add(sprite);
     labelSprites.push(sprite);
     disposables.push(labelMat, texture);
+
+    // World diventa la M gotica, Verse la V gotica.
+    if (gothicM && shapeCenter && GOTHIC_LETTERS[cat.id]) {
+      gothicTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
+    }
   });
+
+  // M gotica: si costruisce quando il font è pronto (o dopo il timeout, col
+  // fallback serif), senza mai bloccare il globo. Nel frattempo resta la M
+  // piatta di sempre.
+  const gothicItems = [];
+  let disposed = false;
+  let lastActiveId = null; // per accendere la M se era già aperta prima che fosse pronta
+  if (gothicTargets.length > 0) {
+    const fontLoads = [...new Set(gothicTargets.map((t) => GOTHIC_LETTERS[t.id].fontLoad))];
+    Promise.all(fontLoads.map((f) => loadGothicFont(f))).then(() => {
+      if (disposed) return;
+      gothicTargets.forEach((t) => {
+        const cfg = GOTHIC_LETTERS[t.id];
+        const size = t.shapeScale * GOTHIC_M_SIZE_FACTOR;
+        let letter = null;
+        try {
+          letter = createGothicLetter({
+            char: cfg.char,
+            font: cfg.font,
+            scaleMode: cfg.scaleMode,
+            sparkleCount: cfg.sparkles,
+            size,
+            particleCount: 2600,
+            pulseCount: 6,
+            // Partenza delle particelle più raccolta del riferimento: qui la
+            // lettera è grande e la camera vicina, non devono passarle dietro.
+            introRadius: [4, 7],
+            // Lettere ferme nella posa di riposo: si muovono solo insieme
+            // al globo (restano colori, impulsi, brillantini e alone).
+            spin: 'none',
+            renderOrder: GOTHIC_RENDER_ORDER,
+          });
+        } catch {
+          letter = null;
+        }
+        if (!letter) return;
+        const k = size / 5.6;
+        const worldUp = Math.abs(t.normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(worldUp, t.normal).normalize();
+        const up = new THREE.Vector3().crossVectors(t.normal, right).normalize();
+        const pivot = new THREE.Group();
+        pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, t.normal));
+        // Davanti al guscio: il retro della lettera appena sopra la M piatta.
+        const lift = SHAPE_SURFACE_OFFSET + letter.halfDepth * k + 1;
+        pivot.position.copy(t.shapeCenter).addScaledVector(t.normal, lift);
+        pivot.add(letter.group);
+        group.add(pivot);
+
+        // La sagoma piatta non si vede più ma resta cliccabile; si clicca
+        // anche la lettera 3D.
+        t.flatMesh.material.visible = false;
+        letter.mesh.userData.categoryId = t.id;
+        faceMeshes.push(letter.mesh);
+
+        // Etichetta sotto la lettera, alla stessa altezza del fronte.
+        const below = t.shapeCenter.clone().addScaledVector(up, -(letter.halfHeight * k + labelScale * 0.6));
+        t.sprite.position.copy(below.normalize()).multiplyScalar(radius + lift + letter.halfDepth * k);
+        t.sprite.renderOrder = GOTHIC_RENDER_ORDER + 3;
+
+        letter.setEmphasis(t.id === lastActiveId ? 1 : 0);
+        gothicItems.push({ id: t.id, letter, pivot, sprite: t.sprite, flatMesh: t.flatMesh, shown: null, prevAngle: null });
+      });
+      if (gothicItems.length > 0) onAnimatedReady?.();
+    });
+  }
 
   function setActive(activeId) {
     if (vivid) {
@@ -969,8 +1201,11 @@ export function buildCategoryShell(
       return;
     }
     faceMeshes.forEach((mesh) => {
-      mesh.material.opacity = mesh.userData.categoryId === activeId ? 0.45 : 0.2;
+      if (Array.isArray(mesh.material)) return; // M gotica: vedi sotto
+      mesh.material.opacity = mesh.userData.categoryId === activeId ? activeOpacity : fillOpacity;
     });
+    gothicItems.forEach((item) => item.letter.setEmphasis(item.id === activeId ? 1 : 0));
+    lastActiveId = activeId;
   }
 
   // Hover del mouse su una forma (solo mondo vivace; altrove non fa nulla):
@@ -991,8 +1226,67 @@ export function buildCategoryShell(
   const worldPos = new THREE.Vector3();
   const toCamera = new THREE.Vector3();
   const worldNormal = new THREE.Vector3();
-  function update(elapsed, deltaSec, { reduceMotion = false, viewportSize = null, camera = null } = {}) {
-    if (!vivid || document.hidden) return;
+  function update(elapsed, deltaSec, { reduceMotion = false, viewportSize = null, camera = null, pixelRatio = 1 } = {}) {
+    if (document.hidden) return;
+    if (gothicItems.length > 0) {
+      for (let i = 0; i < gothicItems.length; i++) {
+        const item = gothicItems[i];
+        const { letter } = item;
+        let speed = 1;
+        if (camera) {
+          // Quanto la lettera guarda la camera: 1 di fronte, 0 di taglio,
+          // negativo sul retro.
+          item.pivot.getWorldPosition(worldPos);
+          worldNormal.copy(worldPos).normalize();
+          toCamera.copy(camera.position).sub(worldPos).normalize();
+          const facing = worldNormal.dot(toCamera);
+          const angle = Math.acos(Math.max(-1, Math.min(1, facing)));
+          if (item.shown === null) {
+            // Primo fotogramma: sul lato nascosto resta spenta, senza
+            // animazione; davanti prosegue l'entrata iniziale.
+            item.shown = facing > GOTHIC_EXIT_FACING;
+            if (!item.shown) letter.setShown(false, { instant: true });
+          } else if (facing < GOTHIC_HIDDEN_FACING) {
+            // Già dietro al globo: mai lettera visibile a metà.
+            if (item.shown || !letter.isHidden()) letter.setShown(false, { instant: true });
+            item.shown = false;
+          } else if (item.shown && facing < GOTHIC_EXIT_FACING) {
+            item.shown = false;
+            letter.setShown(false, { instant: reduceMotion });
+          } else if (!item.shown && facing > GOTHIC_ENTER_FACING) {
+            item.shown = true;
+            letter.setShown(true, { instant: reduceMotion });
+          }
+          // Rotazione a mano più veloce dell'uscita: si accelera perché
+          // finisca prima che la lettera arrivi dietro al globo.
+          if (!item.shown && item.prevAngle !== null && deltaSec > 0) {
+            const omega = (angle - item.prevAngle) / deltaSec; // rad/s verso il retro
+            if (omega > 0) {
+              const timeToHidden = (GOTHIC_HIDDEN_ANGLE - angle) / omega;
+              speed = Math.max(1, letter.exitSecondsLeft() / Math.max(timeToHidden, 0.05));
+            }
+          }
+          item.prevAngle = angle;
+        }
+        const hidden = letter.isHidden();
+        if (item.pivot.visible === hidden) item.pivot.visible = !hidden;
+        // Durante l'uscita (e da spenta) la categoria non si clicca.
+        const noHit = !item.shown;
+        letter.mesh.userData.noHit = noHit;
+        item.flatMesh.userData.noHit = noHit;
+        // L'etichetta segue la lettera (entrata/uscita).
+        const labelOpacity = letter.presence();
+        if (item.sprite.material.opacity !== labelOpacity) item.sprite.material.opacity = labelOpacity;
+        if (hidden) continue;
+        letter.update(elapsed, deltaSec, {
+          reduceMotion,
+          pixelHeight: viewportSize ? viewportSize.y * pixelRatio : 0,
+          viewportSize,
+          speed,
+        });
+      }
+    }
+    if (!vivid) return;
     if (viewportSize && !lastViewport.equals(viewportSize)) {
       lastViewport.copy(viewportSize);
       edgeMaterial.resolution.copy(viewportSize);
@@ -1031,6 +1325,9 @@ export function buildCategoryShell(
   }
 
   function dispose() {
+    disposed = true;
+    gothicItems.forEach((item) => item.letter.dispose());
+    gothicItems.length = 0;
     disposables.forEach((d) => d.dispose && d.dispose());
   }
 
@@ -1044,6 +1341,8 @@ export function buildCategoryShell(
     setHovered,
     update,
     supportsHover: vivid,
+    // Forme che si animano nel giro di disegno (Bambini, M gotica Social).
+    animated: vivid || gothicM,
     dispose,
   };
 }

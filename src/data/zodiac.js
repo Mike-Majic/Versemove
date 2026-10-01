@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 // Segno zodiacale da giorno+mese (mai dall'anno: nel Profilo Social si
 // mostra solo giorno/mese, l'anno resta privato — vedi ProfileSettingsPanel).
 // "from"/"to" sono [mese, giorno]; il Capricorno scavalca l'anno (22 dic -> 19 gen).
@@ -24,4 +26,17 @@ export function zodiacSign(day, month) {
     return (month === fm && day >= fd) || (month === tm && day <= td); // Capricorno
   });
   return sign ?? null;
+}
+
+// "7 agosto" (giorno e mese, mai l'anno) con il nome del mese nella lingua
+// dell'interfaccia. Anno fisso bisestile, così vale anche il 29 febbraio.
+export function birthdayLabel(day, month, locale = i18n?.language) {
+  if (!day || !month) return '';
+  const d = new Date(Date.UTC(2000, month - 1, day));
+  const opts = { day: 'numeric', month: 'long', timeZone: 'UTC' };
+  try {
+    return new Intl.DateTimeFormat(locale || 'it', opts).format(d);
+  } catch {
+    return new Intl.DateTimeFormat('it', opts).format(d);
+  }
 }

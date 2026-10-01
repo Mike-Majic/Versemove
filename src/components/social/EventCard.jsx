@@ -1,4 +1,5 @@
 import './EventCard.css';
+import PublishedAt from '../shared/PublishedAt';
 
 function formatEventDate(dataEventoISO) {
   const d = new Date(dataEventoISO);
@@ -26,7 +27,7 @@ export default function EventCard({ event, user, onOpenAuth, onToggleLike, onOpe
   };
 
   return (
-    <li className="rb-event-card">
+    <li className="rb-event-card" data-event-id={event.id}>
       {event.fotoUrl ? (
         <img className="rb-event-card-photo" src={event.fotoUrl} alt={event.titolo} />
       ) : (
@@ -38,14 +39,15 @@ export default function EventCard({ event, user, onOpenAuth, onToggleLike, onOpe
         <span className="rb-event-card-city">📍 {event.citta}</span>
         {event.bio && <p className="rb-event-card-bio">{event.bio}</p>}
         <span className="rb-event-card-author">Creato da {author.name}</span>
+        <PublishedAt at={event.createdAt} />
 
         <div className="rb-event-card-actions">
           <button type="button" className={`rb-event-card-like-btn ${liked ? 'active' : ''}`} onClick={handleLike}>
-            {liked ? '❤️' : '🤍'} Mi piace
+            {liked ? '✅ Partecipi' : '🙋 Parteciperò'}
           </button>
           {event.mi_piace.length > 0 && (
             <button type="button" className="rb-event-card-likers-btn" onClick={() => onOpenLikers(event.id)}>
-              {event.mi_piace.length} {event.mi_piace.length === 1 ? 'persona' : 'persone'}
+              {event.mi_piace.length} {event.mi_piace.length === 1 ? 'partecipante' : 'partecipanti'}
             </button>
           )}
         </div>

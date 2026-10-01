@@ -1,7 +1,12 @@
 .rb-post-card {
   list-style: none;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Tinta del mondo (blu nel Social) invece del grigio neutro. */
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent, #1d9bf0) 22%, rgba(6, 14, 30, 0.9)),
+    color-mix(in srgb, var(--accent, #1d9bf0) 10%, rgba(6, 14, 30, 0.9))
+  );
+  border: 1px solid color-mix(in srgb, var(--accent, #1d9bf0) 38%, transparent);
   border-radius: 14px;
   padding: 14px;
   margin-bottom: 12px;
@@ -212,28 +217,61 @@
 
 .rb-post-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  min-width: 0;
 }
 
+/* Icone a linea (shared/Icon.jsx) nel cerchio scuro trasparente: con
+   flex-wrap vanno a capo invece di uscire dalla card sulle colonne strette. */
 .rb-post-action-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #f5f5f7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(245, 245, 247, 0.85);
   font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 12px;
+  font-weight: 700;
+  line-height: 1;
   border-radius: 999px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .rb-post-action-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
   border-color: var(--accent, #1d9bf0);
+  color: #fff;
 }
 
-.rb-post-action-btn.active {
-  background: color-mix(in srgb, #ff3860 22%, transparent);
+.rb-post-action-btn.open,
+.rb-post-save-btn.active {
+  color: var(--accent, #1d9bf0);
+  border-color: color-mix(in srgb, var(--accent, #1d9bf0) 60%, transparent);
+}
+
+.rb-post-like-btn.active {
+  color: #ff3860;
+  background: rgba(40, 0, 10, 0.5);
+  border-color: rgba(255, 56, 96, 0.6);
+}
+
+.rb-post-danger-btn:hover {
+  color: #ff5a7a;
   border-color: #ff3860;
+}
+
+/* Segnala in fondo a destra, lontano da Mi piace. */
+.rb-post-report-btn {
+  margin-left: auto;
 }
 
 .rb-post-comments {
@@ -341,4 +379,10 @@
   color: #f5f5f7;
   font-size: 11px;
   font-weight: 600;
+}
+
+/* La mia reazione a un commento. */
+.rb-comment-react-btn.is-mine {
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 22%, transparent);
+  border-radius: 999px;
 }

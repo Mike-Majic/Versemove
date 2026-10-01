@@ -5,6 +5,9 @@ import CustomSelect from '../shared/CustomSelect';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
 import TwoColumnSwitcher from '../layout/TwoColumnSwitcher';
+import { safeFileName } from '../../data/storagePath';
+import PublishedAt from '../shared/PublishedAt';
+import { prepareUpload } from '../../data/mediaCompress';
 
 const CATEGORIE = [
   { value: 'Bug', label: 'Bug' },
@@ -53,8 +56,9 @@ export default function SegnalazioniColumn({ user, onOpenAuth, closing = false }
     setError('');
     let dettagli = descrizione.trim();
     if (screenshot) {
-      const path = `${user.id}/report-${Date.now()}-${screenshot.name}`;
-      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, screenshot);
+      const { file: upload = screenshot } = await prepareUpload(screenshot);
+      const path = `${user.id}/report-${Date.now()}-${safeFileName(upload.name)}`;
+      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
       if (!uploadError) {
         const { data } = supabase.storage.from('content-media').getPublicUrl(path);
         dettagli += `\n\nScreenshot: ${data.publicUrl}`;
@@ -127,6 +131,7 @@ export default function SegnalazioniColumn({ user, onOpenAuth, closing = false }
               <li key={r.id} className="rb-faq-mine-item">
                 <span>
                   <strong>{r.motivo}</strong> · {r.targetType}
+                  <PublishedAt at={r.data} />
                 </span>
                 <span className={`rb-faq-stato-badge rb-faq-stato-${r.stato}`}>{STATO_LABEL[r.stato] ?? r.stato}</span>
               </li>

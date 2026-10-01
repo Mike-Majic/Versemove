@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
 import { useTranslation } from 'react-i18next';
-import { CONTINENTS, REGIONS, MAX_DISTANCE_KM } from '../data/geo';
 import { WORLDS } from '../data/worlds';
 import { listBlockedContacts, blockContact, unblockContact } from '../data/blockedContacts';
 import { hasLavoroConsent, setLavoroConsent } from '../data/lavoro';
@@ -9,7 +8,9 @@ import {
   resetAccountPassword,
   setOwnWorlds,
   setOwnLingua,
-  deleteOwnAccount,
+  requestAccountDeletion,
+  suspendOwnAccount,
+  logoutAccount,
   updateOwnProfileDetails,
   profileCooldownRemaining,
   changeOwnEmail,
@@ -26,12 +27,9 @@ import ModalOverlay from './ModalOverlay';
 import InfoBadge from './InfoBadge';
 import CustomSelect from './shared/CustomSelect';
 import CollapsibleSection from './shared/CollapsibleSection';
-import CityAutocomplete from './shared/CityAutocomplete';
-import { CITY_DATA_CREDIT, locationHasCoords, setMyCittaGeo } from '../data/citta';
+import { disablePush, enablePush, getPushState, needsHomeScreenInstall } from '../data/push';
 import './SettingsPanel.css';
 
-const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
-const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
 const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
 const QUALITY_OPTIONS = [
   { value: 'auto', label: 'Auto' },
@@ -393,6 +391,29 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
     onUpdateUser?.(account);
   };
 
+  // Notifiche push su questo dispositivo (data/push.js): lo stato si legge
+  // dal browser, non dal profilo, perché vale per singolo dispositivo.
+  const [pushState, setPushState] = useState('off');
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    getPushState().then((st) => {
+      if (alive) setPushState(st);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+  const togglePush = async (checked) => {
+    setPushBusy(true);
+    setPushError('');
+    const { error: err } = checked ? await enablePush() : await disablePush();
+    setPushBusy(false);
+    if (err) setPushError(err);
+    setPushState(await getPushState());
+  };
+
   return (
     <>
       <CollapsibleSection
@@ -525,6 +546,48 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
 
       <CollapsibleSection
         level="sub"
+        title="Notifiche"
+        infoText="Avvisi di messaggi, chiamate, match e menzioni anche con Versemove chiuso. Vale solo per questo dispositivo: attivale su ognuno che usi."
+        open={sub === 'notifiche'}
+        onToggle={() => toggleSub('notifiche')}
+      >
+        {!user ? (
+          <button type="button" className="rb-settings-nav-btn" onClick={onOpenAuth}>
+            <span><strong>Accedi per attivare le notifiche</strong></span>
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : pushState === 'unsupported' ? (
+          <p className="rb-settings-hint">
+            {needsHomeScreenInstall()
+              ? 'Su iPhone e iPad le notifiche funzionano aggiungendo Versemove alla schermata Home (Condividi → Aggiungi a Home) e aprendolo da lì.'
+              : 'Questo browser non supporta le notifiche push.'}
+          </p>
+        ) : (
+          <>
+            {pushError && <p className="rb-privacy-error">{pushError}</p>}
+            <label className="rb-toggle-row">
+              <span className="rb-toggle-text-row">
+                <strong>Notifiche su questo dispositivo</strong>
+              </span>
+              <span className="rb-toggle">
+                <input
+                  type="checkbox"
+                  checked={pushState === 'on'}
+                  disabled={pushBusy || pushState === 'denied'}
+                  onChange={(e) => togglePush(e.target.checked)}
+                />
+                <span className="rb-toggle-slider" />
+              </span>
+            </label>
+            {pushState === 'denied' && (
+              <p className="rb-settings-hint">Le notifiche sono bloccate per questo sito: riattivale dalle impostazioni del browser (lucchetto accanto all'indirizzo).</p>
+            )}
+          </>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        level="sub"
         title="Pubblicità"
         infoText="Oggi Versemove mostra solo pubblicità legata al contenuto della pagina che stai guardando, mai basata sul tuo profilo o comportamento — a prescindere da questo interruttore."
         open={sub === 'pubblicita'}
@@ -589,101 +652,129 @@ function PrivacySectionContent({ user, onOpenAuth, friends, onUnfriend, visibili
   );
 }
 
-// Zona pericolosa, in fondo alle Impostazioni: cancellazione definitiva
-// dell'account (Edge Function "delete-account", vedi data/accounts.js).
-// Nascosta per l'owner: la funzione lo blocca comunque, ma non ha senso
-// proporgli un pulsante che fallirà sempre.
-function DeleteAccountSection({ user, onAccountDeleted }) {
-  const [open, setOpen] = useState(false);
+const fmtData = (iso) => (iso ? new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
+
+// Sezione "Account", in fondo alle Impostazioni (zona di pericolo):
+// sospensione per 30 giorni oppure eliminazione (con 30 giorni per
+// ripensarci rientrando). Entrambe fanno uscire dall'account. L'account
+// proprietario vede la sezione ma senza pulsanti.
+function AccountSection({ user, onAccountDeleted }) {
+  const [mode, setMode] = useState(null); // null | 'sospendi' | 'elimina'
   const [password, setPassword] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useReportUnsaved(open && (password !== '' || confirmText !== ''));
+  useReportUnsaved(mode === 'elimina' && (password !== '' || confirmText !== ''));
 
-  if (!user || user.ruolo === ROLES.OWNER) return null;
+  if (!user) return null;
 
   const cancel = () => {
-    setOpen(false);
+    setMode(null);
     setPassword('');
     setConfirmText('');
     setError('');
   };
 
-  const submit = async () => {
+  const sospendi = async () => {
+    setBusy(true);
+    setError('');
+    const res = await suspendOwnAccount();
+    if (res.error) {
+      setBusy(false);
+      setError(res.error);
+      return;
+    }
+    await logoutAccount();
+    setBusy(false);
+    onAccountDeleted?.(`Account sospeso fino al ${fmtData(res.sospesoFinoAl)}. Rientra quando vuoi per riattivarlo.`);
+  };
+
+  const elimina = async () => {
     if (confirmText !== 'ELIMINA' || !password || busy) return;
     setBusy(true);
     setError('');
-    const { error: err } = await deleteOwnAccount(password);
-    setBusy(false);
-    if (err) {
-      setError(err);
+    const res = await requestAccountDeletion(password);
+    if (res.error) {
+      setBusy(false);
+      setError(res.error);
       return;
     }
-    onAccountDeleted?.();
+    await logoutAccount();
+    setBusy(false);
+    onAccountDeleted?.(`Account in eliminazione: verrà cancellato il ${fmtData(res.eliminazionePrevistaAt)}. Rientra entro quella data per annullare.`);
   };
 
   return (
     <section className="rb-settings-section rb-danger-zone">
-      <h3>Elimina account</h3>
-      {!open ? (
-        <>
-          <p className="rb-settings-hint">
-            Cancella per sempre il tuo profilo, i post, i contenuti caricati, le chat, le amicizie e i file collegati
-            al tuo account.
-          </p>
-          <button type="button" className="rb-danger-btn" onClick={() => setOpen(true)}>
-            Elimina il mio account
-          </button>
-        </>
-      ) : (
+      <h3>Account</h3>
+      {user.ruolo === ROLES.OWNER ? (
+        <p className="rb-settings-hint">L'account proprietario non può essere sospeso né eliminato dall'app.</p>
+      ) : mode === 'sospendi' ? (
         <>
           <p className="rb-danger-warning">
-            Questa azione è <strong>definitiva</strong> e non si può annullare: profilo, post, contenuti caricati,
-            chat, amicizie e file collegati al tuo account verranno cancellati per sempre.
+            Per 30 giorni il tuo profilo sparisce per gli altri: non compari sul globo, nelle ricerche e nei mondi. Si
+            riattiva quando rientri, oppure da solo dopo 30 giorni. Ora uscirai dall'account.
+          </p>
+          {error && <p className="rb-privacy-error">{error}</p>}
+          <div className="rb-danger-actions">
+            <button type="button" className="rb-reset-filters-btn" onClick={cancel} disabled={busy}>
+              Annulla
+            </button>
+            <button type="button" className="rb-danger-btn" onClick={sospendi} disabled={busy}>
+              {busy ? 'Un attimo…' : 'Sì, sospendi'}
+            </button>
+          </div>
+        </>
+      ) : mode === 'elimina' ? (
+        <>
+          <p className="rb-danger-warning">
+            Il tuo profilo sparisce subito per gli altri. Hai <strong>30 giorni</strong> per ripensarci: basta rientrare
+            e riattivarlo. Dopo, profilo, post, chat e file collegati al tuo account vengono cancellati{' '}
+            <strong>per sempre</strong>.
           </p>
           <label className="rb-field">
             <span>Password attuale</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={busy}
-            />
+            <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} />
           </label>
           <label className="rb-field">
             <span>Scrivi ELIMINA per confermare</span>
-            <input
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              disabled={busy}
-            />
+            <input type="text" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} disabled={busy} />
           </label>
           {error && <p className="rb-privacy-error">{error}</p>}
           <div className="rb-danger-actions">
             <button type="button" className="rb-reset-filters-btn" onClick={cancel} disabled={busy}>
               Annulla
             </button>
-            <button
-              type="button"
-              className="rb-danger-btn"
-              onClick={submit}
-              disabled={confirmText !== 'ELIMINA' || !password || busy}
-            >
-              {busy ? 'Eliminazione in corso…' : 'Elimina definitivamente'}
+            <button type="button" className="rb-danger-btn" onClick={elimina} disabled={confirmText !== 'ELIMINA' || !password || busy}>
+              {busy ? 'Un attimo…' : 'Elimina account'}
             </button>
           </div>
+        </>
+      ) : (
+        <>
+          <p className="rb-settings-hint">
+            <strong>Sospendi per 30 giorni:</strong> il profilo sparisce per gli altri e si riattiva quando rientri o da
+            solo dopo 30 giorni.
+          </p>
+          <button type="button" className="rb-reset-filters-btn" onClick={() => setMode('sospendi')}>
+            Sospendi account per 30 giorni
+          </button>
+          <p className="rb-settings-hint" style={{ marginTop: 14 }}>
+            <strong>Elimina:</strong> il profilo sparisce subito; hai 30 giorni per ripensarci rientrando, poi tutto viene
+            cancellato per sempre.
+          </p>
+          <button type="button" className="rb-danger-btn" onClick={() => setMode('elimina')}>
+            Elimina account
+          </button>
         </>
       )}
     </section>
   );
 }
 
-// Tutti i filtri di visualizzazione (Suono, Luogo, Mostrami/età, Posizione,
-// Lingua) vivono qui come una "bozza": partono allineati a quanto è già
-// attivo (filters/locationFilters/visibility/lingua, gli stessi che
+// Tutti i filtri di visualizzazione (Suono, Effetti, Posizione, Lingua)
+// vivono qui come una "bozza": partono allineati a quanto è già attivo
+// (visibility/lingua/suono/effetti, gli stessi che
 // contano davvero) ogni volta che il pannello si apre, e toccano lo stato
 // vero solo quando si clicca "Applica" — prima, muovere uno slider o
 // cambiare lingua cambia solo l'anteprima qui dentro. Per Lingua, "Applica"
@@ -697,14 +788,9 @@ export default function SettingsPanel({
   open,
   onClose,
   onApply,
-  initialSection = null,
   user,
   onOpenAuth,
   onUpdateUser,
-  filters,
-  setFilters,
-  locationFilters,
-  setLocationFilters,
   visibility,
   setVisibility,
   friends,
@@ -717,8 +803,6 @@ export default function SettingsPanel({
   const [personalizzaSub, setPersonalizzaSub] = useState('');
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
-  const [draftFilters, setDraftFilters] = useState(filters);
-  const [draftLocationFilters, setDraftLocationFilters] = useState(locationFilters);
   const [draftVisibility, setDraftVisibility] = useState(visibility);
   const [draftSound, setDraftSound] = useState(true);
   const [soundBaseline, setSoundBaseline] = useState(true);
@@ -730,13 +814,6 @@ export default function SettingsPanel({
 
   useEffect(() => {
     if (!open) return;
-    setDraftFilters(filters);
-    setDraftLocationFilters(locationFilters);
-    // Aperto da "📍 città · entro N km" (eventi Cosplay): dritto su Luogo.
-    if (initialSection === 'luogo') {
-      setPersonalizzaOpen(true);
-      setPersonalizzaSub('luogo');
-    }
     setDraftVisibility(visibility);
     const sound = isSoundEnabled();
     setDraftSound(sound);
@@ -751,36 +828,23 @@ export default function SettingsPanel({
 
   if (!open) return null;
 
-  const updateFilter = (key, value) => setDraftFilters((f) => ({ ...f, [key]: value }));
-  const updateLocation = (key, value) => setDraftLocationFilters((f) => ({ ...f, [key]: value }));
   const togglePersonalizzaSub = (name) => setPersonalizzaSub((s) => (s === name ? '' : name));
-  const distanzaUnlimited = draftLocationFilters.distance >= MAX_DISTANCE_KM;
 
   // Vero se la bozza si è mossa da quanto è già applicato: mostra
   // l'avviso "Modifiche non applicate" e fa chiedere conferma prima di
   // chiudere col ✕ (unico modo di chiudere il pannello: lo sfondo non
   // chiude mai nulla, vedi ModalOverlay.jsx).
   const isDirty =
-    JSON.stringify(draftFilters) !== JSON.stringify(filters) ||
-    JSON.stringify(draftLocationFilters) !== JSON.stringify(locationFilters) ||
     JSON.stringify(draftVisibility) !== JSON.stringify(visibility) ||
     draftSound !== soundBaseline ||
     draftQuality !== qualityBaseline ||
     draftLingua !== i18n.language;
 
   const handleReset = () => {
-    setDraftFilters(DEFAULT_FILTERS);
-    setDraftLocationFilters(DEFAULT_LOCATION_FILTERS);
     setDraftVisibility(DEFAULT_VISIBILITY);
   };
 
   const handleApply = async () => {
-    setFilters(draftFilters);
-    setLocationFilters(draftLocationFilters);
-    // Città del profilo sul server (solo loggati, solo se è cambiata).
-    if (user && (draftLocationFilters.geonameId ?? null) !== (locationFilters.geonameId ?? null)) {
-      setMyCittaGeo(draftLocationFilters.geonameId ?? null);
-    }
     setVisibility(draftVisibility);
     setSoundEnabled(draftSound);
     setQualityMode(draftQuality);
@@ -840,44 +904,6 @@ export default function SettingsPanel({
           {isDirty ? <span className="rb-settings-dirty-badge">● {t('settings.unappliedChanges')}</span> : t('settings.applyHint')}
         </p>
 
-        <section className="rb-settings-section rb-settings-section-first">
-          <label className="rb-toggle-row">
-            <span className="rb-toggle-text-row">
-              <strong>{t('settings.sound.title')}</strong>
-              <InfoBadge text={t('settings.sound.hint')} />
-            </span>
-            <span className="rb-toggle">
-              <input
-                type="checkbox"
-                checked={draftSound}
-                onChange={(e) => setDraftSound(e.target.checked)}
-              />
-              <span className="rb-toggle-slider" />
-            </span>
-          </label>
-
-          <div className="rb-field rb-settings-quality-field">
-            <span className="rb-toggle-text-row">
-              <strong>{t('settings.effects.title')}</strong>
-              <InfoBadge text={t('settings.effects.hint')} />
-            </span>
-            <div className="rb-settings-quality-options" role="radiogroup" aria-label={t('settings.effects.ariaLabel')}>
-              {QUALITY_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={draftQuality === opt.value}
-                  className={`rb-settings-quality-btn ${draftQuality === opt.value ? 'active' : ''}`}
-                  onClick={() => setDraftQuality(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <CollapsibleSection
           title={t('settings.sections.privacy.title')}
           infoText={t('settings.sections.privacy.hint')}
@@ -902,108 +928,44 @@ export default function SettingsPanel({
           open={personalizzaOpen}
           onToggle={() => setPersonalizzaOpen((v) => !v)}
         >
-          <CollapsibleSection
-            level="sub"
-            title={t('settings.sections.luogo.title')}
-            infoText={t('settings.sections.luogo.hint')}
-            open={personalizzaSub === 'luogo'}
-            onToggle={() => togglePersonalizzaSub('luogo')}
-          >
-            <label className="rb-field">
-              <span>{t('settings.luogo.continent')}</span>
-              <select value={draftLocationFilters.continent} onChange={(e) => updateLocation('continent', e.target.value)}>
-                <option value="">{t('settings.luogo.allContinents')}</option>
-                {CONTINENTS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="rb-field">
-              <span>{t('settings.luogo.region')}</span>
-              <select value={draftLocationFilters.region} onChange={(e) => updateLocation('region', e.target.value)}>
-                <option value="">{t('settings.luogo.allRegions')}</option>
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="rb-field">
-              <span>{t('settings.luogo.city')}</span>
-              {/* Città con coordinate (GeoNames): scritta a mano vale solo
-                  come testo, scelta dall'elenco porta lat/lng per la
-                  distanza (eventi e annunci vicini). */}
-              <CityAutocomplete
-                value={draftLocationFilters.city}
-                placeholder={t('settings.luogo.cityPlaceholder')}
-                onChange={(text) =>
-                  setDraftLocationFilters((f) => ({ ...f, city: text, lat: null, lng: null, geonameId: null, paese: '', regione: '' }))
-                }
-                onPick={(c) =>
-                  setDraftLocationFilters((f) => ({
-                    ...f,
-                    city: c.nomeMostrato,
-                    lat: c.lat,
-                    lng: c.lng,
-                    geonameId: c.geonameId,
-                    paese: c.paese,
-                    regione: c.regione,
-                  }))
-                }
-              />
-              {draftLocationFilters.city && !locationHasCoords(draftLocationFilters) && (
-                <small className="rb-field-note rb-field-note--warn">Scegli la città dall'elenco: senza coordinate la distanza non si può calcolare.</small>
-              )}
-              <small className="rb-field-note">{CITY_DATA_CREDIT}</small>
-            </label>
-
-            <label className="rb-field">
-              <span className="rb-field-label-row">
-                {t('settings.luogo.distance')}: {distanzaUnlimited ? t('settings.luogo.distanceUnlimited') : `${draftLocationFilters.distance} km`}
-                <InfoBadge text={t('settings.luogo.distanceHint')} />
+          {/* Suono ed Effetti: prime voci di Personalizza (stesso salvataggio con Applica). */}
+          <div className="rb-settings-personalizza-fx">
+            <label className="rb-toggle-row">
+              <span className="rb-toggle-text-row">
+                <strong>{t('settings.sound.title')}</strong>
+                <InfoBadge text={t('settings.sound.hint')} />
               </span>
-              <input type="range" min={1} max={MAX_DISTANCE_KM} value={draftLocationFilters.distance}
-                onChange={(e) => updateLocation('distance', Number(e.target.value))} />
+              <span className="rb-toggle">
+                <input
+                  type="checkbox"
+                  checked={draftSound}
+                  onChange={(e) => setDraftSound(e.target.checked)}
+                />
+                <span className="rb-toggle-slider" />
+              </span>
             </label>
-          </CollapsibleSection>
 
-          <CollapsibleSection
-            level="sub"
-            title={t('settings.sections.mostrami.title')}
-            infoText={t('settings.sections.mostrami.hint')}
-            open={personalizzaSub === 'mostrami'}
-            onToggle={() => togglePersonalizzaSub('mostrami')}
-          >
-            <label className="rb-field">
-              <span>{t('settings.mostrami.label')}</span>
-              <div className="rb-chip-group">
-                {[
-                  { value: 'Tutti', label: t('settings.mostrami.all') },
-                  { value: 'Uomo', label: t('settings.mostrami.male') },
-                  { value: 'Donna', label: t('settings.mostrami.female') },
-                ].map((opt) => (
+            <div className="rb-field rb-settings-quality-field">
+              <span className="rb-toggle-text-row">
+                <strong>{t('settings.effects.title')}</strong>
+                <InfoBadge text={t('settings.effects.hint')} />
+              </span>
+              <div className="rb-settings-quality-options" role="radiogroup" aria-label={t('settings.effects.ariaLabel')}>
+                {QUALITY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
-                    className={`rb-chip ${draftFilters.gender === opt.value ? 'active' : ''}`}
-                    onClick={() => updateFilter('gender', opt.value)}
+                    type="button"
+                    role="radio"
+                    aria-checked={draftQuality === opt.value}
+                    className={`rb-settings-quality-btn ${draftQuality === opt.value ? 'active' : ''}`}
+                    onClick={() => setDraftQuality(opt.value)}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
-            </label>
-
-            <label className="rb-field">
-              <span>{t('settings.mostrami.age')}: {draftFilters.ageMin}–{draftFilters.ageMax}</span>
-              <div className="rb-range-row">
-                <input type="range" min={18} max={80} value={draftFilters.ageMin}
-                  onChange={(e) => updateFilter('ageMin', Math.min(Number(e.target.value), draftFilters.ageMax))} />
-                <input type="range" min={18} max={80} value={draftFilters.ageMax}
-                  onChange={(e) => updateFilter('ageMax', Math.max(Number(e.target.value), draftFilters.ageMin))} />
-              </div>
-            </label>
-          </CollapsibleSection>
+            </div>
+          </div>
 
           <CollapsibleSection
             level="sub"
@@ -1026,7 +988,12 @@ export default function SettingsPanel({
           </CollapsibleSection>
         </CollapsibleSection>
 
-        <DeleteAccountSection user={user} onAccountDeleted={onAccountDeleted} />
+        <AccountSection user={user} onAccountDeleted={onAccountDeleted} />
+
+        {/* Versione in esecuzione (commit + data della build, vedi
+            vite.config.js): per verificare che l'app installata abbia preso
+            l'ultima pubblicazione. */}
+        <p className="rb-settings-version">Versione {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</p>
       </aside>
     </ModalOverlay>
   );

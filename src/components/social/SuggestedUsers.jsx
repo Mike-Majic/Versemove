@@ -1,4 +1,5 @@
 import './SuggestedUsers.css';
+import AvatarImg from '../shared/AvatarImg';
 
 // Widget "Persone da seguire": qualche utente del mondo Social non ancora
 // seguito, per dare subito un motivo per usare il follow appena arrivati.
@@ -12,7 +13,7 @@ export default function SuggestedUsers({ candidates, user, onOpenAuth, onToggleF
         {candidates.map((u) => (
           <li key={u.id} className="rb-suggested-user">
             <button type="button" className="rb-suggested-user-identity" onClick={() => onOpenProfile(u.id)}>
-              <img src={u.avatar} alt={u.name} />
+              <AvatarImg src={u.avatar} name={u?.name || u?.nickname} seed={u?.id} alt={u.name} />
               <div className="rb-suggested-user-info">
                 <strong>{u.name}</strong>
                 <span>{u.city}</span>

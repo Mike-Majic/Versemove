@@ -1,42 +1,83 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 
-// Live reali dei mondi Social e Lavoro (tabelle live_sessions/live_messages):
-// non più uno streaming nostro, ma l'incorporazione della diretta che la
-// persona sta già facendo su Twitch/YouTube/Kick — qui si registra solo
+// Live reali dei mondi Social, Lavoro, Nerd e Intrattenimento (tabelle
+// live_sessions/live_messages): non uno streaming nostro, ma
+// l'incorporazione della diretta che la persona sta già facendo su
+// Twitch/YouTube/Kick/TikTok — qui si registra solo
 // piattaforma+canale (validati dal DB, vedi i CHECK di live_sessions) e si
 // tiene una chat a fianco.
 
-// Riconosce un link incollato (non un URL a caso: solo questi tre formati)
-// e ne ricava piattaforma+canale, gli unici due campi che poi finiscono nel
+// Piattaforme ammesse per mondo (il DB accetta twitch/youtube/kick/tiktok
+// in social, lavoro, nerd e arte — vedi i CHECK di live_sessions).
+export const LIVE_PLATFORMS_BY_WORLD = {
+  social: ['twitch', 'youtube', 'kick'],
+  lavoro: ['twitch', 'youtube', 'kick'],
+  nerd: ['twitch', 'youtube', 'kick'],
+  arte: ['youtube', 'tiktok'],
+};
+
+const PLATFORM_LABEL = { twitch: 'Twitch', youtube: 'YouTube', kick: 'Kick', tiktok: 'TikTok' };
+export function platformLabel(piattaforma) {
+  return PLATFORM_LABEL[piattaforma] ?? piattaforma;
+}
+
+function platformsText(list) {
+  const names = list.map(platformLabel);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} o ${names.at(-1)}` : names[0];
+}
+
+export function liveLinkPlaceholder(platforms) {
+  return `Link della diretta (${platformsText(platforms)})...`;
+}
+
+// Riconosce un link incollato (non un URL a caso: solo questi formati) e
+// ne ricava piattaforma+canale, gli unici due campi che poi finiscono nel
 // DB e nell'URL dell'embed — mai l'URL incollato così com'è.
-export function parseLiveLink(rawUrl) {
+// TikTok: canale = nome utente (diretta: tiktok.com/@nome/live o
+// tiktok.com/@nome) oppure id numerico di un video (tiktok.com/@nome/video/ID).
+export function parseLiveLink(rawUrl, platforms = ['twitch', 'youtube', 'kick']) {
   const url = (rawUrl ?? '').trim();
   if (!url) return { error: 'Incolla il link della tua diretta.' };
+  const ok = (res) => (platforms.includes(res.piattaforma) ? res : { error: `Qui si possono condividere solo link di ${platformsText(platforms)}.` });
 
   const twitch = url.match(/twitch\.tv\/([A-Za-z0-9_]{3,25})\b/i);
-  if (twitch) return { piattaforma: 'twitch', canale: twitch[1] };
+  if (twitch) return ok({ piattaforma: 'twitch', canale: twitch[1] });
 
   const kick = url.match(/kick\.com\/([A-Za-z0-9_]{3,25})\b/i);
-  if (kick) return { piattaforma: 'kick', canale: kick[1] };
+  if (kick) return ok({ piattaforma: 'kick', canale: kick[1] });
 
   if (/youtu\.?be/i.test(url)) {
     const short = url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/i);
-    if (short) return { piattaforma: 'youtube', canale: short[1] };
-    const live = url.match(/youtube\.com\/live\/([A-Za-z0-9_-]{11})/i);
-    if (live) return { piattaforma: 'youtube', canale: live[1] };
+    if (short) return ok({ piattaforma: 'youtube', canale: short[1] });
+    const live = url.match(/youtube\.com\/(?:live|shorts)\/([A-Za-z0-9_-]{11})/i);
+    if (live) return ok({ piattaforma: 'youtube', canale: live[1] });
     const watch = url.match(/[?&]v=([A-Za-z0-9_-]{11})/i);
-    if (watch) return { piattaforma: 'youtube', canale: watch[1] };
+    if (watch) return ok({ piattaforma: 'youtube', canale: watch[1] });
+    return { error: 'Link YouTube non riconosciuto: usa il link del video o della diretta (youtube.com/live/… o youtube.com/watch?v=…).' };
   }
 
-  return { error: 'Link non riconosciuto. Incolla un link di Twitch, YouTube o Kick.' };
+  if (/tiktok\.com/i.test(url)) {
+    const video = url.match(/tiktok\.com\/@[A-Za-z0-9_.]{2,24}\/video\/([0-9]{15,21})/i);
+    if (video) return ok({ piattaforma: 'tiktok', canale: video[1] });
+    const user = url.match(/tiktok\.com\/@([A-Za-z0-9_.]{2,24})/i);
+    if (user) return ok({ piattaforma: 'tiktok', canale: user[1] });
+    return { error: 'Link TikTok non riconosciuto: incolla il link completo (tiktok.com/@nome/live).' };
+  }
+
+  return { error: `Link non riconosciuto. Incolla un link di ${platformsText(platforms)}.` };
 }
+
+const isTiktokVideo = (canale) => /^[0-9]{15,21}$/.test(canale ?? '');
 
 // Costruisce l'URL dell'embed SOLO da piattaforma+canale già validati (mai
 // dall'URL grezzo che qualcuno ha incollato): unici domini possibili.
+// null = non incorporabile (le dirette TikTok: TikTok non permette di
+// guardarle dentro altri siti — si apre tiktok.com).
 export function buildEmbedUrl(piattaforma, canale) {
   if (piattaforma === 'twitch') {
-    return `https://player.twitch.tv/?channel=${encodeURIComponent(canale)}&parent=mike-majic.github.io&parent=localhost`;
+    const host = typeof window !== 'undefined' ? window.location.hostname || 'localhost' : 'localhost';
+    return `https://player.twitch.tv/?channel=${encodeURIComponent(canale)}&parent=${encodeURIComponent(host)}&autoplay=true`;
   }
   if (piattaforma === 'youtube') {
     return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(canale)}?autoplay=1`;
@@ -44,12 +85,38 @@ export function buildEmbedUrl(piattaforma, canale) {
   if (piattaforma === 'kick') {
     return `https://player.kick.com/${encodeURIComponent(canale)}`;
   }
+  if (piattaforma === 'tiktok' && isTiktokVideo(canale)) {
+    return `https://www.tiktok.com/player/v1/${encodeURIComponent(canale)}?autoplay=1&rel=0`;
+  }
   return null;
 }
 
-const PLATFORM_LABEL = { twitch: 'Twitch', youtube: 'YouTube', kick: 'Kick' };
-export function platformLabel(piattaforma) {
-  return PLATFORM_LABEL[piattaforma] ?? piattaforma;
+// Link alla pagina originale (pulsante "Apri su ...").
+export function externalLiveUrl(piattaforma, canale) {
+  if (piattaforma === 'twitch') return `https://www.twitch.tv/${encodeURIComponent(canale)}`;
+  if (piattaforma === 'youtube') return `https://www.youtube.com/watch?v=${encodeURIComponent(canale)}`;
+  if (piattaforma === 'kick') return `https://kick.com/${encodeURIComponent(canale)}`;
+  if (piattaforma === 'tiktok') {
+    return isTiktokVideo(canale) ? `https://www.tiktok.com/embed/v2/${encodeURIComponent(canale)}` : `https://www.tiktok.com/@${encodeURIComponent(canale)}/live`;
+  }
+  return null;
+}
+
+// Anteprime della diretta, dalla più "viva" alla più generica; se nessuna
+// si carica, la card mostra la foto profilo di chi l'ha condivisa.
+// YouTube: miniatura della diretta; Twitch: fotogramma attuale (cambia
+// ogni pochi minuti, per questo il parametro con l'ora); Kick e TikTok non
+// hanno un'anteprima pubblica senza chiavi: foto profilo.
+export function livePreviewUrls(piattaforma, canale) {
+  if (piattaforma === 'youtube') {
+    const id = encodeURIComponent(canale);
+    return [`https://i.ytimg.com/vi/${id}/hqdefault_live.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`];
+  }
+  if (piattaforma === 'twitch') {
+    const slot = Math.floor(Date.now() / 300000);
+    return [`https://static-cdn.jtvnw.net/previews-ttv/live_user_${encodeURIComponent(canale.toLowerCase())}-440x248.jpg?t=${slot}`];
+  }
+  return [];
 }
 
 // Dirette attive di un mondo, con l'host già risolto (public_profiles) — la

@@ -30,7 +30,7 @@ async function copyText(text) {
   }
 }
 
-export default function ShareSheet({ title = 'Condividi', text, url = window.location.origin + window.location.pathname, user, onOpenAuth, onClose }) {
+export default function ShareSheet({ title = 'Condividi', text, feedText, punteggio = null, url = window.location.origin + window.location.pathname, user, onOpenAuth, onClose }) {
   const [status, setStatus] = useState('');
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(false);
@@ -44,7 +44,7 @@ export default function ShareSheet({ title = 'Condividi', text, url = window.loc
     }
     setPosting(true);
     setStatus('');
-    const { error } = await createPost({ testo: text, mondo: 'social' });
+    const { error } = await createPost({ testo: feedText ?? text, punteggio, mondo: 'social' });
     setPosting(false);
     if (error) {
       setStatus(error);

@@ -17,6 +17,7 @@ import './annunci.css';
 // stesso linguaggio visivo di Segnalazioni/Suggerimenti) invece di
 // duplicarlo qui.
 import '../faq/faq.css';
+import PublishedAt from '../shared/PublishedAt';
 
 const DEFAULT_FILTERS = { prezzoMin: null, prezzoMax: null, citta: '', soloConFoto: false, ordinamento: 'recenti', fieldFilters: {} };
 
@@ -27,7 +28,9 @@ const DEFAULT_FILTERS = { prezzoMin: null, prezzoMax: null, citta: '', soloConFo
 // TUTTI i propri annunci di qualsiasi categoria (un'Auto pubblicata dalla
 // colonna Moto compare qui e in Auto, non in Moto) e li gestisce
 // (rinnova/riservato/venduto/elimina, "Vai" alla categoria).
-export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, onGoToCategory, closing = false }) {
+// focusListing: { listing, seq } da un link condiviso (#/annunci/<id>):
+// apre subito la scheda di quell'annuncio.
+export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, onGoToCategory, closing = false, focusListing = null }) {
   const [tipo, setTipo] = useState('vendita');
   const [view, setView] = useState('list'); // list | grid | map
   const [sideTab, setSideTab] = useState('filtri'); // filtri | mie
@@ -41,6 +44,13 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
   const [myListings, setMyListings] = useState(null);
   const [selected, setSelected] = useState(null);
   const [publishOpen, setPublishOpen] = useState(false);
+
+  useEffect(() => {
+    if (!focusListing?.listing) return;
+    if (focusListing.listing.tipo) setTipo(focusListing.listing.tipo);
+    setSelected(focusListing.listing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusListing?.seq]);
 
   const refresh = () => {
     setListings(null);
@@ -217,6 +227,7 @@ export default function AnnunciColumn({ category, user, onOpenAuth, onOpenChat, 
                     {meta ? `${meta.icon} ${meta.label}` : l.categoria} · {l.tipo === 'affitto' ? 'Affitto' : 'Vendita'}
                   </span>
                   <span className={`rb-faq-stato-badge rb-annunci-stato-${l.stato}`}>{l.stato}</span>
+                  <PublishedAt at={l.createdAt} />
                 </div>
                 <div className="rb-annunci-mie-actions">
                   {elsewhere && onGoToCategory && (

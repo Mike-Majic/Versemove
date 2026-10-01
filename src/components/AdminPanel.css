@@ -477,3 +477,12 @@
   background: color-mix(in srgb, #ff3860 25%, transparent);
   color: #ff3860;
 }
+
+/* Aziende: stato della verifica automatica della P.IVA sotto "Verificato". */
+.rb-admin-piva-stato {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.75;
+  max-width: 180px;
+  overflow-wrap: anywhere;
+}

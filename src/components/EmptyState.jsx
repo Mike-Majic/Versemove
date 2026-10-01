@@ -1,11 +1,12 @@
 import './EmptyState.css';
+import Icon from './shared/Icon';
 
 // Segnaposto per "qui non c'è ancora niente", condiviso da feed/colonne di
 // ogni mondo invece di un semplice <p> grigio (Fase 1 "effetto wow"): usa
 // --accent del contenitore che lo ospita (già impostato da ogni
 // panel/explorer, vedi shared.css) così il cerchio prende da solo il colore
 // del mondo corrente, senza bisogno di passarlo come prop.
-export default function EmptyState({ icon = '✨', title, subtitle, actions = [], children }) {
+export default function EmptyState({ icon = <Icon name="sparkle" size={30} />, title, subtitle, actions = [], children }) {
   return (
     <div className="rb-empty-state">
       <span className="rb-empty-state-icon" aria-hidden="true">{icon}</span>

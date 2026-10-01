@@ -475,3 +475,19 @@
 .rb-field-note--warn {
   color: #ffd166;
 }
+
+/* Numero di versione in fondo alle Impostazioni. */
+.rb-settings-version {
+  margin: 18px 0 4px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.45);
+  user-select: all;
+}
+
+/* Suono ed Effetti in cima a "Personalizza il tuo Versemove". */
+.rb-settings-personalizza-fx {
+  padding: 4px 0 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}

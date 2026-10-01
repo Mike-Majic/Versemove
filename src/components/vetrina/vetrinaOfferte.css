@@ -13,23 +13,111 @@
 /* Sfondo scuro, bordo rosa e scroll li dà il pannello di TwoColumnSwitcher
    (.rb-2col-panel), come negli altri mondi. */
 
-.rb-deal-panel-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
+/* Pulsante "Filtri e ordinamento" + menu a tendina (niente più seconda
+   colonna). */
+.rb-deal-filters-anchor {
+  position: relative;
+  align-self: flex-start;
+  z-index: 5;
 }
 
-.rb-deal-filters-stack {
+.rb-deal-filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #ec4899) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #ec4899) 14%, rgba(255, 255, 255, 0.04));
+  color: #f5f5f7;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.rb-deal-filters-toggle:hover,
+.rb-deal-filters-toggle.open {
+  background: color-mix(in srgb, var(--accent, #ec4899) 26%, rgba(255, 255, 255, 0.04));
+  border-color: var(--accent, #ec4899);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent, #ec4899) 35%, transparent);
+}
+.rb-deal-filters-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent, #ec4899);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.rb-deal-filters-chevron {
+  transition: transform 0.2s ease;
+}
+.rb-deal-filters-toggle.open .rb-deal-filters-chevron {
+  transform: rotate(180deg);
+}
+
+.rb-deal-filters-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(340px, calc(100vw - 48px));
+  display: flex;
   flex-direction: column;
-  align-items: stretch;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent, #ec4899) 50%, transparent);
+  background: rgba(14, 10, 22, 0.97);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 24px color-mix(in srgb, var(--accent, #ec4899) 22%, transparent);
+  backdrop-filter: blur(10px);
+  animation: rb-deal-menu-in 0.18s ease-out both;
 }
-
-.rb-deal-filters-stack > * {
+.rb-deal-filters-menu > * {
   width: 100%;
+  box-sizing: border-box;
 }
-
-.rb-deal-show-results {
-  margin-top: auto;
+/* Tendine dello stesso formato del campo di ricerca, a tutta larghezza. */
+.rb-deal-filters-menu .rb-select-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+@keyframes rb-deal-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-deal-filters-menu {
+    animation: none;
+  }
+}
+.rb-deal-filters-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+.rb-deal-filters-reset {
+  background: none;
+  border: none;
+  color: rgba(245, 245, 247, 0.75);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 4px;
+}
+.rb-deal-filters-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .rb-deal-header {
@@ -97,7 +185,9 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* Quante card entrano: 260px minimo l'una (4 su un 1920 con Windows al
+     150%, 5 al 125%, 6 al 100%), 1 sul telefono. */
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -126,6 +216,32 @@
   object-fit: cover;
   display: block;
 }
+/* Codice sconto scaduto: barra rossa di traverso sull'immagine, card spenta. */
+.rb-deal-scaduta-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 0;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  z-index: 2;
+}
+.rb-deal-card-scaduta .rb-deal-media img,
+.rb-deal-card-scaduta .rb-deal-media-empty {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.rb-deal-card-scaduta .rb-deal-info {
+  opacity: 0.6;
+}
+
 .rb-deal-media-empty {
   width: 100%;
   height: 100%;
@@ -387,6 +503,10 @@
   cursor: pointer;
 }
 
-.rb-deal-filters-open {
-  align-self: flex-start;
+/* Avviso affiliazione Amazon, obbligatorio dove ci sono link affiliati. */
+.rb-deal-affiliate-note {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.72);
+  text-align: center;
 }

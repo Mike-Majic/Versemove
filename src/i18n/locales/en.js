@@ -1,6 +1,8 @@
 // English. Keep the same key structure as it.js — see the comment there.
 export default {
   common: {
+    publishedAt: 'Published {{date}} at {{time}}',
+    publishedAgo: 'Published {{ago}}',
     close: 'Close',
     save: 'Save',
     cancel: 'Cancel',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'More categories',
     scrollWorldsUp: 'Scroll worlds up',
     scrollWorldsDown: 'Scroll worlds down',
+    updateAvailable: 'New version available, reload.',
+    reload: 'Reload',
   },
   topbar: {
     notifications: 'Notifications',
@@ -58,6 +62,12 @@ export default {
       mail: 'Email',
       password: 'Password',
       rememberMe: 'Remember me on this device',
+      forgotLink: 'Forgot password?',
+      forgotTitle: 'Reset your password',
+      forgotHint: "Enter your account email: we'll send you a link to choose a new one.",
+      forgotSubmit: 'Send link',
+      forgotSent: 'If the email is registered, the link is on its way. Check your spam folder too.',
+      backToLogin: 'Back to sign in',
       username: 'Username',
       nickname: 'Nickname',
       nicknameChecking: 'Checking availability…',
@@ -176,7 +186,7 @@ export default {
       age: 'Age',
     },
     language: {
-      title: 'Language',
+      title: 'System language',
       hint: 'Change the interface language anytime.',
       saved: 'Language changed and saved to your account.',
     },

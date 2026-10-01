@@ -1,18 +1,32 @@
 // Continenti del globo grande a più livelli di dettaglio (vedi
 // scripts/build-land-geojson.mjs per i file):
-// - lontano (altitudine > ALT_DETAIL): land-110m, costruito subito sul
-//   thread principale (125 poligoni, pochi ms), come sempre;
+// - lontano (altitudine > ALT_DETAIL): land-110m (125 poligoni), anche lui
+//   nel worker: sul thread principale ConicPolygonGeometry lo costruiva in
+//   ~2 s su un portatile con GPU integrata, proprio durante l'animazione
+//   d'ingresso del globo (che quindi si congelava e saltava alla fine);
 // - zoom medio e ravvicinato: land-50m, ritagliato in riquadri da 10°;
 // - zoom ravvicinato (altitudine < ALT_10M): i riquadri land10 vicini al
 //   centro della vista prendono il posto dei riquadri 50m corrispondenti.
 // 50m e 10m si costruiscono nel worker (globe/landWorker.js) e arrivano
-// come array; qui si uniscono in UNA Mesh (calotte), UNA LineSegments
-// (coste) e UNA LineSegments tratteggiata (confini di stato) per tutto il
-// livello "dettaglio": 3 draw call, qualunque sia il numero di riquadri.
-// Mai un buco: finché il 50m non è pronto resta il 110m, e un riquadro 10m
-// non ancora arrivato resta al 50m.
+// come array. Durante la rotazione non si ricostruisce mai nessuna geometria
+// (prima ogni cambio dei riquadri visibili riuniva tutto sul thread
+// principale: 50-100 ms a CPU rallentata 4x, quasi 2 volte al secondo):
+// - il 50m è UN gruppo di buffer per tutto il globo (3 draw call), unito
+//   una volta nel worker; un riquadro coperto dal 10m si spegne riscrivendo
+//   solo il suo intervallo di indici (vedi combineTiles in landGeometry.js);
+// - ogni riquadro 10m è un oggetto a sé, creato alla prima volta che serve
+//   e poi solo acceso/spento con visible.
+// Il 10m si accende e il 50m corrispondente si spegne nello stesso
+// aggiornamento: né buchi né doppio contorno. Mai un buco: finché il 50m non
+// è pronto resta il 110m, e un riquadro 10m non ancora arrivato resta al
+// 50m. L'unico momento senza continenti è il primo secondo dopo il mount,
+// finché il worker non consegna il 110m.
+//
+// Nessun oggetto dei continenti risponde ai raycast: sono solo disegno (il
+// globo cliccabile è la sfera di three-globe), e l'hover di
+// three-render-objects li attraversava ogni 50 ms segmento per segmento
+// (~80% del JavaScript durante un trascinamento).
 import * as THREE from 'three';
-import { polygonsArrays, concatIndexed, concatDashed } from './landGeometry';
 
 const TILE_DEG = 10;
 // Sotto questa altitudine il livello dettaglio (50m + 10m) sostituisce il
@@ -28,9 +42,6 @@ const MAX_10M_RADIUS_DEG = 12;
 // Margine in più sul raggio, per avere i riquadri pronti prima che entrino
 // davvero in vista.
 const PREFETCH_MARGIN_DEG = 3;
-// Riquadri 50m: solo quelli dal lato visibile del globo (raggio visibile
-// più questo margine), il retro non si disegna comunque.
-const VISIBLE_50M_MARGIN_DEG = 15;
 const MAX_CACHED_TILES = 80;
 // Trattini dei confini: lunghezza proporzionale alla distanza della camera
 // dalla superficie, così restano più o meno della stessa misura in pixel.
@@ -68,19 +79,26 @@ function visibleRadiusDeg(altitude, camera) {
   return rad / DEG2RAD;
 }
 
+// Sfera di contenimento nota in anticipo (tutto sta sulla superficie del
+// globo, raggio 100): niente computeBoundingSphere, che scorre tutti i
+// vertici.
+const LAND_BOUNDS = new THREE.Sphere(new THREE.Vector3(), 102);
+const noRaycast = () => {};
+
 function indexedGeometry({ position, index }) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(position, 3));
   g.setIndex(new THREE.BufferAttribute(index, 1));
-  g.computeBoundingSphere();
+  g.boundingSphere = LAND_BOUNDS.clone();
   return g;
 }
 
-function dashedGeometry({ position, lineDistance }) {
+function dashedGeometry({ position, lineDistance, index }) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(position, 3));
   g.setAttribute('lineDistance', new THREE.BufferAttribute(lineDistance, 1));
-  g.computeBoundingSphere();
+  if (index) g.setIndex(new THREE.BufferAttribute(index, 1));
+  g.boundingSphere = LAND_BOUNDS.clone();
   return g;
 }
 
@@ -104,6 +122,9 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     cap.scale.setScalar(1 + altitude);
     stroke.scale.setScalar(1 + altitude + 1e-4);
     borders.scale.setScalar(1 + altitude + 2e-4);
+    cap.raycast = noRaycast;
+    stroke.raycast = noRaycast;
+    borders.raycast = noRaycast;
     level.add(cap, stroke, borders);
     group.add(level);
     const set = (arrays) => {
@@ -120,10 +141,11 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
       stroke.geometry.dispose();
       borders.geometry.dispose();
     };
-    return { level, set, dispose };
+    return { level, set, dispose, parts: { cap, stroke, borders } };
   };
 
-  // Livello lontano: 110m, subito.
+  // Livello lontano: 110m. I poligoni si estraggono qui (istantaneo) e le
+  // geometrie le fa il worker (vedi sotto, dopo `request`).
   const polygons110 = [];
   features110.forEach((f) => {
     const geometry = f.geometry;
@@ -131,7 +153,6 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     else if (geometry?.type === 'MultiPolygon') polygons110.push(...geometry.coordinates);
   });
   const far = makeLevel();
-  far.set(polygonsArrays(polygons110));
 
   // Livello dettaglio: 50m + riquadri 10m, costruito dal worker.
   const detail = makeLevel();
@@ -140,14 +161,20 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
   let worker = null;
   let nextId = 1;
   const pending = new Map();
-  const tiles50 = new Map(); // key -> arrays
+  // 50m: intervalli di indici per riquadro, copia degli indici originali
+  // (per riaccendere) e riquadri spenti perché coperti dal 10m.
+  let ranges50 = null;
+  let original50 = null; // { cap, stroke, borders } -> Uint32Array
+  let sink50 = null; // { cap, stroke, borders } -> indice del vertice pozzo
+  const hidden50 = new Set();
   let land50Ready = false;
   let land50Requested = false;
   let index10 = null; // Set delle chiavi esistenti
   let index10Requested = false;
   const tiles10 = new Map(); // key -> arrays (LRU: ordine di inserimento)
   const tiles10Loading = new Set();
-  let detailKey = null; // quali riquadri 50m e 10m sono dentro la geometria attuale
+  const objects10 = new Map(); // key -> Group (calotta, coste, confini) già creato
+  let shown10 = new Set(); // riquadri 10m accesi adesso
   let detailWanted = false;
   let tenWanted = false;
   let disposed = false;
@@ -168,6 +195,17 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     worker.postMessage({ id, ...message });
   };
 
+  // 110m: i poligoni viaggiano nel messaggio (niente seconda richiesta del
+  // file, che non è in precache), tornano gli array pronti per far.set.
+  request({ kind: 'land110', polygons: polygons110 }, (msg) => {
+    if (disposed) return;
+    if (msg.error) {
+      console.error('Impossibile costruire i continenti 110m', msg.error);
+      return;
+    }
+    far.set(msg.arrays);
+  });
+
   const ensure50 = () => {
     if (land50Requested) return;
     land50Requested = true;
@@ -177,11 +215,14 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
         console.error('Impossibile caricare i continenti 50m', msg.error);
         return;
       }
-      if (msg.key) tiles50.set(msg.key, msg.arrays);
-      if (msg.done) {
-        land50Ready = true;
-        detailKey = null; // forza la costruzione al prossimo update
-      }
+      if (!msg.done) return;
+      const { cap, stroke, borders } = msg.arrays;
+      detail.set({ cap, stroke, borders });
+      ranges50 = msg.ranges;
+      original50 = { cap: cap.index.slice(), stroke: stroke.index.slice(), borders: borders.index.slice() };
+      sink50 = { cap: cap.sink, stroke: stroke.sink, borders: borders.sink };
+      hidden50.clear();
+      land50Ready = true;
     });
   };
 
@@ -215,30 +256,79 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     tiles10.set(key, arrays);
   };
 
+  const disposeObject10 = (key) => {
+    const obj = objects10.get(key);
+    if (!obj) return;
+    detail.level.remove(obj);
+    obj.children.forEach((child) => child.geometry.dispose());
+    objects10.delete(key);
+  };
+
   const evictTiles10 = (keep) => {
     for (const key of tiles10.keys()) {
       if (tiles10.size <= MAX_CACHED_TILES) break;
-      if (!keep.has(key)) tiles10.delete(key);
+      if (!keep.has(key) && !shown10.has(key)) {
+        tiles10.delete(key);
+        disposeObject10(key);
+      }
     }
   };
 
-  const rebuildDetail = (active50, active10) => {
-    const caps = [];
-    const strokes = [];
-    const borders = [];
-    for (const key of active50) {
-      const arrays = tiles50.get(key);
-      caps.push(arrays.cap);
-      strokes.push(arrays.stroke);
-      borders.push(arrays.borders);
+  // Riquadro 10m come oggetto a sé (stesse scale e materiali del livello).
+  const object10 = (key) => {
+    let obj = objects10.get(key);
+    if (obj) return obj;
+    const arrays = tiles10.get(key);
+    const { cap, stroke, borders } = detail.parts;
+    obj = new THREE.Group();
+    const add = (geometry, like, Kind, material) => {
+      const o = new Kind(geometry, material);
+      o.scale.copy(like.scale);
+      o.raycast = noRaycast;
+      obj.add(o);
+    };
+    if (arrays.cap) add(indexedGeometry(arrays.cap), cap, THREE.Mesh, capMaterial);
+    if (arrays.stroke) add(indexedGeometry(arrays.stroke), stroke, THREE.LineSegments, strokeMaterial);
+    if (arrays.borders) add(dashedGeometry(arrays.borders), borders, THREE.LineSegments, borderMaterial);
+    obj.visible = false;
+    detail.level.add(obj);
+    objects10.set(key, obj);
+    return obj;
+  };
+
+  // Spegne (hide = true) o riaccende un riquadro 50m: solo il suo intervallo
+  // di indici, caricato sulla GPU con addUpdateRange (niente buffer nuovi).
+  const setTile50Hidden = (key, hide) => {
+    const r = ranges50?.[key];
+    if (!r || hidden50.has(key) === hide) return;
+    if (hide) hidden50.add(key);
+    else hidden50.delete(key);
+    for (const part of ['cap', 'stroke', 'borders']) {
+      const [start, count] = r[part];
+      if (!count) continue;
+      const attr = detail.parts[part].geometry.index;
+      if (hide) attr.array.fill(sink50[part], start, start + count);
+      else attr.array.set(original50[part].subarray(start, start + count), start);
+      attr.addUpdateRange(start, count);
+      attr.needsUpdate = true;
     }
-    for (const key of active10) {
-      const arrays = tiles10.get(key);
-      caps.push(arrays.cap);
-      strokes.push(arrays.stroke);
-      borders.push(arrays.borders);
+  };
+
+  // Accende i riquadri 10m di `next` e spegne i 50m sotto di loro, e
+  // viceversa per quelli che escono: tutto nello stesso aggiornamento.
+  const applyTiles10 = (next) => {
+    for (const key of shown10) {
+      if (next.has(key)) continue;
+      const obj = objects10.get(key);
+      if (obj) obj.visible = false;
+      setTile50Hidden(key, false);
     }
-    detail.set({ cap: concatIndexed(caps), stroke: concatIndexed(strokes), borders: concatDashed(borders) });
+    for (const key of next) {
+      if (shown10.has(key)) continue;
+      object10(key).visible = true;
+      setTile50Hidden(key, true);
+    }
+    shown10 = next;
   };
 
   const tilesNear = (keysIterable, lat, lng, radiusDeg) => {
@@ -274,13 +364,7 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
 
     const showDetail = detailWanted && land50Ready;
     if (showDetail) {
-      const radius50 = visibleRadiusDeg(alt, camera) + VISIBLE_50M_MARGIN_DEG;
-      const active50 = tilesNear(tiles50.keys(), pov.lat, pov.lng, radius50).filter((key) => !active10.has(key));
-      const key = `${active50.sort().join(',')}|${[...active10].sort().join(',')}`;
-      if (key !== detailKey) {
-        rebuildDetail(active50, active10);
-        detailKey = key;
-      }
+      applyTiles10(active10);
       // Trattini più corti avvicinandosi (unità del globo: raggio 100).
       const dash = Math.max(0.05, DASH_PER_ALTITUDE * alt);
       borderMaterial.dashSize = dash;
@@ -310,6 +394,7 @@ export function createLandLod({ parent, features110, altitude = 0.006 }) {
     parent.remove(group);
     far.dispose();
     detail.dispose();
+    [...objects10.keys()].forEach(disposeObject10);
     capMaterial.dispose();
     strokeMaterial.dispose();
     borderMaterial.dispose();

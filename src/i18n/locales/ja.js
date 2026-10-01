@@ -1,6 +1,8 @@
 // 日本語: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '{{date}} {{time}} に投稿',
+    publishedAgo: '{{ago}}に投稿',
     close: '閉じる',
     save: '保存',
     cancel: 'キャンセル',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: '他のカテゴリー',
     scrollWorldsUp: 'ワールドを上にスクロール',
     scrollWorldsDown: 'ワールドを下にスクロール',
+    updateAvailable: '新しいバージョンがあります。再読み込みしてください。',
+    reload: '再読み込み',
   },
   topbar: {
     notifications: '通知',
@@ -58,6 +62,12 @@ export default {
       mail: 'メールアドレス',
       password: 'パスワード',
       rememberMe: 'この端末で記憶する',
+      forgotLink: 'パスワードをお忘れですか？',
+      forgotTitle: 'パスワードの再設定',
+      forgotHint: 'アカウントのメールを入力してください。新しいパスワードを設定するリンクを送ります。',
+      forgotSubmit: 'リンクを送信',
+      forgotSent: '登録済みのメールであれば、まもなくリンクが届きます。迷惑メールも確認してください。',
+      backToLogin: 'ログインに戻る',
       username: 'ユーザー名',
       nickname: 'ニックネーム',
       nicknameChecking: '利用可否を確認中…',
@@ -176,7 +186,7 @@ export default {
       age: '年齢',
     },
     language: {
-      title: '言語',
+      title: 'システム言語',
       hint: 'インターフェースの言語をいつでも変更できます。',
       saved: '言語を変更し、アカウントに保存しました。',
     },

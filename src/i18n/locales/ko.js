@@ -1,6 +1,8 @@
 // 한국어: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '{{date}} {{time}}에 게시됨',
+    publishedAgo: '{{ago}} 게시됨',
     close: '닫기',
     save: '저장',
     cancel: '취소',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: '다른 카테고리 보기',
     scrollWorldsUp: '월드 위로 스크롤',
     scrollWorldsDown: '월드 아래로 스크롤',
+    updateAvailable: '새 버전이 있습니다. 새로고침하세요.',
+    reload: '새로고침',
   },
   topbar: {
     notifications: '알림',
@@ -58,6 +62,12 @@ export default {
       mail: '이메일',
       password: '비밀번호',
       rememberMe: '이 기기에서 로그인 정보 기억하기',
+      forgotLink: '비밀번호를 잊으셨나요?',
+      forgotTitle: '비밀번호 재설정',
+      forgotHint: '계정 이메일을 입력하세요. 새 비밀번호를 설정할 링크를 보내드립니다.',
+      forgotSubmit: '링크 보내기',
+      forgotSent: '등록된 이메일이라면 곧 링크가 도착합니다. 스팸함도 확인하세요.',
+      backToLogin: '로그인으로 돌아가기',
       username: '사용자 이름',
       nickname: '닉네임',
       nicknameChecking: '사용 가능 여부 확인 중…',
@@ -176,7 +186,7 @@ export default {
       age: '나이',
     },
     language: {
-      title: '언어',
+      title: '시스템 언어',
       hint: '언제든지 인터페이스 언어를 변경할 수 있습니다.',
       saved: '언어가 변경되어 계정에 저장되었습니다.',
     },

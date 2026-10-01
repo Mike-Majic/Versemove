@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ModalOverlay from './ModalOverlay';
 import ReportModal from './shared/ReportModal';
 import './ProfileModal.css';
+import AvatarImg from './shared/AvatarImg';
 
 // "user" qui è il profilo che si sta guardando (non chi è loggato: quello
 // arriva come "viewer", serve solo per sapere se mostrare/abilitare il
@@ -29,7 +30,7 @@ export default function ProfileModal({ user, world, onClose, viewer, onOpenAuth 
         )}
 
         <div className="rb-profile-head">
-          <img src={user.avatar} alt={user.name} className="rb-profile-avatar" />
+          <AvatarImg src={user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.name} className="rb-profile-avatar" />
           <div>
             <h2>{user.name}{user.age ? `, ${user.age}` : ''}</h2>
             <p className="rb-profile-location">📍 {user.city}, {user.country}</p>

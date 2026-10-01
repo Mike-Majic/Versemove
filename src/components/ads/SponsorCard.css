@@ -156,3 +156,34 @@
 .rb-sponsor-riga_lista .rb-sponsor-text {
   display: none;
 }
+
+/* Match (Incontri): la pubblicità prende il posto della card profilo,
+   stesso ingombro, con "Continua" sotto. */
+.rb-match-ad {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rb-match-ad .rb-sponsor-media img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.rb-match-ad-continue {
+  align-self: center;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent, #e11d48);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

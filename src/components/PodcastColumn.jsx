@@ -3,6 +3,8 @@ import { listContentsForPlacement, toggleContentLike } from '../data/contents';
 import { searchRadioStations } from '../data/radioBrowser';
 import '../components/cultural/cultural.css';
 import './PodcastColumn.css';
+import Icon from './shared/Icon';
+import PublishedAt from './shared/PublishedAt';
 
 // Scheda "Radio" della categoria Podcast: stazioni radio reali (Radio
 // Browser, API pubblica senza chiave) ascoltabili in diretta con un
@@ -36,7 +38,7 @@ function RadioTab() {
 
   return (
     <div className="rb-radio-tab">
-      <p className="rb-radio-note">🌍 Stazioni radio in diretta da tutto il mondo — si ascoltano qui dentro, senza uscire da Versemove.</p>
+      <p className="rb-radio-note"><Icon name="globe" size={16} className="rb-icon--inline" /> Stazioni radio in diretta da tutto il mondo — si ascoltano qui dentro, senza uscire da Versemove.</p>
 
       <div className="rb-radio-search-row">
         <input
@@ -57,11 +59,11 @@ function RadioTab() {
       {playing && (
         <div className="rb-radio-player">
           <div className="rb-radio-player-info">
-            {playing.favicon ? <img src={playing.favicon} alt="" /> : <span className="rb-radio-player-icon">📻</span>}
+            {playing.favicon ? <img src={playing.favicon} alt="" /> : <span className="rb-radio-player-icon"><Icon name="radio" size={20} /></span>}
             <strong>{playing.name}</strong>
           </div>
           <audio key={playing.id} src={playing.streamUrl} controls autoPlay />
-          <button type="button" className="rb-radio-player-close" onClick={() => setPlaying(null)} aria-label="Ferma">✕</button>
+          <button type="button" className="rb-radio-player-close" onClick={() => setPlaying(null)} aria-label="Ferma"><Icon name="close" size={16} /></button>
         </div>
       )}
 
@@ -73,12 +75,12 @@ function RadioTab() {
         {stations?.map((s) => (
           <li key={s.id} className={`rb-radio-card ${playing?.id === s.id ? 'active' : ''}`}>
             <button type="button" onClick={() => setPlaying(s)}>
-              {s.favicon ? <img src={s.favicon} alt="" /> : <span className="rb-radio-card-icon">📻</span>}
+              {s.favicon ? <img src={s.favicon} alt="" /> : <span className="rb-radio-card-icon"><Icon name="radio" size={20} /></span>}
               <div>
                 <strong>{s.name}</strong>
                 <span>{[s.country, ...s.tags].filter(Boolean).join(' · ')}</span>
               </div>
-              <span className="rb-radio-play">{playing?.id === s.id ? '⏸' : '▶️'}</span>
+              <span className="rb-radio-play"><Icon name={playing?.id === s.id ? 'pause' : 'play'} size={16} /></span>
             </button>
           </li>
         ))}
@@ -120,9 +122,10 @@ function PodcastTab({ user, onOpenAuth }) {
           <div className="rb-cultural-card-info">
             {c.caption && <strong>{c.caption}</strong>}
             {c.tags?.length > 0 && <p className="rb-cultural-card-meta">{c.tags.map((t) => `#${t}`).join(' ')}</p>}
+            <PublishedAt at={c.created_at} />
           </div>
           <button type="button" className="rb-cultural-reaction-btn" onClick={() => handleLike(c)}>
-            {c.likedByMe ? '❤️' : '🤍'} {c.likeCount}
+            <Icon name="heart" size={16} className={`rb-icon--inline ${c.likedByMe ? 'rb-icon--filled' : ''}`} /> {c.likeCount}
           </button>
         </li>
       ))}

@@ -1,26 +1,38 @@
-// Categorie del mondo Incontri (rosso): solo "Match" (stile Tinder) — le
+// Categorie del mondo Incontri (rosso): "Match" (stile Tinder) e
+// "Videochiamata" (stanze video di gruppo, arrivate dal mondo Nerd) — le
 // live sono state spostate nei mondi Social e Lavoro (vedi
 // liveStreams.js), qui restano solo gli incontri. Stessa struttura di
 // BAMBINI_CATEGORIES/ARTE_CATEGORIES, così funziona con lo stesso
-// meccanismo di triangoli sul globo (vedi App.jsx, CATEGORY_WORLDS).
+// meccanismo di sagome sul globo (vedi App.jsx, CATEGORY_WORLDS).
 //
-// L'anchor è deliberatamente in mezzo all'oceano (non su una città): il
-// triangolo/sagoma di una categoria è grande e semi-trasparente, se
-// ancorato su terraferma finisce sopra ai marker degli utenti di quella
-// zona e li nasconde. Sull'acqua non c'è nessuno da coprire. Era nel
-// Pacifico meridionale (lat -20, lng -140): acqua, ma sul lato opposto del
-// globo rispetto all'inquadratura iniziale (lat 0, lng 0), quindi invisibile
-// finché non si ruotava manualmente. Spostato nel Golfo di Aden — ancora
-// oceano aperto (verificato contro gli stessi dati GeoJSON del globo, vedi
-// landGeo.js), ma vicino all'inquadratura di apertura, così il cuore
-// dell'unica categoria si vede fin da subito.
+// Posizioni: Match sull'equatore a lng 0, cioè al centro del globo nella
+// vista iniziale; Videochiamata alla stessa altezza ma esattamente alle sue
+// spalle (lng 180), quindi all'avvio non si vede e compare ruotando il
+// globo di mezzo giro. Entrambi i punti sono oceano aperto (Golfo di
+// Guinea e Pacifico centrale), quindi non coprono marker di utenti.
+// exactAnchor: la sagoma sta esattamente sull'anchor e non al centro del
+// triangolo più vicino (vedi buildCategoryShell in globe/categoryShell.js),
+// altrimenti il cuore risulterebbe spostato di qualche grado.
 export const INCONTRI_CATEGORIES = [
   {
     id: 'match',
     label: 'Match',
     icon: '💘',
-    anchor: { lat: 12, lng: 48 }, // Golfo di Aden
+    anchor: { lat: 0, lng: 0 }, // centro della vista iniziale
+    exactAnchor: true,
     aliases: ['match', 'tinder', 'mi piace', 'incontri rapidi', 'swipe'],
+    subfamilies: [],
+  },
+  {
+    // Stanze video di gruppo (fino a 8 persone), spostate qui dal mondo
+    // Nerd: stesso componente (nerd/VideoRoomsColumn.jsx, preset
+    // 'incontri'), categoria 'videochiamata' lato server.
+    id: 'videochiamata',
+    label: 'Videochiamata',
+    icon: '🎥',
+    anchor: { lat: 0, lng: 180 }, // alle spalle di Match
+    exactAnchor: true,
+    aliases: ['videochiamata', 'videochiamate', 'stanze video', 'video chat', 'chiamata di gruppo'],
     subfamilies: [],
   },
 ];

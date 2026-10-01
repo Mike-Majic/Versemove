@@ -31,14 +31,24 @@
 .rb-arte-top-controls {
   position: absolute;
   top: 26px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Riga larga quanto lo schermo e centrata con flex (non con transform:
+     un transform farebbe da riferimento al position: fixed della ricerca). */
+  left: 0;
+  right: 0;
+  justify-content: center;
+  /* X e stellina al centro; su schermi larghi la ricerca va a destra,
+     accanto alle icone della topbar (vedi .rb-arte-category-search sotto);
+     su telefono resta sulla stessa riga. */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  pointer-events: auto;
+  gap: 8px;
+  pointer-events: none;
   z-index: 1041;
+}
+
+.rb-arte-top-controls > * {
+  pointer-events: auto;
 }
 
 /* Sotto il breakpoint mobile la topbar (vedi TopBar.css) porta le sue
@@ -98,13 +108,14 @@
 }
 
 .rb-arte-category-search input {
-  width: min(320px, 60vw);
+  width: min(240px, calc(100vw - 150px));
   box-sizing: border-box;
   background: rgba(8, 6, 14, 0.8);
   border: 1px solid color-mix(in srgb, var(--accent, #8b5cf6) 40%, transparent);
   color: #f5f5f7;
   font-size: 13px;
-  padding: 9px 14px;
+  height: 34px;
+  padding: 0 14px;
   border-radius: 999px;
   text-align: center;
 }
@@ -115,4 +126,35 @@
 
 .rb-arte-category-search input::placeholder {
   color: rgba(245, 245, 247, 0.5);
+}
+
+/* Schermi larghi: la ricerca categorie esce dalla riga centrale e si mette
+   a destra, subito prima delle icone della topbar (campanella, chat...):
+   --rb-topbar-actions-w la imposta TopBar.jsx con la larghezza reale. */
+@media (min-width: 761px) {
+  .rb-arte-category-search {
+    position: fixed;
+    top: 17px;
+    right: calc(var(--rb-topbar-actions-w, 200px) + 22px + 14px);
+  }
+
+  .rb-arte-category-search input {
+    width: min(240px, calc(50vw - var(--rb-topbar-actions-w, 200px) - 110px));
+  }
+}
+
+/* Categorie a DUE colonne (TwoColumnSwitcher, desktop: .rb-2col-right;
+   telefono: la maniglia per passare all'altra colonna). Le categorie a una
+   colonna sola restano come sopra.
+   - Niente ricerca categorie accanto a X e stellina.
+   - X e stellina centrate sullo spazio fra le due colonne (le colonne
+     stanno a 22px da sinistra e 70px da destra, quindi il centro non è
+     quello dello schermo). */
+.rb-arte-explorer:has(.rb-2col-right) .rb-arte-category-search,
+.rb-arte-explorer:has(.rb-2col-edge-handle) .rb-arte-category-search {
+  display: none;
+}
+.rb-arte-explorer:has(.rb-2col-right) .rb-arte-top-controls {
+  left: 22px;
+  right: 70px;
 }

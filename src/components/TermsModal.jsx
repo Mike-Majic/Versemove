@@ -1,5 +1,6 @@
 import ModalOverlay from './ModalOverlay';
 import './TermsModal.css';
+import { AFFILIATE_ACTIVE, AFFILIATE_DISCLOSURE } from '../data/affiliate';
 
 // Testo segnaposto: serve perché la registrazione DEVE avere un link ai
 // Termini/Privacy da far spuntare (obbligo GDPR + buona prassi), ma non è
@@ -29,6 +30,12 @@ export default function TermsModal({ open, onClose }) {
           <li>I dati che inserisci (nome utente, nickname, dati anagrafici, allegati) devono riguardare te o, per un'azienda, la tua attività.</li>
           <li>Non è consentito pubblicare contenuti illegali, violenti, discriminatori o che violino i diritti di terzi.</li>
           <li>L'account può essere sospeso o rimosso dai moderatori in caso di violazione di queste regole.</li>
+        </ul>
+
+        <h3>Pubblicità</h3>
+        <ul>
+          {AFFILIATE_ACTIVE && <li>{AFFILIATE_DISCLOSURE}</li>}
+          <li>Nel mondo Bambini compaiono solo pubblicità scelte come adatte ai bambini, senza profilazione.</li>
         </ul>
 
         <h3>Informativa privacy</h3>

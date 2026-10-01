@@ -1,6 +1,8 @@
 // 中文（简体）: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '发布于 {{date}} {{time}}',
+    publishedAgo: '发布于{{ago}}',
     close: '关闭',
     save: '保存',
     cancel: '取消',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: '更多分类',
     scrollWorldsUp: '向上滚动世界列表',
     scrollWorldsDown: '向下滚动世界列表',
+    updateAvailable: '有新版本可用，请刷新。',
+    reload: '刷新',
   },
   topbar: {
     notifications: '通知',
@@ -58,6 +62,12 @@ export default {
       mail: '邮箱',
       password: '密码',
       rememberMe: '在此设备上记住我',
+      forgotLink: '忘记密码？',
+      forgotTitle: '重置密码',
+      forgotHint: '输入账户邮箱：我们会发送一个链接让你设置新密码。',
+      forgotSubmit: '发送链接',
+      forgotSent: '如果该邮箱已注册，链接很快就会送达。也请检查垃圾邮件。',
+      backToLogin: '返回登录',
       username: '用户名',
       nickname: '昵称',
       nicknameChecking: '正在检查可用性…',
@@ -176,7 +186,7 @@ export default {
       age: '年龄',
     },
     language: {
-      title: '语言',
+      title: '系统语言',
       hint: '随时更改界面语言。',
       saved: '语言已更改并保存至您的账户。',
     },

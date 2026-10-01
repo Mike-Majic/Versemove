@@ -5,10 +5,13 @@ import {
   deleteComment as deleteCommentApi,
   fetchComments,
   fetchFeed,
+  FEED_PAGE_SIZE,
   softDeletePost as softDeletePostApi,
   togglePostLike as togglePostLikeApi,
   toggleSavedPost as toggleSavedPostApi,
   updatePostText as updatePostTextApi,
+  applyCommentReaction,
+  toggleCommentReaction,
 } from '../../../data/posts';
 import { toggleContentLike as toggleContentLikeApi } from '../../../data/contents';
 import { COMMUNITY_TOPICS, COSPLAY_CATEGORY_ID, COSPLAY_POST_TAGS, FONTE_SERIE, fetchEventiVicini } from '../../../data/cosplay';
@@ -21,6 +24,8 @@ import Skeleton from '../../Skeleton';
 import Lightbox from '../../shared/chat/Lightbox';
 import { GalleriaFields, WipFields } from './CosplayComposers';
 import { emptyFields, fieldsToPost } from './cosplayPost';
+import LoadMoreButton from '../../shared/LoadMoreButton';
+import PublishedAt from '../../shared/PublishedAt';
 
 // Galleria / WIP / Community della categoria Cosplay: posts con mondo
 // nerd, categoria cosplay e tag galleria / wip / discussione, come le
@@ -48,6 +53,7 @@ function GalleriaGrid({ posts, onOpen }) {
             <span className="rb-clip-caption">
               <strong>{[p.extra?.personaggio, p.extra?.serie].filter(Boolean).join(' · ') || 'Cosplay'}</strong>
               <span>{p.author?.name ?? 'Utente'}{p.extra?.fotografo ? ` · 📷 ${p.extra.fotografo}` : ''}</span>
+              <PublishedAt at={p.data} />
             </span>
           </button>
         </li>
@@ -67,19 +73,31 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
   const [topic, setTopic] = useState(null);
   const [search, setSearch] = useState('');
   const [events, setEvents] = useState([]);
+  // Pagine: si ricaricano le prime pages * FEED_PAGE_SIZE (le azioni sui
+  // post ricaricano l'elenco intero, così restano allineate).
+  const [pages, setPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setPages((n) => n + 1);
+  };
 
   const reload = useCallback(async () => {
-    const res = await fetchFeed({ mondo: 'nerd', categoria: COSPLAY_CATEGORY_ID, tag });
+    const res = await fetchFeed({ mondo: 'nerd', categoria: COSPLAY_CATEGORY_ID, tag, limit: pages * FEED_PAGE_SIZE });
+    setLoadingMore(false);
     if (res.error) {
       setError(res.error);
       setPosts([]);
       return;
     }
+    setHasMore(Boolean(res.hasMore));
     const list = res.posts ?? [];
     setPosts(list);
     const { comments: c } = await fetchComments(list.map((p) => p.id));
     setComments(c ?? []);
-  }, [tag]);
+  }, [tag, pages]);
 
   useEffect(() => {
     reload();
@@ -141,8 +159,18 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
   const handleDeleteComment = withReload((commentId) => deleteCommentApi(commentId));
   const handleEditPost = withReload((postId, testo) => updatePostTextApi(postId, testo));
   const handleDeletePost = withReload((postId) => softDeletePostApi(postId));
-  const handleReactToComment = (commentId, emoji) => {
-    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, reazioni: { ...c.reazioni, [emoji]: (c.reazioni?.[emoji] ?? 0) + 1 } } : c)));
+  const handleReactToComment = async (commentId, emoji) => {
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+    const had = (comments.find((c) => c.id === commentId)?.mieReazioni ?? []).includes(emoji);
+    setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+    const { error: reactErr } = await toggleCommentReaction(commentId, emoji, had);
+    if (reactErr) {
+      setComments((prev) => applyCommentReaction(prev, commentId, emoji));
+      setError(reactErr);
+    }
   };
 
   const fieldsNode = useMemo(() => {
@@ -235,6 +263,7 @@ export default function CosplayFeed({ tag, user, onOpenAuth, locationFilters }) 
           ))}
         </ul>
       )}
+      {posts && hasMore && <LoadMoreButton onLoad={loadMore} loading={loadingMore} label="Carica altri post" loadingLabel="Carico altri post…" />}
 
       {viewer && (
         <Lightbox

@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
 import i18n from '../i18n';
+import { prepareUpload } from './mediaCompress';
 
 // Apre (o riusa, se già esiste) la conversazione diretta con un altro
 // utente reale — la funzione lato server aggiunge entrambi come
@@ -35,9 +36,57 @@ export async function fetchMessages(conversationId, { before = null, limit = nul
       rows = rows.slice(0, limit).reverse();
     }
 
+    // Messaggi che ho eliminato "per me" (chat_message_hidden, la RLS fa
+    // leggere solo le proprie righe): non si mostrano.
+    const hidden = await fetchHiddenMessageIds(rows.map((m) => m.id));
+    if (hidden.size) rows = rows.filter((m) => !hidden.has(m.id));
+
     const profilesMap = await fetchProfilesMap(rows.map((m) => m.sender_id));
     const messages = rows.map((row) => mapMessageRow(row, profilesMap.get(row.sender_id)));
     return { messages, hasMore };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+async function fetchHiddenMessageIds(ids) {
+  if (!ids.length) return new Set();
+  try {
+    const { data } = await supabase.from('chat_message_hidden').select('message_id').in('message_id', ids);
+    return new Set((data ?? []).map((r) => r.message_id));
+  } catch {
+    return new Set();
+  }
+}
+
+// "Elimina per tutti" (solo i miei messaggi): il server svuota il messaggio
+// (tipo 'eliminato') e restituisce il vecchio allegato; il file va tolto
+// dallo storage qui (la policy lo permette al mittente). Se la rimozione
+// del file non riesce il messaggio resta comunque eliminato.
+export async function deleteMessageForAll(messageId) {
+  try {
+    const { data, error } = await supabase.rpc('delete_chat_message_for_all', { p_message_id: messageId });
+    if (error) return { error: translateInteractionError(error) };
+    if (data?.path) {
+      try {
+        await supabase.storage.from('chat-media').remove([data.path]);
+      } catch {
+        // file già sparito o permesso negato: non blocca l'eliminazione
+      }
+    }
+    return {};
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// "Elimina per me": qualunque messaggio della conversazione, sparisce solo
+// dalla mia vista (chat_message_hidden).
+export async function deleteMessageForMe(messageId) {
+  try {
+    const { error } = await supabase.rpc('delete_chat_message_for_me', { p_message_id: messageId });
+    if (error) return { error: translateInteractionError(error) };
+    return {};
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
@@ -62,6 +111,7 @@ export function mapMessageRow(row, author) {
 // Testo breve di un messaggio per le anteprime (hub 💬): i vocali con la
 // durata, i video con l'etichetta, il resto col testo salvato.
 export function messagePreviewText({ tipo, testo, allegato } = {}) {
+  if (tipo === 'eliminato') return 'Messaggio eliminato';
   if (tipo === 'audio') {
     const s = Math.max(0, Math.round(Number(allegato?.durata) || 0));
     return s ? `🎤 Messaggio vocale · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '🎤 Messaggio vocale';
@@ -161,7 +211,9 @@ export function subscribeToParticipantUpdates(conversationId, onUpdate) {
 // cade e si ristabilisce (per ricaricare i messaggi dal DB e non perderne).
 // Va rimosso con supabase.removeChannel alla chiusura/cambio chat, altrimenti
 // resta appeso.
-export function subscribeToConversationMessages(conversationId, onInsert, onReconnect) {
+// onUpdate: un messaggio modificato (es. "Elimina per tutti" dell'altra
+// persona), così la bolla diventa "Messaggio eliminato" subito.
+export function subscribeToConversationMessages(conversationId, onInsert, onReconnect, onUpdate) {
   let everSubscribed = false;
   return supabase
     .channel(`chat-messages-${conversationId}`)
@@ -169,6 +221,11 @@ export function subscribeToConversationMessages(conversationId, onInsert, onReco
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${conversationId}` },
       (payload) => onInsert(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${conversationId}` },
+      (payload) => onUpdate?.(payload.new)
     )
     .subscribe((status) => {
       if (status !== 'SUBSCRIBED') return;
@@ -204,60 +261,33 @@ export function subscribeToOwnMessages(onInsert) {
 
 // Tutte le mie conversazioni dirette, con l'altro partecipante, l'anteprima
 // dell'ultimo messaggio e i non letti — per l'hub DM stile WhatsApp
-// (components/DMHub.jsx): niente RPC dedicata, si compone da tabelle già
-// esistenti (poche righe per utente, va bene lato client).
+// (components/DMHub.jsx). L'ultimo messaggio di ogni chat lo trova il DB
+// (RPC conversazioni_ultimo_msg): prima si scaricavano tutti i messaggi di
+// tutte le chat per prenderne uno.
 export async function listMyConversations() {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return [];
-    const myId = auth.user.id;
 
-    const { data: myRows, error } = await supabase
-      .from('chat_participants')
-      .select('conversation_id, archived')
-      .eq('user_id', myId);
-    if (error || !myRows?.length) return [];
-
-    const convIds = myRows.map((r) => r.conversation_id);
-    const archivedMap = new Map(myRows.map((r) => [r.conversation_id, r.archived]));
-
-    const { data: allParticipants } = await supabase
-      .from('chat_participants')
-      .select('conversation_id, user_id')
-      .in('conversation_id', convIds);
-    const otherIdByConv = new Map();
-    for (const row of allParticipants ?? []) {
-      if (row.user_id !== myId) otherIdByConv.set(row.conversation_id, row.user_id);
-    }
-
-    const { data: recentMessages } = await supabase
-      .from('chat_messages')
-      .select('conversation_id, testo, tipo, allegato, created_at, mondo')
-      .in('conversation_id', convIds)
-      .order('created_at', { ascending: false });
-    const lastMsgByConv = new Map();
-    for (const m of recentMessages ?? []) {
-      if (!lastMsgByConv.has(m.conversation_id)) lastMsgByConv.set(m.conversation_id, m);
-    }
+    const { data: rows, error } = await supabase.rpc('conversazioni_ultimo_msg');
+    if (error || !rows?.length) return [];
 
     const [unreadCounts, profilesMap] = await Promise.all([
       getUnreadCounts(),
-      fetchProfilesMap([...otherIdByConv.values()]),
+      fetchProfilesMap(rows.map((r) => r.other_id)),
     ]);
 
-    return convIds
-      .filter((convId) => otherIdByConv.has(convId))
-      .map((convId) => {
-        const otherId = otherIdByConv.get(convId);
-        const lastMsg = lastMsgByConv.get(convId) ?? null;
+    return rows
+      .map((r) => {
+        const lastMsg = r.created_at ? { testo: r.testo, tipo: r.tipo, allegato: r.allegato, created_at: r.created_at, mondo: r.mondo } : null;
         return {
-          conversationId: convId,
-          other: profilesMap.get(otherId) ?? { id: otherId, name: 'Utente', avatar: '' },
+          conversationId: r.conversation_id,
+          other: profilesMap.get(r.other_id) ?? { id: r.other_id, name: 'Utente', avatar: '' },
           lastMessage: lastMsg ? messagePreviewText(lastMsg) : null,
           lastMessageAt: lastMsg?.created_at ?? null,
           lastMessageMondo: lastMsg?.mondo ?? null,
-          unread: unreadCounts.get(convId) ?? 0,
-          archived: archivedMap.get(convId) ?? false,
+          unread: unreadCounts.get(r.conversation_id) ?? 0,
+          archived: Boolean(r.archived),
         };
       })
       .sort((a, b) => new Date(b.lastMessageAt ?? 0) - new Date(a.lastMessageAt ?? 0));
@@ -287,17 +317,9 @@ export async function setConversationArchived(conversationId, archived) {
 // alla riga giusta nella lista amici, che è per friendId).
 export async function getDirectConversationsMap() {
   try {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user) return new Map();
-    const myId = auth.user.id;
-    const { data, error } = await supabase.from('chat_participants').select('conversation_id, user_id');
+    const { data, error } = await supabase.rpc('conversazioni_ultimo_msg');
     if (error || !data) return new Map();
-    const myConvIds = new Set(data.filter((r) => r.user_id === myId).map((r) => r.conversation_id));
-    const map = new Map();
-    for (const row of data) {
-      if (row.user_id !== myId && myConvIds.has(row.conversation_id)) map.set(row.user_id, row.conversation_id);
-    }
-    return map;
+    return new Map(data.map((r) => [r.other_id, r.conversation_id]));
   } catch {
     return new Map();
   }
@@ -311,10 +333,15 @@ export async function getDirectConversationsMap() {
 // pubblici, si aprono con URL firmati a scadenza.
 export const CHAT_MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-export async function uploadChatAttachment(conversationId, file) {
+export async function uploadChatAttachment(conversationId, original) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
+    // Compressione prima del controllo di peso: un video da 30 MB può
+    // scendere sotto i 20 MB.
+    const prepared = await prepareUpload(original, { allowWebm: false });
+    if (prepared.error) return { error: prepared.error };
+    const file = prepared.file;
     if (file.size > CHAT_MAX_FILE_BYTES) return { error: 'Il file supera i 20 MB.' };
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80) || 'file';
     const path = `${conversationId}/${auth.user.id}/${Date.now()}-${safeName}`;

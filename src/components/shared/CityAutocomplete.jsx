@@ -7,12 +7,14 @@ import './CityAutocomplete.css';
 // tendina "Nome mostrato, Regione · 🇮🇹 Italia". value è il testo del
 // campo (controllato dal genitore); onChange(text) a ogni tasto,
 // onPick(city) alla scelta (il genitore mette nel campo city.nomeMostrato).
-export default function CityAutocomplete({ value, onChange, onPick, placeholder = 'Es. Roma', paese = null, id, autoFocus = false, disabled = false }) {
+// pickedValue: testo iniziale che è già una città scelta dall'elenco (non
+// riapre i suggerimenti appena il campo compare).
+export default function CityAutocomplete({ value, onChange, onPick, placeholder = 'Es. Roma', paese = null, id, autoFocus = false, disabled = false, pickedValue = '' }) {
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(-1);
-  const pickedRef = useRef('');
+  const pickedRef = useRef(String(pickedValue ?? '').trim());
   const wrapRef = useRef(null);
 
   useEffect(() => {

@@ -1,19 +1,27 @@
 import { useState } from 'react';
-import { formatRelativeDate } from './resolveAuthor';
+import PublishedAt from '../shared/PublishedAt';
 import LinkPreview from './LinkPreview';
 import PostComposer from './PostComposer';
 import ReportModal from '../shared/ReportModal';
 import TranslateHint from '../shared/TranslateHint';
 import MentionText from '../shared/MentionText';
+import Icon from '../shared/Icon';
+import ShareLinkButton from '../shared/ShareLinkButton';
+import { linkToPost } from '../../data/deepLinks';
 import { isStaff } from '../../data/roles';
 import { NERD_CATEGORIES } from '../../data/nerdCategories';
+import { COMMENT_REACTION_EMOJIS } from '../../data/posts';
 import { POST_TAGS } from '../../data/gaming';
 import GamingPostExtra from '../nerd/gaming/GamingPostExtra';
 import CosplayPostExtra from '../nerd/cosplay/CosplayPostExtra';
 import { COSPLAY_POST_TAGS } from '../../data/cosplay';
 import './PostCard.css';
+import AvatarImg from '../shared/AvatarImg';
+import GameScoreCard from './GameScoreCard';
+import { scoreFromOldText } from './gameScore';
 
-const REACTION_EMOJIS = ['❤️', '😂', '👍'];
+// Stesse emoji ammesse dal server (comment_reactions).
+const REACTION_EMOJIS = COMMENT_REACTION_EMOJIS;
 
 // GIF salvate come URL (niente vero upload su server per le GIF): se quel
 // link smette di funzionare (CDN, scadenza, rete) l'utente deve vedere un
@@ -32,7 +40,7 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
   const canModerate = !isOwn && isStaff(user?.ruolo);
   return (
     <li className="rb-comment">
-      <img className="rb-comment-avatar" src={author.avatar} alt={author.name} />
+      <AvatarImg className="rb-comment-avatar" src={author.avatar} name={author?.name || author?.nickname} seed={author?.id} alt={author.name} />
       <div className="rb-comment-body">
         <div className="rb-comment-bubble">
           <strong>{author.name}</strong>
@@ -42,11 +50,17 @@ function Comment({ comment, user, onReact, onReport, onDelete }) {
           )}
         </div>
         <div className="rb-comment-footer">
-          <span className="rb-comment-date">{formatRelativeDate(comment.data)}</span>
+          <PublishedAt at={comment.data} className="rb-comment-date inline" />
           {REACTION_EMOJIS.map((emoji) => {
             const count = comment.reazioni?.[emoji] ?? 0;
             return (
-              <button key={emoji} type="button" className="rb-comment-react-btn" onClick={() => onReact(comment.id, emoji)}>
+              <button
+                key={emoji}
+                type="button"
+                className={`rb-comment-react-btn ${comment.mieReazioni?.includes(emoji) ? 'is-mine' : ''}`}
+                aria-pressed={Boolean(comment.mieReazioni?.includes(emoji))}
+                onClick={() => onReact(comment.id, emoji)}
+              >
                 {emoji} {count > 0 ? count : ''}
               </button>
             );
@@ -186,16 +200,19 @@ export default function PostCard({
     setReport({ targetType: 'commento', targetId: commentId, targetLabel: 'commento' });
   };
 
+  // Vecchi post "Ho fatto N punti a ..." (prima della card punteggio).
+  const legacyScore = post.punteggio ? null : scoreFromOldText(post.testo);
+
   return (
     <li className="rb-post-card" data-post-id={post.id}>
       {trendingRank !== null && (
         <span className="rb-post-trending-badge">🔥 #{trendingRank} di tendenza nel mondo Social</span>
       )}
       <div className="rb-post-header">
-        <img className="rb-post-avatar" src={author.avatar} alt={author.name} />
+        <AvatarImg className="rb-post-avatar" src={author.avatar} name={author?.name || author?.nickname} seed={author?.id} alt={author.name} />
         <div className="rb-post-header-info">
           <strong>{author.name}</strong>
-          <span className="rb-post-date">{formatRelativeDate(post.data)}</span>
+          <PublishedAt at={post.data} className="rb-post-date" />
         </div>
         {canFollow && (
           <button type="button" className={`rb-post-follow-btn ${isFollowing ? 'active' : ''}`} onClick={handleFollow}>
@@ -236,8 +253,9 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          {post.testo && <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />}
-          {post.testo && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+          {post.testo && !legacyScore && <MentionText as="p" className="rb-post-text" testo={post.testo} menzioni={post.menzioni} />}
+          {post.testo && !legacyScore && post.autoreId !== user?.id && <TranslateHint text={post.testo} sourceLang={post.lingua} />}
+          {(post.punteggio || legacyScore) && <GameScoreCard punteggio={post.punteggio || legacyScore} />}
         </>
       )}
       {post.extra && post.tag && isCosplay && <CosplayPostExtra post={post} />}
@@ -257,30 +275,65 @@ export default function PostCard({
       {post.link_esterno && <LinkPreview url={post.link_esterno.url} />}
 
       <div className="rb-post-actions">
-        <button type="button" className={`rb-post-action-btn ${liked ? 'active' : ''}`} onClick={handleLike}>
-          {liked ? '❤️' : '🤍'} {likeCount}
+        <button
+          type="button"
+          className={`rb-post-action-btn rb-post-like-btn ${liked ? 'active' : ''}`}
+          onClick={handleLike}
+          aria-pressed={liked}
+          aria-label={liked ? 'Togli mi piace' : 'Mi piace'}
+          title={liked ? 'Togli mi piace' : 'Mi piace'}
+        >
+          <Icon name="heart" size={17} fill={liked ? 'currentColor' : 'none'} />
+          <span>{likeCount}</span>
         </button>
-        <button type="button" className="rb-post-action-btn" onClick={() => setExpanded((v) => !v)}>
-          💬 {postComments.length}
+        <button
+          type="button"
+          className={`rb-post-action-btn ${expanded ? 'open' : ''}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label="Commenti"
+          title="Commenti"
+        >
+          <Icon name="chat" size={17} />
+          <span>{postComments.length}</span>
         </button>
+        {post.fromPostsTable && !post.categoria && (
+          <ShareLinkButton
+            className="rb-post-action-btn"
+            url={() => linkToPost(post.id)}
+            title={`Post di ${author.name}`}
+            text={post.testo ? post.testo.slice(0, 120) : undefined}
+            label={<Icon name="link" size={17} />}
+            copiedLabel={<Icon name="check" size={17} />}
+            ariaLabel="Condividi il link del post"
+          />
+        )}
         {onToggleSave && (
-          <button type="button" className={`rb-post-action-btn rb-post-save-btn ${saved ? 'active' : ''}`} onClick={handleSave}>
-            {saved ? '🔖 Salvato' : '🔖 Salva'}
+          <button
+            type="button"
+            className={`rb-post-action-btn rb-post-save-btn ${saved ? 'active' : ''}`}
+            onClick={handleSave}
+            aria-pressed={saved}
+            aria-label={saved ? 'Salvato' : 'Salva'}
+            title={saved ? 'Salvato' : 'Salva'}
+          >
+            <Icon name="bookmark" size={17} fill={saved ? 'currentColor' : 'none'} />
           </button>
         )}
         {isOwn && onEditPost && (
-          <button type="button" className="rb-post-action-btn" title="Modifica post" onClick={startEdit}>
-            ✏️
+          <button type="button" className="rb-post-action-btn" title="Modifica post" aria-label="Modifica post" onClick={startEdit}>
+            <Icon name="pencil" size={17} />
           </button>
         )}
         {(isOwn || canModeratePost) && onDeletePost && !confirmDelete && (
           <button
             type="button"
-            className="rb-post-action-btn"
+            className="rb-post-action-btn rb-post-danger-btn"
             title={isOwn ? 'Elimina post' : 'Rimuovi post (moderazione)'}
+            aria-label={isOwn ? 'Elimina post' : 'Rimuovi post (moderazione)'}
             onClick={() => setConfirmDelete(true)}
           >
-            {isOwn ? '🗑️' : '🛡️'}
+            <Icon name={isOwn ? 'trash' : 'shield'} size={17} />
           </button>
         )}
         {(isOwn || canModeratePost) && onDeletePost && confirmDelete && (
@@ -290,8 +343,8 @@ export default function PostCard({
             <button type="button" className="rb-post-delete-confirm-no" onClick={() => setConfirmDelete(false)}>No</button>
           </span>
         )}
-        <button type="button" className="rb-post-action-btn" title="Segnala post" onClick={openReportPost}>
-          🚩
+        <button type="button" className="rb-post-action-btn rb-post-report-btn" title="Segnala post" aria-label="Segnala post" onClick={openReportPost}>
+          <Icon name="flag" size={17} />
         </button>
       </div>
 

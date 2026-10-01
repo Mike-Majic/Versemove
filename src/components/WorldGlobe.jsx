@@ -8,6 +8,7 @@ import { createLandLod } from '../globe/landLod';
 import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
+import { makeEventMarkerEl, applyEventZoom } from '../globe/eventMarkers';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
@@ -58,12 +59,26 @@ const CATEGORY_SHAPE_BY_WORLD = {
   bambini: 'kids',
   faq: 'cloud',
   annunci: 'annunci',
+  animali: 'dog',
+};
+
+// Aspetto delle sagome per mondo, oltre alla forma (vedi categoryShell.js):
+// Bambini più piccole e distanziate; FAQ e Animali bianche e più piene,
+// perché col colore del mondo a trasparenza 0.2 si vedevano appena.
+const CATEGORY_LOOK_BY_WORLD = {
+  bambini: { sizeFactor: 0.72 },
+  // Mondo Rosa: 14 triangoli, erano ammassati.
+  vetrina: { sizeFactor: 0.7 },
+  // Mondo Rosso: i cuori erano enormi e quasi attaccati.
+  incontri: { sizeFactor: 0.62 },
+  faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
+  animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };
 
 // Solo Annunci ha bisogno di più margine fra le categorie (poche categorie
 // su un guscio con parecchie facce libere, vedi marginRings in
 // categoryShell.js): gli altri mondi restano sul margine storico.
-const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2 };
+const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2, incontri: 2 };
 
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio
 // marker quando si condivide la posizione in tempo reale (vedi App.jsx,
@@ -71,16 +86,61 @@ const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2 };
 // mondo, come sempre.
 const LIVE_LOCATION_COLOR = '#22c55e';
 
+// Marker costruiti con le API del DOM, mai con innerHTML: nickname, città,
+// avatar e foto degli eventi sono dati degli utenti (niente HTML iniettato).
+// Gli url passano solo se http(s) o relativi.
+function safeUrl(url) {
+  const s = String(url ?? '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s) || s.startsWith('/') || s.startsWith('./') || s.startsWith('data:image/')) return s;
+  return '';
+}
+
+// Puntino della vista panoramica (fascia far) per avatar e grumi, come
+// .rb-ev-dot degli eventi ma del colore del mondo. Il click risale
+// all'elemento esterno (stesso gestore dell'avatar o del grumo).
+function makeFarDot(world) {
+  const dot = document.createElement('div');
+  dot.className = 'rb-marker-far-dot';
+  dot.style.setProperty('--far-dot-color', world.color);
+  return dot;
+}
+
 function makeMarkerEl(user, world, onOpen) {
   const el = document.createElement('div');
   el.className = 'rb-marker';
   const dotColor = user.isLive ? LIVE_LOCATION_COLOR : world.color;
-  el.innerHTML = `
-    <div class="rb-marker-photo" style="border-color:${world.color}">
-      <img src="${user.avatar}" alt="${user.name}" loading="lazy" />
-      <span class="rb-marker-dot ${user.isLive ? 'rb-marker-dot-live' : ''}" style="background:${dotColor}"></span>
-    </div>
-  `;
+  const photo = document.createElement('div');
+  photo.className = 'rb-marker-photo';
+  photo.style.borderColor = world.color;
+  const img = document.createElement('img');
+  const src = safeUrl(user.avatar);
+  if (src) img.src = src;
+  img.alt = String(user.name ?? '');
+  img.loading = 'lazy';
+  // Foto mancante o che non si carica: al suo posto l'iniziale del nome.
+  const showInitial = () => {
+    img.remove();
+    const initial = document.createElement('span');
+    initial.className = 'rb-marker-initial';
+    initial.textContent = String(user.name ?? '?').trim().charAt(0).toUpperCase() || '?';
+    photo.style.background = world.color;
+    photo.prepend(initial);
+  };
+  img.addEventListener('error', showInitial, { once: true });
+  const dot = document.createElement('span');
+  dot.className = `rb-marker-dot ${user.isLive ? 'rb-marker-dot-live' : ''}`;
+  dot.style.background = dotColor;
+  photo.append(img, dot);
+  if (!src) showInitial();
+  // Stesse fasce di zoom degli esagoni evento (data-ev-zoom / --ev-scale su
+  // .rb-globe-shell, vedi globe/eventMarkers.js): l'esterno è solo l'ancora
+  // sulla coordinata (il suo transform lo riscrive la libreria), scala il
+  // figlio; da lontano (fascia far) resta un puntino del colore del mondo.
+  const scaleWrap = document.createElement('div');
+  scaleWrap.className = 'rb-marker-scale';
+  scaleWrap.append(photo);
+  el.append(scaleWrap, makeFarDot(world));
   el.title = `${user.name} · ${user.city}`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -89,47 +149,25 @@ function makeMarkerEl(user, world, onOpen) {
   return el;
 }
 
-// Marker quadrato di un evento (diverso apposta dai marker rotondi degli
-// utenti, per non confonderli): la foto che l'utente ha caricato, con un
-// badge del numero di like sopra se ce n'è almeno uno. Un click apre
-// sempre la lista di chi ha messo like (vedi EventLikersModal), anche a
-// zero like — è lì che si vede il dettaglio dell'evento.
-function makeEventMarkerEl(event, world, onOpen) {
-  const el = document.createElement('div');
-  el.className = 'rb-event-marker';
-  const likeCount = event.mi_piace.length;
-  const photoStyle = event.fotoUrl ? `background-image:url('${event.fotoUrl}')` : `background:${world.color}`;
-  el.innerHTML = `
-    <div class="rb-event-marker-photo" style="${photoStyle}; border-color:${world.color}"></div>
-    ${likeCount > 0 ? `<span class="rb-event-marker-badge">${likeCount}</span>` : ''}
-  `;
-  el.title = `${event.titolo} · ${event.citta}`;
-  el.addEventListener('click', (e) => {
-    e.stopPropagation();
-    onOpen(event.id);
-  });
-  return el;
-}
-
-// Quando un gruppo ha più utenti della soglia, invece di un marker per
-// persona (che a migliaia diventerebbe illeggibile, oltre che lento) si
-// mostra un solo "grumo" col conteggio. Un click vola dentro e affina il
-// raggruppamento (vedi sotto): il livello di dettaglio dipende da quanto
-// sei zoomato, non da un click "ricordato" per sempre.
-const CLUSTER_THRESHOLD = 8;
-
-// Tre livelli, scelti in base all'altitudine della camera (stessa unità di
-// pointOfView: più alta = più lontano). Lontanissimo raggruppa per nazione,
-// medio raggruppa per città, vicino mostra le persone una per una.
+// Soglie di zoom (unità di pointOfView: più alta = più lontano) usate dalle
+// pillole delle città (globe/placeLabels.js, onZoomTo). I marker degli
+// utenti si raggruppano invece per distanza sullo schermo (clusterUsers).
 const ZOOM_TIER_COUNTRY = 1.4;
 const ZOOM_TIER_CITY = 0.55;
 
 function makeClusterEl(cluster, world, onExpand) {
   const el = document.createElement('div');
   el.className = 'rb-marker-cluster';
-  el.style.borderColor = world.color;
-  el.style.background = `color-mix(in srgb, ${world.color} 28%, rgba(0,0,0,0.55))`;
-  el.innerHTML = `<span>${cluster.count}</span>`;
+  // Cerchio, bordo e sfondo su un figlio che scala con lo zoom (come gli
+  // avatar, vedi makeMarkerEl); l'esterno resta l'ancora sulla coordinata.
+  const body = document.createElement('div');
+  body.className = 'rb-marker-cluster-body';
+  body.style.borderColor = world.color;
+  body.style.background = `color-mix(in srgb, ${world.color} 28%, rgba(0,0,0,0.55))`;
+  const count = document.createElement('span');
+  count.textContent = String(cluster.count);
+  body.append(count);
+  el.append(body, makeFarDot(world));
   el.title = `${cluster.label} · ${cluster.count} persone`;
   el.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -138,29 +176,125 @@ function makeClusterEl(cluster, world, onExpand) {
   return el;
 }
 
-// Quanto vicino (in gradi lat/lng, molto approssimativo ma sufficiente qui)
-// deve essere il centro del gruppo al punto che la camera sta guardando,
-// perché a zoom ravvicinato quel gruppo si apra nei singoli individui.
-// Senza questo, a zoom vicino si mostrerebbero TUTTI gli individui di TUTTE
-// le città anche lontanissime dalla vista attuale: con centinaia o migliaia
-// di profili sarebbe di nuovo il problema di partenza (e anche lento).
-const NEARBY_DEGREES = 1;
-
 // Mondi con i nomi di città, regioni, stati e mari (globe/placeLabels.js).
 const PLACE_LABEL_WORLDS = new Set(['lavoro']);
 
-// Altitudine di partenza della camera (unità react-globe.gl: distanza dal
-// centro = raggio globo * (1 + altitude)). Più alta di prima (era 4.2)
-// perché i satelliti stanno su un anello attorno al globo (vedi
-// globe/satelliteGlobes.js) e serve spazio per vederlo tutto; più alta
-// ancora in verticale (schermo stretto) perché l'anello lì è più "alto"
-// che "largo" rispetto all'inquadratura.
-const DEFAULT_ALTITUDE_WIDE = 6;
-const DEFAULT_ALTITUDE_TALL = 7.5;
-function defaultAltitude() {
-  if (typeof window === 'undefined') return DEFAULT_ALTITUDE_WIDE;
-  return window.innerHeight > window.innerWidth ? DEFAULT_ALTITUDE_TALL : DEFAULT_ALTITUDE_WIDE;
+// Un solo percorso per web e telefono: stessa scena (posizioni, taglie,
+// regole) e stessa camera (posizione, distanza, direzione). Sugli schermi
+// più stretti della composizione cambia solo il campo visivo VERTICALE
+// della camera (vedi startupFov): quanto basta perché tutta la composizione
+// entri nella larghezza. È la stessa immagine del web, rimpicciolita fino
+// alla larghezza dello schermo e centrata in verticale. (Allontanare la
+// camera invece cambiava la prospettiva: i satelliti davanti, tarati per
+// essere visti da WEB_STARTUP_DIST, diventavano minuscoli sopra al globo.)
+const WEB_STARTUP_DIST = 615;
+const WEB_FOV_DEG = 50;
+const GLOBE_RADIUS = 100;
+// Tangente della metà del campo visivo verticale attuale (usata per
+// convertire pixel in gradi, vedi clusterCellDegrees).
+let halfFovTan = Math.tan((WEB_FOV_DEG * Math.PI) / 360);
+
+// I punti (PointsMaterial con sizeAttenuation: nodi dei satelliti e della
+// rete, puntini dei continenti, particelle) three.js li dimensiona
+// sull'altezza del canvas, non sul campo visivo: con un campo visivo più
+// ampio (schermi stretti) resterebbero grossi rispetto a sfere e linee,
+// che invece si rimpiccioliscono. Fattore di correzione: 1 sul web.
+// Velocità di rotazione col dito/mouse: globe.gl a ogni 'change' dei
+// controlli mette rotateSpeed = altitudine * 0.3, tarato per il campo visivo
+// del web (50°). OrbitControls ruota in proporzione ai pixel trascinati
+// sull'altezza del canvas, quindi con un campo visivo più ampio (schermi
+// stretti, vedi startupFov) la superficie scorreva sotto il dito molto più
+// lenta del dito stesso (~0.6 px per px in verticale sul telefono, ~2 sul
+// web). Fattore di correzione: 1 sul web, stessa formula ovunque.
+function rotateSpeedFactor() {
+  return halfFovTan / Math.tan((WEB_FOV_DEG * Math.PI) / 360);
 }
+
+function pointSizeFactor() {
+  return Math.tan((WEB_FOV_DEG * Math.PI) / 360) / halfFovTan;
+}
+// Applicato prima di ogni disegno, solo se il fattore non è 1 (sul web non
+// fa nulla). La taglia "di base" è l'ultima scritta da chi possiede il
+// materiale (i satelliti la riscrivono a ogni fotogramma): se è cambiata
+// dall'ultima correzione si riparte da quella.
+function compensatePointSizes(scene) {
+  const k = pointSizeFactor();
+  if (Math.abs(k - 1) < 1e-3 && !compensatePointSizes.active) return;
+  compensatePointSizes.active = Math.abs(k - 1) >= 1e-3;
+  scene.traverse((obj) => {
+    const m = obj.isPoints ? obj.material : null;
+    if (!m || !m.isPointsMaterial || !m.sizeAttenuation) return;
+    const ud = m.userData;
+    if (ud.rbScaledSize === undefined || m.size !== ud.rbScaledSize) ud.rbBaseSize = m.size;
+    m.size = ud.rbBaseSize * k;
+    ud.rbScaledSize = m.size;
+  });
+}
+
+// Altitudine di ritorno dopo il cambio mondo (warp): 6 sul web.
+const DEFAULT_ALTITUDE_WIDE = 6;
+function defaultAltitude() {
+  return DEFAULT_ALTITUDE_WIDE;
+}
+// Vista iniziale (a ogni avvio, mai salvata): panoramica con il mondo
+// attivo al centro e tutti gli altri intorno. Camera dal lato +Z (dove
+// sta il satellite al posto 1, Intrattenimento), azimut 0, 4° sopra il
+// piano orizzontale, rivolta all'origine; il globo parte con rotazione 0
+// (Golfo di Guinea verso la camera). Elevazione e distanza del web
+// ricavate dalla schermata di riferimento (desktop 1908×898).
+const STARTUP_ELEVATION_DEG = 4;
+
+// Stessi valori di globe/satelliteGlobes.js (SATELLITE_RADIUS,
+// PROJECTION_PX, BEAD_PX_WIDE, reference = WEB_STARTUP_DIST): la taglia vera
+// di un satellite nella scena, per calcolare la distanza iniziale.
+const SAT_RADIUS = 30;
+const SAT_PROJECTION_PX = 957;
+const SAT_BEAD_PX = 46;
+const SATELLITE_VISUAL_RADIUS = 1.5; // sfera + rete/nodi attorno, in raggi
+// Posizione nell'anello e larghezza dell'etichetta (in raggi del satellite)
+// dei satelliti visibili, letti dal pool già costruito.
+function satelliteLayout(sats) {
+  return (sats?.satellites ?? [])
+    .filter((sat) => sat.visible && sat.userData.basePosRef)
+    .map((sat) => {
+      const base = sat.userData.labelBase;
+      return { pos: sat.userData.basePosRef, labelW: base ? base.sx / SAT_RADIUS : 4 };
+    });
+}
+
+// Campo visivo verticale (gradi) per uno schermo width×height: 50° come
+// sul web, più ampio solo se con 50° la composizione (dal mondo più a
+// sinistra al più a destra, etichette comprese, vista dalla camera della
+// vista iniziale) non entra nella larghezza, senza margini in più. Sugli
+// schermi larghi resta esattamente 50°.
+// Taglia dei satelliti come in satelliteGlobes update: raggio nella scena
+// = beadPx · (distanza dalla camera di riferimento) / PROJECTION_PX.
+function startupFov(width, height, layout) {
+  if (!width || !height || !layout?.length) return WEB_FOV_DEG;
+  const e = (STARTUP_ELEVATION_DEG * Math.PI) / 180;
+  const cy = WEB_STARTUP_DIST * Math.sin(e);
+  const cz = WEB_STARTUP_DIST * Math.cos(e);
+  // Tangente orizzontale che serve per far entrare ogni satellite.
+  let needTanH = 0;
+  for (const { pos, labelW } of layout) {
+    if (Math.abs(pos.x) < 1 && pos.z < 0) continue; // dietro al globo
+    const dy = pos.y - cy;
+    const dz = pos.z - cz;
+    const depth = -(dy * Math.sin(e) + dz * Math.cos(e));
+    if (depth <= 0) continue;
+    const worldR = (SAT_BEAD_PX * Math.hypot(pos.x, dy, dz)) / SAT_PROJECTION_PX;
+    const halfW = Math.max(SATELLITE_VISUAL_RADIUS, labelW / 2) * worldR;
+    needTanH = Math.max(needTanH, (Math.abs(pos.x) + halfW) / depth);
+  }
+  const webTan = Math.tan((WEB_FOV_DEG * Math.PI) / 360);
+  const tanV = Math.max(webTan, needTanH / (width / height));
+  return (2 * Math.atan(tanV) * 180) / Math.PI;
+}
+
+// Raggio della superficie del globo (sfera e continenti), dove stanno i
+// marker HTML (htmlAltitude 0).
+const MARKER_SURFACE_RADIUS = 100;
+
 // Piano di clipping lontano della camera: di serie (vedi
 // three-render-objects) è troppo vicino per le posizioni assolute dei
 // satelliti (fino a ~450-500 unità dal centro, più l'orbita lenta), che
@@ -185,38 +319,113 @@ const FRAME_MS_COVERED = 95;
 const WARP_DIVE_MS = 550;
 const WARP_FLASH_MS = 150;
 
-// Raggruppa gli utenti secondo il livello adatto all'altitudine attuale:
-// per nazione se sei molto lontano, per città a media/vicina distanza. Solo
-// il gruppo (città) su cui la camera è effettivamente centrata si apre nei
-// singoli individui quando sei abbastanza vicino — gli altri restano
-// raggruppati, anche a zoom ravvicinato, perché sono fuori vista. Zoomando
-// (rotellina/pizzico) o volando su un grumo il livello si ricalcola da
-// solo, non serve "ricordare" cosa hai aperto.
-function clusterUsers(users, view) {
-  const { altitude, lat: viewLat, lng: viewLng } = view;
-  const isCountryTier = altitude >= ZOOM_TIER_COUNTRY;
-  const groupKey = (u) => (isCountryTier ? u.country || 'Altro' : u.city || `${u.lat},${u.lng}`);
-  const targetAltitude = isCountryTier ? ZOOM_TIER_COUNTRY - 0.15 : ZOOM_TIER_CITY - 0.15;
+// Raggruppamento per DISTANZA SULLO SCHERMO, uguale in tutto il mondo (non
+// più per nome di nazione/città: città vicine con pochi utenti ciascuna
+// restavano "aperte" e i marker finivano uno sopra l'altro). Due marker più
+// vicini di CLUSTER_PX pixel finiscono nello stesso grumo col numero;
+// avvicinandosi (zoom o click sul grumo) il grumo si divide finché ogni
+// persona torna col suo avatar.
+//
+// Pixel → gradi: la camera sta a raggio*(1+altitude) dal centro, quindi a
+// raggio*altitude dalla superficie sotto di lei; con il campo visivo
+// verticale di ~50° (tan 25° ≈ 0.466) lo schermo alto H px copre
+// 0.93*raggio*altitude unità, e 1° sulla superficie vale raggio*π/180.
+// Il raggio si semplifica: gradi per pixel = 0.93*altitude*180/(π*H).
+const CLUSTER_PX = 46;
+// Sotto questa altitudine la camera non si avvicina più (limite dei
+// controlli): chi è ancora raggruppato (stessa città, coordinate quasi
+// uguali) si apre a ventaglio attorno al centro del grumo.
+const CLUSTER_MIN_ALTITUDE = 0.03;
 
-  const groups = new Map();
-  for (const u of users) {
-    const key = groupKey(u);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(u);
+function clusterCellDegrees(altitude, viewportHeight) {
+  const h = Math.max(200, viewportHeight || 800);
+  // 0.93 ≈ 2·tan(25°) con il campo visivo del web; sugli schermi stretti
+  // (campo visivo più ampio, vedi startupFov) in proporzione.
+  const fovFactor = 0.93 * (halfFovTan / Math.tan((WEB_FOV_DEG * Math.PI) / 360));
+  return (CLUSTER_PX * fovFactor * altitude * 180) / (Math.PI * h);
+}
+
+function degDistance(aLat, aLng, bLat, bLng) {
+  const dLng = (((bLng - aLng + 540) % 360) - 180) * Math.cos(((aLat + bLat) / 2) * (Math.PI / 180));
+  return Math.hypot(bLat - aLat, dLng);
+}
+
+function clusterUsers(users, view, viewportHeight) {
+  const altitude = Math.max(view.altitude, 0.001);
+  const cell = clusterCellDegrees(altitude, viewportHeight);
+  const degPerAltitude = cell / altitude;
+  // Ordine fisso (non quello di arrivo): stessi grumi a ogni ricalcolo.
+  const sorted = [...users].sort((a, b) => a.lat - b.lat || a.lng - b.lng || String(a.id).localeCompare(String(b.id)));
+
+  // Griglia su lat e lng "schiacciata" dal coseno: si cercano grumi solo
+  // nelle 9 celle vicine, non fra tutti (migliaia di utenti restano veloci).
+  const grid = new Map();
+  const clusters = [];
+  const cellKey = (cy, cx) => `${cy}:${cx}`;
+  for (const u of sorted) {
+    const cy = Math.floor(u.lat / cell);
+    const cx = Math.floor((u.lng * Math.cos((u.lat * Math.PI) / 180)) / cell);
+    let target = null;
+    for (let dy = -1; dy <= 1 && !target; dy++) {
+      for (let dx = -1; dx <= 1 && !target; dx++) {
+        const list = grid.get(cellKey(cy + dy, cx + dx));
+        if (!list) continue;
+        target = list.find((c) => degDistance(c.seedLat, c.seedLng, u.lat, u.lng) < cell) ?? null;
+      }
+    }
+    if (target) {
+      target.members.push(u);
+    } else {
+      const c = { seedLat: u.lat, seedLng: u.lng, members: [u] };
+      clusters.push(c);
+      const key = cellKey(cy, cx);
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(c);
+    }
   }
 
   const items = [];
-  for (const [key, group] of groups) {
-    const lat = group.reduce((sum, u) => sum + u.lat, 0) / group.length;
-    const lng = group.reduce((sum, u) => sum + u.lng, 0) / group.length;
-    const isNearbyAndClose =
-      !isCountryTier && altitude < ZOOM_TIER_CITY && Math.hypot(lat - viewLat, lng - viewLng) < NEARBY_DEGREES;
-
-    if (group.length > CLUSTER_THRESHOLD && !isNearbyAndClose) {
-      items.push({ kind: 'cluster', label: key, lat, lng, count: group.length, targetAltitude });
-    } else {
-      for (const u of group) items.push({ kind: 'user', ...u });
+  for (const c of clusters) {
+    const { members } = c;
+    if (members.length === 1) {
+      items.push({ kind: 'user', ...members[0] });
+      continue;
     }
+    // Il grumo sta sul membro più vicino alla media, non sulla media: la
+    // media di utenti su due coste può cadere in mare, un membro vero no.
+    const meanLat = members.reduce((sum, u) => sum + u.lat, 0) / members.length;
+    const meanLng = members.reduce((sum, u) => sum + u.lng, 0) / members.length;
+    let anchor = members[0];
+    let anchorDist = Infinity;
+    for (const u of members) {
+      const d = degDistance(meanLat, meanLng, u.lat, u.lng);
+      if (d < anchorDist) {
+        anchorDist = d;
+        anchor = u;
+      }
+    }
+    const { lat, lng } = anchor;
+    if (altitude <= CLUSTER_MIN_ALTITUDE * 1.2) {
+      // Più vicino di così non si va: ventaglio attorno al centro.
+      const radius = cell * (0.7 + members.length * 0.08);
+      members.forEach((u, i) => {
+        const angle = (i / members.length) * Math.PI * 2;
+        items.push({
+          kind: 'user',
+          ...u,
+          lat: lat + radius * Math.sin(angle),
+          lng: lng + (radius * Math.cos(angle)) / Math.max(0.2, Math.cos((lat * Math.PI) / 180)),
+        });
+      });
+      continue;
+    }
+    // Quanto avvicinarsi al click: abbastanza perché il membro più lontano
+    // dal centro si stacchi, mai meno del limite dei controlli.
+    const spread = Math.max(...members.map((u) => degDistance(lat, lng, u.lat, u.lng)));
+    const targetAltitude = Math.min(altitude * 0.55, Math.max(CLUSTER_MIN_ALTITUDE, (spread / degPerAltitude) * 0.9));
+    const cities = [...new Set(members.map((u) => u.city).filter(Boolean))];
+    const label = cities.length === 1 ? cities[0] : cities.slice(0, 2).join(', ') + (cities.length > 2 ? '…' : '');
+    items.push({ kind: 'cluster', label, lat, lng, count: members.length, targetAltitude });
   }
   return items;
 }
@@ -263,6 +472,38 @@ export default function WorldGlobe({
   // Nomi di città/regioni/stati/mari (globe/placeLabels.js).
   const placeLabelsRef = useRef(null);
   const globeSpinAngleRef = useRef(0);
+  // true finché la camera è ancora nella vista iniziale (nessun
+  // trascinamento/zoom/volo): solo allora il resize la ricalcola.
+  const startupViewActiveRef = useRef(true);
+  // Rotazione ferma durante il volo verso una categoria e finché la
+  // categoria resta aperta: la sua stella deve restare al centro.
+  const spinFrozenRef = useRef(false);
+  // Ogni volo della camera verso un punto del globo passa da qui: lat/lng
+  // sono coordinate LOCALI dell'oggetto che contiene il punto, e il punto
+  // d'arrivo si ricava dalla rotazione reale di quell'oggetto in questo
+  // momento (matrixWorld), non da un contatore a parte. Di default è
+  // l'oggetto radice di react-globe.gl (marker HTML, continenti, pillole
+  // delle città); per le stelle delle categorie si passa il loro gruppo.
+  // Bug di prima: si aggiungeva sempre globeSpinAngleRef, ma l'oggetto dei
+  // marker non ruota (globeRootRef resta null, vedi l'effetto dei
+  // continenti più giù): dopo 40 s di rotazione il clic su un grumo in
+  // Italia portava la camera oltre 100° più a est.
+  const globeObjectRef = useRef(null);
+  const getGlobeObject = () => {
+    const g = globeRef.current;
+    if (!g) return null;
+    if (!globeObjectRef.current?.parent) globeObjectRef.current = findGlobeRootObject(g.scene());
+    return globeObjectRef.current;
+  };
+  const toWorldLatLng = (lat, lng, container = getGlobeObject()) => {
+    const g = globeRef.current;
+    if (!g || !container) return { lat, lng };
+    container.updateWorldMatrix(true, false);
+    const p = new THREE.Vector3().copy(g.getCoords(lat, lng, 0)).applyMatrix4(container.matrixWorld);
+    const geo = g.toGeoCoords(p);
+    return { lat: geo.lat, lng: geo.lng };
+  };
+  const categoryPositionsRef = useRef({});
   const idleTargetRef = useRef(0);
   const idleRampFromRef = useRef(0);
   const idleRampStartRef = useRef(0);
@@ -302,22 +543,162 @@ export default function WorldGlobe({
   // ogni 250ms).
   const [view, setView] = useState({ altitude: defaultAltitude(), lat: 0, lng: 0 });
 
+  // Grandezza dei marker evento legata allo zoom (globe/eventMarkers.js):
+  // una variabile CSS e un attributo sul contenitore del globo, mai i
+  // marker uno per uno. Chiamata dal polling qui sotto (copre anche i voli
+  // programmati) e dall'evento "change" dei controlli (zoom a mano, subito).
+  const syncEventZoom = (altitude) => {
+    const g = globeRef.current;
+    const canvas = g?.renderer?.().domElement;
+    const shell = canvas?.closest('.rb-globe-shell');
+    if (!shell) return;
+    applyEventZoom(shell, altitude ?? g.pointOfView().altitude);
+  };
+  // Trascinamento che parte da un marker HTML (avatar, grumo, esagono
+  // evento): i marker stanno sopra il canvas con pointer-events: auto, quindi
+  // OrbitControls non riceveva nulla e il globo non girava. Finché il dito
+  // (o il mouse) resta entro MARKER_DRAG_PX il gesto resta del marker: un
+  // tocco secco lo apre come sempre, col click nativo. Appena si muove oltre,
+  // si passa a OrbitControls un pointerdown sul canvas nel punto di partenza:
+  // lui cattura il puntatore sul canvas e segue i movimenti successivi
+  // (ascolta pointermove/pointerup sul documento), pizzico compreso. Il
+  // pointerdown non si inoltra subito perché il click sul globo di
+  // three-render-objects scatterebbe anche per un semplice tocco. Dopo un
+  // trascinamento il click sul marker viene scartato.
+  useEffect(() => {
+    const g = globeRef.current;
+    const canvas = g?.renderer?.().domElement;
+    if (!canvas) return undefined;
+    const MARKER_DRAG_PX = 8;
+    const MARKER_SELECTOR = '.rb-marker, .rb-marker-cluster, .rb-event-marker';
+    const pending = new Map(); // pointerId -> { init, x, y }
+    const forwarded = new Set();
+    const active = new Set();
+    let suppressClickUntil = 0;
+    const markerOf = (target) => {
+      const el = target?.closest?.(MARKER_SELECTOR);
+      return el && canvas.closest('.rb-globe-shell')?.contains(el) ? el : null;
+    };
+    const forward = (pointerId) => {
+      const p = pending.get(pointerId);
+      if (!p) return;
+      pending.delete(pointerId);
+      forwarded.add(pointerId);
+      canvas.dispatchEvent(new PointerEvent('pointerdown', p.init));
+    };
+    const forwardAll = () => Array.from(pending.keys()).forEach(forward);
+    const onDown = (e) => {
+      const othersDown = active.size > 0;
+      active.add(e.pointerId);
+      if (!markerOf(e.target)) {
+        // Secondo dito sul canvas mentre il primo è su un marker: il primo
+        // passa al globo prima (questo ascoltatore precede OrbitControls),
+        // così il pizzico parte con entrambi.
+        if (pending.size && e.target === canvas) forwardAll();
+        return;
+      }
+      pending.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+        init: {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window,
+          pointerId: e.pointerId,
+          pointerType: e.pointerType,
+          isPrimary: e.isPrimary,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          button: e.button,
+          buttons: e.buttons,
+          pressure: e.pressure,
+          width: e.width,
+          height: e.height,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+        },
+      });
+      // Pizzico con un dito già sul globo o su un altro marker: niente
+      // attesa, il gesto è comunque del globo.
+      if (othersDown) forwardAll();
+    };
+    const onMove = (e) => {
+      const p = pending.get(e.pointerId);
+      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > MARKER_DRAG_PX) forward(e.pointerId);
+    };
+    const onUp = (e) => {
+      active.delete(e.pointerId);
+      pending.delete(e.pointerId);
+      if (forwarded.delete(e.pointerId)) suppressClickUntil = performance.now() + 400;
+    };
+    const onClick = (e) => {
+      if ((forwarded.size > 0 || performance.now() < suppressClickUntil) && markerOf(e.target)) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+    const opts = { capture: true };
+    window.addEventListener('pointerdown', onDown, opts);
+    window.addEventListener('pointermove', onMove, opts);
+    window.addEventListener('pointerup', onUp, opts);
+    window.addEventListener('pointercancel', onUp, opts);
+    window.addEventListener('click', onClick, opts);
+    return () => {
+      window.removeEventListener('pointerdown', onDown, opts);
+      window.removeEventListener('pointermove', onMove, opts);
+      window.removeEventListener('pointerup', onUp, opts);
+      window.removeEventListener('pointercancel', onUp, opts);
+      window.removeEventListener('click', onClick, opts);
+    };
+  }, []);
+
+  // Riapplicata dopo globe.gl (questo ascoltatore di 'change' è registrato
+  // dopo il suo, quindi vince) e quando cambia il campo visivo
+  // (measureStartup). Vedi rotateSpeedFactor.
+  const applyRotateSpeed = () => {
+    const g = globeRef.current;
+    const controls = g?.controls?.();
+    if (!controls) return;
+    controls.rotateSpeed = g.pointOfView().altitude * 0.3 * rotateSpeedFactor();
+  };
+  useEffect(() => {
+    const g = globeRef.current;
+    const controls = g?.controls?.();
+    if (!controls) return undefined;
+    const onChange = () => {
+      applyRotateSpeed();
+      syncEventZoom();
+    };
+    controls.addEventListener('change', onChange);
+    syncEventZoom();
+    return () => controls.removeEventListener('change', onChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const g = globeRef.current;
       if (!g) return;
       const pov = g.pointOfView();
+      syncEventZoom(pov.altitude);
+      // Il globo gira da solo senza che la camera si muova: la libreria
+      // ricontrolla il retro solo quando cambia la camera, qui anche così.
+      markerElsRef.current.forEach((el) => setMarkerVisibility(el));
       // Livello di dettaglio dei continenti (110m / 50m / riquadri 10m).
       landLodRef.current?.update(pov, g.camera());
       setView((prev) => {
-        const altChanged = Math.abs(prev.altitude - pov.altitude) > 0.03;
-        // La posizione (lat/lng) conta solo a zoom ravvicinato, dove serve
-        // per capire quale città è "sotto" la camera (vedi clusterUsers).
-        // A zoom lontano/medio ignorarla evita di ricalcolare/rimontare i
-        // marker ad ogni frame solo perché il globo sta ruotando da solo.
-        const closeZoom = pov.altitude < ZOOM_TIER_CITY;
-        const posChanged = closeZoom && (Math.abs(prev.lat - pov.lat) > 0.5 || Math.abs(prev.lng - pov.lng) > 0.5);
-        return altChanged || posChanged ? { altitude: pov.altitude, lat: pov.lat, lng: pov.lng } : prev;
+        // Variazione relativa: a zoom ravvicinato (altitudine 0.03-0.5) una
+        // soglia fissa non scatterebbe mai e i grumi non si dividerebbero.
+        const altChanged = Math.abs(prev.altitude - pov.altitude) > Math.max(0.004, prev.altitude * 0.06);
+        // La posizione non conta più (i grumi dipendono solo dalla distanza
+        // sullo schermo, cioè dall'altitudine): ruotare il globo non
+        // ricalcola/rimonta i marker.
+        return altChanged ? { altitude: pov.altitude, lat: pov.lat, lng: pov.lng } : prev;
       });
       // Etichette delle categorie: nascoste (non tolte, solo sprite.visible)
       // quando sono sul retro del globo, troppo vicine al bordo dello
@@ -335,12 +716,13 @@ export default function WorldGlobe({
 
   const displayItems = useMemo(() => {
     const eventItems = events.map((e) => ({ kind: 'event', ...e }));
-    return [...clusterUsers(users, view), ...eventItems];
+    return [...clusterUsers(users, view, typeof window !== 'undefined' ? window.innerHeight : 800), ...eventItems];
   }, [users, view, events]);
 
   const expandCluster = (cluster) => {
+    startupViewActiveRef.current = false;
     const g = globeRef.current;
-    if (g) g.pointOfView({ lat: cluster.lat, lng: cluster.lng, altitude: cluster.targetAltitude }, 1200);
+    if (g) g.pointOfView({ ...toWorldLatLng(cluster.lat, cluster.lng), altitude: cluster.targetAltitude }, 1200);
   };
 
   // Elementi HTML dei marker (creati da htmlElement più giù), per chi deve
@@ -358,9 +740,41 @@ export default function WorldGlobe({
   }, [displayItems]);
   const registerMarkerEl = (item, el) => {
     markerElsRef.current.set(item, el);
+    el.__rbMarkerItem = item;
     placeLabelsRef.current?.invalidate();
     return el;
   };
+  // Marker nascosti quando stanno sul retro del globo. Il controllo della
+  // libreria (three-globe isBehindGlobe) con i marker a quota 0 sbaglia
+  // proprio sul punto opposto alla camera: un arcocoseno riceve un valore
+  // appena sopra 1 per arrotondamento, dà NaN e il marker resta visibile
+  // attraverso il globo. Qui un test geometrico semplice: un punto della
+  // superficie p (raggio R, centro nell'origine) è rivolto verso la camera
+  // c se p·c > R². La rotazione del globo (globeRootRef) è inclusa.
+  const markerFacingVec = useMemo(() => new THREE.Vector3(), []);
+  const markerFacesCamera = (item) => {
+    const g = globeRef.current;
+    const root = globeRootRef.current;
+    if (!g || !item || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)) return true;
+    const phi = ((90 - item.lat) * Math.PI) / 180;
+    const theta = ((90 - item.lng) * Math.PI) / 180;
+    const v = markerFacingVec.set(
+      MARKER_SURFACE_RADIUS * Math.sin(phi) * Math.cos(theta),
+      MARKER_SURFACE_RADIUS * Math.cos(phi),
+      MARKER_SURFACE_RADIUS * Math.sin(phi) * Math.sin(theta)
+    );
+    if (root) v.applyMatrix4(root.matrixWorld);
+    return v.dot(g.camera().position) > MARKER_SURFACE_RADIUS * MARKER_SURFACE_RADIUS;
+  };
+  // Con htmlElementVisibilityModifier la libreria lascia l'oggetto visibile
+  // e passa a noi l'elemento: si nasconde con visibility (display lo
+  // riscrive il renderer HTML a ogni fotogramma).
+  const setMarkerVisibility = (el) => {
+    const visible = markerFacesCamera(el.__rbMarkerItem);
+    const next = visible ? '' : 'hidden';
+    if (el.style.visibility !== next) el.style.visibility = next;
+  };
+
   // Puntatore "grezzo" (touch) = dispositivo mobile: li' il globo deve stare
   // fermo di default e muoversi solo con le dita (trascinamento/pizzico),
   // mai da solo. Su desktop invece ruota da solo finche' il mouse non ci
@@ -535,10 +949,29 @@ export default function WorldGlobe({
     };
   }, []);
 
+  // Pixel ratio = quello reale dello schermo, col tetto del livello di
+  // qualità; riapplicato anche al resize e quando cambia il
+  // devicePixelRatio (zoom del browser, finestra spostata su un altro
+  // monitor), che il resize da solo non sempre segnala.
   useEffect(() => {
     const g = globeRef.current;
-    if (!g) return;
-    g.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
+    if (!g) return undefined;
+    let dprQuery = null;
+    const apply = () => {
+      const renderer = g.renderer();
+      const next = Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap);
+      // setPixelRatio ridimensiona già il buffer del canvas.
+      if (renderer.getPixelRatio() !== next) renderer.setPixelRatio(next);
+      dprQuery?.removeEventListener('change', apply);
+      dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+      dprQuery?.addEventListener('change', apply);
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => {
+      window.removeEventListener('resize', apply);
+      dprQuery?.removeEventListener('change', apply);
+    };
   }, [quality.pixelRatioCap]);
 
   // Materiale opaco (non trasparente): evitiamo che il globo finisca nel canale di
@@ -695,6 +1128,7 @@ export default function WorldGlobe({
       // vicino); chip "+N" di un centro piccolo: ancora più vicino, così gli
       // avatar si aprono.
       onZoomTo: (lat, lng, closer) => {
+        startupViewActiveRef.current = false;
         const altitude = g.pointOfView().altitude;
         const target = closer
           ? Math.max(0.02, altitude * 0.45)
@@ -703,7 +1137,7 @@ export default function WorldGlobe({
           : altitude >= ZOOM_TIER_CITY
           ? ZOOM_TIER_CITY - 0.15
           : Math.max(0.02, altitude * 0.5);
-        g.pointOfView({ lat, lng, altitude: target }, 1200);
+        g.pointOfView({ ...toWorldLatLng(lat, lng), altitude: target }, 1200);
       },
     });
     placeLabelsRef.current = labels;
@@ -750,9 +1184,16 @@ export default function WorldGlobe({
       color: world.color,
       shapeType: CATEGORY_SHAPE_BY_WORLD[world.id] ?? 'triangle',
       marginRings: CATEGORY_MARGIN_RINGS_BY_WORLD[world.id] ?? 1,
+      ...(CATEGORY_LOOK_BY_WORLD[world.id] ?? {}),
+      // M gotica pronta (font caricato): pieno regime per l'intro a particelle.
+      onAnimatedReady: () => globeActivity.wake(3000),
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;
+    categoryPositionsRef.current = shell.positions;
+    // Mondo nuovo: la rotazione riparte (una categoria aperta nel mondo di
+    // prima non la tiene più ferma).
+    spinFrozenRef.current = false;
     shell.setActive(activeCategory);
     onCategoryPositionsReady?.(shell.positions);
 
@@ -780,8 +1221,12 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, world.color]);
 
+  const prevActiveCategoryRef = useRef(activeCategory);
   useEffect(() => {
     categoryShellRef.current?.setActive(activeCategory);
+    // Categoria chiusa (da qualunque strada): il globo riprende a girare.
+    if (prevActiveCategoryRef.current && !activeCategory) spinFrozenRef.current = false;
+    prevActiveCategoryRef.current = activeCategory;
   }, [activeCategory]);
 
   // Rileva i click sui triangoli delle categorie, distinguendoli da un trascinamento
@@ -809,8 +1254,9 @@ export default function WorldGlobe({
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
-      const hits = raycaster.intersectObjects(categoryShellRef.current?.faceMeshes ?? []);
-      if (hits.length > 0) onCategorySelect(hits[0].object.userData.categoryId);
+      // noHit: lettera gotica in uscita o spenta (vedi categoryShell).
+      const hit = raycaster.intersectObjects(categoryShellRef.current?.faceMeshes ?? []).find((h) => !h.object.userData.noHit);
+      if (hit) onCategorySelect(hit.object.userData.categoryId);
     };
 
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -850,8 +1296,8 @@ export default function WorldGlobe({
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, g.camera());
-      const hits = raycaster.intersectObjects(shell.faceMeshes);
-      setHovered(hits.length > 0 ? hits[0].object.userData.categoryId : null);
+      const hit = raycaster.intersectObjects(shell.faceMeshes).find((h) => !h.object.userData.noHit);
+      setHovered(hit ? hit.object.userData.categoryId : null);
     };
     const onPointerLeave = () => setHovered(null);
 
@@ -882,7 +1328,7 @@ export default function WorldGlobe({
     const g = globeRef.current;
     if (!g) return undefined;
     const scene = g.scene();
-    const sats = buildSatelliteGlobes({ worlds: WORLDS });
+    const sats = buildSatelliteGlobes({ worlds: WORLDS, referenceDistance: WEB_STARTUP_DIST });
     scene.add(sats.group);
     satellitesRef.current = sats;
     globeActivity.wake();
@@ -976,23 +1422,26 @@ export default function WorldGlobe({
       const idleFactor = computeIdleFactor(now);
       const reduceMotion = reduceMotionActiveRef.current;
       if (!reduceMotion) {
-        globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
+        if (!spinFrozenRef.current) globeSpinAngleRef.current += IDLE_GLOBE_SPIN_DEG_S * DEG2RAD * deltaSec * idleFactor;
         const angle = globeSpinAngleRef.current;
         if (globeRootRef.current) globeRootRef.current.rotation.y = angle;
         if (overlayRef.current) overlayRef.current.group.rotation.y = angle;
         if (categoryShellRef.current) categoryShellRef.current.group.rotation.y = angle;
       }
       satellitesRef.current?.update(elapsed, deltaSec, camera, reduceMotion ? 0 : idleFactor, reduceMotion);
-      // Forme "vivaci" del mondo Bambini (pulsazione, galleggiamento, hover):
-      // stesso giro di disegno, niente ciclo a parte (vedi categoryShell.js
-      // update). Negli altri mondi è un no-op immediato.
-      if (categoryShellRef.current?.supportsHover) {
+      // Forme "vivaci" del mondo Bambini (pulsazione, galleggiamento, hover)
+      // e M gotica del mondo Social: stesso giro di disegno, niente ciclo a
+      // parte (vedi categoryShell.js update). Negli altri mondi non si chiama.
+      if (categoryShellRef.current?.animated) {
         categoryShellRef.current.update(elapsed, deltaSec, {
           reduceMotion: reduceMotion || reducedMotionQuery.matches,
           viewportSize: renderer.getSize(shellViewportSize),
+          // Brillantini delle lettere: stessa compensazione dei punti.
+          pixelRatio: renderer.getPixelRatio() * pointSizeFactor(),
           camera,
         });
       }
+      compensatePointSizes(scene);
       originalRender(scene, camera);
       placeLabelsRef.current?.update(camera, camera.position.length() / 100 - 1, now);
     };
@@ -1013,6 +1462,7 @@ export default function WorldGlobe({
   // sopra). Rispetta prefers-reduced-motion: in quel caso passa dritto al
   // nuovo mondo, senza volo né flash.
   const runWarp = (worldId) => {
+    startupViewActiveRef.current = false;
     if (warpingRef.current || !onWarpArrived) return;
     const g = globeRef.current;
     const sats = satellitesRef.current;
@@ -1125,9 +1575,56 @@ export default function WorldGlobe({
     g.controls().enableZoom = true;
     g.camera().far = CAMERA_FAR;
     g.camera().updateProjectionMatrix();
-    g.pointOfView({ altitude: defaultAltitude() }, 0);
+    // Vista iniziale panoramica (vedi startupFov): a ogni
+    // avvio, e di nuovo al resize/rotazione del telefono finché l'utente
+    // non ha mosso la camera (trascinamento, zoom, voli).
+    // Distanza iniziale e fattore di scala della vista per lo schermo di
+    // adesso; il fattore vale anche dopo che l'utente ha mosso la camera
+    // (voli e ritorno dopo il cambio mondo lo usano).
+    // Campo visivo per lo schermo di adesso (vedi startupFov): vale sempre,
+    // anche dopo che l'utente ha mosso la camera.
+    const measureStartup = () => {
+      // Stesse misure dello stato `size` (il canvas può non essere ancora
+      // stato ridimensionato quando arriva l'evento resize).
+      const w = window.visualViewport?.width ?? window.innerWidth;
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      const fov = startupFov(w, h, satelliteLayout(satellitesRef.current));
+      const camera = g.camera();
+      if (Math.abs(camera.fov - fov) > 0.01) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+      halfFovTan = Math.tan((fov * Math.PI) / 360);
+      applyRotateSpeed();
+    };
+    const applyStartupView = () => {
+      measureStartup();
+      g.pointOfView({ lat: STARTUP_ELEVATION_DEG, lng: 0, altitude: WEB_STARTUP_DIST / GLOBE_RADIUS - 1 }, 0);
+      syncEventZoom();
+    };
+    applyStartupView();
+    const markMoved = () => {
+      startupViewActiveRef.current = false;
+    };
+    g.controls().addEventListener('start', markMoved);
+    const onResize = () => {
+      if (!startupViewActiveRef.current) {
+        window.requestAnimationFrame(() => {
+          measureStartup();
+          syncEventZoom();
+        });
+        return;
+      }
+      // dopo il resize del canvas (setSize parte dallo stesso evento)
+      window.requestAnimationFrame(applyStartupView);
+    };
+    window.addEventListener('resize', onResize);
     if (isTouchDevice) globeActivity.wake();
     else globeActivity.startAutoRotate();
+    return () => {
+      g.controls().removeEventListener('start', markMoved);
+      window.removeEventListener('resize', onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1170,13 +1667,25 @@ export default function WorldGlobe({
   useEffect(() => {
     const g = globeRef.current;
     if (!g || !flyTo) return undefined;
+    startupViewActiveRef.current = false;
 
     globeActivity.stopAutoRotate();
+    // Volo verso una categoria: rotazione ferma subito (non con la rampa di
+    // stopAutoRotate) e finché la categoria resta aperta; lo zoom indietro
+    // (chiusura) la fa ripartire.
+    if (flyTo.categoryId) spinFrozenRef.current = true;
+    else if (flyTo.lat === undefined) spinFrozenRef.current = false;
     // Il volo è animato dal ciclo di disegno: a pieno regime finché dura.
     globeActivity.wake(CATEGORY_FLY_MS + IDLE_MS);
     const pov = { altitude: flyTo.altitude ?? 1.3 };
-    if (flyTo.lat !== undefined) pov.lat = flyTo.lat;
-    if (flyTo.lng !== undefined) pov.lng = flyTo.lng;
+    // Posizione ATTUALE: quella della stella calcolata dal guscio (più
+    // precisa dell'anchor passata da App), poi riportata alla rotazione del
+    // momento (vedi toWorldLatLng).
+    const local = (flyTo.categoryId && categoryPositionsRef.current[flyTo.categoryId]) || (flyTo.lat !== undefined ? flyTo : null);
+    if (local && local.lat !== undefined && local.lng !== undefined) {
+      const container = flyTo.categoryId ? categoryShellRef.current?.group : undefined;
+      Object.assign(pov, toWorldLatLng(local.lat, local.lng, container));
+    }
     g.pointOfView(pov, CATEGORY_FLY_MS);
 
     // Su mobile il globo resta sempre fermo (si muove solo con le dita), quindi
@@ -1198,20 +1707,31 @@ export default function WorldGlobe({
         rendererConfig={{ antialias: initialAntialias, alpha: true }}
         globeMaterial={globeMaterial}
         backgroundColor="rgba(0,0,0,0)"
+        // Hover/click degli oggetti di globe.gl non usati (categorie e
+        // satelliti hanno i loro raycaster, i marker sono HTML): senza questo
+        // three-render-objects rifaceva ogni 50 ms un raycast su tutta la
+        // scena, continenti compresi (~80% del JavaScript durante un
+        // trascinamento, vedi globe/landLod.js).
+        enablePointerInteraction={false}
         showAtmosphere={quality.atmosphere}
         atmosphereColor={world.atmosphereColor}
         atmosphereAltitude={0.3}
         htmlElementsData={displayItems}
         htmlLat="lat"
         htmlLng="lng"
-        htmlAltitude={0.03}
+        // Marker sulla superficie (raggio 100, come continenti e sfera): a
+        // quota 0.03 (raggio 103) da vicino la parallasse li faceva
+        // scivolare rispetto alla costa ruotando il globo. Il controllo
+        // "dietro al globo" della libreria funziona anche a quota 0.
+        htmlAltitude={0}
+        htmlElementVisibilityModifier={(el) => setMarkerVisibility(el)}
         htmlElement={(item) =>
           registerMarkerEl(
             item,
             item.kind === 'cluster'
               ? makeClusterEl(item, world, expandCluster)
               : item.kind === 'event'
-              ? makeEventMarkerEl(item, world, onSelectEvent)
+              ? makeEventMarkerEl(item, onSelectEvent)
               : makeMarkerEl(item, world, onSelectUser)
           )
         }

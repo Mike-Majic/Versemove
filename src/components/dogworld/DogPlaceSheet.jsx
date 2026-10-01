@@ -4,12 +4,10 @@ import { placeTypeMeta, CONDIZIONE_META, TAGLIA_LABEL } from './dogPlaceMeta';
 import Skeleton from '../Skeleton';
 import EmptyState from '../EmptyState';
 import ReportModal from '../shared/ReportModal';
+import Icon from '../shared/Icon';
 import './DogPlaceSheet.css';
-
-function formatDate(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+import AvatarImg from '../shared/AvatarImg';
+import PublishedAt from '../shared/PublishedAt';
 
 function Stars({ value }) {
   return (
@@ -117,6 +115,17 @@ function ReviewForm({ placeId, onDone }) {
   );
 }
 
+// Link "Naviga": apre il navigatore del dispositivo già con la destinazione.
+// iPhone/iPad/Mac -> Apple Mappe; Android e computer -> Google Maps in
+// modalità indicazioni (su Android si apre direttamente l'app, se c'è).
+function navigationUrl(lat, lng) {
+  const dest = `${lat},${lng}`;
+  const ua = navigator.userAgent || '';
+  const apple = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (apple) return `https://maps.apple.com/?daddr=${dest}&dirflg=d`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+}
+
 // Foglio in basso (bottom sheet, pensato per il pollice: si apre sempre
 // dal fondo dello schermo, mai un modale centrato) con il dettaglio di un
 // luogo e le sue recensioni. `place` arriva già con lat/lng/tipo/nome dal
@@ -162,6 +171,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
               {meta.emoji} {meta.label}
             </span>
             <h3>{place.nome}</h3>
+            {detail?.createdAt && <PublishedAt at={detail.createdAt} />}
             {stats && stats.nRecensioni > 0 && (
               <div className="rb-dogsheet-rating">
                 <Stars value={Math.round(stats.votoMedio)} />
@@ -192,6 +202,18 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                 </p>
               )}
 
+              {/* Luoghi importati da OpenStreetMap: attribuzione richiesta dalla
+                  licenza ODbL, visibile su ogni scheda. */}
+              {(detail.source ?? place.source) === 'osm' && (
+                <p className="rb-dogsheet-source">
+                  Dati ©{' '}
+                  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+                    OpenStreetMap
+                  </a>{' '}
+                  contributors, licenza ODbL
+                </p>
+              )}
+
               {detail.foto.length > 0 && (
                 <div className="rb-dogsheet-photos">
                   {detail.foto.map((url) => (
@@ -201,6 +223,18 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
               )}
 
               <div className="rb-dogsheet-actions-row">
+                {Number.isFinite(place.lat) && Number.isFinite(place.lng) && (
+                  <a
+                    className="rb-dogsheet-nav-btn"
+                    href={navigationUrl(place.lat, place.lng)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Apri il navigatore con le indicazioni per arrivare qui"
+                  >
+                    <Icon name="map" size={18} strokeWidth={2} />
+                    Naviga
+                  </a>
+                )}
                 {user ? (
                   <button type="button" className="rb-reset-filters-btn" onClick={() => setShowReviewForm((v) => !v)}>
                     {showReviewForm ? 'Annulla' : '✍️ Scrivi una recensione'}
@@ -238,14 +272,14 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                     <div key={r.id} className="rb-dogsheet-review">
                       <div className="rb-dogsheet-review-head">
                         {r.authorAvatar ? (
-                          <img className="rb-dogsheet-review-avatar" src={r.authorAvatar} alt={r.authorName} />
+                          <AvatarImg className="rb-dogsheet-review-avatar" src={r.authorAvatar} name={r.authorName} seed={r.authorId} alt={r.authorName} />
                         ) : (
                           <span className="rb-dogsheet-review-avatar rb-dogsheet-review-avatar-placeholder">🐾</span>
                         )}
                         <div>
                           <strong>{r.authorName}</strong>
                           <div className="rb-dogsheet-review-meta">
-                            <Stars value={r.voto} /> · {formatDate(r.createdAt)}
+                            <Stars value={r.voto} /> · <PublishedAt at={r.createdAt} className="inline" />
                           </div>
                         </div>
                       </div>

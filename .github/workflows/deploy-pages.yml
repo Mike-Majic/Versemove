@@ -27,11 +27,6 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: true
-          # TURN per le videochiamate (vedi src/data/calls.js): facoltativi,
-          # senza restano solo gli STUN pubblici.
-          VITE_TURN_URLS: ${{ secrets.VITE_TURN_URLS }}
-          VITE_TURN_USERNAME: ${{ secrets.VITE_TURN_USERNAME }}
-          VITE_TURN_CREDENTIAL: ${{ secrets.VITE_TURN_CREDENTIAL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

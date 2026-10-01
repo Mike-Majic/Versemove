@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
+import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // Eventi reali del mondo Social (tabelle events + event_attendees), al posto
 // del vecchio stato locale/localStorage di App.jsx. La foto va nel bucket
@@ -13,7 +15,8 @@ import { translateInteractionError } from './errors';
 // timestamptz): dopo la mezzanotte del giorno dell'evento non deve più
 // comparire, né sul globo né in colonna.
 export function isEventExpired(event) {
-  const d = new Date(event.dataEvento);
+  // Eventi di più giorni (fiere, sagre del bot): contano fino all'ultimo.
+  const d = new Date(event.dataFine ?? event.dataEvento);
   const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
   return Date.now() > endOfDay.getTime();
 }
@@ -22,12 +25,19 @@ function mapEvent(row, attendeeIds, likers, myId) {
   return {
     id: row.id,
     autoreId: row.autore_id,
-    author: row.author ?? { id: row.autore_id, name: 'Utente', avatar: '' },
+    // Gli eventi trovati dal bot (fonte 'bot') non li ha scritti una persona.
+    author:
+      row.fonte === 'bot'
+        ? { id: row.autore_id, name: 'Eventi Versemove', avatar: '' }
+        : row.author ?? { id: row.autore_id, name: 'Utente', avatar: '' },
+    fonte: row.fonte ?? 'utente',
+    urlUfficiale: row.url_ufficiale ?? null,
     titolo: row.titolo,
     citta: row.citta,
     lat: row.lat,
     lng: row.lng,
     dataEvento: row.data_evento,
+    dataFine: row.data_fine ?? null,
     bio: row.descrizione ?? '',
     fotoUrl: row.foto_url ?? null,
     createdAt: row.created_at,
@@ -89,8 +99,11 @@ export async function createEvent({ titolo, citta, lat, lng, data, ora, bio, fot
 
     let fotoUrl = null;
     if (fotoFile) {
-      const path = `${auth.user.id}/event-${Date.now()}-${fotoFile.name}`;
-      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, fotoFile);
+      const prepared = await prepareUpload(fotoFile);
+      if (prepared.error) return { error: prepared.error };
+      const upload = prepared.file;
+      const path = `${auth.user.id}/event-${Date.now()}-${safeFileName(upload.name)}`;
+      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
       if (uploadError) return { error: 'File non supportato o troppo grande.' };
       fotoUrl = supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl;
     }

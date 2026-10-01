@@ -1,0 +1,179 @@
+/* Chiamate persistenti (vedi CallProvider.jsx / CallSurface.jsx). */
+
+.rb-call-remote-audio {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Vista completa senza colonna che la ospiti: pannello flottante sopra ai
+   mondi (sotto ai modali, z-index 1060, così una chat aperta resta sopra). */
+.rb-callfloat-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1045;
+  pointer-events: none;
+}
+
+/* Pulsante "Riduci" nella vista completa. */
+.rb-call-minimize-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.45);
+  color: #f5f5f7;
+  cursor: pointer;
+}
+
+.rb-call-minimize-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Mini-monitor flottante: sopra a tutto, trascinabile. */
+.rb-minicall {
+  position: fixed;
+  z-index: 1095;
+  width: 236px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0d14;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.rb-minicall:active {
+  cursor: grabbing;
+}
+
+.rb-minicall-video {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #05050a;
+}
+
+.rb-minicall-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.rb-minicall-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(245, 245, 247, 0.7);
+  font-size: 13px;
+}
+
+.rb-minicall-placeholder img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.rb-minicall-title {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  right: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rb-minicall-controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px;
+}
+
+.rb-minicall-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f5f7;
+  cursor: pointer;
+}
+
+.rb-minicall-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.rb-minicall-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rb-minicall-btn.is-off {
+  background: rgba(255, 56, 96, 0.25);
+  color: #ff8098;
+}
+
+.rb-minicall-btn.is-on {
+  background: rgba(47, 128, 255, 0.35);
+  color: #fff;
+}
+
+.rb-minicall-hangup {
+  background: #e5364f;
+  color: #fff;
+}
+
+.rb-minicall-hangup:hover {
+  background: #ff4863 !important;
+}
+
+@media (max-width: 480px) {
+  .rb-minicall {
+    width: 196px;
+  }
+}
+
+/* Vista completa a tutto schermo (Stanza MOD): sopra alla barra in alto. */
+.rb-callfloat-layer--top {
+  z-index: 1075;
+}
+
+.rb-modroom-call-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px 0;
+  color: #f5f5f7;
+}
+
+/* Barra titolo della stanza video: Riduci + Esci/Chiudi. */
+.rb-vroom-room-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rb-vroom-host {
+  display: contents;
+}

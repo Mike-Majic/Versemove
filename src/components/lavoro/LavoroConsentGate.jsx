@@ -5,7 +5,8 @@ import '../AccessGate.css';
 // Schermata di consenso mostrata entrando nel mondo Lavoro senza averlo
 // ancora dato (o dopo averlo revocato dalle Impostazioni): dentro Lavoro,
 // a differenza di ogni altro mondo, agli altri utenti di Lavoro si vede
-// nome e cognome reali, non solo il nickname — per questo serve un
+// nome e cognome reali (e le aziende la data di nascita completa), non
+// solo il nickname — per questo serve un
 // consenso esplicito e separato dai Termini generali già accettati in
 // registrazione. Stesso guscio visivo di AccessGate (stesse classi CSS).
 export default function LavoroConsentGate({ world, onConsented, onDecline }) {
@@ -31,7 +32,8 @@ export default function LavoroConsentGate({ world, onConsented, onDecline }) {
         <h2>Prima di entrare in Lavoro</h2>
         <p>
           In tutti gli altri mondi vedi e sei visto solo con il nickname. Nel mondo Lavoro, invece, il tuo
-          nome e cognome reali saranno visibili agli altri utenti di Lavoro (aziende e candidati) — e a
+          nome e cognome reali saranno visibili agli altri utenti di Lavoro (aziende e candidati), e la tua
+          data di nascita completa (giorno, mese e anno) sarà visibile alle aziende del mondo Lavoro — a
           nessun altro, fuori da qui. Vedrai a tua volta il nome reale solo di chi ha dato lo stesso
           consenso.
         </p>

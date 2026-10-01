@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { toggleLike, listComments, addComment, rateStudio } from '../../data/tattoo';
 import ReportModal from '../shared/ReportModal';
+import Icon from '../shared/Icon';
+import PublishedAt from '../shared/PublishedAt';
 
 const REPORT_MOTIVI = ['Nudità', 'Contenuto offensivo', 'Non è una mia foto', 'Spam o pubblicità', 'Altro'];
 
@@ -16,7 +18,7 @@ function Stars({ value, onRate, size = 16 }) {
           disabled={!onRate}
           aria-label={`${n} stelle`}
         >
-          ★
+          <Icon name="star" size={18} className={value >= n ? 'rb-icon--filled' : ''} />
         </button>
       ))}
     </span>
@@ -83,10 +85,12 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
   return (
     <li className={`rb-tattoo-card ${fullscreen ? 'fullscreen' : ''}`}>
       {fullscreen && (
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">
+          <Icon name="close" size={18} />
+        </button>
       )}
       <div className="rb-tattoo-carousel">
-        {post.foto[photoIndex] ? <img src={post.foto[photoIndex]} alt="" /> : <div className="rb-tattoo-photo-empty">🖋️</div>}
+        {post.foto[photoIndex] ? <img src={post.foto[photoIndex]} alt="" /> : <div className="rb-tattoo-photo-empty"><Icon name="pen" size={28} /></div>}
         {post.foto.length > 1 && (
           <>
             <button
@@ -125,6 +129,7 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
           {post.studioNome && <span> · {post.studioNome}</span>}
           {post.studioCitta && <span className="rb-tattoo-citta"> · {post.studioCitta}</span>}
         </div>
+        <PublishedAt at={post.createdAt} />
 
         {post.voto != null && (
           <div className="rb-tattoo-author-vote">
@@ -144,10 +149,10 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
 
         <div className="rb-tattoo-actions">
           <button type="button" className={`rb-tattoo-like-btn ${liked ? 'active' : ''}`} onClick={handleLike}>
-            {liked ? '❤️' : '🤍'} {nLike}
+            <Icon name="heart" size={16} className={`rb-icon--inline ${liked ? 'rb-icon--filled' : ''}`} /> {nLike}
           </button>
           <button type="button" className="rb-tattoo-comments-btn" onClick={toggleComments}>
-            💬 {comments?.length ?? post.nCommenti}
+            <Icon name="chat" size={16} className="rb-icon--inline" /> {comments?.length ?? post.nCommenti}
           </button>
           <button type="button" className="rb-tattoo-report-btn" onClick={() => setReportOpen(true)}>
             Segnala
@@ -165,6 +170,7 @@ export default function TattooPostCard({ post, user, onOpenAuth, fullscreen = fa
                 {comments.map((c) => (
                   <li key={c.id}>
                     <strong>{c.authorName}</strong> {c.testo}
+                    <PublishedAt at={c.createdAt} />
                   </li>
                 ))}
               </ul>

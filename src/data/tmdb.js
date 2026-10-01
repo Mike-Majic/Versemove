@@ -1,32 +1,14 @@
-// Film al cinema ora e in uscita prossimamente, da TMDB (The Movie Database):
-// API gratuita, serve una chiave "v3 auth" creata da un account TMDB
-// (nessuna restrizione per referrer/dominio come Google — la chiave TMDB è
-// pensata per stare in app pubbliche, ma resta comunque solo di lettura sul
-// catalogo film, niente di sensibile).
-const TMDB_API_KEY = 'c4ad449f7e7c8daf3b3eb7132a4d9385';
-const TMDB_BASE = 'https://api.themoviedb.org/3';
-const IMAGE_BASE = 'https://image.tmdb.org/t/p/w342';
-const SEARCH_TIMEOUT_MS = 15000;
-const REGION = 'IT';
+import { apiProxy } from './apiProxy';
 
-async function fetchJson(path) {
-  const sep = path.includes('?') ? '&' : '?';
-  const url = `${TMDB_BASE}${path}${sep}api_key=${TMDB_API_KEY}&language=it-IT&region=${REGION}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('chiave');
-      throw new Error(`richiesta fallita (${res.status})`);
-    }
-    return await res.json();
-  } catch (err) {
-    if (err.name === 'AbortError') throw new Error('timeout');
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+// Film al cinema ora e in uscita prossimamente, da TMDB (The Movie Database).
+// La chiave v3 non sta più nel sito: la usa l'edge function api-proxy
+// (Vault), che accetta solo questi percorsi e tiene i risultati in cache.
+const IMAGE_BASE = 'https://image.tmdb.org/t/p/w342';
+
+// path: '/movie/now_playing' | '/movie/upcoming' | '/movie/<id>/videos'
+// (lingua it-IT e regione IT le aggiunge il proxy).
+function fetchJson(path) {
+  return apiProxy('tmdb', { path });
 }
 
 function mapMovie(m) {

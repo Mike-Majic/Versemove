@@ -3,8 +3,10 @@ import { fetchScopaState, fetchMyHand, fetchCaptures, fetchHandResults, playCard
 import { setRoomReady, firstHumanHostId } from '../../../data/gameRooms';
 import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
+import ItalianDeckButton from './ItalianDeckPanel';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
+import AvatarImg from '../../shared/AvatarImg';
 
 // Il tavolo di gioco vero e proprio: legge lo stato pubblico della mano, la
 // propria mano privata e le prese, tutto rifatto ad ogni "tick" di eventi
@@ -153,6 +155,7 @@ export default function ScopaTable({ roomId, room, user, eventTick, onLeave }) {
       </div>
 
       <div className="rb-scopa-felt">
+        <ItalianDeckButton />
         <div className={`rb-scopa-turn-banner ${isMyTurn ? 'mine' : ''}`}>
           {isMyTurn ? 'Tocca a te' : isBotTurn ? `🤖 ${botName ?? 'Il computer'} sta pensando…` : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
         </div>
@@ -228,7 +231,7 @@ function PlayerBadge({ entry, me = false, captureCount = 0 }) {
       {entry.isBot ? (
         <span className="rb-scopa-bot-avatar">🤖</span>
       ) : (
-        <img src={entry.profilo.avatar || undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+        <AvatarImg src={entry.profilo.avatar} name={entry.profilo?.name || entry.profilo?.nickname} seed={entry.profilo?.id} alt="" />
       )}
       <div>
         <strong>{entry.profilo.name}{me ? ' (tu)' : ''}</strong>

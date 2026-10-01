@@ -1,6 +1,8 @@
 // हिन्दी: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: '{{date}} को {{time}} बजे प्रकाशित',
+    publishedAgo: '{{ago}} प्रकाशित',
     close: 'बंद करें',
     save: 'सेव करें',
     cancel: 'रद्द करें',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'और श्रेणियाँ',
     scrollWorldsUp: 'वर्ल्ड्स को ऊपर स्क्रॉल करें',
     scrollWorldsDown: 'वर्ल्ड्स को नीचे स्क्रॉल करें',
+    updateAvailable: 'नया संस्करण उपलब्ध है, रीलोड करें।',
+    reload: 'रीलोड',
   },
   topbar: {
     notifications: 'सूचनाएं',
@@ -58,6 +62,12 @@ export default {
       mail: 'ईमेल',
       password: 'पासवर्ड',
       rememberMe: 'इस डिवाइस पर मुझे याद रखें',
+      forgotLink: 'पासवर्ड भूल गए?',
+      forgotTitle: 'पासवर्ड रीसेट करें',
+      forgotHint: 'खाते का ईमेल लिखें: हम नया पासवर्ड चुनने के लिए एक लिंक भेजेंगे।',
+      forgotSubmit: 'लिंक भेजें',
+      forgotSent: 'अगर ईमेल पंजीकृत है, तो लिंक जल्द ही आएगा। स्पैम भी जाँचें।',
+      backToLogin: 'लॉगिन पर वापस जाएँ',
       username: 'उपयोगकर्ता नाम',
       nickname: 'निकनेम',
       nicknameChecking: 'उपलब्धता जाँची जा रही है…',
@@ -176,7 +186,7 @@ export default {
       age: 'उम्र',
     },
     language: {
-      title: 'भाषा',
+      title: 'सिस्टम भाषा',
       hint: 'इंटरफ़ेस की भाषा कभी भी बदलें।',
       saved: 'भाषा बदल दी गई है और आपके खाते में सेव हो गई है।',
     },

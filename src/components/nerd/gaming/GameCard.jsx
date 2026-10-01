@@ -14,6 +14,7 @@ import { displayName } from '../../../data/posts';
 import { useBackLayer } from '../../../hooks/useBackLayer';
 import Skeleton from '../../Skeleton';
 import GameCover from './GameCover';
+import AvatarImg from '../../shared/AvatarImg';
 
 // Scheda di un gioco: copertina, dati, numeri di chi ci gioca, i miei
 // bottoni (Ci gioco / Finito / Lo voglio + voto) e "Chi ci gioca".
@@ -22,7 +23,7 @@ const VOTES = Array.from({ length: 10 }, (_, i) => i + 1);
 function Avatar({ profile, size = 28 }) {
   const name = displayName(profile, 'Utente');
   return profile?.avatar ? (
-    <img className="rb-vroom-avatar" src={profile.avatar} alt="" style={{ width: size, height: size }} />
+    <AvatarImg className="rb-vroom-avatar" src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt="" style={{ width: size, height: size }} />
   ) : (
     <span className="rb-vroom-avatar rb-vroom-avatar--letter" style={{ width: size, height: size, fontSize: size * 0.45 }}>
       {name.charAt(0).toUpperCase()}

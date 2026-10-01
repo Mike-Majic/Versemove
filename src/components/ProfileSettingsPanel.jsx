@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { translateWorld } from '../i18n/worldLabels';
 import Icon from './shared/Icon';
 import CollapsibleSection from './shared/CollapsibleSection';
 import CustomSelect from './shared/CustomSelect';
@@ -25,7 +23,12 @@ import {
 import { switchToDeviceSession } from '../data/accountSwitcher';
 import { sendMailboxMessage } from '../data/modMailbox';
 import { listMyAlbums, createAlbum, deleteAlbum, addPhotoToAlbum, removePhotoFromAlbum } from '../data/albums';
-import { updateOwnDatingProfile } from '../data/incontri';
+import DatingProfileEditor from './incontri/DatingProfileEditor';
+import VistaPreferenzeCard from './VistaPreferenzeCard';
+import { isAdult } from '../data/age';
+import { isSocialProfileComplete } from '../data/profileOnboarding';
+import CityAutocomplete from './shared/CityAutocomplete';
+import { setMyProfileCity } from '../data/citta';
 import {
   listEsperienze,
   addEsperienza,
@@ -35,9 +38,9 @@ import {
   removeIstruzione,
   updateLavoroContatti,
 } from '../data/lavoroProfile';
-import { zodiacSign } from '../data/zodiac';
+import { setOwnLavoroVisibilita, richiediVerificaAzienda, esitoVerificaAzienda, aziendaVerificaTesto } from '../data/lavoro';
+import { zodiacSign, birthdayLabel } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
-import { WORLDS } from '../data/worlds';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import ModalOverlay from './ModalOverlay';
 import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
@@ -46,8 +49,10 @@ import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
 import { GAMERTAG_FIELDS, GAMERTAG_MAX, cleanGamertags } from '../data/gaming';
 import './ProfileSettingsPanel.css';
+import AvatarImg from './shared/AvatarImg';
+import MyProfilePreview from './profile/MyProfilePreview';
+import { PROFILE_TITLES } from '../data/myProfile';
 
-const CITTA_MAX = 80;
 const BIO_MAX = 300;
 
 const NICKNAME_RULE_TEXT =
@@ -147,6 +152,26 @@ function AvatarUploader({ user, onUpdateUser }) {
   const [error, setError] = useState('');
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
+  // Menu che si apre toccando la foto: Scatta / Galleria.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+  const pick = (ref) => {
+    setMenuOpen(false);
+    ref.current?.click();
+  };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -167,14 +192,32 @@ function AvatarUploader({ user, onUpdateUser }) {
 
   return (
     <div className="rb-avatar-uploader">
-      <img className="rb-avatar-uploader-preview" src={preview ?? user.avatar} alt={user.nickname} />
-      <div className="rb-avatar-uploader-btns">
-        <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading}>
-          <Icon name="camera" size={16} /> Scatta
+      <div className="rb-avatar-uploader-photo-wrap" ref={wrapRef}>
+        <button
+          type="button"
+          className="rb-avatar-uploader-photo-btn"
+          onClick={() => setMenuOpen((o) => !o)}
+          disabled={uploading}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Cambia la foto profilo"
+          title="Cambia la foto profilo"
+        >
+          <AvatarImg className="rb-avatar-uploader-preview" src={preview ?? user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.nickname} />
+          <span className="rb-avatar-uploader-cam" aria-hidden="true">
+            <Icon name="camera" size={16} />
+          </span>
         </button>
-        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          <Icon name="image" size={16} /> Galleria
-        </button>
+        {menuOpen && (
+          <div className="rb-avatar-uploader-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => pick(cameraInputRef)}>
+              <Icon name="camera" size={16} /> Scatta una foto
+            </button>
+            <button type="button" role="menuitem" onClick={() => pick(fileInputRef)}>
+              <Icon name="image" size={16} /> Scegli dalla galleria
+            </button>
+          </div>
+        )}
       </div>
       {uploading && <p className="rb-avatar-uploader-status">Caricamento...</p>}
       {error && <p className="rb-profile-field-error">{error}</p>}
@@ -182,7 +225,7 @@ function AvatarUploader({ user, onUpdateUser }) {
         ref={cameraInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        capture="environment"
+        capture="user"
         hidden
         onChange={handleFile}
       />
@@ -532,40 +575,6 @@ function AccountTab({ user, onUpdateUser }) {
 // (tipo/fatturazione/genere/pronomi), organizzati in schede per restare
 // leggibile. Mondi abilitati e blocco contatti vivono nel pannello
 // Impostazioni generale (SettingsPanel), insieme al resto della privacy.
-// Lista delle categorie preferite (stellina, vedi FavoriteStarButton),
-// raggruppate nell'ordine dei mondi (verde, blu, bianco, viola, giallo,
-// rosso — lo stesso di data/worlds.js): ogni nome categoria è una pillola
-// con lo sfondo del colore del suo mondo, testo sempre nel colore standard
-// del resto dell'app.
-function FavoriteCategoriesList({ favoriteCategories }) {
-  const { t } = useTranslation();
-  const byWorld = WORLDS.map((w) => ({
-    world: w,
-    items: favoriteCategories.filter((f) => f.worldId === w.id),
-  })).filter((g) => g.items.length > 0);
-
-  if (byWorld.length === 0) {
-    return <p className="rb-profile-favorites-empty">Nessuna categoria preferita ancora — clicca la stellina ☆ accanto alla X quando apri una categoria.</p>;
-  }
-
-  return (
-    <div className="rb-profile-favorites">
-      {byWorld.map(({ world, items }) => (
-        <div key={world.id} className="rb-profile-favorites-group">
-          <h4>{translateWorld(t, world).label}</h4>
-          <div className="rb-profile-favorites-chips">
-            {items.map((f) => (
-              <span key={f.categoryId} className="rb-profile-favorites-chip" style={{ backgroundColor: world.color }}>
-                {f.categoryLabel}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Multi-profilo stile Facebook: un account Persona può collegarsi a un
 // account Azienda della stessa persona reale (o viceversa), mai due dello
 // stesso tipo — vedi la funzione link_second_account lato server, che
@@ -684,7 +693,7 @@ function AccountLinkPanel({ user, onClose }) {
 
       {linked && (
         <div className="rb-profile-linked-card">
-          <img src={linked.avatar} alt={linked.nickname} />
+          <AvatarImg src={linked.avatar} name={linked?.name || linked?.nickname} seed={linked?.id} alt={linked.nickname} />
           <div className="rb-profile-linked-info">
             <strong>{linked.nickname}</strong>
             <span>{linked.tipoAccount === 'azienda' ? '🏢 Azienda' : '🙂 Persona'}</span>
@@ -720,41 +729,80 @@ function AccountLinkPanel({ user, onClose }) {
   );
 }
 
+// Campo città di un profilo: si scrive e dopo 2 lettere compaiono le città
+// vere (GeoNames, vedi CityAutocomplete); vale solo una città scelta
+// dall'elenco, perché è quella a posizionare il marker sui mondi (un testo
+// qualunque non saprebbe dove andare). value = { text, geo }: geo è il
+// geoname_id della città scelta, null finché non se ne sceglie una.
+function ProfileCityField({ label, value, onChange, initialText = '' }) {
+  const text = value.text ?? '';
+  return (
+    <div className="rb-field">
+      <span className="rb-field-label-row">{label}</span>
+      <CityAutocomplete
+        value={text}
+        pickedValue={value.geo ? initialText : ''}
+        placeholder="Scrivi e scegli la città dall'elenco"
+        onChange={(t) => onChange({ text: t, geo: null })}
+        onPick={(c) => onChange({ text: c.nomeMostrato, geo: c.geonameId })}
+      />
+      {text.trim() && !value.geo && (
+        <small className="rb-field-note rb-field-note--warn">Scegli la città dall'elenco che compare mentre scrivi.</small>
+      )}
+    </div>
+  );
+}
+
+const CITY_NOT_PICKED = "Scegli la città dall'elenco che compare mentre scrivi: serve a mettere il tuo segnaposto nel punto giusto.";
+
+// Salva la città scelta (o la toglie, se il campo è vuoto) e restituisce il
+// nome ufficiale che il server ha salvato come testo.
+async function saveProfileCity(campo, city) {
+  const hasText = Boolean(city.text.trim());
+  if (hasText && !city.geo) return { error: CITY_NOT_PICKED };
+  return setMyProfileCity(campo, hasText ? city.geo : null);
+}
+
 // Coppia Città+Bio con salvataggio immediato (come nickname/nome, niente
 // "Applica"): stessa card per i tre profili sotto (Social/Lavoro/Incontri),
 // parametrizzata coi valori iniziali e la funzione di salvataggio — invece
-// di ripetere lo stesso modulo tre volte.
-function CittaBioCard({ citta: initialCitta, bio: initialBio, onSave, successMessage }) {
-  const [citta, setCitta] = useState(initialCitta ?? '');
+// di ripetere lo stesso modulo tre volte. campo: quale città del profilo
+// ('social' | 'lavoro' | 'incontri', vedi setMyProfileCity). onSave(citta,
+// bio, geo) riceve il nome ufficiale della città già salvata.
+function CittaBioCard({ campo, citta: initialCitta, cittaGeo: initialGeo, bio: initialBio, onSave, successMessage }) {
+  const [city, setCity] = useState({ text: initialCitta ?? '', geo: initialGeo ?? null });
   const [bio, setBio] = useState(initialBio ?? '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
-  const [, markSaved] = useFormDirty({ citta, bio });
+  const [, markSaved] = useFormDirty({ city, bio });
 
   const save = async () => {
     setError('');
     setSuccess('');
     setBusy(true);
-    const { error: err } = await onSave(citta.trim(), bio.trim());
+    const cityRes = await saveProfileCity(campo, city);
+    if (cityRes.error) {
+      setBusy(false);
+      setError(cityRes.error);
+      return;
+    }
+    const nome = cityRes.nome ?? '';
+    const geo = nome ? city.geo : null;
+    const { error: err } = await onSave(nome, bio.trim(), geo);
     setBusy(false);
     if (err) {
       setError(err);
       return;
     }
+    setCity({ text: nome, geo });
     setSuccess(successMessage);
     markSaved();
   };
 
   return (
     <div className="rb-profile-field-group">
-      <label className="rb-field">
-        <span className="rb-field-label-row">
-          Città
-          <span className="rb-profile-link-hint" style={{ margin: 0 }}>{citta.length}/{CITTA_MAX}</span>
-        </span>
-        <input type="text" value={citta} maxLength={CITTA_MAX} onChange={(e) => setCitta(e.target.value)} />
-      </label>
+      <ProfileCityField label="Città" value={city} onChange={setCity} initialText={initialCitta ?? ''} />
       <label className="rb-field">
         <span className="rb-field-label-row">
           Bio
@@ -787,7 +835,8 @@ const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario'
 // giorno+mese di nascita (mai l'anno). Il campo "citta"/"bio" di base resta
 // in CittaBioCard sopra: qui gli altri dati richiesti per il Profilo Social.
 function SocialExtraCard({ user, onUpdateUser }) {
-  const [cittaOrigine, setCittaOrigine] = useState(user?.cittaOrigine ?? '');
+  const [cittaOrigine, setCittaOrigine] = useState({ text: user?.cittaOrigine ?? '', geo: user?.cittaOrigineGeo ?? null });
+  const [lingueOpen, setLingueOpen] = useState(false);
   const [statoRelazionale, setStatoRelazionale] = useState(user?.statoRelazionale ?? '');
   const [lingue, setLingue] = useState(user?.lingueParlate ?? []);
   const [mostraData, setMostraData] = useState(user?.mostraDataNascitaSocial ?? false);
@@ -804,45 +853,69 @@ function SocialExtraCard({ user, onUpdateUser }) {
     setError('');
     setSuccess('');
     setBusy(true);
-    const { error: err } = await updateOwnSocialExtra(cittaOrigine.trim(), statoRelazionale, lingue, mostraData);
+    const cityRes = await saveProfileCity('origine', cittaOrigine);
+    if (cityRes.error) {
+      setBusy(false);
+      setError(cityRes.error);
+      return;
+    }
+    const nome = cityRes.nome ?? '';
+    const geo = nome ? cittaOrigine.geo : null;
+    const { error: err } = await updateOwnSocialExtra(nome, statoRelazionale, lingue, mostraData);
     setBusy(false);
     if (err) {
       setError(err);
       return;
     }
+    setCittaOrigine({ text: nome, geo });
     setSuccess('Informazioni aggiornate.');
     markSaved();
-    onUpdateUser?.({ ...user, cittaOrigine: cittaOrigine.trim(), statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
+    onUpdateUser?.({ ...user, cittaOrigine: nome, cittaOrigineGeo: geo, statoRelazionale, lingueParlate: lingue, mostraDataNascitaSocial: mostraData });
   };
 
-  // Anteprima calcolata dal proprio dataNascita (dato privato ma già in
-  // mano al client per sé stessi): mostra cosa vedrebbero gli altri se
-  // l'interruttore è acceso, mai l'anno.
+  // Compleanno calcolato dal proprio dataNascita (dato privato ma già in
+  // mano al client per sé stessi): giorno, mese e segno, mai l'anno. È
+  // quello che vedono gli altri se l'interruttore è acceso.
   const nascitaPreview = (() => {
     if (!user?.dataNascita) return null;
     const d = new Date(user.dataNascita);
     const day = d.getUTCDate();
     const month = d.getUTCMonth() + 1;
     const sign = zodiacSign(day, month);
-    const label = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const label = birthdayLabel(day, month);
     return sign ? `${label} ${sign.emoji} ${sign.name}` : label;
   })();
 
   return (
     <div className="rb-profile-field-group">
-      <label className="rb-field">
-        <span>Città di origine</span>
-        <input type="text" value={cittaOrigine} maxLength={CITTA_MAX} onChange={(e) => setCittaOrigine(e.target.value)} />
-      </label>
+      <ProfileCityField label="Città di origine" value={cittaOrigine} onChange={setCittaOrigine} initialText={user?.cittaOrigine ?? ''} />
 
       <label className="rb-field">
         <span>Stato</span>
         <CustomSelect ariaLabel="Stato" value={statoRelazionale} onChange={setStatoRelazionale} options={STATO_RELAZIONALE_OPTIONS} />
       </label>
 
+      {/* Menu a tendina: chiuso mostra solo quelle scelte, aperto l'elenco
+          completo (80 lingue) in un riquadro che scorre. */}
       <div className="rb-field">
         <span>Lingue parlate</span>
-        <div className="rb-social-lingue-list">
+        <button
+          type="button"
+          className={`rb-social-lingue-toggle ${lingueOpen ? 'open' : ''}`}
+          aria-expanded={lingueOpen}
+          onClick={() => setLingueOpen((o) => !o)}
+        >
+          <span className="rb-social-lingue-summary">
+            {lingue.length === 0
+              ? 'Nessuna lingua scelta'
+              : SUPPORTED_LANGUAGES.filter((l) => lingue.includes(l.code))
+                  .map((l) => l.nativeLabel)
+                  .join(', ')}
+          </span>
+          <span className="rb-social-lingue-chevron" aria-hidden="true">{lingueOpen ? '▲' : '▼'}</span>
+        </button>
+        {lingueOpen && (
+        <div className="rb-social-lingue-list rb-social-lingue-list--menu">
           {SUPPORTED_LANGUAGES.map((l) => (
             <button
               type="button"
@@ -854,12 +927,14 @@ function SocialExtraCard({ user, onUpdateUser }) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
+      {nascitaPreview && <p className="rb-social-birthday-readonly">Compleanno: {nascitaPreview}</p>}
       <label className="rb-field rb-social-birthday-toggle">
         <input type="checkbox" checked={mostraData} onChange={(e) => setMostraData(e.target.checked)} />
         <span>
-          Mostra giorno e mese di nascita nel Profilo Social{nascitaPreview ? ` — ${nascitaPreview}` : ''}
+          Mostra giorno e mese di nascita nel Profilo Social
           <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>L'anno resta sempre privato.</span>
         </span>
       </label>
@@ -876,8 +951,8 @@ function SocialExtraCard({ user, onUpdateUser }) {
 // Gamertag (profiles.gamertags): PSN, Xbox, Steam... mostrati agli altri
 // come chip nel profilo pubblico e accanto al nome nel mondo Nerd
 // (Gaming PC / PS / Xbox), vedi data/gaming.js.
-function GamertagSection({ user, onUpdateUser }) {
-  const [open, setOpen] = useState(false);
+// Gamertag: parte del Profilo Social (nella modifica e nell'anteprima).
+function GamertagCard({ user, onUpdateUser }) {
   const [values, setValues] = useState(() => ({ ...(user?.gamertags ?? {}) }));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -902,35 +977,32 @@ function GamertagSection({ user, onUpdateUser }) {
   };
 
   return (
-    <CollapsibleSection
-      title="Gamertag"
-      infoText="I tuoi nomi su PSN, Xbox, Steam e le altre piattaforme: gli altri li vedono nel tuo profilo e nel mondo Nerd, con un bottone per copiarli."
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-    >
-      <div className="rb-profile-field-group">
-        <div className="rb-profile-name-row rb-gamertag-grid">
-          {GAMERTAG_FIELDS.map((f) => (
-            <label key={f.key} className="rb-field">
-              <span>{f.icon} {f.label}</span>
-              <input
-                type="text"
-                value={values[f.key] ?? ''}
-                maxLength={GAMERTAG_MAX}
-                placeholder={`Il tuo nome su ${f.label}`}
-                autoComplete="off"
-                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
-              />
-            </label>
-          ))}
-        </div>
-        {error && <p className="rb-profile-field-error">{error}</p>}
-        {success && <p className="rb-profile-field-success">{success}</p>}
-        <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
-          {busy ? 'Un attimo…' : 'Salva'}
-        </button>
+    <div className="rb-profile-field-group">
+      <div className="rb-profile-field-title">
+        <strong>Gamertag</strong>
+        <InfoBadge text="I tuoi nomi su PSN, Xbox, Steam e le altre piattaforme: gli altri li vedono nel tuo profilo e nel mondo Nerd, con un bottone per copiarli." />
       </div>
-    </CollapsibleSection>
+      <div className="rb-profile-name-row rb-gamertag-grid">
+        {GAMERTAG_FIELDS.map((f) => (
+          <label key={f.key} className="rb-field">
+            <span>{f.icon} {f.label}</span>
+            <input
+              type="text"
+              value={values[f.key] ?? ''}
+              maxLength={GAMERTAG_MAX}
+              placeholder={`Il tuo nome su ${f.label}`}
+              autoComplete="off"
+              onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+      {success && <p className="rb-profile-field-success">{success}</p>}
+      <button type="button" className="rb-profile-save-btn" onClick={save} disabled={busy}>
+        {busy ? 'Un attimo…' : 'Salva'}
+      </button>
+    </div>
   );
 }
 
@@ -943,26 +1015,24 @@ function GamertagSection({ user, onUpdateUser }) {
 // reale, nessun elenco colleghi/candidati — struttura pronta, si aggancia
 // quando costruiremo quella parte. Incontri resta il campo già esistente
 // (get_match_candidates), invariato.
-function SocialProfileSection({ user, onUpdateUser }) {
-  const [open, setOpen] = useState(false);
+function SocialProfileForms({ user, onUpdateUser }) {
   return (
-    <CollapsibleSection
-      title="Profilo Social"
-      infoText="Mostrato agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-    >
+    <>
       <CittaBioCard
+        campo="social"
         citta={user?.cittaSocial}
+        cittaGeo={user?.cittaSocialGeo}
         bio={user?.bioSocial}
         successMessage="Profilo Social aggiornato."
-        onSave={async (citta, bio) => {
+        onSave={async (citta, bio, geo) => {
           const { error } = await updateOwnSocialProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, cittaSocial: citta, bioSocial: bio });
+          if (!error) onUpdateUser?.({ ...user, cittaSocial: citta, cittaSocialGeo: geo, bioSocial: bio });
           return { error };
         }}
       />
       <SocialExtraCard user={user} onUpdateUser={onUpdateUser} />
+      <GamertagCard user={user} onUpdateUser={onUpdateUser} />
+      <VistaPreferenzeCard ambito="social" />
       {(user?.genere || user?.pronomi) && (
         <div className="rb-profile-field-group">
           <div className="rb-profile-field-title"><strong>Genere e pronomi</strong></div>
@@ -975,6 +1045,20 @@ function SocialProfileSection({ user, onUpdateUser }) {
         <div className="rb-profile-field-title"><strong>Familiari</strong></div>
         <FamilySection userId={user.id} />
       </div>
+    </>
+  );
+}
+
+function SocialProfileSection({ user, onUpdateUser, defaultOpen = false, required = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <CollapsibleSection
+      title={required ? 'Profilo Social (obbligatorio)' : 'Profilo Social'}
+      infoText="Mostrato agli altri in tutti i mondi tranne Lavoro e Incontri, che hanno un profilo a parte."
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    >
+      <SocialProfileForms user={user} onUpdateUser={onUpdateUser} />
     </CollapsibleSection>
   );
 }
@@ -1321,52 +1405,188 @@ function LavoroContattiCard({ user, onUpdateUser }) {
   );
 }
 
-function LavoroProfileSection({ user, onUpdateUser }) {
+// Candidato: "Visibile alle aziende (cerco lavoro)". Si salva subito al
+// clic (niente "Salva"); se il server rifiuta (es. manca il consenso
+// Lavoro) l'interruttore torna com'era e si mostra il suo messaggio.
+function LavoroVisibilitaCard({ user, onUpdateUser }) {
+  const [visibile, setVisibile] = useState(user?.lavoroVisibileAziende ?? false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (next) => {
+    setError('');
+    setBusy(true);
+    setVisibile(next);
+    const { error: err } = await setOwnLavoroVisibilita(next);
+    setBusy(false);
+    if (err) {
+      setVisibile(!next);
+      setError(err);
+      return;
+    }
+    onUpdateUser?.({ ...user, lavoroVisibileAziende: next });
+  };
+
+  return (
+    <div className="rb-profile-field-group">
+      <label className="rb-field rb-social-birthday-toggle">
+        <input type="checkbox" checked={visibile} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>
+          Visibile alle aziende (cerco lavoro)
+          <span className="rb-profile-link-hint" style={{ margin: '2px 0 0' }}>
+            Le aziende verificate del mondo Lavoro possono trovarti nella ricerca "Cerca candidati" e vedere: nome,
+            cognome, data di nascita, città, esperienze, titolo di studio, lingue, telefono, e-mail e curriculum.
+          </span>
+        </span>
+      </label>
+      {error && <p className="rb-profile-field-error">{error}</p>}
+    </div>
+  );
+}
+
+// Azienda: verifica della partita IVA sul registro europeo VIES. Il server
+// avvia il controllo (richiedi_verifica_azienda) e ne dà l'esito
+// (esito_verifica_azienda): qui si chiede l'esito ogni 2 s finché non è più
+// 'in_corso' (al massimo 30 s), poi si ricarica l'account.
+const VERIFICA_POLL_MS = 2000;
+const VERIFICA_MAX_MS = 30000;
+
+function AziendaVerificaSection({ user, onUpdateUser }) {
   const [open, setOpen] = useState(false);
+  const [esito, setEsito] = useState(() => (user?.verificato ? { stato: 'verificata', nome_registro: user?.aziendaVerifica?.nome_registro } : user?.aziendaVerifica ?? null));
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const verifica = async () => {
+    setError('');
+    setBusy(true);
+    const started = Date.now();
+    const req = await richiediVerificaAzienda();
+    if (!aliveRef.current) return;
+    if (req.error) {
+      setBusy(false);
+      setError(req.error);
+      return;
+    }
+    let current = req.esito;
+    setEsito(current);
+    while (current?.stato === 'in_corso' && Date.now() - started < VERIFICA_MAX_MS) {
+      await new Promise((resolve) => setTimeout(resolve, VERIFICA_POLL_MS));
+      if (!aliveRef.current) return;
+      const res = await esitoVerificaAzienda();
+      if (!aliveRef.current) return;
+      if (res.error) {
+        setError(res.error);
+        break;
+      }
+      current = res.esito;
+      setEsito(current);
+    }
+    const fresh = await getCurrentAccount();
+    if (!aliveRef.current) return;
+    setBusy(false);
+    if (fresh) onUpdateUser?.(fresh);
+  };
+
+  const stato = esito?.stato ?? (user?.verificato ? 'verificata' : null);
+  const verificata = stato === 'verificata' || user?.verificato;
+  const testo = aziendaVerificaTesto(verificata ? 'verificata' : stato, esito?.nome_registro);
+
   return (
     <CollapsibleSection
-      title="Profilo di Lavoro"
-      infoText="Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Il mondo Lavoro non ha ancora una schermata che li mostra ad altri: per ora restano salvati, pronti per quando ci sarà."
+      title="Verifica azienda"
+      infoText="Controlliamo la partita IVA sul registro europeo VIES. Solo le aziende verificate possono cercare candidati nel mondo Lavoro."
       open={open}
       onToggle={() => setOpen((v) => !v)}
     >
+      <div className="rb-profile-field-group">
+        <p className="rb-azienda-verifica-dati">
+          {user?.ragioneSociale || '—'}
+          {user?.partitaIva ? ` · P.IVA ${user.partitaIva}` : ''}
+        </p>
+        {testo && (
+          <p className={`rb-azienda-verifica-stato ${verificata ? 'ok' : ''}`}>
+            {verificata ? '✓ ' : ''}
+            {testo}
+            {verificata && esito?.nome_registro ? ` — ${esito.nome_registro}` : ''}
+          </p>
+        )}
+        {error && <p className="rb-profile-field-error">{error}</p>}
+        {!verificata && (
+          <button type="button" className="rb-profile-save-btn" onClick={verifica} disabled={busy}>
+            {busy ? 'Controllo in corso...' : 'Verifica partita IVA'}
+          </button>
+        )}
+      </div>
+    </CollapsibleSection>
+  );
+}
+
+const LAVORO_INFO =
+  "Città, bio, esperienze, istruzione e contatti pensati per il mondo Lavoro, visibili solo da lì. Nel mondo Lavoro, oltre a nome e cognome, la tua data di nascita completa è visibile alle aziende. Con «Visibile alle aziende» acceso, le aziende verificate possono trovarti e vedere il tuo profilo di Lavoro completo.";
+
+function LavoroProfileForms({ user, onUpdateUser }) {
+  return (
+    <>
       <CittaBioCard
+        campo="lavoro"
         citta={user?.cittaLavoro}
+        cittaGeo={user?.cittaLavoroGeo}
         bio={user?.bioLavoro}
         successMessage="Profilo di Lavoro aggiornato."
-        onSave={async (citta, bio) => {
+        onSave={async (citta, bio, geo) => {
           const { error } = await updateOwnLavoroProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, cittaLavoro: citta, bioLavoro: bio });
+          if (!error) onUpdateUser?.({ ...user, cittaLavoro: citta, cittaLavoroGeo: geo, bioLavoro: bio });
           return { error };
         }}
       />
       <LavoroEsperienzeCard />
       <LavoroIstruzioneCard />
       <LavoroContattiCard user={user} onUpdateUser={onUpdateUser} />
+      {user?.tipoAccount !== 'azienda' && <LavoroVisibilitaCard user={user} onUpdateUser={onUpdateUser} />}
+      <VistaPreferenzeCard ambito="lavoro" />
+    </>
+  );
+}
+
+function LavoroProfileSection({ user, onUpdateUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CollapsibleSection title="Profilo di Lavoro" infoText={LAVORO_INFO} open={open} onToggle={() => setOpen((v) => !v)}>
+      <LavoroProfileForms user={user} onUpdateUser={onUpdateUser} />
     </CollapsibleSection>
   );
 }
 
-function IncontriProfileSection({ user, onUpdateUser }) {
-  const [open, setOpen] = useState(false);
+// Profilo Incontri completo (essenziali, foto, dettagli, "Chi vedo"): vedi
+// incontri/DatingProfileEditor.jsx. In registrazione (onboarding) è tutto
+// facoltativo, con Salta e Salva.
+function IncontriProfileSection({ user, onUpdateUser, defaultOpen = false, onboarding = false, sectionRef }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <CollapsibleSection
-      title="Profilo Incontri"
-      infoText="Città e bio mostrate agli altri nel mazzo del mondo Incontri, visibili solo da lì."
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-    >
-      <CittaBioCard
-        citta={user?.citta}
-        bio={user?.bio}
-        successMessage="Profilo Incontri aggiornato."
-        onSave={async (citta, bio) => {
-          const { error } = await updateOwnDatingProfile(citta, bio);
-          if (!error) onUpdateUser?.({ ...user, citta, bio });
-          return { error };
-        }}
-      />
-    </CollapsibleSection>
+    <div ref={sectionRef}>
+      <CollapsibleSection
+        title="Profilo Incontri"
+        infoText="Il tuo profilo nel mondo rosso: foto, chi sei, chi vuoi incontrare, dettagli e chi vedere nel mazzo. Visibile solo da lì."
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      >
+        <DatingProfileEditor
+          user={user}
+          onUpdateUser={onUpdateUser}
+          variant={onboarding ? 'onboarding' : 'settings'}
+          onSkip={() => setOpen(false)}
+          onDone={() => setOpen(false)}
+        />
+      </CollapsibleSection>
+    </div>
   );
 }
 
@@ -1443,31 +1663,66 @@ function DocumentsSection({ user, onUpdateUser }) {
 // mai mostrati agli altri utenti, solo usati per la verifica documento.
 // Città e bio restano fuori: servono solo al mazzo del mondo Incontri
 // (Impostazioni → Profilo Incontri), non sono un dato di profilo generale.
-function ProfilePreviewCard({ user }) {
-  const pronomi = user.pronomi || (user.genere === 'donna' ? 'Lei (she/her)' : user.genere === 'uomo' ? 'Lui (he/him)' : '');
+// Le tre voci sotto la foto: ognuna apre la sua anteprima.
+const PROFILE_ITEMS = [
+  { id: 'social', icon: '👤', hint: 'Come ti vedono in tutti i mondi tranne Lavoro e Incontri' },
+  { id: 'lavoro', icon: '💼', hint: 'Come ti vedono le aziende nel mondo Lavoro' },
+  { id: 'incontri', icon: '❤️', hint: 'La tua scheda nel mondo rosso' },
+];
+
+// Finestra di modifica di un profilo, sopra la sua anteprima: i moduli che
+// esistono già. Chiudendola si torna all'anteprima, che si ricarica.
+function ProfileEditWindow({ profilo, user, onUpdateUser, onClose }) {
   return (
-    <div className="rb-profile-preview">
-      <p className="rb-profile-preview-label">Anteprima — così ti vedono gli altri utenti</p>
-      <div className="rb-profile-preview-card">
-        <img className="rb-profile-preview-avatar" src={user.avatar} alt={user.nickname} />
-        <div className="rb-profile-preview-info">
-          <div className="rb-profile-preview-name-row">
-            <strong>{user.nickname}</strong>
-            {user.verificato && <span className="rb-verified-badge" title="Account verificato">✓</span>}
-          </div>
-          {user.tipoAccount === 'azienda' ? (
-            <span className="rb-profile-preview-tag">🏢 {user.ragioneSociale || 'Azienda'}</span>
-          ) : (
-            pronomi && <span className="rb-profile-preview-tag">{pronomi}</span>
-          )}
+    <ModalOverlay onClose={onClose}>
+      <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
+        <div className="rb-myprof-edit-head">
+          <h2>Modifica {PROFILE_TITLES[profilo]}</h2>
+          <button type="button" className="rb-myprof-icon-btn" onClick={onClose} aria-label="Chiudi la modifica" title="Chiudi">
+            ✕
+          </button>
         </div>
+        {profilo === 'social' && <SocialProfileForms user={user} onUpdateUser={onUpdateUser} />}
+        {profilo === 'lavoro' && (
+          <>
+            <p className="rb-profile-link-hint">{LAVORO_INFO}</p>
+            {user.tipoAccount === 'azienda' && <AziendaVerificaSection user={user} onUpdateUser={onUpdateUser} />}
+            <LavoroProfileForms user={user} onUpdateUser={onUpdateUser} />
+          </>
+        )}
+        {profilo === 'incontri' && <DatingProfileEditor user={user} onUpdateUser={onUpdateUser} variant="settings" onDone={onClose} />}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
-export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [] }) {
+// variant="onboarding": dopo la registrazione, direttamente la modifica
+// (Social con i gamertag, Lavoro, Incontri) senza schede né anteprime; si
+// chiude solo col Profilo Social compilato. Nelle Impostazioni invece:
+// elenco dei tre profili -> anteprima in sola lettura -> matita -> modifica.
+export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, variant = 'settings', initialSection = null }) {
+  const onboarding = variant === 'onboarding';
+  const [onboardingWarn, setOnboardingWarn] = useState(false);
+  const incontriRef = useRef(null);
+  useEffect(() => {
+    if (open && initialSection === 'incontri') {
+      window.setTimeout(() => incontriRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }, [open, initialSection]);
   const [tab, setTab] = useState('profilo');
+  // Anteprima aperta ('social' | 'lavoro' | 'incontri' | null) e finestra di
+  // modifica sopra di essa. initialSection (es. "Chi vedo", avviso del mondo
+  // rosso) porta direttamente alla modifica di quel profilo.
+  const [preview, setPreview] = useState(() => (onboarding ? null : initialSection));
+  const [editing, setEditing] = useState(() => !onboarding && Boolean(initialSection));
+  const [previewVersion, setPreviewVersion] = useState(0);
+  const closeEdit = () => {
+    setEditing(false);
+    setPreviewVersion((n) => n + 1);
+  };
+  useBackLayer(!onboarding && tab === 'profilo' && preview !== null && !editing, () => setPreview(null), 'subpage:profile-preview', {
+    level: BACK_LEVELS.modal + 0.5,
+  });
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [nickErr, setNickErr] = useState('');
   const [nickOk, setNickOk] = useState('');
@@ -1534,70 +1789,125 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
     if (!error) setUrgentSent(true);
   };
 
+  const socialDone = isSocialProfileComplete(user);
+  const incontriWanted = (user.mondiAbilitati ?? []).includes('incontri') && isAdult(user.dataNascita);
+  const close = () => {
+    if (onboarding && !socialDone) {
+      setOnboardingWarn(true);
+      return;
+    }
+    onClose();
+  };
+
+  if (onboarding) {
+    return (
+      <ModalOverlay onClose={close}>
+        <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
+          <h2>Completa il tuo profilo</h2>
+          <p className="rb-profile-link-hint">
+            Il <strong>Profilo Social</strong> è obbligatorio: scegli la città dall'elenco, scrivi la bio e premi Salva. Gli altri
+            profili sono facoltativi e puoi completarli quando vuoi da Il mio profilo.
+          </p>
+          <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
+          <SocialProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen required />
+          <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
+          <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} defaultOpen={incontriWanted} onboarding sectionRef={incontriRef} />
+          {onboardingWarn && !socialDone && (
+            <p className="rb-profile-field-error">Prima di continuare completa il Profilo Social: città e bio, poi Salva.</p>
+          )}
+          <button type="button" className="rb-profile-save-btn rb-profile-onboarding-done" onClick={close}>
+            {socialDone ? 'Fine' : 'Fine (manca il Profilo Social)'}
+          </button>
+        </div>
+      </ModalOverlay>
+    );
+  }
+
   return (
     <ModalOverlay onClose={onClose} hasUnsavedChanges={hasUnsavedChanges}>
       <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
-        <h2>Il mio profilo</h2>
-
-        <div className="rb-profile-tabs">
-          <button type="button" className={tab === 'profilo' ? 'active' : ''} onClick={() => setTab('profilo')}>Profilo</button>
-          <button type="button" className={tab === 'album' ? 'active' : ''} onClick={() => setTab('album')}>Album</button>
-          <button type="button" className={tab === 'documenti' ? 'active' : ''} onClick={() => setTab('documenti')}>Documenti</button>
-          <button type="button" className={tab === 'preferiti' ? 'active' : ''} onClick={() => setTab('preferiti')}>Preferiti</button>
-          <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
-        </div>
-
-        {tab === 'preferiti' && <FavoriteCategoriesList favoriteCategories={favoriteCategories} />}
-
-        {tab === 'profilo' && (
-          <>
-            <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
-            <ProfilePreviewCard user={user} />
-            <SocialProfileSection user={user} onUpdateUser={onUpdateUser} />
-            <GamertagSection user={user} onUpdateUser={onUpdateUser} />
-            <LavoroProfileSection user={user} onUpdateUser={onUpdateUser} />
-            <IncontriProfileSection user={user} onUpdateUser={onUpdateUser} />
-          </>
+        {tab === 'profilo' && preview && (
+          <MyProfilePreview
+            key={`${preview}-${previewVersion}`}
+            profilo={preview}
+            user={user}
+            onEdit={() => setEditing(true)}
+            onClose={() => setPreview(null)}
+          />
+        )}
+        {tab === 'profilo' && preview && editing && (
+          <ProfileEditWindow profilo={preview} user={user} onUpdateUser={onUpdateUser} onClose={closeEdit} />
         )}
 
-        {tab === 'album' && <AlbumsPanel />}
-
-        {tab === 'documenti' && <DocumentsSection user={user} onUpdateUser={onUpdateUser} />}
-
-        {tab === 'account' && (
+        {!(tab === 'profilo' && preview) && (
           <>
-            <FieldGroup
-              title="Nickname"
-              ruleText={NICKNAME_RULE_TEXT}
-              cooldownMs={nicknameCooldownRemaining(user)}
-              onSave={saveNickname}
-              onRequestUrgent={() => openUrgent('nickname')}
-              disabled={!nickname.trim() || nickname.trim() === user.nickname}
-              error={nickErr}
-              success={nickOk}
-            >
-              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={30} />
-            </FieldGroup>
+            <button type="button" className="rb-close-btn" onClick={onClose} aria-label="Chiudi">✕</button>
+            <h2>Il mio profilo</h2>
 
-            <FieldGroup
-              title="Nome e cognome"
-              ruleText={NAME_RULE_TEXT}
-              cooldownMs={nameCooldownRemaining(user)}
-              onSave={saveName}
-              onRequestUrgent={() => openUrgent('nome')}
-              disabled={!nome.trim() && !cognome.trim()}
-              error={nameErr}
-              success={nameOk}
-            >
-              <div className="rb-profile-name-row">
-                <input type="text" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={40} />
-                <input type="text" placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} maxLength={40} />
-              </div>
-            </FieldGroup>
+            <div className="rb-profile-tabs">
+              <button type="button" className={tab === 'profilo' ? 'active' : ''} onClick={() => setTab('profilo')}>Profilo</button>
+              <button type="button" className={tab === 'album' ? 'active' : ''} onClick={() => setTab('album')}>Album</button>
+              <button type="button" className={tab === 'documenti' ? 'active' : ''} onClick={() => setTab('documenti')}>Documenti</button>
+              <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
+            </div>
 
-            <AccountTab user={user} onUpdateUser={onUpdateUser} />
-            <AccountLinkPanel user={user} onClose={onClose} />
+            {tab === 'profilo' && (
+              <>
+                <AvatarUploader user={user} onUpdateUser={onUpdateUser} />
+                <div className="rb-myprof-list">
+                  {PROFILE_ITEMS.map((item) => (
+                    <button key={item.id} type="button" className="rb-myprof-item" onClick={() => setPreview(item.id)}>
+                      <span className="rb-myprof-item-icon" aria-hidden="true">{item.icon}</span>
+                      <span className="rb-myprof-item-text">
+                        <strong>{PROFILE_TITLES[item.id]}</strong>
+                        <span>{item.hint}</span>
+                      </span>
+                      <span className="rb-myprof-item-arrow" aria-hidden="true">›</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+          )}
+
+          {tab === 'album' && <AlbumsPanel />}
+
+          {tab === 'documenti' && <DocumentsSection user={user} onUpdateUser={onUpdateUser} />}
+
+          {tab === 'account' && (
+            <>
+              <FieldGroup
+                title="Nickname"
+                ruleText={NICKNAME_RULE_TEXT}
+                cooldownMs={nicknameCooldownRemaining(user)}
+                onSave={saveNickname}
+                onRequestUrgent={() => openUrgent('nickname')}
+                disabled={!nickname.trim() || nickname.trim() === user.nickname}
+                error={nickErr}
+                success={nickOk}
+              >
+                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={30} />
+              </FieldGroup>
+
+              <FieldGroup
+                title="Nome e cognome"
+                ruleText={NAME_RULE_TEXT}
+                cooldownMs={nameCooldownRemaining(user)}
+                onSave={saveName}
+                onRequestUrgent={() => openUrgent('nome')}
+                disabled={!nome.trim() && !cognome.trim()}
+                error={nameErr}
+                success={nameOk}
+              >
+                <div className="rb-profile-name-row">
+                  <input type="text" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={40} />
+                  <input type="text" placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} maxLength={40} />
+                </div>
+              </FieldGroup>
+
+              <AccountTab user={user} onUpdateUser={onUpdateUser} />
+              <AccountLinkPanel user={user} onClose={onClose} />
+            </>
+          )}
           </>
         )}
 

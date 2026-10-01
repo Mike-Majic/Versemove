@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { fetchProfilesMap } from './posts';
 import { translateInteractionError } from './errors';
+import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // Categoria Cosplay del mondo Nerd (components/nerd/cosplay/): eventi
 // (events + event_attendees, RPC eventi_vicini), "Cerco gruppo"
@@ -104,20 +106,22 @@ function mapEvento(row) {
     nPartecipa: Number(row.n_partecipa ?? 0),
     nInteressati: Number(row.n_interessati ?? 0),
     mioStato: row.mio_stato ?? null,
+    createdAt: row.created_at ?? null,
   };
 }
 
-// Eventi Cosplay: vicini (lat/lng/km) o di tutto il mondo (tutti null),
+// Eventi Cosplay (o di un'altra categoria con mondo/categoria, es. Teatro
+// del mondo Arte): vicini (lat/lng/km) o di tutto il mondo (tutti null),
 // prossimi (compresi quelli in corso) o passati, filtro tipo facoltativo,
 // a pagine di 30. -> { events } | { error }
-export async function fetchEventiVicini({ lat = null, lng = null, km = null, periodo = 'prossimi', tipo = null, limit = EVENTS_PAGE_SIZE, offset = 0 } = {}) {
+export async function fetchEventiVicini({ lat = null, lng = null, km = null, periodo = 'prossimi', tipo = null, limit = EVENTS_PAGE_SIZE, offset = 0, mondo = 'nerd', categoria = COSPLAY_CATEGORY_ID } = {}) {
   try {
     const { data, error } = await supabase.rpc('eventi_vicini', {
       p_lat: lat,
       p_lng: lng,
       p_km: km,
-      p_mondo: 'nerd',
-      p_categoria: COSPLAY_CATEGORY_ID,
+      p_mondo: mondo,
+      p_categoria: categoria,
       p_periodo: periodo,
       p_tipo: tipo,
       p_limit: limit,
@@ -127,6 +131,43 @@ export async function fetchEventiVicini({ lat = null, lng = null, km = null, per
     return { events: (data ?? []).map(mapEvento) };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// Un solo evento Cosplay (link condiviso #/nerd/cosplay/evento/<id>), con
+// conteggi, "in corso" e stato mio calcolati come in eventi_vicini (fine
+// effettiva = data_fine o un giorno dopo l'inizio; eventi non approvati
+// solo per il loro autore). Se non si può vedere torna null.
+export async function fetchCosplayEvent(id) {
+  try {
+    const { data: row, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .eq('mondo', 'nerd')
+      .eq('categoria', COSPLAY_CATEGORY_ID)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !row) return null;
+    const [{ data: auth }, { data: att }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('event_attendees').select('user_id, stato').eq('event_id', id),
+    ]);
+    const myId = auth?.user?.id ?? null;
+    if (row.stato !== 'approvato' && row.autore_id !== myId) return null;
+    const list = att ?? [];
+    const now = Date.now();
+    const start = new Date(row.data_evento).getTime();
+    const end = row.data_fine ? new Date(row.data_fine).getTime() : start + 24 * 3600 * 1000;
+    return mapEvento({
+      ...row,
+      in_corso: start <= now && end >= now,
+      n_partecipa: list.filter((a) => a.stato === 'partecipa').length,
+      n_interessati: list.filter((a) => a.stato === 'interessato').length,
+      mio_stato: list.find((a) => a.user_id === myId)?.stato ?? null,
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -159,8 +200,11 @@ export async function proposeEvent({ titolo, tipo, citta, lat, lng, paese, indir
     if (!auth?.user) return { error: 'Devi essere loggato.' };
     let fotoUrl = null;
     if (fotoFile) {
-      const path = `${auth.user.id}/event-${Date.now()}-${fotoFile.name}`;
-      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, fotoFile);
+      const prepared = await prepareUpload(fotoFile);
+      if (prepared.error) return { error: prepared.error };
+      const upload = prepared.file;
+      const path = `${auth.user.id}/event-${Date.now()}-${safeFileName(upload.name)}`;
+      const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
       if (uploadError) return { error: 'File non supportato o troppo grande.' };
       fotoUrl = supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl;
     }

@@ -6,6 +6,9 @@ import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../../data/supabas
 // dell'upload per dare un messaggio chiaro invece di un errore del server.
 export const BUCKET = 'chat-media';
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+// Foto e video si comprimono prima del caricamento (vedi data/mediaCompress.js):
+// all'invio possono pesare di più, il limite dei 20 MB vale dopo.
+export const MAX_RAW_MEDIA_BYTES = 200 * 1024 * 1024;
 export const MAX_FILES = 10;
 export const MAX_VOICE_SECONDS = 120;
 
@@ -55,8 +58,9 @@ export function formatDuration(seconds) {
 // null se va bene, altrimenti il motivo in italiano.
 export function validateFile(file) {
   if (!file) return 'File non valido.';
-  if (file.size > MAX_FILE_BYTES) {
-    return `"${file.name}" pesa ${formatSize(file.size)}: il massimo è 20 MB.`;
+  const media = /^(image|video)\//.test(mimeOf(file));
+  if (file.size > (media ? MAX_RAW_MEDIA_BYTES : MAX_FILE_BYTES)) {
+    return `"${file.name}" pesa ${formatSize(file.size)}: il massimo è ${media ? '200' : '20'} MB.`;
   }
   if (!ALLOWED.has(mimeOf(file))) {
     return `"${file.name}": tipo di file non ammesso (foto, video, audio, PDF, Office, ZIP o TXT).`;
@@ -125,7 +129,7 @@ export async function uploadWithProgress(path, file, onProgress) {
         const body = JSON.parse(xhr.responseText);
         if (/mime|type/i.test(body.message || body.error || '')) message = 'Tipo di file non ammesso.';
         else if (/size|large|exceed/i.test(body.message || body.error || '')) message = 'Il file supera i 20 MB.';
-        else if (/row-level|policy|unauthor/i.test(body.message || body.error || '')) message = 'Non hai il permesso di caricare qui.';
+        else if (/row-level|policy|unauthor/i.test(body.message || body.error || '')) message = 'Caricamento non consentito: forse hai finito lo spazio a disposizione (200 MB).';
         else if (body.message) message = body.message;
       } catch {
         // risposta non JSON: resta il messaggio generico.

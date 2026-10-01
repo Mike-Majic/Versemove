@@ -49,3 +49,16 @@
   min-width: 40px;
   height: 40px;
 }
+
+/* Stato "attivo" di un'icona a linea (mi piace, salvato): riempita col
+   colore del testo, stesso disegno. */
+.rb-icon--filled {
+  fill: currentColor;
+}
+
+/* Icona dentro una riga di testo (pulsante o etichetta non flex): in
+   linea col testo, allineata alla sua altezza. */
+.rb-icon.rb-icon--inline {
+  display: inline-block;
+  vertical-align: -0.22em;
+}

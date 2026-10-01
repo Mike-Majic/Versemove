@@ -5,6 +5,8 @@
 // come ripiego (fallbackLng: 'en'), mai questa versione italiana.
 export default {
   common: {
+    publishedAt: 'Pubblicato il {{date}} alle {{time}}',
+    publishedAgo: 'Pubblicato {{ago}}',
     close: 'Chiudi',
     save: 'Salva',
     cancel: 'Annulla',
@@ -16,6 +18,8 @@ export default {
     nextCategoriesPage: 'Altra pagina di categorie',
     scrollWorldsUp: 'Scorri su i mondi',
     scrollWorldsDown: 'Scorri giù i mondi',
+    updateAvailable: 'Nuova versione disponibile, ricarica.',
+    reload: 'Ricarica',
   },
   topbar: {
     notifications: 'Notifiche',
@@ -64,6 +68,12 @@ export default {
       mail: 'Mail',
       password: 'Password',
       rememberMe: 'Ricordami su questo dispositivo',
+      forgotLink: 'Password dimenticata?',
+      forgotTitle: 'Recupera la password',
+      forgotHint: "Scrivi la mail dell'account: ti mandiamo un link per sceglierne una nuova.",
+      forgotSubmit: 'Invia il link',
+      forgotSent: 'Se la mail è registrata, tra poco ricevi il link. Controlla anche lo spam.',
+      backToLogin: "Torna all'accesso",
       username: 'Nome utente',
       nickname: 'Nickname',
       nicknameChecking: 'Controllo disponibilità…',
@@ -182,7 +192,7 @@ export default {
       age: 'Età',
     },
     language: {
-      title: 'Lingua',
+      title: 'Lingua sistema',
       hint: "Cambia la lingua dell'interfaccia in qualsiasi momento.",
       saved: 'Lingua cambiata e salvata sul tuo account.',
     },

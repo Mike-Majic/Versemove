@@ -1,6 +1,8 @@
 // Français. Garde la même structure de clés que it.js — voir le commentaire là-bas.
 export default {
   common: {
+    publishedAt: 'Publié le {{date}} à {{time}}',
+    publishedAgo: 'Publié {{ago}}',
     close: 'Fermer',
     save: 'Enregistrer',
     cancel: 'Annuler',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'Autre page de catégories',
     scrollWorldsUp: 'Faire défiler les mondes vers le haut',
     scrollWorldsDown: 'Faire défiler les mondes vers le bas',
+    updateAvailable: 'Nouvelle version disponible, rechargez.',
+    reload: 'Recharger',
   },
   topbar: {
     notifications: 'Notifications',
@@ -58,6 +62,12 @@ export default {
       mail: 'E-mail',
       password: 'Mot de passe',
       rememberMe: 'Se souvenir de moi sur cet appareil',
+      forgotLink: 'Mot de passe oublié ?',
+      forgotTitle: 'Réinitialiser le mot de passe',
+      forgotHint: "Saisis l'e-mail du compte : nous t'enverrons un lien pour en choisir un nouveau.",
+      forgotSubmit: 'Envoyer le lien',
+      forgotSent: "Si l'e-mail est enregistré, le lien arrive bientôt. Vérifie aussi les spams.",
+      backToLogin: 'Retour à la connexion',
       username: "Nom d'utilisateur",
       nickname: 'Pseudo',
       nicknameChecking: 'Vérification de la disponibilité…',
@@ -176,7 +186,7 @@ export default {
       age: 'Âge',
     },
     language: {
-      title: 'Langue',
+      title: 'Langue du système',
       hint: "Changez la langue de l'interface à tout moment.",
       saved: 'Langue changée et enregistrée sur votre compte.',
     },

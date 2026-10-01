@@ -291,6 +291,11 @@
   color: var(--a-ink);
 }
 
+.rb-dm-chat-confirm button.primary.danger {
+  background: #e5364f;
+  color: #fff;
+}
+
 @media (max-width: 560px) {
   .rb-dm-chat {
     height: min(100%, 92vh);

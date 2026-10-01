@@ -1,6 +1,8 @@
 // Русский: vedi commento in it.js — stessa struttura, stesse chiavi.
 export default {
   common: {
+    publishedAt: 'Опубликовано {{date}} в {{time}}',
+    publishedAgo: 'Опубликовано {{ago}}',
     close: 'Закрыть',
     save: 'Сохранить',
     cancel: 'Отмена',
@@ -12,6 +14,8 @@ export default {
     nextCategoriesPage: 'Ещё категории',
     scrollWorldsUp: 'Прокрутить миры вверх',
     scrollWorldsDown: 'Прокрутить миры вниз',
+    updateAvailable: 'Доступна новая версия, перезагрузите.',
+    reload: 'Перезагрузить',
   },
   topbar: {
     notifications: 'Уведомления',
@@ -58,6 +62,12 @@ export default {
       mail: 'Почта',
       password: 'Пароль',
       rememberMe: 'Запомнить меня на этом устройстве',
+      forgotLink: 'Забыли пароль?',
+      forgotTitle: 'Сброс пароля',
+      forgotHint: 'Введите почту аккаунта: мы отправим ссылку, чтобы выбрать новый пароль.',
+      forgotSubmit: 'Отправить ссылку',
+      forgotSent: 'Если почта зарегистрирована, ссылка скоро придёт. Проверьте и папку «Спам».',
+      backToLogin: 'Вернуться ко входу',
       username: 'Имя пользователя',
       nickname: 'Никнейм',
       nicknameChecking: 'Проверка доступности…',
@@ -176,7 +186,7 @@ export default {
       age: 'Возраст',
     },
     language: {
-      title: 'Язык',
+      title: 'Язык системы',
       hint: 'Измените язык интерфейса в любой момент.',
       saved: 'Язык изменён и сохранён в вашем аккаунте.',
     },

@@ -6,9 +6,11 @@ import MusicaApp from './musica/MusicaApp';
 import PodcastColumn from './PodcastColumn';
 import CinemaColumn from './cultural/CinemaColumn';
 import CommunityEventsColumn from './cultural/CommunityEventsColumn';
+import TeatroColumn from './arte/TeatroColumn';
 import TattooColumn from './tattoo/TattooColumn';
 import GiochiTavoloColumn from './nerd/games/GiochiTavoloColumn';
-import VideoRoomsColumn from './nerd/VideoRoomsColumn';
+import TwitchColumn from './nerd/twitch/TwitchColumn';
+import LiveWorldPanel from './live/LiveWorldPanel';
 import GamingColumn from './nerd/gaming/GamingColumn';
 import NerdBachecaColumn from './nerd/NerdBachecaColumn';
 import CosplayColumn from './nerd/cosplay/CosplayColumn';
@@ -121,13 +123,24 @@ export default function ArteExplorer({
           ) : world.id === 'nerd' && GAMING_CATEGORY_IDS.includes(category.id) ? (
             // Gaming PC / PS / Xbox: una sola colonna, la piattaforma della
             // categoria fa da contesto (vedi nerd/gaming/GamingColumn.jsx).
-            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} />
+            <GamingColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} focus={gamingFocus} locationFilters={locationFilters} />
           ) : VETRINA_OFFERTE_CATEGORY_IDS.includes(category.id) ? (
             <VetrinaOfferteColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} locationFilters={locationFilters} closing={isClosing} />
+          ) : world.id === 'nerd' && category.id === 'streaming' ? (
+            // Streaming & Content Creator: Twitch dentro Versemove (dirette,
+            // ricerca, player e chat incorporati).
+            <TwitchColumn key={category.id} user={user} onOpenAuth={onOpenAuth} />
           ) : world.id === 'nerd' && category.id === NERD_LIVE_CATEGORY ? (
-            // Live del mondo Nerd: stanze video di gruppo, più la scheda
-            // "Eventi" con la colonna di prima, identica.
-            <VideoRoomsColumn key={category.id} user={user} onOpenAuth={onOpenAuth} events={genericColumn} />
+            // Live del mondo Nerd: dirette Twitch/YouTube/Kick come nel Social
+            // (le stanze video sono passate al mondo Incontri).
+            <LiveWorldPanel key={category.id} mondo="nerd" standalone title="Live" user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'arte' && category.id === 'dirette' ? (
+            // In diretta (Intrattenimento): link di dirette YouTube e TikTok.
+            <LiveWorldPanel key={category.id} mondo="arte" standalone title="In diretta" user={user} onOpenAuth={onOpenAuth} />
+          ) : world.id === 'arte' && ['teatro', 'arti-visive', 'live'].includes(category.id) ? (
+            // Teatro: eventi come in Cosplay (lista/mappa, città + km,
+            // periodo, tipo) più la scheda Community di prima.
+            <TeatroColumn key={category.id} category={category} user={user} onOpenAuth={onOpenAuth} onShowReactors={onShowReactors} locationFilters={locationFilters} />
           ) : COMMUNITY_EVENT_CATEGORIES.has(category.id) ? (
             <CommunityEventsColumn
               key={category.id}

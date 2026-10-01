@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchMentionable } from '../../data/mentions';
 import './mentions.css';
+import AvatarImg from './AvatarImg';
 
 // Campo di testo (textarea con multiline, altrimenti input) con i
 // suggerimenti "@": digitando @ seguito da lettere (anche nessuna) si apre
@@ -155,7 +156,7 @@ export default function MentionInput({
               onClick={() => choose(p)}
             >
               {p.avatar ? (
-                <img src={p.avatar} alt="" />
+                <AvatarImg src={p.avatar} name={p?.name || p?.nickname} seed={p?.id} alt="" />
               ) : (
                 <span className="rb-mention-letter">{p.nickname.charAt(0).toUpperCase()}</span>
               )}

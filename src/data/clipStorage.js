@@ -9,7 +9,9 @@ import { translateUploadError } from './contents';
 const BUCKET = 'music-clips';
 
 export async function uploadClip(file, ownerId) {
-  const path = `${ownerId}/${Date.now()}-clip.webm`;
+  // mp4 o webm, secondo cosa ha registrato il browser (vedi videoCompress.js).
+  const ext = /mp4/.test(file.type) ? 'mp4' : 'webm';
+  const path = `${ownerId}/${Date.now()}-clip.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) return { error: translateUploadError(error) };
   return { path, url: getClipUrl(path) };

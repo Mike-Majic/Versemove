@@ -8,6 +8,18 @@ export function isCompressionSupported() {
   return typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function';
 }
 
+// Bitrate video di destinazione (~1,5 Mbit/s a 720p: circa 11 MB al minuto).
+const VIDEO_BITS_PER_SECOND = 1_500_000;
+// Formati in ordine di preferenza: mp4 (H.264) si vede ovunque, iPhone
+// compresi; webm solo dove mp4 non si può registrare.
+const RECORDER_TYPES = [
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+  'video/mp4',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm',
+];
+
 export async function compressVideoClip(file, { maxDurationSec = 60, maxHeight = 720 } = {}) {
   if (!isCompressionSupported()) {
     throw new Error('unsupported');
@@ -57,9 +69,9 @@ export async function compressVideoClip(file, { maxDurationSec = 60, maxHeight =
         }
         const stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
 
-        const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-          .find((t) => MediaRecorder.isTypeSupported?.(t)) || 'video/webm';
-        const recorder = new MediaRecorder(stream, { mimeType });
+        const mimeType = RECORDER_TYPES.find((t) => MediaRecorder.isTypeSupported?.(t));
+        if (!mimeType) throw new Error('unsupported');
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_BITS_PER_SECOND });
         const chunks = [];
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) chunks.push(e.data);
@@ -69,7 +81,7 @@ export async function compressVideoClip(file, { maxDurationSec = 60, maxHeight =
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(new Blob(chunks, { type: 'video/webm' }));
+          resolve(new Blob(chunks, { type: mimeType.split(';')[0] }));
         };
 
         const draw = () => {
@@ -86,12 +98,17 @@ export async function compressVideoClip(file, { maxDurationSec = 60, maxHeight =
           })
           .catch(fail);
 
-        video.ontimeupdate = () => {
-          if (video.currentTime >= duration && recorder.state === 'recording') {
+        const stop = () => {
+          if (recorder.state === 'recording') {
             video.pause();
             recorder.stop();
           }
         };
+        video.ontimeupdate = () => {
+          if (video.currentTime >= duration) stop();
+        };
+        // Durata sconosciuta (alcuni webm) o fine del file prima del limite.
+        video.onended = stop;
       } catch (err) {
         fail(err);
       }

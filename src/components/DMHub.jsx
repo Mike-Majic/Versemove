@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import ModalOverlay from './ModalOverlay';
 import ContactsPanel from './ContactsPanel';
-import ContactProfileModal from './chat/ContactProfileModal';
+import { openProfileFromMention } from '../data/mentions';
 import { formatRelativeDate } from './social/resolveAuthor';
 import { listMyConversations, setConversationArchived } from '../data/directChat';
 import { WORLDS } from '../data/worlds';
 import { inkOn } from './shared/chat/chatMedia';
 import './FriendsModal.css';
 import './DMHub.css';
+import AvatarImg from './shared/AvatarImg';
 
 // Colore del mondo da cui è arrivato l'ultimo messaggio di una
 // conversazione, per il bordo della card (richiesta di Mike): un solo
@@ -53,7 +54,7 @@ function ConversationRow({ conv, onOpen, onArchiveToggle, onOpenProfile }) {
             }
           }}
         >
-          <img src={conv.other.avatar} alt="" />
+          <AvatarImg src={conv.other.avatar} name={conv.other?.name || conv.other?.nickname} seed={conv.other?.id} alt="" />
         </span>
         <div className="rb-dm-row-text">
           <span className="rb-dm-row-name">
@@ -114,7 +115,6 @@ function useHubVisible(ref) {
 export default function DMHub({ onClose, onOpenChat, onFriendsChanged, initialTab = 'messaggi' }) {
   const [tab, setTab] = useState(initialTab); // 'messaggi' | 'archiviati' | 'contatti'
   const [conversations, setConversations] = useState(null);
-  const [profilePreview, setProfilePreview] = useState(null);
   const frameRef = useRef(null);
   const hubVisible = useHubVisible(frameRef);
 
@@ -173,7 +173,7 @@ export default function DMHub({ onClose, onOpenChat, onFriendsChanged, initialTa
                 conv={c}
                 onOpen={onOpenChat}
                 onArchiveToggle={toggleArchive}
-                onOpenProfile={setProfilePreview}
+                onOpenProfile={(contact) => contact?.id && openProfileFromMention(contact.id)}
               />
             ))}
           </ul>
@@ -185,7 +185,6 @@ export default function DMHub({ onClose, onOpenChat, onFriendsChanged, initialTa
       </div>
       </div>
 
-      {profilePreview && <ContactProfileModal contact={profilePreview} onClose={() => setProfilePreview(null)} />}
     </ModalOverlay>
   );
 }

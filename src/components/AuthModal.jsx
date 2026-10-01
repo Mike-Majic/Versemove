@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { registerAccount, loginAccount, resendConfirmationEmail, isNicknameTaken } from '../data/accounts';
+import { registerAccount, loginAccount, resendConfirmationEmail, isNicknameTaken, resetAccountPassword } from '../data/accounts';
+import { markProfileOnboarding } from '../data/profileOnboarding';
 import { setRememberMe } from '../data/supabaseClient';
 import { computeAge } from '../data/age';
 import { WORLDS } from '../data/worlds';
@@ -172,6 +173,25 @@ export default function AuthModal({ open, onClose, onLogin }) {
     finishAuth(account);
   };
 
+  // "Password dimenticata?": mail con il link di Supabase Auth; al ritorno
+  // App.jsx riceve PASSWORD_RECOVERY e apre PasswordRecoveryModal. Il
+  // messaggio è lo stesso che la mail esista o no (niente elenco degli
+  // account registrati).
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    const mail = loginEmail.trim();
+    if (!mail) return;
+    setBusy(true);
+    setError('');
+    const { error: err } = await resetAccountPassword(mail);
+    setBusy(false);
+    if (err && /rate|limit|seconds/i.test(err)) {
+      setError(err);
+      return;
+    }
+    setInfo(t('auth.fields.forgotSent'));
+  };
+
   const resendConfirmation = async () => {
     setBusy(true);
     const { error: err } = await resendConfirmationEmail(pendingConfirmEmail);
@@ -286,6 +306,9 @@ export default function AuthModal({ open, onClose, onLogin }) {
       setError(err);
       return;
     }
+    // Al primo accesso con questo account: "Completa il tuo profilo"
+    // (Profilo Social obbligatorio, gli altri facoltativi), vedi App.jsx.
+    markProfileOnboarding(email);
     if (needsEmailConfirmation) {
       setInfo(t('auth.info.accountCreated'));
       setPendingConfirmEmail(email);
@@ -310,10 +333,10 @@ export default function AuthModal({ open, onClose, onLogin }) {
       <form
         className="rb-auth-card"
         onClick={(e) => e.stopPropagation()}
-        onSubmit={mode === 'login' ? submitLogin : submitRegister}
+        onSubmit={mode === 'login' ? submitLogin : mode === 'forgot' ? submitForgot : submitRegister}
       >
         <button type="button" className="rb-close-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
-        <h2>{mode === 'login' ? t('auth.title.login') : t('auth.title.register')}</h2>
+        <h2>{mode === 'login' ? t('auth.title.login') : mode === 'forgot' ? t('auth.fields.forgotTitle') : t('auth.title.register')}</h2>
 
         <div className="rb-auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => switchMode('login')}>
@@ -324,7 +347,27 @@ export default function AuthModal({ open, onClose, onLogin }) {
           </button>
         </div>
 
-        {mode === 'login' ? (
+        {mode === 'forgot' ? (
+          <>
+            <p className="rb-auth-info rb-auth-forgot-hint">{t('auth.fields.forgotHint')}</p>
+            <label className="rb-field">
+              <span>{t('auth.fields.mail')}</span>
+              <input
+                type="email"
+                name="email"
+                id="forgot-email"
+                autoFocus
+                autoComplete="email"
+                required
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+              />
+            </label>
+            <button type="button" className="rb-auth-link-btn" onClick={() => switchMode('login')}>
+              ← {t('auth.fields.backToLogin')}
+            </button>
+          </>
+        ) : mode === 'login' ? (
           <>
             <label className="rb-field">
               <span>{t('auth.fields.mail')}</span>
@@ -364,6 +407,9 @@ export default function AuthModal({ open, onClose, onLogin }) {
               <input type="checkbox" checked={rememberChecked} onChange={(e) => setRememberChecked(e.target.checked)} />
               <span>{t('auth.fields.rememberMe')}</span>
             </label>
+            <button type="button" className="rb-auth-link-btn" onClick={() => switchMode('forgot')}>
+              {t('auth.fields.forgotLink')}
+            </button>
           </>
         ) : (
           <>
@@ -664,7 +710,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
           className="rb-btn-primary rb-auth-submit"
           disabled={busy || (mode === 'register' && !nicknameValid)}
         >
-          {busy ? t('auth.submit.oneMoment') : mode === 'login' ? t('auth.submit.login') : t('auth.submit.register')}
+          {busy ? t('auth.submit.oneMoment') : mode === 'login' ? t('auth.submit.login') : mode === 'forgot' ? t('auth.fields.forgotSubmit') : t('auth.submit.register')}
         </button>
       </form>
 

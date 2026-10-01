@@ -64,7 +64,7 @@ export default function AnimaliWorldExplorer({
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
-                placeholder="Cerca (es. cani)..."
+                placeholder="Cerca (es. 4 zampe)..."
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);

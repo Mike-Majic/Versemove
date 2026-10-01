@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { getContentUrl, translateUploadError } from './contents';
+import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // Album fotografici stile Facebook: photo_albums raggruppa righe già
 // esistenti in "contents" (stesso storage/like/RLS del resto dell'app,
@@ -65,8 +67,11 @@ export async function addPhotoToAlbum({ file, albumId, caption = '' }) {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
+    const prepared = await prepareUpload(file);
+    if (prepared.error) return { error: prepared.error };
+    const upload = prepared.file;
+    const path = `${auth.user.id}/${Date.now()}-${safeFileName(upload.name)}`;
+    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
     if (uploadError) return { error: translateUploadError(uploadError) };
 
     const { data: content, error: contentError } = await supabase

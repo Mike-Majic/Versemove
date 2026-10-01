@@ -1,0 +1,76 @@
+/* Avviso di videochiamata in arrivo (IncomingCallToast): in alto al
+   centro, sopra pannelli e mondi, dentro lo schermo anche a 360 px. */
+.rb-incall-toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(380px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: #131318;
+  border: 1px solid #22c55e;
+  color: #f5f5f7;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  animation: rb-incall-in 0.25s ease, rb-incall-pulse 1.6s ease-in-out infinite;
+}
+.rb-incall-toast img,
+.rb-incall-avatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 20px;
+}
+.rb-incall-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+.rb-incall-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.rb-incall-text span {
+  opacity: 0.75;
+}
+.rb-incall-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #fff;
+}
+.rb-incall-decline {
+  background: #ef4444;
+}
+.rb-incall-accept {
+  background: #22c55e;
+}
+@keyframes rb-incall-in {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes rb-incall-pulse {
+  0%, 100% { box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(34, 197, 94, 0.45); }
+  50% { box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 0 0 8px rgba(34, 197, 94, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-incall-toast { animation: none; }
+}

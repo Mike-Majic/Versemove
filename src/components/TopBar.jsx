@@ -1,8 +1,11 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './shared/Icon';
 import { isStaff } from '../data/roles';
 import { translateWorld } from '../i18n/worldLabels';
+import WorldStats from './WorldStats';
 import './TopBar.css';
+import AvatarImg from './shared/AvatarImg';
 
 export default function TopBar({
   world,
@@ -14,9 +17,23 @@ export default function TopBar({
   onOpenProfile,
   onOpenFriends,
   onOpenNotifications,
+  onOpenFavorites,
   unreadMessagesCount = 0,
   unreadNotifCount = 0,
 }) {
+  // Larghezza delle icone a destra (campanella, chat, ...) come variabile
+  // CSS: la barra "Cerca" delle categorie (categoryExplorerShell.css) si
+  // mette subito alla loro sinistra, qualunque sia il numero di icone.
+  const actionsRef = useRef(null);
+  useEffect(() => {
+    const el = actionsRef.current;
+    if (!el) return undefined;
+    const set = () => document.documentElement.style.setProperty('--rb-topbar-actions-w', `${Math.round(el.getBoundingClientRect().width)}px`);
+    set();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(set) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, []);
   const { t } = useTranslation();
   return (
     <header className="rb-topbar" style={{ '--accent': world.color }}>
@@ -26,11 +43,15 @@ export default function TopBar({
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
         <span className="rb-world-pill">{translateWorld(t, world).label}</span>
+        <WorldStats world={world} />
       </div>
 
-      <div className="rb-topbar-actions">
+      <div className="rb-topbar-actions" ref={actionsRef}>
         {user ? (
           <div className="rb-user-chip">
+            <button className="rb-iconbtn lg" onClick={onOpenFavorites} aria-label="Preferiti" title="Preferiti">
+              <Icon name="star" size={20} />
+            </button>
             <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenNotifications} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
               <Icon name="bell" size={20} />
               {unreadNotifCount > 0 && (
@@ -49,7 +70,7 @@ export default function TopBar({
               </button>
             )}
             <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title={t('topbar.myProfile')}>
-              <img src={user.avatar} alt={user.name} onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+              <AvatarImg src={user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.name} />
               <span>{user.name}</span>
               {user.verificato && <span className="rb-verified-badge" title={t('topbar.verified')}>✓</span>}
             </button>

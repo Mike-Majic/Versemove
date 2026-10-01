@@ -5,6 +5,8 @@
 // destra a sinistra grazie all'algoritmo bidi del browser.
 export default {
   common: {
+    publishedAt: 'نُشر في {{date}} الساعة {{time}}',
+    publishedAgo: 'نُشر {{ago}}',
     close: 'إغلاق',
     save: 'حفظ',
     cancel: 'إلغاء',
@@ -16,6 +18,8 @@ export default {
     nextCategoriesPage: 'المزيد من الفئات',
     scrollWorldsUp: 'تمرير العوالم للأعلى',
     scrollWorldsDown: 'تمرير العوالم للأسفل',
+    updateAvailable: 'يتوفر إصدار جديد، أعد التحميل.',
+    reload: 'إعادة التحميل',
   },
   topbar: {
     notifications: 'الإشعارات',
@@ -62,6 +66,12 @@ export default {
       mail: 'البريد الإلكتروني',
       password: 'كلمة المرور',
       rememberMe: 'تذكرني على هذا الجهاز',
+      forgotLink: 'نسيت كلمة المرور؟',
+      forgotTitle: 'استعادة كلمة المرور',
+      forgotHint: 'اكتب بريد الحساب: سنرسل لك رابطًا لاختيار كلمة مرور جديدة.',
+      forgotSubmit: 'إرسال الرابط',
+      forgotSent: 'إذا كان البريد مسجلًا فسيصلك الرابط قريبًا. تحقق أيضًا من البريد العشوائي.',
+      backToLogin: 'العودة إلى تسجيل الدخول',
       username: 'اسم المستخدم',
       nickname: 'الاسم المستعار',
       nicknameChecking: 'جارٍ التحقق من التوفر…',
@@ -180,7 +190,7 @@ export default {
       age: 'العمر',
     },
     language: {
-      title: 'اللغة',
+      title: 'لغة النظام',
       hint: 'غيّر لغة الواجهة في أي وقت.',
       saved: 'تم تغيير اللغة وحفظها في حسابك.',
     },

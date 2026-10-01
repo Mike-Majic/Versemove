@@ -9,11 +9,16 @@ import TopBar from './components/TopBar';
 import DisabledWorldPopover from './components/DisabledWorldPopover';
 import WorldSelectorColumn from './components/WorldSelectorColumn';
 import { WORLDS, DEFAULT_WORLD_INDEX } from './data/worlds';
+import { fetchVideoRoom, setPendingRoomFocus, roomCategoryTarget } from './data/videoRooms';
 import { fetchLfg } from './data/gaming';
+import { getListing } from './data/annunci';
+import { clearDeepLinkHash, parseDeepLink, profileIdByNickname } from './data/deepLinks';
 import { usersForWorld } from './data/mockUsers';
+import { fetchGlobeUsers } from './data/globeUsers';
 import { useSwipeWorld } from './hooks/useSwipeWorld';
 import { useBackLayer, useBackNavigationRoot } from './hooks/useBackLayer';
-import { getCityInfo, findCityMatch } from './data/geo';
+import { findCityMatch } from './data/geo';
+import { getVistaPreferenze, locationFiltersFrom, EMPTY_LOCATION_FILTERS, VISTA_SAVED_EVENT } from './data/vista';
 import {
   ARTE_CATEGORIES,
   FEATURED_SEARCHES as ARTE_FEATURED,
@@ -29,19 +34,23 @@ import {
 import { BAMBINI_CATEGORIES, resolveCategoryQuery as resolveBambiniCategoryQuery } from './games/registry';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQuery } from './data/incontriCategories';
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
-import { LAVORO_CATEGORIES, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
+import { getLavoroCategories, canSearchCandidates, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
 import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
 import { ANIMALI_CATEGORIES, resolveCategoryQuery as resolveAnimaliCategoryQuery } from './data/animaliCategories';
 import AccessGate from './components/AccessGate';
 import CookieConsentBanner from './components/CookieConsentBanner';
+import UpdateToast from './components/UpdateToast';
 import { hasLavoroConsent } from './data/lavoro';
 import { isAdult } from './data/age';
+import { needsProfileOnboarding, clearProfileOnboarding } from './data/profileOnboarding';
+import { getMyDatingProfile, segnaAvvisoIncontri } from './data/incontri';
+import { incontriNoticeText } from './data/datingLabels';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
-import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice } from './data/accounts';
+import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice, accountPause, reactivateOwnAccount } from './data/accounts';
 import {
   getFriends,
   getSentRequests,
@@ -58,6 +67,8 @@ import { supabase } from './data/supabaseClient';
 import PageLoading from './components/PageLoading';
 import { useGlobeCover } from './fx/globeCover';
 import './App.css';
+import { CallProvider } from './calls/CallProvider';
+import AvatarImg from './components/shared/AvatarImg';
 
 // Componenti pesanti o aperti solo su richiesta, caricati al bisogno invece
 // che nel bundle iniziale (React.lazy + Suspense, vedi fallback PageLoading
@@ -81,15 +92,16 @@ const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
 const EventLikersModal = lazyWithRetry(() => import('./components/EventLikersModal'));
 const ReactorsModal = lazyWithRetry(() => import('./components/cultural/ReactorsModal'));
 const FriendChatModal = lazyWithRetry(() => import('./components/FriendChatModal'));
+const IncomingCallToast = lazyWithRetry(() => import('./components/IncomingCallToast'));
 const MentionProfileViewer = lazyWithRetry(() => import('./components/shared/MentionProfileViewer'));
+const DatingCardModal = lazyWithRetry(() => import('./components/incontri/DatingCardModal'));
 const DMHub = lazyWithRetry(() => import('./components/DMHub'));
 const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
 const ProfileSettingsPanel = lazyWithRetry(() => import('./components/ProfileSettingsPanel'));
 const PasswordRecoveryModal = lazyWithRetry(() => import('./components/PasswordRecoveryModal'));
 const NotificationsPanel = lazyWithRetry(() => import('./components/NotificationsPanel'));
+const FavoritesPanel = lazyWithRetry(() => import('./components/FavoritesPanel'));
 
-const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
-const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
 const DEFAULT_ARTE_FILTER = { category: '', subfamily: '' };
 const DEFAULT_VISIBILITY = { nearbyVisible: false, shareLiveLocation: false };
 
@@ -110,8 +122,10 @@ const CATEGORY_WORLDS = {
   incontri: { categories: INCONTRI_CATEGORIES, resolveQuery: resolveIncontriCategoryQuery },
   // Social: solo "World", apre il feed esistente invece di CategoryColumn.
   social: { categories: SOCIAL_CATEGORIES, resolveQuery: resolveSocialCategoryQuery },
-  // Lavoro: solo "Live" per ora, apre il pannello delle dirette invece di CategoryColumn.
-  lavoro: { categories: LAVORO_CATEGORIES, resolveQuery: resolveLavoroCategoryQuery },
+  // Lavoro: "Stanza conferenze" per tutti; "Cerca candidati" solo per le
+  // aziende verificate, aggiunta sotto con getLavoroCategories(...) come la
+  // Stanza MOD del mondo FAQ.
+  lavoro: { categories: getLavoroCategories(false), resolveQuery: resolveLavoroCategoryQuery },
   // Vetrina: solo "Novità" per ora, nessun contenuto editoriale ancora —
   // CategoryColumn mostra da sé lo stato vuoto con featured/results vuoti.
   vetrina: { categories: VETRINA_CATEGORIES, featured: {}, results: {}, resolveQuery: resolveVetrinaCategoryQuery },
@@ -187,11 +201,16 @@ export default function App() {
   // ricalcola la lista categorie in base al ruolo, così il triangolo/nuvola
   // sul globo e la lista sotto al mondo non la mostrano mai a chi non deve
   // vederla (vedi anche FaqWorldExplorer, che rifà lo stesso filtro per sé).
+  // Stesso filtro per "Cerca candidati" del mondo Lavoro (solo aziende
+  // verificate e owner, vedi canSearchCandidates).
+  const canRecruit = canSearchCandidates(user);
   const categorySet = useMemo(() => {
-    if (!baseCategorySet || world.id !== 'faq') return baseCategorySet;
-    return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
+    if (!baseCategorySet) return baseCategorySet;
+    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
+    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit) };
+    return baseCategorySet;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseCategorySet, world.id, user?.ruolo]);
+  }, [baseCategorySet, world.id, user?.ruolo, canRecruit]);
   // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
   // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
   // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
@@ -224,7 +243,9 @@ export default function App() {
   // Conferma dopo l'eliminazione definitiva dell'account (Impostazioni ->
   // Elimina account): a quel punto user è già null e tutti i pannelli si
   // sono chiusi, serve solo un avviso temporaneo.
-  const [accountDeletedNotice, setAccountDeletedNotice] = useState(false);
+  const [accountDeletedNotice, setAccountDeletedNotice] = useState('');
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [pauseError, setPauseError] = useState('');
   // Modale "Scegli una nuova password", apre solo sull'evento
   // PASSWORD_RECOVERY di Supabase Auth (link "Password dimenticata?"
   // cliccato dalla mail) — mai su richiesta diretta dell'utente.
@@ -262,8 +283,12 @@ export default function App() {
   const [disabledWorldPopover, setDisabledWorldPopover] = useState(null);
   const closeDisabledWorldPopover = useCallback(() => setDisabledWorldPopover(null), []);
 
-  const [filters, setFilters] = useState(() => loadStored('rb-filters', DEFAULT_FILTERS));
-  const [locationFilters, setLocationFilters] = useState(() => loadStored('rb-location-filters', DEFAULT_LOCATION_FILTERS));
+  // "Chi vedo" del Profilo Social e del Profilo di Lavoro (data/vista.js),
+  // salvato sul server: sostituisce i vecchi filtri Luogo/Mostrami delle
+  // Impostazioni. globe_users applica già zona, distanza ed età; qui serve
+  // solo il "centro" per eventi, annunci e simili (locationFilters).
+  const [vista, setVista] = useState(null);
+  const [globeUsersVersion, setGlobeUsersVersion] = useState(0);
   const [activeArteCategory, setActiveArteCategory] = useState(null);
   // Vero solo quando il pannello categoria appena aperto arriva da un volo
   // di camera completo (vedi flyToCategoryThenOpen): governa il morph
@@ -321,24 +346,91 @@ export default function App() {
   // reactors } quando aperto, null quando chiuso (vedi ReactorsModal).
   const [culturalReactorsView, setCulturalReactorsView] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
+  // Chat aperta da "Rispondi" su una chiamata in arrivo: la chiamata si
+  // accetta da sola (vedi IncomingCallToast / CallModal autoAnswer).
+  const [answerCallFrom, setAnswerCallFrom] = useState(null);
+  useEffect(() => {
+    if (!answerCallFrom) return undefined;
+    const t = setTimeout(() => setAnswerCallFrom(null), 35000);
+    return () => clearTimeout(t);
+  }, [answerCallFrom]);
   // Notifiche (match/super like): il numero non letto sulla campanella, il
   // pannello, il toast quando ne arriva una nuova in tempo reale, e su
   // quale scheda di Incontri deve aprirsi cliccandola.
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Pannello delle categorie preferite (stellina nella barra in alto).
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifToast, setNotifToast] = useState(null);
   // Post da mostrare nel feed Social (clic su una notifica di menzione).
   const [focusPost, setFocusPost] = useState(null);
+  // Evento cliccato sul globo: si apre il feed Social sulla scheda Eventi,
+  // con l'evento in vista (vedi SocialFeed focusEvent).
+  const [focusEvent, setFocusEvent] = useState(null);
   // Profilo aperto cliccando una "@menzione" fuori dal feed Social.
   const [mentionProfileId, setMentionProfileId] = useState(null);
+  // Mondo Incontri: cliccando un contatto si apre SOLO la scheda del
+  // Profilo Incontri (DatingCardModal), mai il profilo Social.
+  const [datingCardId, setDatingCardId] = useState(null);
+  const worldIdRef = useRef(world.id);
+  useEffect(() => {
+    worldIdRef.current = world.id;
+  }, [world.id]);
+  const openProfileInWorld = (id) => {
+    if (!id) return;
+    if (worldIdRef.current === 'incontri') setDatingCardId(id);
+    else setMentionProfileId(id);
+  };
   // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
   const [gamingFocus, setGamingFocus] = useState(null);
   // Annuncio "Cerco gruppo" Cosplay da evidenziare (notifiche lfg_* con
-  // riferimento cosplay_lfg): { lfgId, seq }.
+  // riferimento cosplay_lfg): { lfgId, seq }, oppure evento Cosplay da un
+  // link condiviso: { eventId, seq }.
   const [cosplayFocus, setCosplayFocus] = useState(null);
+  // Annuncio aperto da un link condiviso: { listing, seq }.
+  const [annunciFocus, setAnnunciFocus] = useState(null);
+  // Link condiviso (#/social/post/<id>, #/u/<nickname>, #/annunci/<id>,
+  // #/nerd/cosplay/evento/<id>, vedi data/deepLinks.js) in attesa di
+  // sessione: si apre appena l'accesso è pronto.
+  const [pendingLink, setPendingLink] = useState(() => parseDeepLink());
+  // Avviso breve quando il contenuto di un link non c'è più.
+  const [linkNotice, setLinkNotice] = useState('');
+  useEffect(() => {
+    if (!linkNotice) return undefined;
+    const t = setTimeout(() => setLinkNotice(''), 4000);
+    return () => clearTimeout(t);
+  }, [linkNotice]);
   const [incontriInitialTab, setIncontriInitialTab] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  // 'incontri' = Il mio profilo aperto sul Profilo Incontri (avviso del mondo rosso).
+  const [profileSettingsSection, setProfileSettingsSection] = useState(null);
+  // "Completa il tuo profilo" dopo la registrazione (vedi profileOnboarding.js).
+  const [profileOnboardingOpen, setProfileOnboardingOpen] = useState(false);
+  // Mondo rosso: avviso finché il Profilo Incontri non è visibile.
+  // Avviso "completa il Profilo Incontri": lo decide il server
+  // (get_my_dating_profile.avviso, già spento per 14 giorni dopo che è stato
+  // mostrato). { avviso, mancano } finché non si chiude.
+  const [incontriNotice, setIncontriNotice] = useState(null);
+  const [incontriCheck, setIncontriCheck] = useState(0);
+  // Dopo "Completa il tuo profilo": l'avviso vale anche fuori dal mondo rosso.
+  const [incontriNoticeAfterOnboarding, setIncontriNoticeAfterOnboarding] = useState(false);
+  useEffect(() => {
+    if (user && needsProfileOnboarding(user)) setProfileOnboardingOpen(true);
+  }, [user?.id]);
+  const incontriEnabled = Boolean(user) && (user.mondiAbilitati ?? []).includes('incontri') && isAdult(user.dataNascita);
+  useEffect(() => {
+    const wanted = (world.id === 'incontri' || incontriNoticeAfterOnboarding) && incontriEnabled && !profileOnboardingOpen && !profileSettingsOpen;
+    if (!wanted || incontriNotice) return undefined;
+    let cancelled = false;
+    getMyDatingProfile().then((r) => {
+      if (!cancelled && r.profile?.avviso) setIncontriNotice({ avviso: r.profile.avviso, mancano: r.profile.mancano, foto: r.profile.foto.length });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id, incontriEnabled, user?.id, incontriCheck, profileOnboardingOpen, profileSettingsOpen, incontriNoticeAfterOnboarding]);
   // Categorie preferite (stellina accanto alla X di ogni pannello categoria,
   // vedi FavoriteStarButton): caricate una volta per sessione, aggiornate
   // subito quando l'utente ne aggiunge/togliene una.
@@ -496,14 +588,42 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [accountDeletedNotice]);
 
-  useEffect(() => localStorage.setItem('rb-filters', JSON.stringify(filters)), [filters]);
+  // Vecchi filtri locali (Luogo/Mostrami), sostituiti da "Chi vedo".
   useEffect(() => {
     try {
-      localStorage.setItem('rb-location-filters', JSON.stringify(locationFilters));
+      localStorage.removeItem('rb-filters');
+      localStorage.removeItem('rb-location-filters');
     } catch {
-      // localStorage pieno o bloccato: il filtro resta in memoria.
+      // storage non disponibile: niente da togliere
     }
-  }, [locationFilters]);
+  }, []);
+  useEffect(() => {
+    if (!user) {
+      setVista(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const load = () =>
+      getVistaPreferenze().then((v) => {
+        if (!cancelled) setVista(v);
+      });
+    load();
+    const onSaved = () => {
+      load();
+      setGlobeUsersVersion((n) => n + 1);
+    };
+    window.addEventListener(VISTA_SAVED_EVENT, onSaved);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(VISTA_SAVED_EVENT, onSaved);
+    };
+  }, [user?.id]);
+  // Mondo Lavoro -> preferenze lavoro; tutti gli altri -> social (Incontri
+  // ha le sue, vedi Profilo Incontri). Stessa forma dei vecchi filtri.
+  const locationFilters = useMemo(
+    () => (vista ? locationFiltersFrom(world.id === 'lavoro' ? vista.lavoro : vista.social) : EMPTY_LOCATION_FILTERS),
+    [vista, world.id]
+  );
   useEffect(() => localStorage.setItem('rb-arte-filter', JSON.stringify(arteFilter)), [arteFilter]);
   useEffect(() => localStorage.setItem('rb-visibility', JSON.stringify(visibility)), [visibility]);
   useEffect(() => {
@@ -723,23 +843,30 @@ export default function App() {
     return {};
   };
 
-  const worldUsers = useMemo(() => {
-    const base = usersForWorld(world.id);
-
-    const matchesLocation = (u) => {
-      if (locationFilters.city && !u.city.toLowerCase().includes(locationFilters.city.toLowerCase())) return false;
-      const info = getCityInfo(u.city);
-      if (locationFilters.continent && info?.continent !== locationFilters.continent) return false;
-      if (locationFilters.region && info?.region !== locationFilters.region) return false;
-      return true;
-    };
-
-    return base.filter((u) => {
-      if (filters.gender !== 'Tutti' && u.gender !== filters.gender.toLowerCase()) return false;
-      if (u.age && (u.age < filters.ageMin || u.age > filters.ageMax)) return false;
-      return matchesLocation(u);
+  // Utenti veri del mondo attivo sul globo (vedi data/globeUsers.js): si
+  // ricaricano a ogni cambio di mondo o di account.
+  const [dbWorldUsers, setDbWorldUsers] = useState({ worldId: null, users: [] });
+  useEffect(() => {
+    if (!user) {
+      setDbWorldUsers({ worldId: null, users: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    const worldId = world.id;
+    fetchGlobeUsers(worldId).then((users) => {
+      if (!cancelled) setDbWorldUsers({ worldId, users });
     });
-  }, [world.id, filters, locationFilters]);
+    return () => {
+      cancelled = true;
+    };
+  }, [world.id, user?.id, globeUsersVersion]);
+
+  // Nessun filtro qui: zona, distanza ed età le applica già globe_users sul
+  // server ("Chi vedo" del Profilo Social/Lavoro, Profilo Incontri).
+  const worldUsers = useMemo(() => {
+    const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
+    return [...usersForWorld(world.id), ...fromDb];
+  }, [world.id, dbWorldUsers]);
 
   // Il proprio marker (quando si condivide la posizione in tempo reale) si
   // aggiunge SOPRA ai risultati già filtrati, non dentro: i propri filtri
@@ -751,6 +878,9 @@ export default function App() {
   const globeUsers = useMemo(() => {
     if (!user || !visibility.shareLiveLocation || !ownPosition) return worldUsers;
     if (!(user.mondiAbilitati ?? []).includes(world.id)) return worldUsers;
+    // Con la posizione in tempo reale il proprio marker "di città" sparisce:
+    // resta solo quello live.
+    const others = worldUsers.filter((u) => u.id !== user.id);
     const ownMarker = {
       id: 'me-live',
       name: user.nickname ?? user.name ?? 'Io',
@@ -761,13 +891,22 @@ export default function App() {
       lng: ownPosition.lng,
       isLive: true,
     };
-    return [...worldUsers, ownMarker];
+    return [...others, ownMarker];
   }, [worldUsers, user, visibility.shareLiveLocation, ownPosition]);
 
   // Quando la città cercata nei filtri (globali, validi per tutti i mondi) corrisponde
   // a una città nota, il globo ci "vola" sopra.
+  // Solo quando l'utente CAMBIA la città: il valore salvato in localStorage
+  // non deve far volare la camera all'avvio (la vista iniziale è sempre la
+  // panoramica di tutti i mondi, vedi WorldGlobe startupPointOfView).
   const debouncedCityQuery = useDebouncedValue(locationFilters.city, 500);
+  // (Confronto col valore iniziale, non un "primo giro": in sviluppo
+  // StrictMode esegue gli effect due volte.)
+  const startupCityRef = useRef(locationFilters.city);
+  const cityChangedRef = useRef(false);
   useEffect(() => {
+    if (debouncedCityQuery !== startupCityRef.current) cityChangedRef.current = true;
+    if (!cityChangedRef.current) return;
     const match = findCityMatch(debouncedCityQuery);
     if (match) setFlyTo({ lat: match.lat, lng: match.lng, key: `city-${match.name}` });
   }, [debouncedCityQuery]);
@@ -794,7 +933,9 @@ export default function App() {
     if (pendingOpenRef.current) clearTimeout(pendingOpenRef.current);
     cancelCategoryClosing();
     setActiveArteCategory(null);
-    setFlyTo({ lat: pos.lat, lng: pos.lng, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
+    // categoryId: WorldGlobe usa la posizione ATTUALE della stella (il globo
+    // ruota), lat/lng restano solo come ripiego.
+    setFlyTo({ lat: pos.lat, lng: pos.lng, categoryId: id, altitude: 1.3, key: `cat-${id}-${Date.now()}` });
     pendingOpenRef.current = setTimeout(() => {
       setActiveArteCategory(id);
       // Il volo finisce sempre con la camera centrata sulla categoria: la
@@ -834,7 +975,8 @@ export default function App() {
   const navigateToCategory = (worldId, categoryId, initialSubfamily = '') => {
     const targetIndex = WORLDS.findIndex((w) => w.id === worldId);
     if (targetIndex === -1) return;
-    const cat = CATEGORY_WORLDS[worldId]?.categories.find((c) => c.id === categoryId);
+    const worldCategories = worldId === 'lavoro' ? getLavoroCategories(canRecruit) : CATEGORY_WORLDS[worldId]?.categories;
+    const cat = worldCategories?.find((c) => c.id === categoryId);
     if (!cat) return;
     const sameWorld = targetIndex === index;
 
@@ -867,7 +1009,7 @@ export default function App() {
   // Clic su una "@menzione" (MentionText): profilo della persona.
   useEffect(() => {
     const onOpenProfile = (e) => {
-      if (e.detail?.id) setMentionProfileId(e.detail.id);
+      openProfileInWorld(e.detail?.id);
     };
     // "Rispondi" a un messaggio della casella dello staff (Stanza MOD):
     // chat diretta con chi l'ha scritto.
@@ -877,6 +1019,13 @@ export default function App() {
     window.addEventListener('vm:open-profile', onOpenProfile);
     window.addEventListener('vm:open-chat', onOpenChat);
     const onOpenSettings = (e) => {
+      // "Luogo" non è più nelle Impostazioni: zona e distanza stanno in
+      // "Chi vedo" del Profilo Social (Il mio profilo).
+      if (e.detail?.section === 'luogo') {
+        setProfileSettingsSection('social');
+        setProfileSettingsOpen(true);
+        return;
+      }
       setSettingsInitialSection(e.detail?.section ?? null);
       setSettingsOpen(true);
     };
@@ -887,6 +1036,55 @@ export default function App() {
       window.removeEventListener('vm:open-settings', onOpenSettings);
     };
   }, []);
+
+  // Link condiviso incollato con l'app già aperta: stesso percorso di quello
+  // letto all'avvio.
+  useEffect(() => {
+    const onHash = () => {
+      const link = parseDeepLink();
+      if (link) setPendingLink(link);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // Tutti i mondi tranne FAQ chiedono l'accesso: senza sessione il link
+  // resta in attesa e si apre il modulo di accesso; dopo il login si apre.
+  useEffect(() => {
+    if (!pendingLink || !authReady) return;
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    const link = pendingLink;
+    setPendingLink(null);
+    clearDeepLinkHash();
+    openDeepLink(link);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLink, authReady, user?.id]);
+
+  const openDeepLink = async (link) => {
+    const seq = Date.now();
+    if (link.type === 'post') {
+      setFocusPost({ postId: link.id, seq });
+      navigateToCategory('social', 'world');
+    } else if (link.type === 'profile') {
+      const id = await profileIdByNickname(link.nickname);
+      if (id) setMentionProfileId(id);
+      else setLinkNotice(`Nessun profilo "${link.nickname}".`);
+    } else if (link.type === 'listing') {
+      const listing = await getListing(link.id);
+      if (!listing) {
+        setLinkNotice('Questo annuncio non esiste più o non è visibile.');
+        return;
+      }
+      setAnnunciFocus({ listing, seq });
+      navigateToCategory('annunci', listing.categoria);
+    } else if (link.type === 'cosplayEvent') {
+      setCosplayFocus({ eventId: link.id, seq });
+      navigateToCategory('nerd', 'cosplay');
+    }
+  };
 
   // n: la notifica (oggetto), o solo il tipo per le chiamate vecchie.
   const openNotificationTarget = (n) => {
@@ -923,6 +1121,20 @@ export default function App() {
       fetchLfg(lfgId).then((lfg) => {
         setGamingFocus(lfgId ? { lfgId, seq: Date.now() } : null);
         navigateToCategory('nerd', lfg?.categoria ?? 'gaming-pc');
+      });
+      return;
+    }
+    if (tipo === 'posto_libero') {
+      // Stanza video piena che si è liberata: la sua categoria, con la
+      // stanza in evidenza nell'elenco (vedi VideoRoomsColumn).
+      fetchVideoRoom(notif.riferimentoId).then((room) => {
+        const target = room && !room.endedAt ? roomCategoryTarget(room.mondo, room.categoria) : null;
+        if (!target) {
+          setNotifToast(null);
+          return;
+        }
+        setPendingRoomFocus(room.id);
+        navigateToCategory(target.world, target.category);
       });
       return;
     }
@@ -1016,7 +1228,10 @@ export default function App() {
   // Priorità dei gate sul mondo corrente: prima serve un account, poi (solo
   // su Incontri/Lavoro) serve essere maggiorenni, solo dopo conta se
   // l'utente ha scelto di disattivare questo mondo dalle Impostazioni.
-  const needsAuthForWorld = !user;
+  // Il mondo FAQ (Informazioni, Termini e Privacy, Segnalazioni) si apre
+  // anche senza account: è il posto dove chi non è registrato capisce cos'è
+  // Versemove e legge l'informativa (il banner dei cookie rimanda lì).
+  const needsAuthForWorld = !user && world.id !== 'faq';
   const ageBlockedForWorld = isAgeGatedWorld && !needsAuthForWorld && !isAdult(user?.dataNascita);
   // FAQ resta sempre attivo (è il posto dove si chiede aiuto): non lo si
   // può disattivare dalle Impostazioni -> Mondi, mai bloccato qui. Work in
@@ -1027,7 +1242,93 @@ export default function App() {
     !ageBlockedForWorld &&
     !(user.mondiAbilitati ?? []).includes(world.id);
 
+  // L'avviso Incontri non compare mai sopra una scheda, un pannello o una
+  // finestra aperti: aspetta che siano chiusi. Appena compare davvero si
+  // avvisa il server (segna_avviso_incontri), che non lo ripropone per 14
+  // giorni.
+  const somethingOpen = Boolean(
+    authOpen ||
+      settingsOpen ||
+      profileSettingsOpen ||
+      profileOnboardingOpen ||
+      passwordRecoveryOpen ||
+      adminOpen ||
+      notificationsOpen ||
+      favoritesOpen ||
+      friendsModalOpen ||
+      datingCardId ||
+      mentionProfileId ||
+      selectedUser ||
+      activeFriendChatId ||
+      activeArteCategory ||
+      document.querySelector('.rb-modal-overlay')
+  );
+  const incontriNoticeVisible = Boolean(incontriNotice) && !somethingOpen;
+  const incontriNoticeMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!incontriNoticeVisible || incontriNoticeMarkedRef.current === incontriNotice) return;
+    incontriNoticeMarkedRef.current = incontriNotice;
+    segnaAvvisoIncontri();
+  }, [incontriNoticeVisible, incontriNotice]);
+
+  // Account sospeso o in eliminazione: al posto dell'app una schermata per
+  // riattivarlo (riattiva_account) o uscire. Stesso momento del controllo
+  // del ban (account caricato all'avvio o all'accesso), ma senza
+  // disconnettere.
+  const pause = accountPause(user);
+  if (pause) {
+    const quando = new Date(pause.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    return (
+      <div className="rb-adult-gate-overlay">
+        <div className="rb-adult-gate-card">
+          <h2>{pause.tipo === 'sospeso' ? 'Account sospeso' : 'Account in eliminazione'}</h2>
+          <p>
+            {pause.tipo === 'sospeso'
+              ? `Il tuo account è sospeso fino al ${quando}. Finché è sospeso il tuo profilo non è visibile agli altri.`
+              : `Il tuo account verrà eliminato il ${quando}. Fino ad allora puoi ancora ripensarci.`}
+          </p>
+          {pauseError && <p className="rb-privacy-error">{pauseError}</p>}
+          <div className="rb-adult-gate-actions">
+            <button
+              type="button"
+              className="rb-adult-gate-decline"
+              onClick={async () => {
+                await logoutAccount();
+                setUser(null);
+              }}
+            >
+              Esci
+            </button>
+            <button
+              type="button"
+              className="rb-adult-gate-confirm"
+              disabled={pauseBusy}
+              onClick={async () => {
+                setPauseBusy(true);
+                setPauseError('');
+                const res = await reactivateOwnAccount();
+                if (res.error) {
+                  setPauseError(res.error);
+                  setPauseBusy(false);
+                  return;
+                }
+                const account = await getCurrentAccount();
+                setPauseBusy(false);
+                if (account) setUser(account);
+              }}
+            >
+              {pauseBusy ? 'Un attimo…' : 'Riattiva il mio account'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
+    // Chiamate che restano attive cambiando mondo o pagina (stanze video,
+    // Stanza MOD, 1:1 dalla chat): vedi calls/CallProvider.jsx.
+    <CallProvider user={user}>
     <div className="rb-app" style={{ '--accent': world.color }}>
       <TopBar
         world={world}
@@ -1048,6 +1349,7 @@ export default function App() {
           setFriendsModalOpen(true);
         }}
         onOpenNotifications={() => setNotificationsOpen(true)}
+        onOpenFavorites={() => setFavoritesOpen(true)}
         unreadMessagesCount={totalUnreadMessages}
         unreadNotifCount={unreadNotifCount + receivedRequestsCount + receivedFamilyRequestsCount}
       />
@@ -1061,7 +1363,7 @@ export default function App() {
       )}
 
       {accountDeletedNotice && (
-        <div className="rb-email-confirmed-banner">✅ Account eliminato.</div>
+        <div className="rb-email-confirmed-banner">✅ {accountDeletedNotice}</div>
       )}
 
       {eventActionError && (
@@ -1079,7 +1381,9 @@ export default function App() {
         <WorldGlobe
           world={world}
           users={globeUsers}
-          onSelectUser={setSelectedUser}
+          // Utenti veri: il profilo Social completo (post, Segui...), lo
+          // stesso delle @menzioni; il vecchio ProfileModal resta per gli altri.
+          onSelectUser={(u) => (u?.fromDb ? openProfileInWorld(u.id) : setSelectedUser(u))}
           containerRef={containerRef}
           flyTo={flyTo}
           categories={categorySet?.categories ?? null}
@@ -1087,7 +1391,10 @@ export default function App() {
           onCategorySelect={toggleArteCategory}
           onCategoryPositionsReady={setArteCategoryPositions}
           events={world.id === 'social' ? visibleEvents : []}
-          onSelectEvent={(eventId) => setEventLikersId(eventId)}
+          onSelectEvent={(eventId) => {
+            setFocusEvent({ eventId, seq: Date.now() });
+            navigateToCategory('social', 'world');
+          }}
           warpRequest={warpRequest}
           disabledWorlds={globeDisabledWorlds}
           onDisabledWorldClick={user ? setDisabledWorldPopover : undefined}
@@ -1148,11 +1455,16 @@ export default function App() {
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
+            onOpenProfile={(id) => setDatingCardId(id)}
+            onOpenMyDatingProfile={() => {
+              setProfileSettingsSection('incontri');
+              setProfileSettingsOpen(true);
+            }}
+            myDatingProfileVersion={incontriCheck}
             initialMatchTab={incontriInitialTab}
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
-            matchFilters={{ citta: locationFilters.city, etaMin: filters.ageMin, etaMax: filters.ageMax }}
           />
         </Suspense>
       )}
@@ -1168,6 +1480,7 @@ export default function App() {
             onOpenAuth={() => setAuthOpen(true)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            onNoAccess={() => setLavoroConsentState(false)}
           />
         </Suspense>
       )}
@@ -1182,7 +1495,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {world.id === 'faq' && user && (
+      {world.id === 'faq' && (
         <Suspense fallback={<PageLoading />}>
           <FaqWorldExplorer
             world={world}
@@ -1211,6 +1524,7 @@ export default function App() {
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            focusListing={annunciFocus}
           />
         </Suspense>
       )}
@@ -1254,6 +1568,7 @@ export default function App() {
             onToggleEventLike={toggleEventLike}
             onOpenEventLikers={(eventId) => setEventLikersId(eventId)}
             focusPost={focusPost}
+            focusEvent={focusEvent}
           />
         </Suspense>
       )}
@@ -1309,6 +1624,13 @@ export default function App() {
                     {translateCategoryLabel(t, world.id, c)}
                   </button>
                 ))}
+              {/* Azienda non ancora verificata: al posto di "Cerca candidati"
+                  l'invito a verificarsi (Il mio profilo → Verifica azienda). */}
+              {world.id === 'lavoro' && user?.tipoAccount === 'azienda' && !canRecruit && (
+                <button type="button" className="rb-tagline-cat-btn rb-tagline-cat-btn--invite" onClick={() => setProfileSettingsOpen(true)}>
+                  🔎 Verifica l'azienda per cercare candidati
+                </button>
+              )}
             </div>
           </>
         ) : (
@@ -1338,15 +1660,9 @@ export default function App() {
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
             onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-            filters={filters}
-            setFilters={setFilters}
-            locationFilters={locationFilters}
-            setLocationFilters={setLocationFilters}
             visibility={visibility}
             setVisibility={setVisibility}
             onResetFilters={() => {
-              setFilters(DEFAULT_FILTERS);
-              setLocationFilters(DEFAULT_LOCATION_FILTERS);
               setArteFilter(DEFAULT_ARTE_FILTER);
               setVisibility(DEFAULT_VISIBILITY);
             }}
@@ -1355,7 +1671,7 @@ export default function App() {
               removeFriendApi(id);
               setFriends((prev) => prev.filter((f) => f !== id));
             }}
-            onAccountDeleted={() => {
+            onAccountDeleted={(message) => {
               setUser(null);
               setAuthOpen(false);
               setSettingsOpen(false);
@@ -1365,7 +1681,7 @@ export default function App() {
               setActiveFriendChatId(null);
               setEventLikersId(null);
               setSelectedUser(null);
-              setAccountDeletedNotice(true);
+              setAccountDeletedNotice(message || 'Account eliminato.');
             }}
             onLavoroConsentRevoked={() => {
               setLavoroConsentState(false);
@@ -1385,6 +1701,21 @@ export default function App() {
               setActiveFriendChatId(friendId);
             }}
             onFriendsChanged={refreshFriendsState}
+          />
+        </Suspense>
+      )}
+
+      {favoritesOpen && user && (
+        <Suspense fallback={<PageLoading />}>
+          <FavoritesPanel
+            favorites={favoriteCategories}
+            user={user}
+            onClose={() => setFavoritesOpen(false)}
+            onOpenCategory={(f) => {
+              setFavoritesOpen(false);
+              navigateToCategory(f.worldId, f.categoryId);
+            }}
+            onRemove={(f) => toggleFavoriteCategory(f, true)}
           />
         </Suspense>
       )}
@@ -1415,9 +1746,15 @@ export default function App() {
         </div>
       )}
 
+      {linkNotice && (
+        <div className="rb-notif-toast rb-link-notice" role="status" onClick={() => setLinkNotice('')}>
+          {linkNotice}
+        </div>
+      )}
+
       {notifToast && (
         <button type="button" className="rb-notif-toast" onClick={() => openNotificationTarget(notifToast)}>
-          <img src={notifToast.actor.avatar} alt="" />
+          <AvatarImg src={notifToast.actor.avatar} name={notifToast.actor?.name || notifToast.actor?.nickname} seed={notifToast.actor?.id} alt="" />
           {(() => {
             const { who, text } = describeNotification(notifToast);
             return who ? `${who} ${text}` : text;
@@ -1475,6 +1812,38 @@ export default function App() {
         </Suspense>
       )}
 
+      {activeFriendChatId && (
+        <Suspense fallback={<PageLoading />}>
+          <FriendChatModal
+            friendId={activeFriendChatId}
+            user={user}
+            world={world}
+            onClose={() => {
+              setActiveFriendChatId(null);
+              setAnswerCallFrom(null);
+            }}
+            onMessagesRead={refreshUnread}
+            autoAnswerCall={answerCallFrom === activeFriendChatId}
+          />
+        </Suspense>
+      )}
+
+      {/* Dopo la chat: il profilo aperto dall'avatar di un contatto deve
+          stare sopra la finestra della chat (stesso z-index, vince l'ordine). */}
+      {datingCardId && (
+        <Suspense fallback={<PageLoading />}>
+          <DatingCardModal
+            userId={datingCardId}
+            viewer={user}
+            onClose={() => setDatingCardId(null)}
+            onOpenChat={(id) => {
+              setDatingCardId(null);
+              setActiveFriendChatId(id);
+            }}
+          />
+        </Suspense>
+      )}
+
       {mentionProfileId && (
         <Suspense fallback={<PageLoading />}>
           <MentionProfileViewer
@@ -1486,14 +1855,17 @@ export default function App() {
         </Suspense>
       )}
 
-      {activeFriendChatId && (
-        <Suspense fallback={<PageLoading />}>
-          <FriendChatModal
-            friendId={activeFriendChatId}
+      <UpdateToast />
+
+      {user && (
+        <Suspense fallback={null}>
+          <IncomingCallToast
             user={user}
-            world={world}
-            onClose={() => setActiveFriendChatId(null)}
-            onMessagesRead={refreshUnread}
+            openChatWith={activeFriendChatId}
+            onAnswer={(callerId) => {
+              setAnswerCallFrom(callerId);
+              setActiveFriendChatId(callerId);
+            }}
           />
         </Suspense>
       )}
@@ -1508,12 +1880,61 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <ProfileSettingsPanel
             open={profileSettingsOpen}
-            onClose={() => setProfileSettingsOpen(false)}
+            onClose={() => {
+              setProfileSettingsOpen(false);
+              setProfileSettingsSection(null);
+              setIncontriCheck((n) => n + 1);
+            }}
+            initialSection={profileSettingsSection}
             user={user}
             onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-            favoriteCategories={favoriteCategories}
           />
         </Suspense>
+      )}
+
+      {profileOnboardingOpen && user && (
+        <Suspense fallback={<PageLoading />}>
+          <ProfileSettingsPanel
+            open
+            variant="onboarding"
+            user={user}
+            onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
+            onClose={() => {
+              clearProfileOnboarding();
+              setProfileOnboardingOpen(false);
+              setIncontriNoticeAfterOnboarding(true);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {incontriNoticeVisible && (
+        <div className="rb-incontri-notice" role="status">
+          <span>{incontriNoticeText(incontriNotice.avviso, incontriNotice.mancano, incontriNotice.foto)}</span>
+          <div className="rb-incontri-notice-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setIncontriNotice(null);
+                setIncontriNoticeAfterOnboarding(false);
+              }}
+            >
+              Più tardi
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIncontriNotice(null);
+                setIncontriNoticeAfterOnboarding(false);
+                setProfileSettingsSection('incontri');
+                setProfileSettingsOpen(true);
+              }}
+            >
+              Apri il Profilo Incontri
+            </button>
+          </div>
+        </div>
       )}
 
       {authOpen && (
@@ -1556,5 +1977,6 @@ export default function App() {
 
       <CookieConsentBanner user={user} onOpenPrivacyInfo={() => navigateToCategory('faq', 'informazioni')} />
     </div>
+    </CallProvider>
   );
 }

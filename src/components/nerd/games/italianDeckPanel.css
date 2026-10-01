@@ -1,0 +1,161 @@
+/* 🎨 di Scopa e Trentuno (ItalianDeckPanel.jsx), stesso aspetto del
+   pannello del Burraco. */
+.rb-it-gear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.55);
+  color: #f5f5f7;
+  font-size: 17px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.rb-it-pop {
+  position: absolute;
+  top: 50px;
+  right: 8px;
+  z-index: 20;
+  width: min(400px, calc(100% - 16px));
+  box-sizing: border-box;
+  background: rgba(18, 18, 26, 0.97);
+  border: 1px solid #34344a;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+  color: #f5f5f7;
+  text-align: left;
+}
+
+.rb-it-pop h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.rb-it-pop-sec {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9a9ab0;
+  margin: 10px 0 8px;
+}
+
+.rb-it-opts {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-it-opt {
+  flex: 1;
+  min-width: 0;
+  border: 2px solid #2c2c40;
+  border-radius: 12px;
+  padding: 8px 4px;
+  background: none;
+  text-align: center;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.rb-it-opt.on {
+  border-color: #d6e84a;
+  color: #e8f59a;
+}
+
+.rb-it-mini {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+  pointer-events: none;
+}
+
+.rb-it-mini .rb-scopa-card {
+  width: 44px !important;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.rb-it-mini .rb-scopa-card + .rb-scopa-card {
+  margin-left: -14px;
+}
+
+.rb-it-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-it-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.rb-it-switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: #3a3a50;
+  transition: background 0.15s ease;
+}
+
+.rb-it-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.rb-it-switch input:checked + .rb-it-switch-track {
+  background: #6fbf73;
+}
+
+.rb-it-switch input:checked + .rb-it-switch-track::after {
+  transform: translateX(16px);
+}
+
+.rb-it-switch input:focus-visible + .rb-it-switch-track {
+  outline: 2px solid #d6e84a;
+  outline-offset: 2px;
+}
+
+.rb-it-switch small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9a9ab0;
+}
+
+.rb-it-pop-note {
+  font-size: 11px;
+  color: #8a8aa0;
+  margin: 10px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-it-switch-track,
+  .rb-it-switch-track::after {
+    transition: none;
+  }
+}

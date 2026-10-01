@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { rememberDeviceSession } from './accountSwitcher';
+import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // Il bucket "attachments" accetta solo certi tipi di file e una dimensione
 // massima (vedi accept sull'input allegati in AuthModal): un upload respinto
@@ -44,6 +46,12 @@ function mapProfile(row) {
     genere: row.genere ?? '',
     pronomi: row.pronomi ?? '',
     citta: row.citta ?? '',
+    // Riferimenti alle città vere (public.citta) dei campi città del
+    // profilo: senza, il testo non è una città scelta dall'elenco.
+    cittaIncontriGeo: row.citta_incontri_geo ?? null,
+    cittaSocialGeo: row.citta_social_geo ?? null,
+    cittaLavoroGeo: row.citta_lavoro_geo ?? null,
+    cittaOrigineGeo: row.citta_origine_geo ?? null,
     bio: row.bio ?? '',
     cittaSocial: row.citta_social ?? '',
     bioSocial: row.bio_social ?? '',
@@ -55,6 +63,10 @@ function mapProfile(row) {
     mostraDataNascitaSocial: row.mostra_data_nascita_social ?? false,
     lavoroSocialMedia: row.lavoro_social_media ?? '',
     lavoroTelefono: row.lavoro_telefono ?? '',
+    // Candidato: compare nella ricerca "Cerca candidati" delle aziende.
+    lavoroVisibileAziende: row.lavoro_visibile_aziende ?? false,
+    // Azienda: esito della verifica della partita IVA ({ stato, nome_registro, ... }).
+    aziendaVerifica: row.azienda_verifica ?? null,
     terminiAccettatiAt: row.termini_accettati_at,
     consensoMarketing: row.consenso_marketing ?? false,
     mondiAbilitati: row.mondi_abilitati ?? [],
@@ -65,6 +77,10 @@ function mapProfile(row) {
     bannato: row.bannato ?? false,
     banMotivo: row.ban_motivo,
     banFinoAl: row.ban_fino_al,
+    // Sospensione volontaria (30 giorni) ed eliminazione richiesta (si
+    // può annullare rientrando entro la data prevista).
+    sospesoFinoAl: row.sospeso_fino_al ?? null,
+    eliminazionePrevistaAt: row.eliminazione_prevista_at ?? null,
     avatar: row.avatar_url,
     createdAt: row.created_at,
     lastNicknameChangeAt: row.last_nickname_change_at,
@@ -319,11 +335,10 @@ export async function registerAccount({
     return { needsEmailConfirmation: true };
   }
 
-  // Sessione subito attiva: l'avatar di default (nessun vero upload) e gli
-  // eventuali allegati caricati in registrazione si possono sistemare ora.
-  const avatar = `https://i.pravatar.cc/150?u=${encodeURIComponent(cleanEmail)}`;
-  await supabase.rpc('update_own_avatar', { p_avatar_url: avatar });
-
+  // Sessione subito attiva: gli eventuali allegati caricati in
+  // registrazione si possono sistemare ora. Nessuna foto profilo finta:
+  // finché la persona non ne carica una, l'app mostra l'iniziale del
+  // nickname (shared/AvatarImg.jsx), uguale in tutte le schede.
   let attachmentError = '';
   if (attachments?.length) {
     for (const att of attachments) {
@@ -390,43 +405,61 @@ export async function resendConfirmationEmail(email) {
 // italiano sugli errori attesi (password sbagliata, conferma mancante,
 // owner, ecc.): qui va recuperato indipendentemente da come supabase-js
 // incapsula un errore HTTP non-2xx.
-export async function deleteOwnAccount(password) {
+// Elimina l'account: il profilo sparisce subito, si hanno 30 giorni per
+// ripensarci rientrando, poi tutto viene cancellato per sempre (lato server).
+export async function requestAccountDeletion(password) {
   try {
-    const { data, error } = await supabase.functions.invoke('delete-account', {
-      body: { password, conferma: 'ELIMINA' },
-    });
-    if (error) {
-      let message = '';
-      const ctx = error.context;
-      if (ctx && typeof ctx.json === 'function') {
-        try {
-          message = (await ctx.json())?.error ?? '';
-        } catch {
-          // risposta non-JSON o già letta: si passa al messaggio generico sotto
-        }
-      } else if (ctx?.error) {
-        message = ctx.error;
-      }
-      return { error: message || error.message || 'Errore durante l\'eliminazione dell\'account.' };
-    }
-    if (data?.error) return { error: data.error };
+    const { data, error } = await supabase.rpc('richiedi_eliminazione_account', { p_password: password, p_conferma: 'ELIMINA' });
+    // "invalid salt": password salvata in un formato che non si può
+    // confrontare (account di prova vecchi) — per chi usa l'app è comunque
+    // una password non valida.
+    if (error) return { error: /invalid salt/i.test(error.message) ? 'Password errata' : error.message };
+    return { eliminazionePrevistaAt: data?.eliminazione_prevista_at ?? null };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
 
-    await supabase.auth.signOut();
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith('rb-'))
-      .forEach((key) => localStorage.removeItem(key));
+// Sospende l'account per 30 giorni: il profilo sparisce per gli altri e si
+// riattiva rientrando o da solo alla scadenza.
+export async function suspendOwnAccount() {
+  try {
+    const { data, error } = await supabase.rpc('sospendi_account');
+    if (error) return { error: error.message };
+    return { sospesoFinoAl: data?.sospeso_fino_al ?? null };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+export async function reactivateOwnAccount() {
+  try {
+    const { error } = await supabase.rpc('riattiva_account');
+    if (error) return { error: error.message };
     return {};
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
 }
 
+// Account sospeso (fino a una data futura) o in attesa di eliminazione:
+// { tipo: 'sospeso' | 'eliminazione', data } oppure null.
+export function accountPause(account) {
+  if (!account) return null;
+  if (account.eliminazionePrevistaAt) return { tipo: 'eliminazione', data: account.eliminazionePrevistaAt };
+  if (account.sospesoFinoAl && new Date(account.sospesoFinoAl) > new Date()) return { tipo: 'sospeso', data: account.sospesoFinoAl };
+  return null;
+}
+
 // Carica un file nel bucket privato "attachments" (sotto il proprio uid,
 // imposto dalle policy di storage) e lo registra nel profilo tramite la
 // funzione add_own_attachment. `file` è un File/Blob del browser.
 export async function uploadAttachment(userId, file) {
-  const path = `${userId}/${Date.now()}-${file.name}`;
-  const { error: uploadError } = await supabase.storage.from('attachments').upload(path, file);
+  const prepared = await prepareUpload(file);
+  if (prepared.error) return { error: prepared.error };
+  const upload = prepared.file;
+  const path = `${userId}/${Date.now()}-${safeFileName(upload.name)}`;
+  const { error: uploadError } = await supabase.storage.from('attachments').upload(path, upload);
   if (uploadError) return { error: translateUploadError(uploadError) };
   const { error: rpcError } = await supabase.rpc('add_own_attachment', { p_name: file.name, p_path: path });
   if (rpcError) return { error: rpcError.message };
@@ -497,16 +530,18 @@ export function profileCooldownRemaining(account) {
 // Foto profilo: carica nel bucket pubblico "content-media" già usato per i
 // contenuti (stesso percorso sotto il proprio uid, come richiedono le sue
 // policy di storage) e salva l'URL con la RPC già pronta lato server —
-// finora chiamata solo una volta, in automatico, con un avatar finto
-// (pravatar.cc) alla registrazione: qui è la prima volta che la persona può
-// davvero scegliere la propria foto.
+// qui la persona sceglie la propria foto (alla registrazione non se ne
+// assegna nessuna).
 export async function uploadAvatar(file) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/avatar-${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
+    const prepared = await prepareUpload(file);
+    if (prepared.error) return { error: prepared.error };
+    const upload = prepared.file;
+    const path = `${auth.user.id}/avatar-${Date.now()}-${safeFileName(upload.name)}`;
+    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
     if (uploadError) return { error: translateUploadError(uploadError) };
 
     const { data } = supabase.storage.from('content-media').getPublicUrl(path);

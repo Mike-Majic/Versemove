@@ -1,14 +1,25 @@
 import { supabase } from './supabaseClient';
+import { safeFileName } from './storagePath';
+import { prepareUpload } from './mediaCompress';
 
 // I bucket di storage accettano solo certi tipi di file e una dimensione
 // massima (vedi accept sugli <input type="file">): un upload respinto per
 // questo arriva come un errore tecnico di Supabase Storage, qui diventa un
 // messaggio comprensibile.
+// Peso massimo di un file nel bucket content-media (file_size_limit sul
+// server): dopo la compressione un video a 720p ci sta per circa 2 minuti.
+export const CONTENT_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
 export function translateUploadError(error) {
   const msg = error?.message ?? '';
   const status = String(error?.statusCode ?? error?.status ?? '');
   if (status === '400' || status === '413' || /mime type|not supported|exceeded the maximum allowed size|payload too large/i.test(msg)) {
     return 'File non supportato o troppo grande.';
+  }
+  // Policy di storage: fuori dalla propria cartella (non succede dall'app)
+  // oppure spazio dell'utente finito (vedi storage_quota_ok sul server).
+  if (/row-level security|violates.*policy/i.test(msg)) {
+    return 'Caricamento non consentito: forse hai finito lo spazio a disposizione (200 MB).';
   }
   return msg || 'Errore durante il caricamento del file.';
 }
@@ -28,8 +39,14 @@ export async function publishContent({ file, type, caption, tags, placements }) 
     const { data: auth } = await supabase.auth.getUser();
     if (!auth?.user) return { error: 'Devi essere loggato.' };
 
-    const path = `${auth.user.id}/${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, file);
+    const prepared = await prepareUpload(file);
+    if (prepared.error) return { error: prepared.error };
+    const upload = prepared.file;
+    if (upload.size > CONTENT_MEDIA_MAX_BYTES) {
+      return { error: `Il file, anche compresso, pesa ${Math.round(upload.size / 1048576)} MB: il massimo è 25 MB (circa 2 minuti di video).` };
+    }
+    const path = `${auth.user.id}/${Date.now()}-${safeFileName(upload.name)}`;
+    const { error: uploadError } = await supabase.storage.from('content-media').upload(path, upload);
     if (uploadError) return { error: translateUploadError(uploadError) };
 
     const { data: content, error: contentError } = await supabase
@@ -67,7 +84,10 @@ export function getContentUrl(storagePath) {
 
 // Contenuti posizionati in un mondo (ed eventualmente una categoria
 // specifica), più recenti prima, con conteggio like e se piace già a me.
-export async function listContentsForPlacement({ world, category }) {
+// Al massimo `limit` (i più recenti): prima si leggevano tutti.
+export const CONTENTS_PAGE_SIZE = 100;
+
+export async function listContentsForPlacement({ world, category, limit = CONTENTS_PAGE_SIZE }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
     const myId = auth?.user?.id ?? null;
@@ -76,7 +96,8 @@ export async function listContentsForPlacement({ world, category }) {
       .from('content_placements')
       .select('subfamily, contents(id, owner_id, type, storage_path, caption, tags, created_at)')
       .eq('world_id', world)
-      .order('created_at', { referencedTable: 'contents', ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
     query = category ? query.eq('category_id', category) : query.is('category_id', null);
 
     const { data, error } = await query;
