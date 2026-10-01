@@ -3,6 +3,7 @@ import { fetchScopaState, fetchMyHand, fetchCaptures, fetchHandResults, playCard
 import { setRoomReady, firstHumanHostId } from '../../../data/gameRooms';
 import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
+import ItalianDeckButton from './ItalianDeckPanel';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
 import AvatarImg from '../../shared/AvatarImg';
@@ -154,6 +155,7 @@ export default function ScopaTable({ roomId, room, user, eventTick, onLeave }) {
       </div>
 
       <div className="rb-scopa-felt">
+        <ItalianDeckButton />
         <div className={`rb-scopa-turn-banner ${isMyTurn ? 'mine' : ''}`}>
           {isMyTurn ? 'Tocca a te' : isBotTurn ? `🤖 ${botName ?? 'Il computer'} sta pensando…` : `Turno di ${opponentEntry?.profilo.name ?? 'avversario'}`}
         </div>

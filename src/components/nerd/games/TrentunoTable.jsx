@@ -11,6 +11,7 @@ import {
 import { setRoomReady, firstHumanHostId } from '../../../data/gameRooms';
 import useBotDriver from './useBotDriver';
 import PlayingCard from './PlayingCard';
+import ItalianDeckButton from './ItalianDeckPanel';
 import Skeleton from '../../Skeleton';
 import './scopaTable.css';
 import './trentunoTable.css';
@@ -148,6 +149,7 @@ export default function TrentunoTable({ roomId, room, user, eventTick, onLeave }
       </div>
 
       <div className="rb-scopa-felt">
+        <ItalianDeckButton />
         <div className={`rb-scopa-turn-banner ${isMyTurn ? 'mine' : ''}`}>
           {isMyTurn
             ? state.fase === 'pesca' ? 'Tocca a te — pesca o bussa' : 'Tocca a te — scarta una carta'
@@ -167,7 +169,7 @@ export default function TrentunoTable({ roomId, room, user, eventTick, onLeave }
           </button>
 
           <button type="button" className="rb-burraco-pile" onClick={() => canDraw && state.scartoCima && handleDraw('scarti')} disabled={!(canDraw && state.scartoCima) || busy}>
-            {state.scartoCima ? <PlayingCard card={state.scartoCima} size="md" /> : <div className="rb-scopa-empty-table">Scarti vuoti</div>}
+            {state.scartoCima ? <PlayingCard card={state.scartoCima} size="md" decorative /> : <div className="rb-scopa-empty-table">Scarti vuoti</div>}
             <span>Pila scarti</span>
           </button>
         </div>

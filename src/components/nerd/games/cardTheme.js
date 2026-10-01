@@ -26,19 +26,37 @@ export const CARD_SIZES = [
 ];
 export const cardSizeScale = (id) => CARD_SIZES.find((s) => s.id === id)?.scale ?? 1.25;
 
+// Mazzi regionali per Scopa e Trentuno (carte italiane, vedi
+// italianDecks.js e PlayingCard.jsx). "Mostra i numeri": piccolo indice
+// nell'angolo, che i mazzi veri non hanno.
+export const ITALIAN_DECKS = [
+  { id: 'napoletane', label: 'Napoletane' },
+  { id: 'piacentine', label: 'Piacentine' },
+  { id: 'siciliane', label: 'Siciliane' },
+];
+
 export const TABLES = [
   { id: 'verde', label: 'Feltro verde', felt: '#1f7a4a', frame: '#6b4423' },
   { id: 'blu', label: 'Blu notte', felt: '#1d3f7a', frame: '#c9a55a' },
   { id: 'bordeaux', label: 'Bordeaux Versemove', felt: '#6e1f2c', frame: '#d6e84a' },
 ];
 
-const KEYS = { deck: 'vm-cards-deck', table: 'vm-cards-table', sort: 'vm-burraco-sort', size: 'vm-cards-size' };
-const DEFAULTS = { deck: 'classico', table: 'verde', sort: 'seme', size: 'grande' };
+const KEYS = {
+  deck: 'vm-cards-deck',
+  table: 'vm-cards-table',
+  sort: 'vm-burraco-sort',
+  size: 'vm-cards-size',
+  italianDeck: 'vm-cards-italian-deck',
+  italianIndex: 'vm-cards-italian-index',
+};
+const DEFAULTS = { deck: 'classico', table: 'verde', sort: 'seme', size: 'grande', italianDeck: 'napoletane', italianIndex: 'on' };
 const VALID = {
   deck: DECKS.map((d) => d.id),
   table: TABLES.map((t) => t.id),
   sort: ['seme', 'numero'],
   size: CARD_SIZES.map((s) => s.id),
+  italianDeck: ITALIAN_DECKS.map((d) => d.id),
+  italianIndex: ['on', 'off'],
 };
 
 function read(name) {
@@ -50,7 +68,7 @@ function read(name) {
   }
 }
 
-const values = { deck: read('deck'), table: read('table'), sort: read('sort'), size: read('size') };
+const values = Object.fromEntries(Object.keys(KEYS).map((name) => [name, read(name)]));
 const listeners = new Set();
 
 function setValue(name, value) {
@@ -79,6 +97,12 @@ export const useCardDeck = () => usePreference('deck');
 export const useCardTable = () => usePreference('table');
 export const useHandSort = () => usePreference('sort');
 export const useCardSize = () => usePreference('size');
+export const useItalianDeck = () => usePreference('italianDeck');
+// [mostra, setMostra] con un booleano (salvato come 'on'/'off').
+export function useItalianIndex() {
+  const [value, setValue] = usePreference('italianIndex');
+  return [value === 'on', (on) => setValue(on ? 'on' : 'off')];
+}
 
 // Ordinamento della mano, solo per la vista (il database non cambia).
 // Codici carta come in data/burraco.js: "H7", "S10", "SA", "JK".
