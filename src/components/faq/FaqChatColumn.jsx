@@ -300,7 +300,7 @@ export default function FaqChatColumn({ user, onOpenAuth, onClose }) {
     <div className="rb-faqchat-panel rb-chat-scope" ref={panelRef} style={{ '--a': ACCENT, '--a-ink': inkOn(ACCENT) }}>
       <header className="rb-faqchat-head">
         <div className="rb-faqchat-head-title">
-          <h2>💬 Chat con lo staff</h2>
+          <h2>💬 Chat pubblica con lo staff</h2>
           <p>Una stanza unica per tutti: lo staff risponde con l'etichetta «Staff».</p>
         </div>
         <div className="rb-faqchat-head-actions">

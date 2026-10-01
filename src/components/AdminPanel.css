@@ -1,7 +1,7 @@
 .rb-admin-card {
   position: relative;
-  width: min(920px, 94vw);
-  max-height: 85vh;
+  width: min(1600px, 94vw);
+  max-height: 90vh;
   overflow-y: auto;
   background: #131318;
   border: 1px solid rgba(255, 255, 255, 0.1);

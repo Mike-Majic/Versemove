@@ -46,12 +46,12 @@
 /* Riquadro: alto al massimo ~65vh, scorre nei due sensi; la barra
    orizzontale resta sempre visibile in fondo al riquadro (overflow-x:
    scroll + barra disegnata, non quella "a scomparsa" dei sistemi). */
-/* min(...): il pannello Backend è alto al massimo 85vh; sopra la tabella
+/* min(...): il pannello Backend è alto al massimo 90vh; sopra la tabella
    ci sono titolo, schede e contatori (~250px): così il riquadro intero, con
    la sua barra orizzontale, resta sempre dentro al pannello senza doverlo
    scorrere. */
 .rb-admin-users-wrap {
-  max-height: min(65vh, calc(85vh - 250px));
+  max-height: calc(90vh - 250px);
   min-height: 220px;
   overflow: auto;
   overflow-x: scroll;
