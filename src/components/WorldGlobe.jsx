@@ -8,7 +8,7 @@ import { createLandLod } from '../globe/landLod';
 import { createPlaceLabels } from '../globe/placeLabels';
 import { buildLandDots, buildNetworkShell, buildShellNodeGeometry } from '../globe/networkOverlay';
 import { buildCategoryShell } from '../globe/categoryShell';
-import { makeEventMarkerEl, applyEventZoom } from '../globe/eventMarkers';
+import { makeEventMarkerEl, applyEventZoom, eventZoomFor } from '../globe/eventMarkers';
 import { buildSatelliteGlobes } from '../globe/satelliteGlobes';
 import { CATEGORY_FLY_MS } from '../fx/timing';
 import { IDLE_GLOBE_SPIN_DEG_S, IDLE_EASE_IN_S, IDLE_EASE_OUT_S } from '../fx/globeRotation';
@@ -156,6 +156,15 @@ function makeMarkerEl(user, world, onOpen) {
 // stanno sopra al canvas e coprivano nuvolette ed etichette). Non sono
 // cliccabili. Gli altri mondi restano sui marker di sempre.
 const USER_DOT_WORLDS = new Set(['faq']);
+// Mondi in cui gli utenti diventano gli stessi pallini solo da lontano
+// (fascia 'far' di eventZoomFor, la soglia a cui avatar e grumi
+// spariscono): al posto del puntino HTML dei marker. Avvicinandosi i
+// pallini si spengono e tornano avatar e grumi.
+const FAR_USER_DOT_WORLDS = new Set(['lavoro']);
+// Mondi senza i nodi luminosi della rete esterna (shell.nodes): nel Lavoro
+// erano bianchi come i pallini degli utenti e si confondevano. Le linee
+// della rete restano.
+const HIDE_SHELL_NODES_WORLDS = new Set(['lavoro']);
 // Raggio 100 come la sfera, più un filo (quota 0.003 = raggio 100,3):
 // esattamente a 100 i pallini vicino al bordo del globo sfarfallerebbero
 // con la superficie (stessa profondità).
@@ -487,6 +496,9 @@ export default function WorldGlobe({
 }) {
   const globeRef = useRef();
   const overlayRef = useRef(null);
+  // Pallini degli utenti nella scena: { points, farOnly } (vedi l'effetto
+  // dei pallini più giù e syncEventZoom).
+  const userDotsRef = useRef(null);
   const categoryShellRef = useRef(null);
   const landPointsRef = useRef(null);
   const satellitesRef = useRef(null);
@@ -590,7 +602,19 @@ export default function WorldGlobe({
     const canvas = g?.renderer?.().domElement;
     const shell = canvas?.closest('.rb-globe-shell');
     if (!shell) return;
-    applyEventZoom(shell, altitude ?? g.pointOfView().altitude);
+    const alt = altitude ?? g.pointOfView().altitude;
+    applyEventZoom(shell, alt);
+    // Pallini degli utenti "solo da lontano" (FAR_USER_DOT_WORLDS): accesi
+    // e spenti qui, nello stesso momento in cui data-ev-zoom fa sparire o
+    // tornare avatar e grumi.
+    const dots = userDotsRef.current;
+    if (dots?.farOnly) {
+      const visible = eventZoomFor(alt).band === 'far';
+      if (dots.points.visible !== visible) {
+        dots.points.visible = visible;
+        globeActivity.wake();
+      }
+    }
   };
   // Trascinamento che parte da un marker HTML (avatar, grumo, esagono
   // evento): i marker stanno sopra il canvas con pointer-events: auto, quindi
@@ -755,6 +779,7 @@ export default function WorldGlobe({
   // Nei mondi a pallini (USER_DOT_WORLDS) gli utenti non diventano marker
   // HTML: li disegna l'oggetto Points più giù.
   const userDotsWorld = USER_DOT_WORLDS.has(world.id);
+  const farUserDotsWorld = FAR_USER_DOT_WORLDS.has(world.id);
   const displayItems = useMemo(() => {
     const eventItems = events.map((e) => ({ kind: 'event', ...e }));
     if (userDotsWorld) return eventItems;
@@ -1059,16 +1084,20 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Utenti come pallini nella scena (mondi di USER_DOT_WORLDS): un solo
-  // THREE.Points nel gruppo dell'overlay, che ruota insieme al globo. Le
-  // coordinate vengono da getCoords del globo, la stessa funzione che
-  // posiziona i marker HTML negli altri mondi. La sfera opaca nasconde da
+  // Utenti come pallini nella scena (mondi di USER_DOT_WORLDS sempre, di
+  // FAR_USER_DOT_WORLDS solo da lontano, vedi syncEventZoom): un solo
+  // THREE.Points dentro l'oggetto del globo (findGlobeRootObject), lo
+  // stesso dei continenti (createLandLod), così ogni pallino resta sul suo
+  // punto del continente col globo fermo, in rotazione e trascinato. Non
+  // nel gruppo dell'overlay: quello riceve la rotazione delle categorie
+  // (globeSpinAngleRef) e i pallini si staccavano dai continenti. Le
+  // coordinate vengono da getCoords del globo, locali a quell'oggetto, la
+  // stessa funzione che posiziona i marker HTML. La sfera opaca nasconde da
   // sola i pallini sul retro; renderOrder -1 li disegna prima delle
   // nuvolette trasparenti, che restano davanti.
   useEffect(() => {
     const g = globeRef.current;
-    const overlay = overlayRef.current;
-    if (!userDotsWorld || !g || !overlay || !users?.length) return undefined;
+    if ((!userDotsWorld && !farUserDotsWorld) || !g || !users?.length) return undefined;
     const positions = new Float32Array(users.length * 3);
     const colors = new Float32Array(users.length * 3);
     const base = new THREE.Color(world.color);
@@ -1098,15 +1127,32 @@ export default function WorldGlobe({
     const points = new THREE.Points(geometry, material);
     points.renderOrder = -1;
     points.raycast = () => {}; // mai cliccabili
-    overlay.group.add(points);
-    globeActivity.wake();
+    const farOnly = !userDotsWorld;
+    if (farOnly) points.visible = eventZoomFor(g.pointOfView().altitude).band === 'far';
+    userDotsRef.current = { points, farOnly };
+    // L'oggetto del globo si cerca qui, come per i continenti; se
+    // react-globe.gl non l'ha ancora messo nella scena si riprova al
+    // fotogramma dopo.
+    let raf = 0;
+    const attach = () => {
+      const root = findGlobeRootObject(g.scene());
+      if (!root) {
+        raf = requestAnimationFrame(attach);
+        return;
+      }
+      root.add(points);
+      globeActivity.wake();
+    };
+    attach();
     return () => {
-      overlay.group.remove(points);
+      cancelAnimationFrame(raf);
+      points.parent?.remove(points);
+      if (userDotsRef.current?.points === points) userDotsRef.current = null;
       geometry.dispose();
       material.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userDotsWorld, users, world.color]);
+  }, [userDotsWorld, farUserDotsWorld, users, world.color]);
 
   // Continenti: due sistemi alternativi, scelti da USE_REALISTIC_CONTINENTS.
   // Puntini (vecchio): caricati dall'immagine terra/acqua, se falliscono il
@@ -1193,6 +1239,15 @@ export default function WorldGlobe({
   useEffect(() => {
     if (overlayRef.current) applyOverlayColor(overlayRef.current, world.atmosphereColor, world.lineColor);
   }, [world.atmosphereColor, world.lineColor]);
+
+  // Nodi luminosi della rete esterna spenti nei mondi di
+  // HIDE_SHELL_NODES_WORLDS; linee e categorie restano come sono.
+  useEffect(() => {
+    if (!overlayRef.current) return;
+    overlayRef.current.shell.nodes.visible = !HIDE_SHELL_NODES_WORLDS.has(world.id);
+    globeActivity.wake();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id]);
 
   // Nomi dei luoghi: livello HTML sopra il canvas (vedi globe/placeLabels.js).
   // Si aggiornano dal giro di disegno (render wrapper sopra), solo quando la
@@ -1792,7 +1847,7 @@ export default function WorldGlobe({
   }, [flyTo]);
 
   return (
-    <div className="rb-globe-shell" ref={containerRef}>
+    <div className="rb-globe-shell" ref={containerRef} data-far-user-dots={farUserDotsWorld ? 'true' : undefined}>
       <Globe
         ref={globeRef}
         rendererConfig={{ antialias: initialAntialias, alpha: true }}
