@@ -2,20 +2,25 @@ import { isAccountBlocked } from './banStatus';
 
 // Categorie del mondo FAQ (nero): Stanza MOD (solo staff, filtrata via
 // getFaqCategories — mai nell'array passato a chi non è owner/moderatore),
-// Chat (stanza unica utenti + staff, per tutti), Segnalazioni,
+// Community (stanza unica utenti + staff, per tutti), Segnalazioni,
 // Suggerimenti, Informazioni. Stessa struttura delle altre
 // liste categoria (LAVORO_CATEGORIES ecc.), stesso meccanismo di forme sul
 // globo (nuvole, vedi App.jsx CATEGORY_SHAPE_BY_WORLD e globe/categoryShell.js).
 //
-// Anchor sparsi sull'oceano, come le altre categorie "globali" — un
-// riquadro semi-trasparente grande su terraferma finirebbe sopra ai marker
-// degli utenti di quella zona.
+// Anchor distribuiti su tutto il globo, sull'oceano (un riquadro grande su
+// terraferma finirebbe sopra ai pallini degli utenti di quella zona): sei
+// vertici di un cubo, a latitudine ±35.3° e longitudini a passi di 90°.
+// Le quattro categorie che vede ogni utente (Community, Segnalazioni,
+// Suggerimenti, Informazioni) stanno su un tetraedro, la disposizione più
+// larga possibile per quattro punti (109° l'una dall'altra); Stanza MOD e
+// INFO BAN, solo per lo staff, su due vertici liberi del cubo (almeno 70°
+// da tutte le altre).
 export const FAQ_CATEGORIES = [
   {
     id: 'mod-room',
     label: 'Stanza MOD',
     icon: '🛡️',
-    anchor: { lat: 35.5, lng: -159.5 }, // distribuzione uniforme sull'oceano
+    anchor: { lat: -35.3, lng: -20 }, // Atlantico del sud
     aliases: ['stanza mod', 'mod room', 'staff'],
     subfamilies: [],
     staffOnly: true,
@@ -26,7 +31,7 @@ export const FAQ_CATEGORIES = [
     id: 'chat',
     label: 'Community',
     icon: '💬',
-    anchor: { lat: -28, lng: -15 }, // Atlantico del sud, lontano dalle altre nuvole
+    anchor: { lat: 35.3, lng: 160 }, // Pacifico del nord
     aliases: ['community', 'comunità', 'chat', 'chat pubblica', 'chat staff', 'parla con lo staff', 'assistenza', 'supporto'],
     subfamilies: [],
   },
@@ -37,7 +42,7 @@ export const FAQ_CATEGORIES = [
     id: 'info-ban',
     label: 'INFO BAN',
     icon: '⛔',
-    anchor: { lat: 5, lng: -140 }, // Pacifico, a metà fra le altre nuvole
+    anchor: { lat: -35.3, lng: 160 }, // Mar di Tasman
     aliases: ['info ban', 'ban', 'bloccato', 'account bloccato', 'sblocco'],
     subfamilies: [],
     blockedOrStaffOnly: true,
@@ -47,7 +52,7 @@ export const FAQ_CATEGORIES = [
     id: 'segnalazioni',
     label: 'Segnalazioni',
     icon: '🚩',
-    anchor: { lat: -35.3, lng: 45 }, // distribuzione uniforme sull'oceano
+    anchor: { lat: -35.3, lng: 70 }, // Oceano Indiano
     aliases: ['segnalazioni', 'segnala', 'problema', 'bug'],
     subfamilies: [],
   },
@@ -55,7 +60,7 @@ export const FAQ_CATEGORIES = [
     id: 'suggerimenti',
     label: 'Suggerimenti',
     icon: '💡',
-    anchor: { lat: 35.5, lng: -20.5 }, // distribuzione uniforme sull'oceano
+    anchor: { lat: 35.3, lng: -20 }, // Atlantico del nord
     aliases: ['suggerimenti', 'idee', 'proposte'],
     subfamilies: [],
   },
@@ -63,7 +68,7 @@ export const FAQ_CATEGORIES = [
     id: 'informazioni',
     label: 'Informazioni',
     icon: 'ℹ️',
-    anchor: { lat: -40.8, lng: -90 }, // distribuzione uniforme sull'oceano
+    anchor: { lat: -35.3, lng: -110 }, // Pacifico del sud
     aliases: ['informazioni', 'guida', 'aiuto', 'come funziona'],
     subfamilies: [],
   },
