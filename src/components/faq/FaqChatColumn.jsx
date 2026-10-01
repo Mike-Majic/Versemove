@@ -301,7 +301,7 @@ export default function FaqChatColumn({ user, onOpenAuth, onClose }) {
       <header className="rb-faqchat-head">
         <div className="rb-faqchat-head-title">
           <h2>💬 Chat pubblica con lo staff</h2>
-          <p>Una stanza unica per tutti: lo staff risponde con l'etichetta «Staff».</p>
+          <p>La community di Versemove: utenti e staff nella stessa stanza, lo staff ha l'etichetta «Staff».</p>
         </div>
         <div className="rb-faqchat-head-actions">
           {searchOpen && (
