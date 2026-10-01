@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ModalOverlay from '../ModalOverlay';
 import { getCandidato } from '../../data/lavoro';
 import CandidatoView from './CandidatoView';
@@ -9,6 +10,7 @@ import './candidati.css';
 // apre: il server registra ogni apertura. La resa è in CandidatoView.
 
 export default function CandidatoModal({ candidato: preview, onClose }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -16,15 +18,16 @@ export default function CandidatoModal({ candidato: preview, onClose }) {
     let cancelled = false;
     getCandidato(preview.id).then((res) => {
       if (cancelled) return;
-      // Dal globo si può cliccare anche chi non ha reso visibile il Profilo
-      // di Lavoro alle aziende: il server risponde "Candidato non disponibile".
-      if (res.error) setError(/non disponibile/i.test(res.error) ? 'Questa persona non ha reso visibile il Profilo di Lavoro alle aziende.' : res.error);
+      // Nel mondo Lavoro chi è dentro è sempre visibile alle aziende: il
+      // server risponde "Candidato non disponibile" solo per un profilo
+      // uscito nel frattempo (mondo disattivato, bloccato, eliminato...).
+      if (res.error) setError(/non disponibile/i.test(res.error) ? t('lavoroVisibility.profileUnavailable') : res.error);
       else setData(res.candidato);
     });
     return () => {
       cancelled = true;
     };
-  }, [preview.id]);
+  }, [preview.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <ModalOverlay onClose={onClose}>

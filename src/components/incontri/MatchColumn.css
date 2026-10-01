@@ -485,3 +485,19 @@
   font-size: 12px !important;
   color: rgba(245, 245, 247, 0.6);
 }
+
+/* Il pannello sopra al globo del mondo rosso (IncontriLiveExplorer): al
+   centro, al posto di categorie e persone, cliccabile anche se il guscio
+   delle colonne lascia passare i clic. */
+.rb-incontri-gate-float {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  margin: 0;
+  pointer-events: auto;
+  box-sizing: border-box;
+}

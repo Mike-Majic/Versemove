@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { INCONTRI_CATEGORIES, resolveCategoryQuery } from '../../data/incontriCategories';
 import MatchColumn from './MatchColumn';
+import IncontriGatePanel from './IncontriGatePanel';
 import VideoRoomsColumn from '../nerd/VideoRoomsColumn';
 import FavoriteStarButton from '../shared/FavoriteStarButton';
 import SponsorCard from '../ads/SponsorCard';
@@ -11,6 +12,11 @@ import '../shared/categoryExplorerShell.css';
 // "Match" (stile Tinder) e "Videochiamata" (stanze video di gruppo, le
 // stesse del mondo Nerd, preset 'incontri'). Le dirette sono nei mondi
 // Social, Lavoro, Nerd e Intrattenimento.
+//
+// datingGate: il proprio Profilo Incontri quando non è ancora visibile
+// (null se è completo, o per il proprietario). Finché c'è, al posto di
+// Match e Videochiamata, e anche a categorie chiuse sopra al globo, si vede
+// solo il pannello "cosa manca": chi non è visibile non vede nessuno.
 export default function IncontriLiveExplorer({
   world,
   activeCategory,
@@ -21,11 +27,11 @@ export default function IncontriLiveExplorer({
   onOpenChat,
   onOpenProfile,
   onOpenMyDatingProfile,
-  myDatingProfileVersion,
   initialMatchTab,
   onConsumeInitialMatchTab,
   favorites = [],
   onToggleFavorite,
+  datingGate = null,
 }) {
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -83,7 +89,7 @@ export default function IncontriLiveExplorer({
             </form>
           </div>
 
-          {category.id === 'videochiamata' ? (
+          {datingGate ? null : category.id === 'videochiamata' ? (
             <VideoRoomsColumn key={category.id} preset="incontri" user={user} onOpenAuth={onOpenAuth} />
           ) : (
             <MatchColumn
@@ -91,16 +97,15 @@ export default function IncontriLiveExplorer({
               onOpenAuth={onOpenAuth}
               onOpenChat={onOpenChat}
               onOpenProfile={onOpenProfile}
-              onOpenMyDatingProfile={onOpenMyDatingProfile}
-              myDatingProfileVersion={myDatingProfileVersion}
               initialTab={initialMatchTab}
               onConsumeInitialTab={onConsumeInitialMatchTab}
             />
           )}
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}
-          <SponsorCard mondo="incontri" categoria={category.id} formato="banner_pannello" />
+          {!datingGate && <SponsorCard mondo="incontri" categoria={category.id} formato="banner_pannello" />}
         </>
       )}
+      {datingGate && <IncontriGatePanel profile={datingGate} onComplete={onOpenMyDatingProfile} className="rb-incontri-gate-float" />}
     </div>
   );
 }

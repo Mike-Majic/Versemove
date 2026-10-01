@@ -72,8 +72,9 @@ export async function getLavoroProfiles(ids) {
 
 // --- Cerca candidati (aziende verificate) ----------------------------------
 // Il server decide chi può cercare (is_lavoro_recruiter: azienda verificata o
-// owner) e chi compare (candidati con "Visibile alle aziende" acceso e
-// consenso Lavoro): qui solo le chiamate e la forma dei dati.
+// owner) e chi compare (chi ha dato il consenso Lavoro e tiene il mondo
+// abilitato: sempre visibile, niente interruttore; lavoro_visibile_aziende
+// la calcola il server): qui solo le chiamate e la forma dei dati.
 
 export const TITOLI_STUDIO = [
   { id: 'licenza_media', label: 'Licenza media' },
@@ -247,18 +248,6 @@ export async function candidatoCvUrl(path) {
     const { data, error } = await supabase.storage.from('attachments').createSignedUrl(path, 60);
     if (error || !data?.signedUrl) return { error: error?.message ?? 'Curriculum non disponibile.' };
     return { url: data.signedUrl };
-  } catch (err) {
-    return { error: err?.message ?? 'Errore di rete.' };
-  }
-}
-
-// Lato candidato: "Visibile alle aziende (cerco lavoro)". Il server rifiuta
-// se manca il consenso Lavoro, col suo messaggio.
-export async function setOwnLavoroVisibilita(visibile) {
-  try {
-    const { error } = await supabase.rpc('set_own_lavoro_visibilita', { p_visibile: Boolean(visibile) });
-    if (error) return { error: error.message };
-    return {};
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete.' };
   }

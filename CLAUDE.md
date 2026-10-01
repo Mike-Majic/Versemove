@@ -19,3 +19,13 @@ se non è chiesto in modo esplicito.
 - **Un solo percorso di codice per la scena 3D su web e telefono:** niente
   rami separati per telefono/verticale nella scena, nella camera o nei
   satelliti. Sugli schermi stretti si allarga solo il FOV verticale.
+- **Mondo Lavoro sempre visibile alle aziende:** chi dà il consenso ed entra
+  nel mondo Lavoro è sempre visibile alle aziende verificate ("Cerca
+  candidati"). Niente interruttore "Visibile alle aziende": chi non vuole
+  comparire disattiva il mondo Lavoro dalle Impostazioni.
+  `lavoro_visibile_aziende` la calcola il server, il frontend non la scrive.
+- **Mondo Incontri "vedi solo se sei visibile":** chi non ha completato il
+  Profilo Incontri non è visibile e non vede nessuno. Al posto di globo,
+  Match, Mi piace ricevuti, Preferiti, Videochiamata e schede aperte da un
+  link c'è il pannello "cosa manca" (`IncontriGatePanel`). Il proprietario
+  (`ruolo === 'owner'`) vede sempre tutto.

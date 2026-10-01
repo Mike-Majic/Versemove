@@ -451,6 +451,38 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.id, incontriEnabled, user?.id, incontriCheck, profileOnboardingOpen, profileSettingsOpen, incontriNoticeAfterOnboarding]);
+  // Mondo rosso: chi non ha il Profilo Incontri completo non è visibile agli
+  // altri e quindi non vede nessuno (il server, dopo lo script di
+  // visibilità, restituisce elenchi vuoti). Qui il proprio profilo, quando
+  // non è visibile: al posto di globo, Match, Mi piace, Preferiti,
+  // Videochiamata e schede aperte da un link si mostra il pannello "cosa
+  // manca" (IncontriGatePanel). Il proprietario lo salta sempre. Si
+  // ricontrolla alla chiusura di Il mio profilo (incontriCheck).
+  const [incontriGateState, setIncontriGateState] = useState({ userId: null, profile: null });
+  const incontriGateApplies = incontriEnabled && user?.ruolo !== 'owner';
+  const incontriGateWanted = incontriGateApplies && (world.id === 'incontri' || Boolean(datingCardId));
+  useEffect(() => {
+    if (!incontriGateWanted) return undefined;
+    let cancelled = false;
+    getMyDatingProfile().then((r) => {
+      if (cancelled) return;
+      // Errore di rete: niente pannello (decide comunque il server).
+      setIncontriGateState({ userId: user.id, profile: r.profile && !r.profile.visibile ? r.profile : null });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incontriGateWanted, user?.id, incontriCheck]);
+  const incontriGateKnown = !incontriGateApplies || incontriGateState.userId === user?.id;
+  const datingGate = incontriGateApplies && incontriGateState.userId === user?.id ? incontriGateState.profile : null;
+  // Appena il profilo diventa completo, il globo del mondo rosso si ricarica
+  // da solo (Match e le altre colonne si montano adesso, con dati nuovi).
+  const prevDatingGateRef = useRef(null);
+  useEffect(() => {
+    if (prevDatingGateRef.current && !datingGate) setGlobeUsersVersion((n) => n + 1);
+    prevDatingGateRef.current = datingGate;
+  }, [datingGate]);
   // Categorie preferite (stellina accanto alla X di ogni pannello categoria,
   // vedi FavoriteStarButton): caricate una volta per sessione, aggiornate
   // subito quando l'utente ne aggiunge/togliene una.
@@ -889,10 +921,14 @@ export default function App() {
 
   // Nessun filtro qui: zona, distanza ed età le applica già globe_users sul
   // server ("Chi vedo" del Profilo Social/Lavoro, Profilo Incontri).
+  const incontriHidden = world.id === 'incontri' && (Boolean(datingGate) || !incontriGateKnown);
   const worldUsers = useMemo(() => {
+    // Mondo rosso con il proprio Profilo Incontri incompleto: nessun
+    // pallino né avatar (vedi datingGate).
+    if (incontriHidden) return [];
     const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
     return [...usersForWorld(world.id), ...fromDb];
-  }, [world.id, dbWorldUsers]);
+  }, [world.id, dbWorldUsers, incontriHidden]);
 
   // Il proprio marker (quando si condivide la posizione in tempo reale) si
   // aggiunge SOPRA ai risultati già filtrati, non dentro: i propri filtri
@@ -902,6 +938,7 @@ export default function App() {
   // marker non deve comparire lì per nessuno: disattivare un mondo vuol
   // dire anche sparire da quel mondo agli occhi degli altri.
   const globeUsers = useMemo(() => {
+    if (incontriHidden) return worldUsers;
     if (!user || !visibility.shareLiveLocation || !ownPosition) return worldUsers;
     if (!(user.mondiAbilitati ?? []).includes(world.id)) return worldUsers;
     // Con la posizione in tempo reale il proprio marker "di città" sparisce:
@@ -918,7 +955,7 @@ export default function App() {
       isLive: true,
     };
     return [...others, ownMarker];
-  }, [worldUsers, user, visibility.shareLiveLocation, ownPosition]);
+  }, [worldUsers, user, visibility.shareLiveLocation, ownPosition, incontriHidden]);
 
   // Quando la città cercata nei filtri (globali, validi per tutti i mondi) corrisponde
   // a una città nota, il globo ci "vola" sopra.
@@ -1308,7 +1345,9 @@ export default function App() {
       activeArteCategory ||
       document.querySelector('.rb-modal-overlay')
   );
-  const incontriNoticeVisible = Boolean(incontriNotice) && !somethingOpen;
+  // Nel mondo rosso con il pannello "cosa manca" già a schermo l'avviso
+  // direbbe la stessa cosa: non si mostra.
+  const incontriNoticeVisible = Boolean(incontriNotice) && !somethingOpen && !(world.id === 'incontri' && datingGate);
   const incontriNoticeMarkedRef = useRef(null);
   useEffect(() => {
     if (!incontriNoticeVisible || incontriNoticeMarkedRef.current === incontriNotice) return;
@@ -1558,6 +1597,7 @@ export default function App() {
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
             onToggleFavorite={toggleFavoriteCategory}
+            datingGate={datingGate}
           />
         </Suspense>
       )}
@@ -1939,6 +1979,12 @@ export default function App() {
           <DatingCardModal
             userId={datingCardId}
             viewer={user}
+            datingGate={incontriGateKnown ? datingGate : undefined}
+            onOpenMyDatingProfile={() => {
+              setDatingCardId(null);
+              setProfileSettingsSection('incontri');
+              setProfileSettingsOpen(true);
+            }}
             onClose={() => setDatingCardId(null)}
             onOpenChat={(id) => {
               setDatingCardId(null);
