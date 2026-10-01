@@ -271,8 +271,9 @@
   cursor: pointer;
 }
 
-/* Finestra "Elimina utente". */
-.rb-admin-delete-card {
+/* Finestra "Elimina utente" (e quella del blocco). Due classi: deve
+   vincere sul testo centrato di .rb-admin-reset-card (AdminPanel.css). */
+.rb-admin-reset-card.rb-admin-delete-card {
   max-width: 420px;
   text-align: left;
 }
@@ -324,4 +325,81 @@
 .rb-admin-reset-card button.rb-admin-danger-btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* Menu a tendina "Blocca…" (stesso aspetto dei pulsanti della riga).
+   Con la tabella davanti: deve vincere su .rb-admin-table select. */
+.rb-admin-users-table .rb-admin-ban-select,
+.rb-admin-ban-select {
+  width: 92px;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.06)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f5f5f7' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 26px 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rb-admin-ban-select:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rb-admin-ban-select option {
+  background: #16161f;
+  color: #f5f5f7;
+}
+
+/* Finestra del blocco. */
+.rb-admin-reset-card.rb-admin-ban-card {
+  max-width: 460px;
+  width: 100%;
+}
+
+.rb-admin-ban-card select {
+  box-sizing: border-box;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #f5f5f7;
+  font: inherit;
+}
+
+.rb-admin-ban-card select option {
+  background: #16161f;
+}
+
+.rb-admin-ban-custom {
+  display: flex;
+  gap: 8px;
+}
+
+.rb-admin-ban-custom input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-admin-ban-custom select {
+  width: auto;
+  flex: 0 0 110px;
+}
+
+.rb-admin-reset-card p.rb-admin-ban-summary {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 59, 59, 0.1);
+  border: 1px solid rgba(255, 59, 59, 0.35);
+  color: #ffd6d6;
+  font-size: 12.5px;
 }

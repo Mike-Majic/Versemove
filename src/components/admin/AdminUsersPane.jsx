@@ -24,18 +24,6 @@ const ROLE_LABELS = { [ROLES.OWNER]: 'Owner', [ROLES.MODERATOR]: 'Moderatore', [
 const SEARCH_DELAY_MS = 300;
 const ONLINE_REFRESH_MS = 60 * 1000;
 
-function toDatetimeLocal(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromDatetimeLocal(value) {
-  if (!value) return null;
-  return new Date(value).toISOString();
-}
-
 // Allegato privato (bucket "attachments"): URL firmato valido 60 secondi.
 async function openAttachment(att) {
   const { data, error } = await supabase.storage.from('attachments').createSignedUrl(att.path, 60);
@@ -101,14 +89,163 @@ function HeaderCell({ col, open, onToggle, value, onChange, sort, onSort, classN
   );
 }
 
-// Blocco inline: motivo facoltativo, scadenza facoltativa (vuoto = senza
-// fine). Stesso schema di prima, con le parole Blocca/Sblocca.
-function BanControl({ account, enabled, onBan, onUnban }) {
-  const [open, setOpen] = useState(false);
+// Durate del blocco nel menu a tendina "Blocca…". 'custom' apre nella
+// finestra la scelta di ore o giorni a mano; 'forever' = senza scadenza
+// (come "Fino al: vuoto" di prima).
+const BAN_DURATIONS = [
+  { value: '1d', label: '1 giorno', hours: 24 },
+  { value: '3d', label: '3 giorni', hours: 72 },
+  { value: '7d', label: '7 giorni', hours: 168 },
+  { value: 'custom', label: 'Ore o giorni a scelta…' },
+  { value: 'forever', label: 'Senza scadenza' },
+];
+
+// Motivazioni pronte: sceglierne una scrive il testo nel campo, che resta
+// modificabile; "Scrivi tu" lascia il campo libero.
+const BAN_REASONS = [
+  'Linguaggio offensivo o insulti verso altri utenti.',
+  'Spam o pubblicità non richiesta.',
+  'Molestie o comportamento aggressivo.',
+  'Contenuti inappropriati o non adatti alla community.',
+  'Profilo falso o uso dell’identità di un’altra persona.',
+  'Truffa o tentativo di frode.',
+  'Violazioni ripetute delle regole della community.',
+];
+
+const MAX_CUSTOM = { ore: 24 * 365, giorni: 365 };
+
+function durationLabel(hours) {
+  if (hours % 24 === 0) {
+    const d = hours / 24;
+    return d === 1 ? '1 giorno' : `${d} giorni`;
+  }
+  return hours === 1 ? '1 ora' : `${hours} ore`;
+}
+
+// Finestra del blocco: la durata scelta (o ore/giorni a mano), poi la
+// motivazione — da un elenco di risposte pronte o scritta a mano. La
+// motivazione arriva all'utente (fascia "Account bloccato" e mail).
+function BanDialog({ account, duration, onClose, onConfirm }) {
+  const [customAmount, setCustomAmount] = useState('');
+  const [customUnit, setCustomUnit] = useState('giorni');
+  const [preset, setPreset] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [finoAl, setFinoAl] = useState('');
-  const [saving, setSaving] = useState(false);
-  useReportUnsaved(open && (motivo.trim() !== '' || finoAl !== ''));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useReportUnsaved(motivo.trim() !== '' || customAmount !== '');
+  const name = account.nickname || account.username || 'questo utente';
+  const choice = BAN_DURATIONS.find((d) => d.value === duration);
+
+  const amount = Number(customAmount);
+  const customValid = Number.isInteger(amount) && amount >= 1 && amount <= MAX_CUSTOM[customUnit];
+  const hours =
+    duration === 'forever' ? null : duration === 'custom' ? (customValid ? amount * (customUnit === 'ore' ? 1 : 24) : null) : choice?.hours ?? null;
+  // Anteprima della scadenza dal momento in cui si è aperta la finestra
+  // (quella vera si ricalcola alla conferma, vedi run).
+  const [openedAt] = useState(() => Date.now());
+  const until = hours ? new Date(openedAt + hours * 3600 * 1000) : null;
+  const durationOk = duration === 'forever' || Boolean(hours);
+  const canConfirm = durationOk && motivo.trim().length > 0 && !busy;
+
+  const pickPreset = (value) => {
+    setPreset(value);
+    if (value !== '') setMotivo(BAN_REASONS[Number(value)]);
+  };
+
+  const run = async () => {
+    if (!canConfirm) return;
+    setBusy(true);
+    setError('');
+    // La scadenza si ricalcola adesso, non quando si è aperta la finestra.
+    const finoAl = hours ? new Date(Date.now() + hours * 3600 * 1000).toISOString() : null;
+    const res = await onConfirm(account, motivo.trim(), finoAl);
+    setBusy(false);
+    if (res?.error) setError(res.error);
+  };
+
+  return (
+    <ModalOverlay onClose={busy ? () => {} : onClose} className="rb-admin-reset-overlay">
+      <div className="rb-admin-reset-card rb-admin-delete-card rb-admin-ban-card" onClick={(e) => e.stopPropagation()}>
+        <h3>Blocca {name}</h3>
+
+        {duration === 'custom' ? (
+          <div className="rb-admin-delete-field">
+            Durata
+            <div className="rb-admin-ban-custom">
+              <input
+                type="number"
+                min={1}
+                max={MAX_CUSTOM[customUnit]}
+                step={1}
+                inputMode="numeric"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="es. 12"
+                aria-label="Quante ore o giorni"
+                autoFocus
+              />
+              <select value={customUnit} onChange={(e) => setCustomUnit(e.target.value)} aria-label="Ore o giorni">
+                <option value="ore">ore</option>
+                <option value="giorni">giorni</option>
+              </select>
+            </div>
+            {customAmount !== '' && !customValid && (
+              <small className="rb-admin-error">
+                Scrivi un numero intero da 1 a {MAX_CUSTOM[customUnit]} {customUnit}.
+              </small>
+            )}
+          </div>
+        ) : null}
+
+        <p className="rb-admin-ban-summary">
+          {duration === 'forever'
+            ? 'Blocco senza scadenza: resta finché qualcuno dello staff non lo toglie.'
+            : until
+            ? `Blocco di ${durationLabel(hours)}, fino al ${until.toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' })}.`
+            : 'Scegli quante ore o quanti giorni.'}
+        </p>
+
+        <label className="rb-admin-delete-field">
+          Motivazione
+          <select value={preset} onChange={(e) => pickPreset(e.target.value)}>
+            <option value="">Scrivi tu la motivazione…</option>
+            {BAN_REASONS.map((r, i) => (
+              <option key={r} value={String(i)}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="rb-admin-delete-field">
+          Messaggio per l'utente
+          <textarea
+            rows={4}
+            maxLength={500}
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Perché viene bloccato: lo vedrà nella fascia in alto e nella mail."
+            autoFocus={duration !== 'custom'}
+          />
+        </label>
+
+        {error && <p className="rb-admin-error">⚠️ {error}</p>}
+        <div className="rb-admin-delete-actions">
+          <button type="button" className="rb-reset-filters-btn" onClick={onClose} disabled={busy}>
+            Annulla
+          </button>
+          <button type="button" className="rb-admin-danger-btn" onClick={run} disabled={!canConfirm}>
+            {busy ? 'Blocco…' : 'Blocca'}
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// Cella del blocco: già bloccato -> "Sblocca"; altrimenti il menu a
+// tendina "Blocca…" con le durate, che apre la finestra della motivazione.
+function BanControl({ account, enabled, onBan, onUnban }) {
+  const [duration, setDuration] = useState(null);
 
   if (account.bannato) {
     return (
@@ -117,39 +254,37 @@ function BanControl({ account, enabled, onBan, onUnban }) {
       </button>
     );
   }
-  if (!open) {
-    return (
-      <button type="button" className="rb-admin-reset-btn" onClick={() => setOpen(true)} disabled={!enabled}>
-        Blocca
-      </button>
-    );
-  }
-  const submit = async () => {
-    setSaving(true);
-    const ok = await onBan(account, motivo, finoAl ? fromDatetimeLocal(finoAl) : null);
-    setSaving(false);
-    if (ok) {
-      setOpen(false);
-      setMotivo('');
-      setFinoAl('');
-    }
-  };
   return (
-    <div className="rb-admin-ban-form">
-      <textarea placeholder="Motivo (facoltativo)" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} />
-      <label>
-        Fino al (vuoto = senza fine)
-        <input type="datetime-local" value={finoAl} onChange={(e) => setFinoAl(e.target.value)} min={toDatetimeLocal(new Date().toISOString())} />
-      </label>
-      <div className="rb-admin-ban-form-actions">
-        <button type="button" className="rb-reset-filters-btn" onClick={() => setOpen(false)} disabled={saving}>
-          Annulla
-        </button>
-        <button type="button" className="rb-btn-primary" onClick={submit} disabled={saving}>
-          {saving ? 'Blocco…' : 'Blocca'}
-        </button>
-      </div>
-    </div>
+    <>
+      <select
+        className="rb-admin-ban-select"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) setDuration(e.target.value);
+        }}
+        disabled={!enabled}
+        aria-label={`Blocca ${account.nickname || account.username || 'utente'}`}
+      >
+        <option value="">Blocca…</option>
+        {BAN_DURATIONS.map((d) => (
+          <option key={d.value} value={d.value}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+      {duration && (
+        <BanDialog
+          account={account}
+          duration={duration}
+          onClose={() => setDuration(null)}
+          onConfirm={async (acc, motivo, finoAl) => {
+            const res = await onBan(acc, motivo, finoAl);
+            if (!res?.error) setDuration(null);
+            return res;
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -325,12 +460,11 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
 
   // Blocco riuscito -> la mail di avviso (staff-actions notifica_ban), con
   // l'esito della mail accanto al messaggio.
+  // -> { error } se il blocco non riesce (mostrato nella finestra del
+  // blocco), {} se riesce.
   const ban = async (account, motivo, finoAl) => {
     const { error } = await banAccount(account.id, motivo, finoAl);
-    if (error) {
-      setNotice({ tone: 'error', text: error });
-      return false;
-    }
+    if (error) return { error };
     const name = account.nickname || account.username;
     const mail = await notifyBan(account.id, motivo?.trim() || '');
     setNotice(
@@ -339,7 +473,7 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
         : { tone: 'ok', text: `${name} bloccato · ${mailLabel(mail.email)}` }
     );
     afterChange('ban_account', account.id, { motivo: motivo || null, finoAl });
-    return true;
+    return {};
   };
 
   const unban = async (account) => {
