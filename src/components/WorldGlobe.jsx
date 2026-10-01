@@ -149,6 +149,44 @@ function makeMarkerEl(user, world, onOpen) {
   return el;
 }
 
+// Mondi in cui gli utenti sono solo pallini, a qualsiasi zoom: niente
+// avatar né grumi col numero (marker HTML), ma un solo oggetto Points
+// dentro la scena 3D, sulla superficie del globo. Così le categorie, che
+// stanno sul guscio esterno, restano davanti e cliccabili (i marker HTML
+// stanno sopra al canvas e coprivano nuvolette ed etichette). Non sono
+// cliccabili. Gli altri mondi restano sui marker di sempre.
+const USER_DOT_WORLDS = new Set(['faq']);
+// Raggio 100 come la sfera, più un filo (quota 0.003 = raggio 100,3):
+// esattamente a 100 i pallini vicino al bordo del globo sfarfallerebbero
+// con la superficie (stessa profondità).
+const USER_DOT_ALTITUDE = 0.003;
+// Dimensione in pixel sullo schermo (uguale da lontano e da vicino).
+const USER_DOT_SIZE_PX = 11;
+
+// Texture del pallino: centro pieno e alone morbido intorno; il colore lo
+// dà il colore del vertice (quello del mondo, verde per la posizione dal
+// vivo). Una sola, condivisa.
+let userDotTexture = null;
+function getUserDotTexture() {
+  if (userDotTexture) return userDotTexture;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.22, 'rgba(255,255,255,1)');
+  g.addColorStop(0.32, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.6, 'rgba(255,255,255,0.16)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  userDotTexture = new THREE.CanvasTexture(canvas);
+  userDotTexture.colorSpace = THREE.SRGBColorSpace;
+  return userDotTexture;
+}
+
 // Soglie di zoom (unità di pointOfView: più alta = più lontano) usate dalle
 // pillole delle città (globe/placeLabels.js, onZoomTo). I marker degli
 // utenti si raggruppano invece per distanza sullo schermo (clusterUsers).
@@ -714,10 +752,14 @@ export default function WorldGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Nei mondi a pallini (USER_DOT_WORLDS) gli utenti non diventano marker
+  // HTML: li disegna l'oggetto Points più giù.
+  const userDotsWorld = USER_DOT_WORLDS.has(world.id);
   const displayItems = useMemo(() => {
     const eventItems = events.map((e) => ({ kind: 'event', ...e }));
+    if (userDotsWorld) return eventItems;
     return [...clusterUsers(users, view, typeof window !== 'undefined' ? window.innerHeight : 800), ...eventItems];
-  }, [users, view, events]);
+  }, [users, view, events, userDotsWorld]);
 
   const expandCluster = (cluster) => {
     startupViewActiveRef.current = false;
@@ -1016,6 +1058,55 @@ export default function WorldGlobe({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Utenti come pallini nella scena (mondi di USER_DOT_WORLDS): un solo
+  // THREE.Points nel gruppo dell'overlay, che ruota insieme al globo. Le
+  // coordinate vengono da getCoords del globo, la stessa funzione che
+  // posiziona i marker HTML negli altri mondi. La sfera opaca nasconde da
+  // sola i pallini sul retro; renderOrder -1 li disegna prima delle
+  // nuvolette trasparenti, che restano davanti.
+  useEffect(() => {
+    const g = globeRef.current;
+    const overlay = overlayRef.current;
+    if (!userDotsWorld || !g || !overlay || !users?.length) return undefined;
+    const positions = new Float32Array(users.length * 3);
+    const colors = new Float32Array(users.length * 3);
+    const base = new THREE.Color(world.color);
+    const live = new THREE.Color(LIVE_LOCATION_COLOR);
+    let n = 0;
+    for (const u of users) {
+      if (!Number.isFinite(u?.lat) || !Number.isFinite(u?.lng)) continue;
+      const p = g.getCoords(u.lat, u.lng, USER_DOT_ALTITUDE);
+      positions.set([p.x, p.y, p.z], n * 3);
+      const c = u.isLive ? live : base;
+      colors.set([c.r, c.g, c.b], n * 3);
+      n++;
+    }
+    if (n === 0) return undefined;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, n * 3), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, n * 3), 3));
+    const material = new THREE.PointsMaterial({
+      size: USER_DOT_SIZE_PX,
+      sizeAttenuation: false,
+      map: getUserDotTexture(),
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.renderOrder = -1;
+    points.raycast = () => {}; // mai cliccabili
+    overlay.group.add(points);
+    globeActivity.wake();
+    return () => {
+      overlay.group.remove(points);
+      geometry.dispose();
+      material.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDotsWorld, users, world.color]);
 
   // Continenti: due sistemi alternativi, scelti da USE_REALISTIC_CONTINENTS.
   // Puntini (vecchio): caricati dall'immagine terra/acqua, se falliscono il
