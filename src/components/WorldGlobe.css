@@ -385,3 +385,11 @@
 .rb-event-marker * {
   touch-action: none;
 }
+
+/* Mondi con gli utenti a pallini 3D da lontano (FAR_USER_DOT_WORLDS in
+   WorldGlobe.jsx): nella fascia far il puntino HTML dei marker lascia il
+   posto ai pallini dentro la scena, fermi coi continenti. */
+[data-far-user-dots][data-ev-zoom='far'] .rb-marker-far-dot {
+  opacity: 0;
+  pointer-events: none;
+}
