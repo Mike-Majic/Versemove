@@ -982,7 +982,11 @@ export function buildCategoryShell(
     b.fromBufferAttribute(pos, bestFace * 3 + 1);
     c.fromBufferAttribute(pos, bestFace * 3 + 2);
     centroid.copy(a).add(b).add(c).divideScalar(3);
-    const normal = centroid.clone().normalize();
+    // Di norma la sagoma sta al centro del triangolo più vicino all'anchor;
+    // con exactAnchor (mondo Incontri: Match al centro della vista iniziale,
+    // Videochiamata esattamente alle sue spalle) sta proprio sull'anchor. Il
+    // triangolo resta comunque "occupato", per il margine dalle altre.
+    const normal = cat.exactAnchor ? targetDir.clone() : centroid.clone().normalize();
 
     // Triangoli semplici (niente sagoma): sizeFactor li rimpicciolisce
     // direttamente (es. Vetrina, 14 categorie: più spazio fra l'una e
@@ -1008,6 +1012,14 @@ export function buildCategoryShell(
       shapeCenter = normal.clone().multiplyScalar(radius);
       shapeScale = uniformShapeRadius * sizeFactor;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
+      if (cat.exactAnchor) {
+        // Il disegno della sagoma (es. il cuore) non è centrato sulla sua
+        // origine: qui si centra sul suo riquadro, così il centro visivo
+        // cade esattamente sull'anchor.
+        faceGeo.computeBoundingBox();
+        const box = faceGeo.boundingBox;
+        faceGeo.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, 0);
+      }
       if (vivid) {
         // Geometria lasciata LOCALE (piana, centrata nell'origine): la
         // posizione/orientamento sulla sfera li porta il perno (pivot)
