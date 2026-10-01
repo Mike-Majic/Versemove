@@ -173,28 +173,57 @@ export async function getUnreadCounts() {
   }
 }
 
-// last_read_at dell'altro partecipante di una conversazione diretta (per
-// "Visualizzato"/"Inviato" sotto il mio ultimo messaggio): la RLS
+// Ricevute dell'altro partecipante di una conversazione diretta:
+// last_delivered_at (i messaggi gli sono arrivati, ✓✓ grigie) e
+// last_read_at (li ha letti, ✓✓ blu). La RLS
 // (chat_participants_select_participant) lascia leggere la riga solo a chi
 // partecipa già alla stessa conversazione.
-export async function getOtherParticipantLastRead(conversationId, myId) {
+export async function getOtherParticipantReceipts(conversationId, myId) {
   try {
     const { data, error } = await supabase
       .from('chat_participants')
-      .select('user_id, last_read_at')
+      .select('user_id, last_read_at, last_delivered_at')
       .eq('conversation_id', conversationId)
       .neq('user_id', myId)
       .maybeSingle();
-    if (error || !data) return null;
-    return data.last_read_at;
+    if (error || !data) return { lastReadAt: null, lastDeliveredAt: null };
+    return { lastReadAt: data.last_read_at ?? null, lastDeliveredAt: data.last_delivered_at ?? null };
   } catch {
-    return null;
+    return { lastReadAt: null, lastDeliveredAt: null };
   }
+}
+
+// "Mi sono arrivati": aggiorna last_delivered_at su tutte le mie
+// conversazioni con messaggi nuovi (mark_chats_delivered). Al massimo una
+// chiamata ogni 2 secondi: quelle in mezzo diventano una sola chiamata alla
+// fine dell'intervallo, così nessun messaggio arrivato resta senza ✓✓.
+const DELIVERED_MIN_GAP_MS = 2000;
+let lastDeliveredCallAt = 0;
+let deliveredTimer = null;
+function callMarkDelivered() {
+  lastDeliveredCallAt = Date.now();
+  supabase.rpc('mark_chats_delivered').then(
+    () => {},
+    () => {}
+  );
+}
+export function markChatsDelivered() {
+  if (deliveredTimer) return;
+  const wait = lastDeliveredCallAt + DELIVERED_MIN_GAP_MS - Date.now();
+  if (wait <= 0) {
+    callMarkDelivered();
+    return;
+  }
+  deliveredTimer = setTimeout(() => {
+    deliveredTimer = null;
+    callMarkDelivered();
+  }, wait);
 }
 
 // Canale realtime sugli aggiornamenti di chat_participants per la
 // conversazione aperta: l'altra persona che apre la chat (mark_conversation_read)
-// aggiorna la propria riga, qui basta ricontrollare il suo last_read_at.
+// aggiorna la propria riga (anche mark_chats_delivered), qui basta
+// rileggere last_read_at e last_delivered_at.
 export function subscribeToParticipantUpdates(conversationId, onUpdate) {
   return supabase
     .channel(`chat-participants-${conversationId}`)

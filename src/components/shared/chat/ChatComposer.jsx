@@ -32,6 +32,9 @@ export default function ChatComposer({
   onSend,
   extraMenuItems = [],
   onDirtyChange,
+  // false: niente suggerimenti "@" (es. chat FAQ, dove il server non salva
+  // le menzioni).
+  mentionsEnabled = true,
 }) {
   const [text, setText] = useState('');
   const [mentions, setMentions] = useState([]);
@@ -339,6 +342,7 @@ export default function ChatComposer({
             onMentionsChange={setMentions}
             contesto={contesto}
             contestoId={contestoId}
+            suggest={mentionsEnabled}
             dropdownTitle={mentionTitle}
             placeholder={placeholder}
             disabled={disabled}

@@ -1,6 +1,7 @@
 // Categorie del mondo FAQ (nero): Stanza MOD (solo staff, filtrata via
 // getFaqCategories — mai nell'array passato a chi non è owner/moderatore),
-// Segnalazioni, Suggerimenti, Informazioni. Stessa struttura delle altre
+// Chat (stanza unica utenti + staff, per tutti), Segnalazioni,
+// Suggerimenti, Informazioni. Stessa struttura delle altre
 // liste categoria (LAVORO_CATEGORIES ecc.), stesso meccanismo di forme sul
 // globo (nuvole, vedi App.jsx CATEGORY_SHAPE_BY_WORLD e globe/categoryShell.js).
 //
@@ -16,6 +17,16 @@ export const FAQ_CATEGORIES = [
     aliases: ['stanza mod', 'mod room', 'staff'],
     subfamilies: [],
     staffOnly: true,
+  },
+  {
+    // Stanza unica stile gruppo fra utenti e staff (FaqChatColumn):
+    // visibile a chiunque abbia accesso al mondo FAQ.
+    id: 'chat',
+    label: 'Chat',
+    icon: '💬',
+    anchor: { lat: -28, lng: -15 }, // Atlantico del sud, lontano dalle altre nuvole
+    aliases: ['chat', 'chat staff', 'parla con lo staff', 'assistenza', 'supporto'],
+    subfamilies: [],
   },
   {
     id: 'segnalazioni',
@@ -46,9 +57,11 @@ export const FAQ_CATEGORIES = [
 // Solo le categorie visibili per QUESTO utente (Stanza MOD esclusa per chi
 // non è owner/moderatore) — usato ovunque al posto dell'array completo,
 // così una categoria nascosta non compare né sul globo né nella lista né
-// nella ricerca testuale.
-export function getFaqCategories(isStaffUser) {
-  return isStaffUser ? FAQ_CATEGORIES : FAQ_CATEGORIES.filter((c) => !c.staffOnly);
+// nella ricerca testuale. Il proprietario (user.ruolo === 'owner') vede
+// sempre tutto, qualunque sia il primo argomento.
+export function getFaqCategories(isStaffUser, user = null) {
+  if (user?.ruolo === 'owner' || isStaffUser) return FAQ_CATEGORIES;
+  return FAQ_CATEGORIES.filter((c) => !c.staffOnly);
 }
 
 export function resolveCategoryQuery(query, categories = FAQ_CATEGORIES) {

@@ -59,7 +59,7 @@ import {
   removeFriend as removeFriendApi,
 } from './data/friends';
 import { getReceivedFamilyRequests } from './data/family';
-import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
+import { getUnreadCounts, subscribeToOwnMessages, markChatsDelivered } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications, describeNotification } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
@@ -206,8 +206,8 @@ export default function App() {
   const canRecruit = canSearchCandidates(user);
   const categorySet = useMemo(() => {
     if (!baseCategorySet) return baseCategorySet;
-    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
-    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit) };
+    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo), user) };
+    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit, user) };
     return baseCategorySet;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseCategorySet, world.id, user?.ruolo, canRecruit]);
@@ -346,6 +346,10 @@ export default function App() {
   // reactors } quando aperto, null quando chiuso (vedi ReactorsModal).
   const [culturalReactorsView, setCulturalReactorsView] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
+  // Conversazione già aperta da chi apre la chat (es. lo staff con
+  // start_staff_conversation dalla Chat FAQ): FriendChatModal la usa
+  // invece di crearne/cercarne una con start_direct_conversation.
+  const [activeFriendChatConvId, setActiveFriendChatConvId] = useState(null);
   // Chat aperta da "Rispondi" su una chiamata in arrivo: la chiamata si
   // accetta da sola (vedi IncomingCallToast / CallModal autoAnswer).
   const [answerCallFrom, setAnswerCallFrom] = useState(null);
@@ -736,11 +740,25 @@ export default function App() {
   };
   useEffect(refreshUnread, [user?.id]);
 
+  // Spunte delle chat private: "consegnato" (✓✓ grigie) per chi scrive
+  // quando i suoi messaggi arrivano qui — all'accesso, quando la scheda
+  // torna visibile e a ogni messaggio in arrivo da altri
+  // (mark_chats_delivered, al massimo una volta ogni 2 secondi, vedi
+  // markChatsDelivered in data/directChat.js).
   useEffect(() => {
     if (!user) return undefined;
-    const channel = subscribeToOwnMessages(() => refreshUnread());
+    markChatsDelivered();
+    const channel = subscribeToOwnMessages((row) => {
+      refreshUnread();
+      if (row?.sender_id && row.sender_id !== user.id) markChatsDelivered();
+    });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') markChatsDelivered();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -975,7 +993,15 @@ export default function App() {
   const navigateToCategory = (worldId, categoryId, initialSubfamily = '') => {
     const targetIndex = WORLDS.findIndex((w) => w.id === worldId);
     if (targetIndex === -1) return;
-    const worldCategories = worldId === 'lavoro' ? getLavoroCategories(canRecruit) : CATEGORY_WORLDS[worldId]?.categories;
+    // Stessi filtri per ruolo di categorySet: altrimenti una categoria
+    // riservata (Stanza MOD, Cerca candidati) non si troverebbe qui anche
+    // per chi la vede, e il proprietario vede sempre tutto.
+    const worldCategories =
+      worldId === 'lavoro'
+        ? getLavoroCategories(canRecruit, user)
+        : worldId === 'faq'
+        ? getFaqCategories(isStaff(user?.ruolo), user)
+        : CATEGORY_WORLDS[worldId]?.categories;
     const cat = worldCategories?.find((c) => c.id === categoryId);
     if (!cat) return;
     const sameWorld = targetIndex === index;
@@ -1014,7 +1040,9 @@ export default function App() {
     // "Rispondi" a un messaggio della casella dello staff (Stanza MOD):
     // chat diretta con chi l'ha scritto.
     const onOpenChat = (e) => {
-      if (e.detail?.userId) setActiveFriendChatId(e.detail.userId);
+      if (!e.detail?.userId) return;
+      setActiveFriendChatConvId(e.detail.conversationId ?? null);
+      setActiveFriendChatId(e.detail.userId);
     };
     window.addEventListener('vm:open-profile', onOpenProfile);
     window.addEventListener('vm:open-chat', onOpenChat);
@@ -1816,10 +1844,12 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <FriendChatModal
             friendId={activeFriendChatId}
+            initialConversationId={activeFriendChatConvId}
             user={user}
             world={world}
             onClose={() => {
               setActiveFriendChatId(null);
+              setActiveFriendChatConvId(null);
               setAnswerCallFrom(null);
             }}
             onMessagesRead={refreshUnread}

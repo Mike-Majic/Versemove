@@ -24,7 +24,7 @@ export default function LavoroWorldExplorer({
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
   const canRecruit = canSearchCandidates(user);
-  const categories = useMemo(() => getLavoroCategories(canRecruit), [canRecruit]);
+  const categories = useMemo(() => getLavoroCategories(canRecruit, user), [canRecruit, user]);
   const category = categories.find((c) => c.id === activeCategory) ?? null;
 
   const submitSearch = (e) => {

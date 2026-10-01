@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { getFaqCategories, resolveCategoryQuery } from '../../data/faqCategories';
 import { isStaff } from '../../data/roles';
 import ModRoomColumn from './ModRoomColumn';
+import FaqChatColumn from './FaqChatColumn';
 import SegnalazioniColumn from './SegnalazioniColumn';
 import SuggerimentiColumn from './SuggerimentiColumn';
 import InformazioniColumn from './InformazioniColumn';
@@ -28,7 +29,7 @@ export default function FaqWorldExplorer({
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
   const staff = isStaff(user?.ruolo);
-  const categories = useMemo(() => getFaqCategories(staff), [staff]);
+  const categories = useMemo(() => getFaqCategories(staff, user), [staff, user]);
   const category = categories.find((c) => c.id === activeCategory) ?? null;
 
   const submitSearch = (e) => {
@@ -71,9 +72,9 @@ export default function FaqWorldExplorer({
               />
             </div>
 
-            {/* Sopra la Stanza MOD (pannello unico a tutto schermo) la
-                ricerca delle categorie coprirebbe la sua testata. */}
-            {category.id !== 'mod-room' && (
+            {/* Sopra la Stanza MOD e la Chat (pannelli unici a tutto
+                schermo) la ricerca delle categorie coprirebbe la testata. */}
+            {category.id !== 'mod-room' && category.id !== 'chat' && (
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
@@ -94,6 +95,9 @@ export default function FaqWorldExplorer({
               del mondo, apertura olografica, chiusura in particelle) —
               prima i contenuti erano disegnati "nudi" sopra al globo. */}
           {category.id === 'mod-room' && staff && <ModRoomColumn user={user} onOpenCategory={onToggleCategory} />}
+          {category.id === 'chat' && (
+            <FaqChatColumn user={user} onOpenAuth={onOpenAuth} onClose={() => onToggleCategory(null)} />
+          )}
           {category.id === 'segnalazioni' && (
             <SegnalazioniColumn user={user} onOpenAuth={onOpenAuth} closing={isClosing} />
           )}
