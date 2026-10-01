@@ -17,25 +17,13 @@ import {
   toggleCommentReaction,
 } from '../../data/posts';
 import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
-import { getFamily, familyRelationLabel } from '../../data/family';
-import { SUPPORTED_LANGUAGES } from '../../i18n';
-import { birthdayLabel } from '../../data/zodiac';
+import { getFamily } from '../../data/family';
 import { fetchGamertagsMap } from '../../data/gaming';
-import GamertagChips from '../shared/GamertagChips';
+import SocialProfileView from './SocialProfileView';
 import './SocialProfileModal.css';
 import LoadMoreButton from '../shared/LoadMoreButton';
-import AvatarImg from '../shared/AvatarImg';
 import Icon from '../shared/Icon';
 
-const GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario', preferisco_non_dire: 'Preferisco non dire' };
-const STATO_LABELS = {
-  single: 'Single',
-  fidanzato_a: 'Fidanzato/a',
-  sposato_a: 'Sposato/a',
-  unione_civile: 'Unione civile',
-  convivente: 'Convivente',
-  complicato: "È complicato",
-};
 
 // Profilo pubblico di un altro utente: avatar/nickname + i suoi post nel
 // mondo Social (stessa PostCard del feed principale, per coerenza visiva e
@@ -149,72 +137,32 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
           <Skeleton lines={4} />
         ) : (
           <>
-            <div className="rb-social-profile-head">
-              <AvatarImg src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt={profile.name} />
-              <div>
-                <strong>{profile.name}</strong>
-                {profile.citta && <span className="rb-social-profile-city">{profile.citta}</span>}
-              </div>
-              <button
-                type="button"
-                className={`rb-social-profile-follow-btn ${isFollowing ? 'active' : ''}`}
-                onClick={() => (user ? onToggleFollow(userId) : onOpenAuth())}
-              >
-                {isFollowing ? 'Segui già' : '+ Segui'}
-              </button>
-              {profile.nickname && (
-                <ShareLinkButton
-                  className="rb-social-profile-share-btn"
-                  url={() => linkToProfile(profile.nickname)}
-                  title={`${profile.name} su Versemove`}
-                  label={<Icon name="link" size={17} />}
-                  copiedLabel="✓"
-                  ariaLabel="Condividi il link del profilo"
-                />
-              )}
-            </div>
-
-            {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}
-            <GamertagChips gamertags={gamertags} />
-
-            {(profile.cittaOrigine || profile.statoRelazionale || profile.genere || profile.pronomi || profile.zodiaco || profile.lingueParlate?.length > 0) && (
-              <ul className="rb-social-profile-info-list">
-                {profile.cittaOrigine && <li>🏠 Di {profile.cittaOrigine}</li>}
-                {(profile.zodiaco || (profile.giornoNascita && profile.meseNascita)) && (
-                  <li>
-                    {profile.giornoNascita && profile.meseNascita && `🎂 ${birthdayLabel(profile.giornoNascita, profile.meseNascita)}`}
-                    {profile.giornoNascita && profile.meseNascita && profile.zodiaco && ' '}
-                    {profile.zodiaco && `${profile.zodiaco.emoji} ${profile.zodiaco.name}`}
-                  </li>
-                )}
-                {profile.statoRelazionale && <li>💞 {STATO_LABELS[profile.statoRelazionale] ?? profile.statoRelazionale}</li>}
-                {(profile.genere || profile.pronomi) && (
-                  <li>
-                    ⚧ {GENDER_LABELS[profile.genere] ?? profile.genere}{profile.pronomi ? ` · ${profile.pronomi}` : ''}
-                  </li>
-                )}
-                {profile.lingueParlate?.length > 0 && (
-                  <li>
-                    🗣️ {profile.lingueParlate.map((code) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.nativeLabel ?? code).join(', ')}
-                  </li>
-                )}
-              </ul>
-            )}
-
-            {family.length > 0 && (
-              <div className="rb-social-profile-family">
-                <span className="rb-social-profile-family-title">Familiari</span>
-                <ul className="rb-social-profile-family-list">
-                  {family.map((f) => (
-                    <li key={f.linkId}>
-                      <AvatarImg src={f.other.avatar} name={f.other?.name || f.other?.nickname} seed={f.other?.id} alt="" />
-                      <span>{f.other.name}</span>
-                      <span className="rb-social-profile-family-relation">{familyRelationLabel(f.relazione)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <SocialProfileView
+              profile={profile}
+              gamertags={gamertags}
+              family={family}
+              actions={
+                <>
+                  <button
+                    type="button"
+                    className={`rb-social-profile-follow-btn ${isFollowing ? 'active' : ''}`}
+                    onClick={() => (user ? onToggleFollow(userId) : onOpenAuth())}
+                  >
+                    {isFollowing ? 'Segui già' : '+ Segui'}
+                  </button>
+                  {profile.nickname && (
+                    <ShareLinkButton
+                      className="rb-social-profile-share-btn"
+                      url={() => linkToProfile(profile.nickname)}
+                      title={`${profile.name} su Versemove`}
+                      label={<Icon name="link" size={17} />}
+                      copiedLabel="✓"
+                      ariaLabel="Condividi il link del profilo"
+                    />
+                  )}
+                </>
+              }
+            />
 
             {error && <p className="rb-giochi-error">{error}</p>}
 

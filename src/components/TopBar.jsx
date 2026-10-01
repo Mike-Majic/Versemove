@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from './shared/Icon';
 import { isStaff } from '../data/roles';
 import { translateWorld } from '../i18n/worldLabels';
+import WorldStats from './WorldStats';
 import './TopBar.css';
 import AvatarImg from './shared/AvatarImg';
 
@@ -42,6 +43,7 @@ export default function TopBar({
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
         <span className="rb-world-pill">{translateWorld(t, world).label}</span>
+        <WorldStats world={world} />
       </div>
 
       <div className="rb-topbar-actions" ref={actionsRef}>

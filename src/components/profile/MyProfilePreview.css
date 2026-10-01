@@ -1,0 +1,208 @@
+/* Anteprima di un profilo in Il mio profilo (MyProfilePreview.jsx). */
+.rb-myprof-head {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 16px;
+}
+
+.rb-myprof-title {
+  text-align: center;
+  min-width: 0;
+}
+
+.rb-profile-settings-card .rb-myprof-title h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.rb-myprof-title span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent, #1d9bf0);
+}
+
+.rb-myprof-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f5f7;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.rb-myprof-icon-btn:hover {
+  border-color: var(--accent, #1d9bf0);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rb-myprof-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rb-myprof-msg {
+  margin: 8px 0;
+  font-size: 13.5px;
+  color: rgba(245, 245, 247, 0.7);
+  text-align: center;
+}
+
+.rb-myprof-status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: rgba(245, 245, 247, 0.75);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.rb-myprof-status.ok {
+  color: #7cf0a6;
+  background: rgba(62, 224, 122, 0.08);
+  border-color: rgba(62, 224, 122, 0.45);
+}
+
+/* Le rese degli altri profili, adattate alla larghezza del pannello. */
+.rb-myprof-social .rb-social-profile-head {
+  padding-right: 0;
+}
+
+.rb-myprof-lavoro .rb-cand-modal-head {
+  padding-right: 0;
+}
+
+.rb-profile-settings-card .rb-myprof-lavoro .rb-cand-modal-head h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.rb-myprof-dating {
+  display: flex;
+  justify-content: center;
+}
+
+.rb-myprof-dating .rb-dpc {
+  width: 100%;
+  max-width: 400px;
+  height: min(70vh, 600px);
+}
+
+.rb-myprof-complete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--accent, #1d9bf0) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 8%, transparent);
+  color: #f5f5f7;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-myprof-complete strong {
+  display: block;
+  font-size: 14px;
+}
+
+.rb-myprof-complete-list {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-myprof-complete > span[aria-hidden] {
+  font-size: 22px;
+  color: var(--accent, #1d9bf0);
+}
+
+/* Elenco dei tre profili sotto la foto. */
+.rb-myprof-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rb-myprof-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f5f7;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-myprof-item:hover {
+  border-color: var(--accent, #1d9bf0);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.rb-myprof-item-icon {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+}
+
+.rb-myprof-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.rb-myprof-item-text strong {
+  display: block;
+  font-size: 15px;
+}
+
+.rb-myprof-item-text span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.rb-myprof-item-arrow {
+  font-size: 22px;
+  color: rgba(245, 245, 247, 0.45);
+}
+
+/* Finestra di modifica di un profilo. */
+.rb-myprof-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.rb-profile-settings-card .rb-myprof-edit-head h2 {
+  margin: 0;
+}
+
+/* Il titolo del pannello (h2) non deve cambiare il nome sulla scheda. */
+.rb-profile-settings-card .rb-myprof-dating .rb-dpc-name {
+  margin: 2px 0;
+  font-size: 30px;
+}

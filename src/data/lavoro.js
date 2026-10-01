@@ -170,6 +170,77 @@ export async function getCandidato(id) {
   }
 }
 
+// Anteprima del proprio Profilo di Lavoro (Il mio profilo): gli stessi
+// dati che get_candidato_lavoro dà alle aziende verificate, letti dal
+// proprio profilo (quella funzione è riservata alle aziende).
+function etaDa(iso) {
+  const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const oggi = new Date();
+  let eta = oggi.getFullYear() - Number(m[1]);
+  if (oggi.getMonth() + 1 < Number(m[2]) || (oggi.getMonth() + 1 === Number(m[2]) && oggi.getDate() < Number(m[3]))) eta -= 1;
+  return eta;
+}
+
+export async function getMyCandidatoPreview() {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return { error: 'Accesso richiesto.' };
+    const [{ data: p, error }, { data: esp }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select(
+          'id, nome, cognome, avatar_url, email, data_nascita, citta_lavoro, citta_lavoro_geo, bio_lavoro, lavoro_titolo_studio, lingue_parlate, lavoro_telefono, lavoro_telefono_secondario, attachments, lavoro_visibile_aziende'
+        )
+        .eq('id', auth.user.id)
+        .single(),
+      supabase
+        .from('lavoro_esperienze')
+        .select('azienda, posizione, citta, descrizione, anno_da, anno_a, attuale')
+        .eq('user_id', auth.user.id)
+        .order('attuale', { ascending: false })
+        .order('anno_da', { ascending: false, nullsFirst: false }),
+    ]);
+    if (error || !p) return { error: error?.message ?? 'Profilo non disponibile.' };
+    let paese = '';
+    let cittaGeo = '';
+    if (p.citta_lavoro_geo) {
+      const { data: c } = await supabase.from('citta').select('nome, paese').eq('geoname_id', p.citta_lavoro_geo).maybeSingle();
+      paese = c?.paese ?? '';
+      cittaGeo = c?.nome ?? '';
+    }
+    const cv = (p.attachments ?? []).find((a) => a?.tipo === 'cv' && a?.path);
+    return {
+      visibile: Boolean(p.lavoro_visibile_aziende),
+      candidato: {
+        ...mapCandidato({
+          ...p,
+          citta: p.citta_lavoro || cittaGeo,
+          paese,
+          bio: p.bio_lavoro,
+          eta: etaDa(p.data_nascita),
+          titolo_studio: p.lavoro_titolo_studio,
+        }),
+        email: p.email ?? '',
+        telefono: p.lavoro_telefono ?? '',
+        telefonoSecondario: p.lavoro_telefono_secondario ?? '',
+        cv: cv ? { name: cv.name ?? 'Curriculum', path: cv.path } : null,
+        esperienze: (esp ?? []).map((e) => ({
+          azienda: e.azienda ?? '',
+          posizione: e.posizione ?? '',
+          citta: e.citta ?? '',
+          descrizione: e.descrizione ?? '',
+          annoDa: e.anno_da ?? null,
+          annoA: e.anno_a ?? null,
+          attuale: Boolean(e.attuale),
+        })),
+      },
+    };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
 // Curriculum nel bucket privato "attachments": link firmato valido 60 s.
 export async function candidatoCvUrl(path) {
   try {

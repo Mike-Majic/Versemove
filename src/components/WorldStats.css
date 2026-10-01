@@ -1,0 +1,89 @@
+/* Contatori iscritti/online accanto al nome del mondo (WorldStats.jsx). */
+.rb-world-stats {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #1d9bf0) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 10%, rgba(10, 12, 20, 0.55));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(245, 245, 247, 0.85);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: default;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #1d9bf0) 18%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.rb-world-stats strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.rb-world-stats-sep {
+  opacity: 0.5;
+}
+
+.rb-world-stats-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rb-world-stats-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ee07a;
+  box-shadow: 0 0 6px #3ee07a;
+}
+
+.rb-world-stats-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid #3ee07a;
+  animation: rb-world-stats-pulse 1.8s ease-out infinite;
+}
+
+@keyframes rb-world-stats-pulse {
+  from {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Schermi stretti: solo pallino e online; gli iscritti al tocco. */
+@media (max-width: 560px) {
+  .rb-world-stats {
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .rb-world-stats-iscritti,
+  .rb-world-stats-sep,
+  .rb-world-stats-online-label {
+    display: none;
+  }
+  .rb-world-stats.expanded .rb-world-stats-iscritti,
+  .rb-world-stats.expanded .rb-world-stats-sep {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-world-stats-dot::after {
+    animation: none;
+    display: none;
+  }
+}
