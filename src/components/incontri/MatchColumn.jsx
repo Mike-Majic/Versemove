@@ -15,6 +15,7 @@ import {
   addFavorite,
   removeFavorite,
   subscribeToOwnMatches,
+  INCONTRI_DECISION_EVENT,
 } from '../../data/incontri';
 import './MatchColumn.css';
 import AvatarImg from '../shared/AvatarImg';
@@ -51,7 +52,18 @@ function ActivityBadge({ attivita }) {
 // subito come nella vecchia demo locale). "Messaggi" apre la chat diretta
 // reale già usata per gli amici (FriendChatModal, via onOpenChat), non ha
 // una sua chat: un match è comunque solo una conversazione come le altre.
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, onConsumeInitialTab, matchFilters }) {
+// Nome + foto di un contatto: aprono la scheda del Profilo Incontri
+// (DatingCardModal via onOpenProfile), mai il profilo Social.
+function ContactButton({ profile, onOpen, children }) {
+  return (
+    <button type="button" className="rb-match-contact-btn" onClick={() => onOpen?.(profile.id)} aria-label={`Apri il profilo di ${profile.name}`}>
+      <AvatarImg src={profile.avatar} name={profile?.name || profile?.nickname} seed={profile?.id} alt="" />
+      {children}
+    </button>
+  );
+}
+
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab, matchFilters }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -205,6 +217,24 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // "Mi piace" dato dalla scheda del profilo (DatingCardModal): stesso
+  // effetto di quello dato da qui.
+  useEffect(() => {
+    const onDecision = (e) => {
+      const { id, matched } = e.detail ?? {};
+      if (!id) return;
+      setLikesYou((prev) => prev.filter((p) => p.id !== id));
+      setDeck((prev) => prev.filter((p) => p.id !== id));
+      if (matched) {
+        justMatchedIds.current.add(id);
+        refreshMatches();
+      }
+    };
+    window.addEventListener(INCONTRI_DECISION_EVENT, onDecision);
+    return () => window.removeEventListener(INCONTRI_DECISION_EVENT, onDecision);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const current = deck[0] ?? null;
 
   // Una pubblicità ogni MATCH_AD_EVERY voti (richiesta di Mike): il
@@ -346,7 +376,9 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
           >
             {isFavorite(current.id) ? '⭐' : '☆'}
           </button>
-          <AvatarImg className="rb-match-card-photo" src={current.avatar} name={current?.name || current?.nickname} seed={current?.id} alt={current.name} />
+          <button type="button" className="rb-match-card-photo-btn" onClick={() => onOpenProfile?.(current.id)} aria-label={`Apri il profilo di ${current.name}`}>
+            <AvatarImg className="rb-match-card-photo" src={current.avatar} name={current?.name || current?.nickname} seed={current?.id} alt={current.name} />
+          </button>
           <div className="rb-match-card-info">
             <strong>{current.name}{current.age ? `, ${current.age}` : ''}</strong>
             <span>{current.city}</span>
@@ -378,12 +410,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {likesYou.length === 0 && <p className="rb-match-pane-empty">Nessuno per ora, torna più tardi.</p>}
       {likesYou.map((u) => (
         <li key={u.id} className="rb-match-likes-item">
-          <AvatarImg src={u.avatar} name={u?.name || u?.nickname} seed={u?.id} alt="" />
-          <span>
-            <strong>{u.super ? '⭐ ' : ''}{u.name}{u.age ? `, ${u.age}` : ''}</strong>
-            <span className="rb-match-list-city">{u.city}</span>
-            <ActivityBadge attivita={u.attivita} />
-          </span>
+          <ContactButton profile={u} onOpen={onOpenProfile}>
+            <span>
+              <strong>{u.super ? '⭐ ' : ''}{u.name}{u.age ? `, ${u.age}` : ''}</strong>
+              <span className="rb-match-list-city">{u.city}</span>
+              <ActivityBadge attivita={u.attivita} />
+            </span>
+          </ContactButton>
           <div className="rb-match-likes-actions">
             <button type="button" onClick={() => decideLikesYou(u, 'passed')} aria-label="Rifiuta">✕</button>
             <button type="button" onClick={() => decideLikesYou(u, 'liked')} aria-label="Accetta">❤️</button>
@@ -400,12 +433,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {matches.length === 0 && <p className="rb-match-pane-empty">Metti &quot;Mi piace&quot; a un profilo per iniziare a fare match.</p>}
       {matches.map((m) => (
         <li key={m.id} className="rb-match-likes-item">
-          <AvatarImg src={m.avatar} name={m?.name || m?.nickname} seed={m?.id} alt="" />
-          <span>
-            <strong>{m.name}{m.age ? `, ${m.age}` : ''}</strong>
-            <span className="rb-match-list-city">{m.city}</span>
-            <ActivityBadge attivita={m.attivita} />
-          </span>
+          <ContactButton profile={m} onOpen={onOpenProfile}>
+            <span>
+              <strong>{m.name}{m.age ? `, ${m.age}` : ''}</strong>
+              <span className="rb-match-list-city">{m.city}</span>
+              <ActivityBadge attivita={m.attivita} />
+            </span>
+          </ContactButton>
           <button
             type="button"
             className="rb-reset-filters-btn rb-privacy-inline-btn"
@@ -445,12 +479,13 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, initialTab, 
       {favorites.length === 0 && <p className="rb-match-pane-empty">Tocca la stellina su un profilo per salvarlo qui.</p>}
       {favorites.map((f) => (
         <li key={f.id} className="rb-match-likes-item">
-          <AvatarImg src={f.avatar} name={f?.name || f?.nickname} seed={f?.id} alt="" />
-          <span>
-            <strong>{f.name}</strong>
-            <span className="rb-match-list-city">{f.city}</span>
-            <ActivityBadge attivita={f.attivita} />
-          </span>
+          <ContactButton profile={f} onOpen={onOpenProfile}>
+            <span>
+              <strong>{f.name}</strong>
+              <span className="rb-match-list-city">{f.city}</span>
+              <ActivityBadge attivita={f.attivita} />
+            </span>
+          </ContactButton>
           <button
             type="button"
             className="rb-match-fav-remove"

@@ -360,3 +360,46 @@
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* Foto + nome di un contatto: aprono la scheda del Profilo Incontri. */
+.rb-match-contact-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-match-contact-btn > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-match-contact-btn:hover strong {
+  text-decoration: underline;
+}
+
+.rb-match-card-photo-btn {
+  display: block;
+  width: 100%;
+  height: 60%;
+  min-height: 160px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.rb-match-card-photo-btn .rb-match-card-photo {
+  height: 100%;
+  min-height: 0;
+}

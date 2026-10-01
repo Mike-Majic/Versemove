@@ -1,0 +1,214 @@
+/* Scheda del Profilo Incontri (DatingCardModal.jsx). */
+.rb-dating-card {
+  --accent: #ff3860;
+  position: relative;
+  width: min(420px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: #131318;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: #f5f5f7;
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.rb-dating-card > .rb-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+.rb-dating-card-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rb-dating-card-photos {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  background: #0b0b0f;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.rb-dating-card-strip {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.rb-dating-card-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.rb-dating-card-strip img {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  scroll-snap-align: start;
+  user-select: none;
+}
+
+.rb-dating-card-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  font-size: 96px;
+}
+
+.rb-dating-card-dots {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 56px;
+  display: flex;
+  gap: 4px;
+}
+
+.rb-dating-card-dots button {
+  flex: 1;
+  height: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+}
+
+.rb-dating-card-dots button.active {
+  background: #fff;
+}
+
+.rb-dating-card-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rb-dating-card-arrow.prev {
+  left: 8px;
+}
+
+.rb-dating-card-arrow.next {
+  right: 8px;
+}
+
+.rb-dating-card-body {
+  padding: 16px 20px 22px;
+}
+
+.rb-dating-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rb-dating-card-head h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.rb-dating-card-city {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.rb-dating-card-heart {
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  font-size: 26px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.rb-dating-card-heart:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.rb-dating-card-heart.liked {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  cursor: default;
+}
+
+.rb-dating-card-heart:disabled:not(.liked) {
+  opacity: 0.6;
+}
+
+.rb-dating-card-match {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-weight: 800;
+  animation: rb-match-toast-in 0.25s ease;
+}
+
+.rb-dating-card-write {
+  justify-content: center;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-dating-card-bio {
+  margin: 14px 0 6px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.rb-dating-card-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 14px;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.rb-dating-card-facts dt {
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.rb-dating-card-facts dd {
+  margin: 0;
+}
+
+.rb-dating-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rb-dating-card-chips span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}

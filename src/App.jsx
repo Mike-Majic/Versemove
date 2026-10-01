@@ -90,6 +90,7 @@ const ReactorsModal = lazyWithRetry(() => import('./components/cultural/Reactors
 const FriendChatModal = lazyWithRetry(() => import('./components/FriendChatModal'));
 const IncomingCallToast = lazyWithRetry(() => import('./components/IncomingCallToast'));
 const MentionProfileViewer = lazyWithRetry(() => import('./components/shared/MentionProfileViewer'));
+const DatingCardModal = lazyWithRetry(() => import('./components/incontri/DatingCardModal'));
 const DMHub = lazyWithRetry(() => import('./components/DMHub'));
 const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
 const ProfileSettingsPanel = lazyWithRetry(() => import('./components/ProfileSettingsPanel'));
@@ -357,6 +358,18 @@ export default function App() {
   const [focusEvent, setFocusEvent] = useState(null);
   // Profilo aperto cliccando una "@menzione" fuori dal feed Social.
   const [mentionProfileId, setMentionProfileId] = useState(null);
+  // Mondo Incontri: cliccando un contatto si apre SOLO la scheda del
+  // Profilo Incontri (DatingCardModal), mai il profilo Social.
+  const [datingCardId, setDatingCardId] = useState(null);
+  const worldIdRef = useRef(world.id);
+  useEffect(() => {
+    worldIdRef.current = world.id;
+  }, [world.id]);
+  const openProfileInWorld = (id) => {
+    if (!id) return;
+    if (worldIdRef.current === 'incontri') setDatingCardId(id);
+    else setMentionProfileId(id);
+  };
   // Annuncio "Cerco compagni" da evidenziare (notifiche lfg_*): { lfgId, seq }.
   const [gamingFocus, setGamingFocus] = useState(null);
   // Annuncio "Cerco gruppo" Cosplay da evidenziare (notifiche lfg_* con
@@ -957,7 +970,7 @@ export default function App() {
   // Clic su una "@menzione" (MentionText): profilo della persona.
   useEffect(() => {
     const onOpenProfile = (e) => {
-      if (e.detail?.id) setMentionProfileId(e.detail.id);
+      openProfileInWorld(e.detail?.id);
     };
     // "Rispondi" a un messaggio della casella dello staff (Stanza MOD):
     // chat diretta con chi l'ha scritto.
@@ -1240,7 +1253,7 @@ export default function App() {
           users={globeUsers}
           // Utenti veri: il profilo Social completo (post, Segui...), lo
           // stesso delle @menzioni; il vecchio ProfileModal resta per gli altri.
-          onSelectUser={(u) => (u?.fromDb ? setMentionProfileId(u.id) : setSelectedUser(u))}
+          onSelectUser={(u) => (u?.fromDb ? openProfileInWorld(u.id) : setSelectedUser(u))}
           containerRef={containerRef}
           flyTo={flyTo}
           categories={categorySet?.categories ?? null}
@@ -1312,6 +1325,7 @@ export default function App() {
             user={user}
             onOpenAuth={() => setAuthOpen(true)}
             onOpenChat={(otherId) => setActiveFriendChatId(otherId)}
+            onOpenProfile={(id) => setDatingCardId(id)}
             initialMatchTab={incontriInitialTab}
             onConsumeInitialMatchTab={() => setIncontriInitialTab(null)}
             favorites={favoriteCategories}
@@ -1673,6 +1687,20 @@ export default function App() {
 
       {/* Dopo la chat: il profilo aperto dall'avatar di un contatto deve
           stare sopra la finestra della chat (stesso z-index, vince l'ordine). */}
+      {datingCardId && (
+        <Suspense fallback={<PageLoading />}>
+          <DatingCardModal
+            userId={datingCardId}
+            viewer={user}
+            onClose={() => setDatingCardId(null)}
+            onOpenChat={(id) => {
+              setDatingCardId(null);
+              setActiveFriendChatId(id);
+            }}
+          />
+        </Suspense>
+      )}
+
       {mentionProfileId && (
         <Suspense fallback={<PageLoading />}>
           <MentionProfileViewer

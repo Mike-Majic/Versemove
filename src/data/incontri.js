@@ -161,3 +161,67 @@ export function subscribeToOwnMatches(onInsert) {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches' }, (payload) => onInsert(payload.new))
     .subscribe();
 }
+
+// --- Scheda del Profilo Incontri (mai il profilo Social nel mondo rosso) ---
+
+export const DATING_GENDER_LABELS = { uomo: 'Uomo', donna: 'Donna', non_binario: 'Non binario' };
+export const COSA_CERCA_LABELS = {
+  relazione_seria: 'Relazione seria',
+  relazione_aperta: 'Relazione aperta',
+  qualcosa_di_leggero: 'Qualcosa di leggero',
+  senza_impegno: 'Senza impegno',
+  una_sera: 'Una sera',
+  uscire: 'Uscire',
+  amicizia: 'Amicizia',
+  vediamo: 'Vediamo',
+};
+
+const DATING_PHOTOS_BUCKET = 'dating-photos';
+const DATING_PHOTO_URL_SECONDS = 60 * 60;
+
+// URL delle foto della scheda, nell'ordine: quelle con url esterno così
+// come sono, quelle caricate (bucket privato "dating-photos") con un link
+// firmato di un'ora, chiesto in una sola chiamata.
+async function datingPhotoUrls(foto) {
+  const paths = foto.filter((f) => !f.url && f.path).map((f) => f.path);
+  const signed = new Map();
+  if (paths.length) {
+    const { data } = await supabase.storage.from(DATING_PHOTOS_BUCKET).createSignedUrls(paths, DATING_PHOTO_URL_SECONDS);
+    (data ?? []).forEach((d) => d.signedUrl && signed.set(d.path, d.signedUrl));
+  }
+  return foto.map((f) => f.url || signed.get(f.path)).filter(Boolean);
+}
+
+// Scheda completa di un profilo Incontri (get_dating_card): null dal server
+// = profilo nascosto, bloccato o Incontri non abilitato.
+export async function getDatingCard(id) {
+  try {
+    const { data, error } = await supabase.rpc('get_dating_card', { p_id: id });
+    if (error) return { error: error.message };
+    if (!data) return { error: 'Profilo non disponibile' };
+    const foto = await datingPhotoUrls(data.foto ?? []);
+    return {
+      card: {
+        id: data.id,
+        nickname: data.nickname || 'Utente',
+        avatar: data.avatar_url || '',
+        eta: data.eta ?? null,
+        citta: data.citta || '',
+        bio: data.bio || '',
+        attivita: data.attivita ?? null,
+        genere: data.genere || '',
+        cosaCerca: data.cosa_cerca ?? [],
+        foto: foto.length ? foto : data.avatar_url ? [data.avatar_url] : [],
+        miaDecisione: data.mia_decisione ?? null,
+        match: Boolean(data.match),
+      },
+    };
+  } catch (err) {
+    return { error: err?.message ?? 'Errore di rete.' };
+  }
+}
+
+// Avviso fra la scheda (DatingCardModal) e la colonna Match: una decisione
+// presa dalla scheda toglie il profilo da "A chi piaci"/mazzo e, se nasce
+// un match, evita il doppio "È un match" quando arriva dal canale realtime.
+export const INCONTRI_DECISION_EVENT = 'vm:incontri-decision';

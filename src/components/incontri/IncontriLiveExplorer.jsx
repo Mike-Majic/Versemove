@@ -19,6 +19,7 @@ export default function IncontriLiveExplorer({
   user,
   onOpenAuth,
   onOpenChat,
+  onOpenProfile,
   initialMatchTab,
   onConsumeInitialMatchTab,
   favorites = [],
@@ -88,6 +89,7 @@ export default function IncontriLiveExplorer({
               user={user}
               onOpenAuth={onOpenAuth}
               onOpenChat={onOpenChat}
+              onOpenProfile={onOpenProfile}
               initialTab={initialMatchTab}
               onConsumeInitialTab={onConsumeInitialMatchTab}
               matchFilters={matchFilters}
