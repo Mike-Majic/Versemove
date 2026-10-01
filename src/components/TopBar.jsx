@@ -16,6 +16,7 @@ export default function TopBar({
   onOpenProfile,
   onOpenFriends,
   onOpenNotifications,
+  onOpenFavorites,
   unreadMessagesCount = 0,
   unreadNotifCount = 0,
 }) {
@@ -46,6 +47,9 @@ export default function TopBar({
       <div className="rb-topbar-actions" ref={actionsRef}>
         {user ? (
           <div className="rb-user-chip">
+            <button className="rb-iconbtn lg" onClick={onOpenFavorites} aria-label="Preferiti" title="Preferiti">
+              <Icon name="star" size={20} />
+            </button>
             <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenNotifications} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
               <Icon name="bell" size={20} />
               {unreadNotifCount > 0 && (

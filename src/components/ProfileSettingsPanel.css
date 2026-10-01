@@ -890,3 +890,73 @@
   width: 100%;
   margin-top: 14px;
 }
+
+/* Foto profilo cliccabile: icona fotocamera sopra e menu Scatta/Galleria. */
+.rb-avatar-uploader-photo-wrap {
+  position: relative;
+}
+
+.rb-avatar-uploader-photo-btn {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.rb-avatar-uploader-photo-btn:focus-visible {
+  outline: 2px solid #1d9bf0;
+  outline-offset: 3px;
+}
+
+.rb-avatar-uploader-cam {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #1d9bf0;
+  color: #fff;
+  border: 2px solid #131318;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.rb-avatar-uploader-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 14px;
+  background: #1c1c22;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.rb-avatar-uploader-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: #f5f5f7;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-avatar-uploader-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}

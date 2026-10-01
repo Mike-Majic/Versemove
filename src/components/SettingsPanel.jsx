@@ -923,44 +923,6 @@ export default function SettingsPanel({
           {isDirty ? <span className="rb-settings-dirty-badge">● {t('settings.unappliedChanges')}</span> : t('settings.applyHint')}
         </p>
 
-        <section className="rb-settings-section rb-settings-section-first">
-          <label className="rb-toggle-row">
-            <span className="rb-toggle-text-row">
-              <strong>{t('settings.sound.title')}</strong>
-              <InfoBadge text={t('settings.sound.hint')} />
-            </span>
-            <span className="rb-toggle">
-              <input
-                type="checkbox"
-                checked={draftSound}
-                onChange={(e) => setDraftSound(e.target.checked)}
-              />
-              <span className="rb-toggle-slider" />
-            </span>
-          </label>
-
-          <div className="rb-field rb-settings-quality-field">
-            <span className="rb-toggle-text-row">
-              <strong>{t('settings.effects.title')}</strong>
-              <InfoBadge text={t('settings.effects.hint')} />
-            </span>
-            <div className="rb-settings-quality-options" role="radiogroup" aria-label={t('settings.effects.ariaLabel')}>
-              {QUALITY_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={draftQuality === opt.value}
-                  className={`rb-settings-quality-btn ${draftQuality === opt.value ? 'active' : ''}`}
-                  onClick={() => setDraftQuality(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <CollapsibleSection
           title={t('settings.sections.privacy.title')}
           infoText={t('settings.sections.privacy.hint')}
@@ -985,6 +947,45 @@ export default function SettingsPanel({
           open={personalizzaOpen}
           onToggle={() => setPersonalizzaOpen((v) => !v)}
         >
+          {/* Suono ed Effetti: prime voci di Personalizza (stesso salvataggio con Applica). */}
+          <div className="rb-settings-personalizza-fx">
+            <label className="rb-toggle-row">
+              <span className="rb-toggle-text-row">
+                <strong>{t('settings.sound.title')}</strong>
+                <InfoBadge text={t('settings.sound.hint')} />
+              </span>
+              <span className="rb-toggle">
+                <input
+                  type="checkbox"
+                  checked={draftSound}
+                  onChange={(e) => setDraftSound(e.target.checked)}
+                />
+                <span className="rb-toggle-slider" />
+              </span>
+            </label>
+
+            <div className="rb-field rb-settings-quality-field">
+              <span className="rb-toggle-text-row">
+                <strong>{t('settings.effects.title')}</strong>
+                <InfoBadge text={t('settings.effects.hint')} />
+              </span>
+              <div className="rb-settings-quality-options" role="radiogroup" aria-label={t('settings.effects.ariaLabel')}>
+                {QUALITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={draftQuality === opt.value}
+                    className={`rb-settings-quality-btn ${draftQuality === opt.value ? 'active' : ''}`}
+                    onClick={() => setDraftQuality(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <CollapsibleSection
             level="sub"
             title={t('settings.sections.luogo.title')}

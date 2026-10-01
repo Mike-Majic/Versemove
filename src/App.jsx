@@ -99,6 +99,7 @@ const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
 const ProfileSettingsPanel = lazyWithRetry(() => import('./components/ProfileSettingsPanel'));
 const PasswordRecoveryModal = lazyWithRetry(() => import('./components/PasswordRecoveryModal'));
 const NotificationsPanel = lazyWithRetry(() => import('./components/NotificationsPanel'));
+const FavoritesPanel = lazyWithRetry(() => import('./components/FavoritesPanel'));
 
 const DEFAULT_FILTERS = { gender: 'Tutti', ageMin: 18, ageMax: 60 };
 const DEFAULT_LOCATION_FILTERS = { continent: '', region: '', city: '', distance: 150 };
@@ -352,6 +353,8 @@ export default function App() {
   // pannello, il toast quando ne arriva una nuova in tempo reale, e su
   // quale scheda di Incontri deve aprirsi cliccandola.
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Pannello delle categorie preferite (stellina nella barra in alto).
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifToast, setNotifToast] = useState(null);
   // Post da mostrare nel feed Social (clic su una notifica di menzione).
@@ -1241,6 +1244,7 @@ export default function App() {
       passwordRecoveryOpen ||
       adminOpen ||
       notificationsOpen ||
+      favoritesOpen ||
       friendsModalOpen ||
       datingCardId ||
       mentionProfileId ||
@@ -1281,6 +1285,7 @@ export default function App() {
           setFriendsModalOpen(true);
         }}
         onOpenNotifications={() => setNotificationsOpen(true)}
+        onOpenFavorites={() => setFavoritesOpen(true)}
         unreadMessagesCount={totalUnreadMessages}
         unreadNotifCount={unreadNotifCount + receivedRequestsCount + receivedFamilyRequestsCount}
       />
@@ -1642,6 +1647,21 @@ export default function App() {
         </Suspense>
       )}
 
+      {favoritesOpen && user && (
+        <Suspense fallback={<PageLoading />}>
+          <FavoritesPanel
+            favorites={favoriteCategories}
+            user={user}
+            onClose={() => setFavoritesOpen(false)}
+            onOpenCategory={(f) => {
+              setFavoritesOpen(false);
+              navigateToCategory(f.worldId, f.categoryId);
+            }}
+            onRemove={(f) => toggleFavoriteCategory(f, true)}
+          />
+        </Suspense>
+      )}
+
       {notificationsOpen && (
         <Suspense fallback={<PageLoading />}>
           <NotificationsPanel
@@ -1810,7 +1830,6 @@ export default function App() {
             initialSection={profileSettingsSection}
             user={user}
             onUpdateUser={(account) => setUser({ ...account, name: account.nickname })}
-            favoriteCategories={favoriteCategories}
           />
         </Suspense>
       )}

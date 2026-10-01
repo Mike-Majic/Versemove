@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { translateWorld } from '../i18n/worldLabels';
 import Icon from './shared/Icon';
 import CollapsibleSection from './shared/CollapsibleSection';
 import CustomSelect from './shared/CustomSelect';
@@ -42,7 +40,6 @@ import {
 import { setOwnLavoroVisibilita, richiediVerificaAzienda, esitoVerificaAzienda, aziendaVerificaTesto } from '../data/lavoro';
 import { zodiacSign, birthdayLabel } from '../data/zodiac';
 import { supabase } from '../data/supabaseClient';
-import { WORLDS } from '../data/worlds';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 import ModalOverlay from './ModalOverlay';
 import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
@@ -51,10 +48,6 @@ import InfoBadge from './InfoBadge';
 import FamilySection from './social/FamilySection';
 import { GAMERTAG_FIELDS, GAMERTAG_MAX, cleanGamertags } from '../data/gaming';
 import './ProfileSettingsPanel.css';
-import { ANIMALI_CATEGORIES } from '../data/animaliCategories';
-import { ARTE_CATEGORIES } from '../data/arteCategories';
-import { NERD_CATEGORIES } from '../data/nerdCategories';
-import { LAVORO_CATEGORIES, canSearchCandidates } from '../data/lavoroCategories';
 import AvatarImg from './shared/AvatarImg';
 
 const BIO_MAX = 300;
@@ -156,6 +149,26 @@ function AvatarUploader({ user, onUpdateUser }) {
   const [error, setError] = useState('');
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
+  // Menu che si apre toccando la foto: Scatta / Galleria.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+  const pick = (ref) => {
+    setMenuOpen(false);
+    ref.current?.click();
+  };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -176,7 +189,33 @@ function AvatarUploader({ user, onUpdateUser }) {
 
   return (
     <div className="rb-avatar-uploader">
-      <AvatarImg className="rb-avatar-uploader-preview" src={preview ?? user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.nickname} />
+      <div className="rb-avatar-uploader-photo-wrap" ref={wrapRef}>
+        <button
+          type="button"
+          className="rb-avatar-uploader-photo-btn"
+          onClick={() => setMenuOpen((o) => !o)}
+          disabled={uploading}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Cambia la foto profilo"
+          title="Cambia la foto profilo"
+        >
+          <AvatarImg className="rb-avatar-uploader-preview" src={preview ?? user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.nickname} />
+          <span className="rb-avatar-uploader-cam" aria-hidden="true">
+            <Icon name="camera" size={16} />
+          </span>
+        </button>
+        {menuOpen && (
+          <div className="rb-avatar-uploader-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => pick(cameraInputRef)}>
+              <Icon name="camera" size={16} /> Scatta una foto
+            </button>
+            <button type="button" role="menuitem" onClick={() => pick(fileInputRef)}>
+              <Icon name="image" size={16} /> Scegli dalla galleria
+            </button>
+          </div>
+        )}
+      </div>
       <div className="rb-avatar-uploader-btns">
         <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading}>
           <Icon name="camera" size={16} /> Scatta
@@ -191,7 +230,7 @@ function AvatarUploader({ user, onUpdateUser }) {
         ref={cameraInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        capture="environment"
+        capture="user"
         hidden
         onChange={handleFile}
       />
@@ -541,65 +580,6 @@ function AccountTab({ user, onUpdateUser }) {
 // (tipo/fatturazione/genere/pronomi), organizzati in schede per restare
 // leggibile. Mondi abilitati e blocco contatti vivono nel pannello
 // Impostazioni generale (SettingsPanel), insieme al resto della privacy.
-// Lista delle categorie preferite (stellina, vedi FavoriteStarButton),
-// raggruppate nell'ordine dei mondi (verde, blu, bianco, viola, giallo,
-// rosso — lo stesso di data/worlds.js): ogni nome categoria è una pillola
-// con lo sfondo del colore del suo mondo, testo sempre nel colore standard
-// del resto dell'app.
-// Etichetta salvata col preferito, ma se la categoria è stata rinominata
-// (es. Animali: "Cani" -> "Amici a 4 zampe", Intrattenimento: "Cinema" ->
-// "Sala cinema") vince il nome attuale.
-const RENAMED_CATEGORY_LABELS = new Map([
-  ...ANIMALI_CATEGORIES.map((c) => [`animali:${c.id}`, c.label]),
-  ...ARTE_CATEGORIES.map((c) => [`arte:${c.id}`, c.label]),
-  ...NERD_CATEGORIES.map((c) => [`nerd:${c.id}`, c.label]),
-  ...LAVORO_CATEGORIES.map((c) => [`lavoro:${c.id}`, c.label]),
-]);
-// Categorie tolte (Lavoro "Live", sostituita da "Stanza conferenze"): un
-// vecchio preferito non si mostra più.
-const REMOVED_CATEGORIES = new Set(['lavoro:live']);
-function currentCategoryLabel(f) {
-  return RENAMED_CATEGORY_LABELS.get(`${f.worldId}:${f.categoryId}`) ?? f.categoryLabel;
-}
-
-// Categorie riservate (Lavoro "Cerca candidati"): un preferito rimasto da
-// quando l'azienda era verificata non si mostra a chi non può più aprirla.
-const RECRUITER_CATEGORIES = new Set(LAVORO_CATEGORIES.filter((c) => c.recruiterOnly).map((c) => `lavoro:${c.id}`));
-
-function FavoriteCategoriesList({ favoriteCategories, user }) {
-  const { t } = useTranslation();
-  const canRecruit = canSearchCandidates(user);
-  const hidden = (f) => {
-    const key = `${f.worldId}:${f.categoryId}`;
-    return REMOVED_CATEGORIES.has(key) || (!canRecruit && RECRUITER_CATEGORIES.has(key));
-  };
-  const byWorld = WORLDS.map((w) => ({
-    world: w,
-    items: favoriteCategories.filter((f) => f.worldId === w.id && !hidden(f)),
-  })).filter((g) => g.items.length > 0);
-
-  if (byWorld.length === 0) {
-    return <p className="rb-profile-favorites-empty">Nessuna categoria preferita ancora — clicca la stellina ☆ accanto alla X quando apri una categoria.</p>;
-  }
-
-  return (
-    <div className="rb-profile-favorites">
-      {byWorld.map(({ world, items }) => (
-        <div key={world.id} className="rb-profile-favorites-group">
-          <h4>{translateWorld(t, world).label}</h4>
-          <div className="rb-profile-favorites-chips">
-            {items.map((f) => (
-              <span key={f.categoryId} className="rb-profile-favorites-chip" style={{ backgroundColor: world.color }}>
-                {currentCategoryLabel(f)}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Multi-profilo stile Facebook: un account Persona può collegarsi a un
 // account Azienda della stessa persona reale (o viceversa), mai due dello
 // stesso tipo — vedi la funzione link_second_account lato server, che
@@ -1701,7 +1681,7 @@ function ProfilePreviewCard({ user }) {
 // (Social, Gamertag, Lavoro, Incontri) senza schede; si chiude solo col
 // Profilo Social compilato. initialSection="incontri" apre e mostra il
 // Profilo Incontri (avviso del mondo rosso).
-export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, favoriteCategories = [], variant = 'settings', initialSection = null }) {
+export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser, variant = 'settings', initialSection = null }) {
   const onboarding = variant === 'onboarding';
   const [onboardingWarn, setOnboardingWarn] = useState(false);
   const incontriRef = useRef(null);
@@ -1823,11 +1803,8 @@ export default function ProfileSettingsPanel({ open, onClose, user, onUpdateUser
           <button type="button" className={tab === 'profilo' ? 'active' : ''} onClick={() => setTab('profilo')}>Profilo</button>
           <button type="button" className={tab === 'album' ? 'active' : ''} onClick={() => setTab('album')}>Album</button>
           <button type="button" className={tab === 'documenti' ? 'active' : ''} onClick={() => setTab('documenti')}>Documenti</button>
-          <button type="button" className={tab === 'preferiti' ? 'active' : ''} onClick={() => setTab('preferiti')}>Preferiti</button>
           <button type="button" className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Account</button>
         </div>
-
-        {tab === 'preferiti' && <FavoriteCategoriesList favoriteCategories={favoriteCategories} user={user} />}
 
         {tab === 'profilo' && (
           <>
