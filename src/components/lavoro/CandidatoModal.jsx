@@ -16,7 +16,9 @@ export default function CandidatoModal({ candidato: preview, onClose }) {
     let cancelled = false;
     getCandidato(preview.id).then((res) => {
       if (cancelled) return;
-      if (res.error) setError(res.error);
+      // Dal globo si può cliccare anche chi non ha reso visibile il Profilo
+      // di Lavoro alle aziende: il server risponde "Candidato non disponibile".
+      if (res.error) setError(/non disponibile/i.test(res.error) ? 'Questa persona non ha reso visibile il Profilo di Lavoro alle aziende.' : res.error);
       else setData(res.candidato);
     });
     return () => {

@@ -82,6 +82,7 @@ const SocialWorldExplorer = lazyWithRetry(() => import('./components/social/Soci
 const IncontriLiveExplorer = lazyWithRetry(() => import('./components/incontri/IncontriLiveExplorer'));
 const LavoroWorldExplorer = lazyWithRetry(() => import('./components/lavoro/LavoroWorldExplorer'));
 const LavoroConsentGate = lazyWithRetry(() => import('./components/lavoro/LavoroConsentGate'));
+const CandidatoModal = lazyWithRetry(() => import('./components/lavoro/CandidatoModal'));
 const FaqWorldExplorer = lazyWithRetry(() => import('./components/faq/FaqWorldExplorer'));
 const AnnunciWorldExplorer = lazyWithRetry(() => import('./components/annunci/AnnunciWorldExplorer'));
 const AnimaliWorldExplorer = lazyWithRetry(() => import('./components/animali/AnimaliWorldExplorer'));
@@ -266,6 +267,11 @@ export default function App() {
   // Sezione da aprire subito nelle Impostazioni (evento vm:open-settings).
   const [settingsInitialSection, setSettingsInitialSection] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  // Mondo Lavoro, azienda verificata (o owner) che clicca un utente sul
+  // globo: si apre la scheda candidato (CandidatoModal, la stessa di "Cerca
+  // candidati"), non il profilo Social. Anteprima con i dati del globo,
+  // il resto arriva da get_candidato_lavoro.
+  const [candidatoPreview, setCandidatoPreview] = useState(null);
 
   // Mondi disattivati dall'utente (Impostazioni -> Mondi): sul mappamondo il
   // loro satellite diventa un buco nero (vedi globe/blackHole.js). Il globo
@@ -1458,6 +1464,10 @@ export default function App() {
           // stesso delle @menzioni; il vecchio ProfileModal resta per gli altri.
           onSelectUser={(u) => {
             if (accountBlocked) return;
+            if (u?.fromDb && world.id === 'lavoro' && canRecruit && u.id !== user?.id) {
+              setCandidatoPreview({ id: u.id, nome: u.name, cognome: '', avatar: u.avatar, citta: u.city });
+              return;
+            }
             if (u?.fromDb) openProfileInWorld(u.id);
             else setSelectedUser(u);
           }}
@@ -1846,6 +1856,12 @@ export default function App() {
             return who ? `${who} ${text}` : text;
           })()}
         </button>
+      )}
+
+      {candidatoPreview && (
+        <Suspense fallback={<PageLoading />}>
+          <CandidatoModal candidato={candidatoPreview} onClose={() => setCandidatoPreview(null)} />
+        </Suspense>
       )}
 
       {selectedUser && (
