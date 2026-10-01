@@ -20,6 +20,8 @@ export default function TopBar({
   onOpenFavorites,
   unreadMessagesCount = 0,
   unreadNotifCount = 0,
+  // Account bloccato: tutti i pulsanti disattivati tranne "Esci".
+  blocked = false,
 }) {
   // Larghezza delle icone a destra (campanella, chat, ...) come variabile
   // CSS: la barra "Cerca" delle categorie (categoryExplorerShell.css) si
@@ -36,45 +38,45 @@ export default function TopBar({
   }, []);
   const { t } = useTranslation();
   return (
-    <header className="rb-topbar" style={{ '--accent': world.color }}>
+    <header className={`rb-topbar ${blocked ? 'rb-topbar--blocked' : ''}`} style={{ '--accent': world.color }}>
       <div className="rb-topbar-brand">
         <span className="rb-logo-wordmark">
           <img className="rb-logo-icon" src={`${import.meta.env.BASE_URL}icons/logo-160.png`} alt="" />
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
         <span className="rb-world-pill">{translateWorld(t, world).label}</span>
-        <WorldStats world={world} />
+        <WorldStats world={world} locked={blocked} />
       </div>
 
       <div className="rb-topbar-actions" ref={actionsRef}>
         {user ? (
           <div className="rb-user-chip">
-            <button className="rb-iconbtn lg" onClick={onOpenFavorites} aria-label="Preferiti" title="Preferiti">
+            <button className="rb-iconbtn lg" onClick={onOpenFavorites} disabled={blocked} aria-label="Preferiti" title="Preferiti">
               <Icon name="star" size={20} />
             </button>
-            <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenNotifications} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
+            <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenNotifications} disabled={blocked} aria-label={t('topbar.notifications')} title={t('topbar.notifications')}>
               <Icon name="bell" size={20} />
               {unreadNotifCount > 0 && (
                 <span className="rb-friends-badge">{unreadNotifCount}</span>
               )}
             </button>
-            <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenFriends} aria-label={t('topbar.messages')} title={t('topbar.messages')}>
+            <button className="rb-iconbtn lg rb-friends-btn" onClick={onOpenFriends} disabled={blocked} aria-label={t('topbar.messages')} title={t('topbar.messages')}>
               <Icon name="chat" size={20} />
               {unreadMessagesCount > 0 && (
                 <span className="rb-friends-badge">{unreadMessagesCount}</span>
               )}
             </button>
             {isStaff(user.ruolo) && (
-              <button className="rb-iconbtn lg" onClick={onOpenAdmin} aria-label={t('topbar.backend')} title={t('topbar.backend')}>
+              <button className="rb-iconbtn lg" onClick={onOpenAdmin} disabled={blocked} aria-label={t('topbar.backend')} title={t('topbar.backend')}>
                 <Icon name="tools" size={20} />
               </button>
             )}
-            <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} title={t('topbar.myProfile')}>
+            <button type="button" className="rb-user-chip-identity" onClick={onOpenProfile} disabled={blocked} title={t('topbar.myProfile')}>
               <AvatarImg src={user.avatar} name={user?.name || user?.nickname} seed={user?.id} alt={user.name} />
               <span>{user.name}</span>
               {user.verificato && <span className="rb-verified-badge" title={t('topbar.verified')}>✓</span>}
             </button>
-            <button className="rb-iconbtn lg" onClick={onOpenSettings} aria-label={t('topbar.settings')} title={t('topbar.settings')}>
+            <button className="rb-iconbtn lg" onClick={onOpenSettings} disabled={blocked} aria-label={t('topbar.settings')} title={t('topbar.settings')}>
               <Icon name="gear" size={20} />
             </button>
             <button className="rb-btn-ghost" onClick={onLogout}>{t('topbar.logout')}</button>

@@ -1,0 +1,472 @@
+/* INFO BAN (mondo FAQ e scheda "Info ban" del Backend): chat dell'utente
+   bloccato e vista dello staff. Accento rosso come la scritta della
+   nuvola sul globo. */
+
+.rb-infoban-chat,
+.rb-infoban-staff {
+  --a: #ff3b3b;
+  --a-ink: #fff;
+  color: #f1f1f5;
+}
+
+/* --- Chat dell'utente bloccato ----------------------------------------- */
+.rb-infoban-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-infoban-loading {
+  flex: 1;
+  padding: 18px;
+}
+
+.rb-infoban-banner,
+.rb-infoban-error,
+.rb-infoban-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 14px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.rb-infoban-banner,
+.rb-infoban-notice.ok {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #c9f7d6;
+}
+
+.rb-infoban-error,
+.rb-infoban-notice.error {
+  background: rgba(255, 59, 59, 0.12);
+  border: 1px solid rgba(255, 59, 59, 0.45);
+  color: #ffd0d0;
+}
+
+.rb-infoban-banner button,
+.rb-infoban-notice button {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rb-infoban-composer {
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rb-infoban-left {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: #ffb3b3;
+}
+
+.rb-infoban-left.none {
+  color: #ff7a7a;
+  font-weight: 700;
+}
+
+.rb-infoban-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.rb-infoban-input-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  resize: none;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f1f1f5;
+  font: inherit;
+  font-size: 14px;
+}
+
+.rb-infoban-input-row textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rb-infoban-send {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: none;
+  background: #ff3b3b;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rb-infoban-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Vista staff -------------------------------------------------------- */
+.rb-infoban-staff {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(10, 10, 14, 0.6);
+}
+
+.rb-infoban-staff.compact {
+  height: min(62vh, 620px);
+}
+
+.rb-infoban-staff.narrow {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rb-infoban-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rb-infoban-staff.narrow .rb-infoban-list {
+  border-right: none;
+}
+
+.rb-infoban-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #a4a4b8;
+}
+
+.rb-infoban-list-head button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f1f5;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.rb-infoban-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rb-infoban-item {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rb-infoban-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rb-infoban-item.on {
+  background: rgba(255, 59, 59, 0.1);
+  border-color: rgba(255, 59, 59, 0.35);
+}
+
+/* Chi aspetta una risposta: bordo rosso a sinistra e pillola "In attesa". */
+.rb-infoban-item.waiting {
+  box-shadow: inset 3px 0 0 #ff3b3b;
+  background: rgba(255, 59, 59, 0.07);
+}
+
+.rb-infoban-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rb-infoban-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.rb-infoban-waiting {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #ff3b3b;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+
+.rb-infoban-item-text {
+  font-size: 12.5px;
+  color: rgba(241, 241, 245, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-infoban-item-meta {
+  font-size: 11px;
+  color: #8f8fa3;
+}
+
+.rb-infoban-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 59, 59, 0.18);
+  color: #ffd0d0;
+  font-weight: 800;
+}
+
+.rb-infoban-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rb-infoban-empty {
+  margin: 0;
+  padding: 14px;
+  font-size: 12.5px;
+  color: #a4a4b8;
+}
+
+.rb-infoban-empty.center {
+  margin: auto;
+  text-align: center;
+}
+
+.rb-infoban-conv {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rb-infoban-conv-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rb-infoban-back {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f1f5;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.rb-infoban-profile-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.rb-infoban-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.rb-infoban-profile:hover,
+.rb-infoban-profile[aria-expanded='true'] {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rb-infoban-profile span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rb-infoban-profile small {
+  font-size: 11.5px;
+  color: #a4a4b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-infoban-caret {
+  color: #a4a4b8;
+}
+
+.rb-infoban-profile-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #16161f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.rb-infoban-profile-menu button {
+  text-align: left;
+  background: none;
+  border: none;
+  color: #f5f5f7;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.rb-infoban-profile-menu button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.rb-infoban-profile-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rb-infoban-profile-menu button.danger {
+  color: #ff8a8a;
+}
+
+/* --- Pannello della categoria INFO BAN nel mondo FAQ -------------------- */
+.rb-infoban-panel {
+  position: absolute;
+  top: 62px;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  background: rgba(12, 12, 17, 0.97);
+  border: 1px solid rgba(255, 59, 59, 0.4);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 34px rgba(255, 59, 59, 0.1);
+}
+
+/* Utente bloccato: la fascia "Account bloccato" occupa la parte alta. */
+.rb-infoban-panel.blocked {
+  top: 116px;
+}
+
+.rb-infoban-panel.user {
+  max-width: 820px;
+}
+
+@media (min-width: 900px) {
+  .rb-infoban-panel.user {
+    left: 50%;
+    right: auto;
+    width: min(820px, calc(100vw - 36px));
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 760px) {
+  .rb-infoban-panel {
+    top: 120px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+  .rb-infoban-panel.blocked {
+    top: 132px;
+  }
+}
+
+.rb-infoban-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 59, 59, 0.14), transparent);
+}
+
+.rb-infoban-panel-head h2 {
+  margin: 0;
+  font-size: 19px;
+  color: #ff5a5a;
+}
+
+.rb-infoban-panel-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #a4a4b8;
+}
+
+.rb-infoban-panel-head button {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f1f5;
+  cursor: pointer;
+}
+
+.rb-infoban-panel .rb-infoban-staff {
+  margin: 12px;
+  border-radius: 12px;
+}

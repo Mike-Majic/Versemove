@@ -32,7 +32,9 @@ function MiniGlobeIcon() {
 // funzionare (bug live segnalato dall'utente — "clicco e non succede
 // niente" — verificato: un click sintetico diretto sul bottone funzionava,
 // un click reale del mouse no, proprio per questa ritargetizzazione).
-export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWorld }) {
+// disabled: account bloccato, la colonna resta visibile ma non si usa
+// (inert: niente clic né tasto Tab).
+export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWorld, disabled = false }) {
   const { t } = useTranslation();
   const containerRef = useRef(null);
   const dragRef = useRef(null); // { startY, startScrollTop, moved }
@@ -147,7 +149,7 @@ export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWor
   };
 
   return (
-    <div className="rb-world-selector">
+    <div className={`rb-world-selector ${disabled ? 'rb-world-selector--disabled' : ''}`} inert={disabled || undefined} aria-disabled={disabled || undefined}>
       {!atTop && (
         <button
           type="button"

@@ -281,3 +281,71 @@
   border-color: rgba(255, 255, 255, 0.3);
   background: transparent;
 }
+
+/* Fascia "Account bloccato" (App.jsx, accountBlocked): sotto la barra in
+   alto, sopra a tutto il resto, finché il blocco è attivo. */
+.rb-blocked-banner {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1036;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  padding: 9px 18px;
+  border-radius: 14px;
+  background: rgba(60, 8, 14, 0.94);
+  border: 1px solid rgba(255, 59, 59, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #ffd6d6;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.rb-blocked-banner strong {
+  color: #ff5a5a;
+}
+
+.rb-blocked-banner-hint {
+  color: rgba(255, 214, 214, 0.7);
+}
+
+@media (max-width: 760px) {
+  .rb-blocked-banner {
+    top: 58px;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 12px;
+  }
+  .rb-blocked-banner-hint {
+    display: none;
+  }
+}
+
+/* Colonna dei mondi a destra: spenta per un account bloccato. */
+.rb-world-selector--disabled {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.rb-topbar .rb-iconbtn:disabled,
+.rb-topbar .rb-user-chip-identity:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Telefono: con l'account bloccato i pulsanti spenti della barra si
+   tolgono, così "Esci" (l'unico attivo) resta subito visibile invece di
+   finire oltre il bordo della fila che scorre. */
+@media (max-width: 760px) {
+  .rb-topbar--blocked .rb-iconbtn:disabled,
+  .rb-topbar--blocked .rb-user-chip-identity:disabled {
+    display: none;
+  }
+}

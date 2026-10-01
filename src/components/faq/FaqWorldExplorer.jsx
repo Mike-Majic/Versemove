@@ -3,6 +3,8 @@ import { getFaqCategories, resolveCategoryQuery } from '../../data/faqCategories
 import { isStaff } from '../../data/roles';
 import ModRoomColumn from './ModRoomColumn';
 import FaqChatColumn from './FaqChatColumn';
+import InfoBanColumn from '../infoban/InfoBanColumn';
+import { isAccountBlocked } from '../../data/banStatus';
 import SegnalazioniColumn from './SegnalazioniColumn';
 import SuggerimentiColumn from './SuggerimentiColumn';
 import InformazioniColumn from './InformazioniColumn';
@@ -29,6 +31,7 @@ export default function FaqWorldExplorer({
   const [query, setQuery] = useState('');
   const [invalid, setInvalid] = useState(false);
   const staff = isStaff(user?.ruolo);
+  const blocked = isAccountBlocked(user);
   const categories = useMemo(() => getFaqCategories(staff, user), [staff, user]);
   const category = categories.find((c) => c.id === activeCategory) ?? null;
 
@@ -47,7 +50,7 @@ export default function FaqWorldExplorer({
   return (
     // La Stanza MOD ha l'accento rosso (come la sua nuvola sul globo), le
     // altre categorie il grigio-argento del mondo FAQ.
-    <div className="rb-arte-explorer" style={{ '--accent': category?.id === 'mod-room' ? '#ff3b3b' : world.color }}>
+    <div className="rb-arte-explorer" style={{ '--accent': category?.id === 'mod-room' || category?.id === 'info-ban' ? '#ff3b3b' : world.color }}>
       {category && (
         <>
           <div className="rb-arte-top-controls">
@@ -61,6 +64,7 @@ export default function FaqWorldExplorer({
               >
                 ✕
               </button>
+              {!blocked && (
               <FavoriteStarButton
                 worldId={world.id}
                 categoryId={category.id}
@@ -70,11 +74,12 @@ export default function FaqWorldExplorer({
                 user={user}
                 onOpenAuth={onOpenAuth}
               />
+              )}
             </div>
 
             {/* Sopra la Stanza MOD e la Chat (pannelli unici a tutto
                 schermo) la ricerca delle categorie coprirebbe la testata. */}
-            {category.id !== 'mod-room' && category.id !== 'chat' && (
+            {category.id !== 'mod-room' && category.id !== 'chat' && category.id !== 'info-ban' && (
             <form className="rb-arte-category-search" onSubmit={submitSearch}>
               <input
                 type="text"
@@ -95,6 +100,7 @@ export default function FaqWorldExplorer({
               del mondo, apertura olografica, chiusura in particelle) —
               prima i contenuti erano disegnati "nudi" sopra al globo. */}
           {category.id === 'mod-room' && staff && <ModRoomColumn user={user} onOpenCategory={onToggleCategory} />}
+          {category.id === 'info-ban' && <InfoBanColumn user={user} onClose={() => onToggleCategory(null)} />}
           {category.id === 'chat' && (
             <FaqChatColumn user={user} onOpenAuth={onOpenAuth} onClose={() => onToggleCategory(null)} />
           )}
