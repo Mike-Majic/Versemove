@@ -78,7 +78,18 @@ export default function AnnunciWorldExplorer({
             </form>
           </div>
 
-          <AnnunciColumn category={category} user={user} onOpenAuth={onOpenAuth} onOpenChat={onOpenChat} closing={isClosing} focusListing={focusListing} />
+          <AnnunciColumn
+            category={category}
+            user={user}
+            onOpenAuth={onOpenAuth}
+            onOpenChat={onOpenChat}
+            onGoToCategory={(id) => {
+              const target = ANNUNCI_CATEGORIES.find((c) => c.id === id);
+              if (target) onSearchCategory(target);
+            }}
+            closing={isClosing}
+            focusListing={focusListing}
+          />
         </>
       )}
     </div>

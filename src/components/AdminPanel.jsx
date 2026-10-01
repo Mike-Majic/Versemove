@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useFormDirty, useReportUnsaved } from '../hooks/useUnsavedChanges';
-import { getAccounts, updateAccountRole, setAccountVerified, resetAccountPassword, banAccount, unbanAccount } from '../data/accounts';
+import { useFormDirty } from '../hooks/useUnsavedChanges';
 import { getMailboxMessages, markMessageRead } from '../data/modMailbox';
 import { getReports, updateReportStatus } from '../data/reports';
 import { getAuditLog, logAdminAction, AUDIT_LABELS } from '../data/adminAuditLog';
 import { listAllSponsorships, createSponsorship, updateSponsorship } from '../data/sponsorships';
-import { supabase } from '../data/supabaseClient';
-import { computeAge } from '../data/age';
-import { ROLES } from '../data/roles';
 import ModalOverlay from './ModalOverlay';
 import './AdminPanel.css';
-import { aziendaVerificaTesto } from '../data/lavoro';
-
-const ROLE_LABELS = { [ROLES.OWNER]: 'Owner', [ROLES.MODERATOR]: 'Moderatore', [ROLES.USER]: 'Utente' };
+import AdminUsersPane from './admin/AdminUsersPane';
+import InfoBanStaffView from './infoban/InfoBanStaffView';
 
 const REPORT_TARGET_LABELS = {
   post: 'Post',
@@ -29,6 +24,7 @@ const ADMIN_TABS = [
   { id: 'utenti', label: 'Utenti' },
   { id: 'posta', label: 'Posta' },
   { id: 'moderazione', label: 'Moderazione' },
+  { id: 'infoban', label: 'Info ban' },
   { id: 'sponsorizzazioni', label: 'Sponsorizzazioni' },
   { id: 'log', label: 'Log azioni' },
 ];
@@ -310,81 +306,6 @@ function SponsorshipsPane({ sponsorships, onCreate, onUpdate }) {
   );
 }
 
-// Cella "Ban" della tabella Utenti: badge di stato se già bannato (con
-// pulsante per togliere il ban), altrimenti un piccolo form inline
-// (motivo facoltativo, scadenza facoltativa = permanente) per bannarlo —
-// stesso schema "apri form inline nella riga" del resto del pannello
-// (SponsorshipsPane). canBan arriva già calcolato dal chiamante: protegge
-// la riga dell'owner (mai bannabile) e quella di un moderatore (solo
-// l'owner può bannare un altro moderatore), rispecchiando lato client la
-// stessa gerarchia che la funzione set_account_banned impone lato server.
-function BanCell({ account, canBan, onBan, onUnban }) {
-  const [open, setOpen] = useState(false);
-  const [motivo, setMotivo] = useState('');
-  const [finoAl, setFinoAl] = useState('');
-  const [saving, setSaving] = useState(false);
-  useReportUnsaved(open && (motivo.trim() !== '' || finoAl !== ''));
-
-  if (account.bannato) {
-    return (
-      <div className="rb-admin-ban-cell">
-        <span className="rb-admin-role-badge rb-admin-banned-badge">
-          Bannato{account.banFinoAl ? ` fino al ${new Date(account.banFinoAl).toLocaleDateString('it-IT')}` : ''}
-        </span>
-        {canBan && (
-          <button type="button" className="rb-admin-reset-btn" onClick={() => onUnban(account)}>
-            Rimuovi ban
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  if (!canBan) return <span className="rb-admin-empty">—</span>;
-
-  if (!open) {
-    return (
-      <button type="button" className="rb-admin-reset-btn" onClick={() => setOpen(true)}>
-        Banna
-      </button>
-    );
-  }
-
-  const submit = async () => {
-    setSaving(true);
-    await onBan(account, motivo, finoAl ? fromDatetimeLocal(finoAl) : null);
-    setSaving(false);
-    setOpen(false);
-    setMotivo('');
-    setFinoAl('');
-  };
-
-  return (
-    <div className="rb-admin-ban-form">
-      <textarea placeholder="Motivo (facoltativo)" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} />
-      <label>
-        Fino al (vuoto = permanente)
-        <input type="datetime-local" value={finoAl} onChange={(e) => setFinoAl(e.target.value)} />
-      </label>
-      <div className="rb-admin-ban-form-actions">
-        <button type="button" className="rb-reset-filters-btn" onClick={() => setOpen(false)} disabled={saving}>Annulla</button>
-        <button type="button" className="rb-btn-primary" onClick={submit} disabled={saving}>{saving ? 'Salvo…' : 'Conferma'}</button>
-      </div>
-    </div>
-  );
-}
-
-// Apre un allegato in una nuova scheda: il bucket "attachments" è privato,
-// quindi serve un URL firmato temporaneo (valido 60 secondi) invece di un
-// link diretto — è così che owner/moderatori guardano il documento caricato
-// in registrazione prima di segnare un account come verificato, nessun
-// servizio di controllo automatico dietro, solo revisione umana.
-async function openAttachment(att) {
-  const { data, error } = await supabase.storage.from('attachments').createSignedUrl(att.path, 60);
-  if (error || !data?.signedUrl) return;
-  window.open(data.signedUrl, '_blank', 'noopener');
-}
-
 function MailboxPane({ messages, onMarkRead }) {
   return (
     <div className="rb-admin-mailbox">
@@ -513,75 +434,26 @@ function AuditLogPane({ entries }) {
 // stesso (le regole vere le applica Supabase lato server, qui è solo UI).
 export default function AdminPanel({ user, onClose }) {
   const [tab, setTab] = useState('utenti');
-  const [accounts, setAccounts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [reports, setReports] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [sponsorships, setSponsorships] = useState([]);
-  const [resetSentTo, setResetSentTo] = useState(null);
-  const isOwner = user?.ruolo === ROLES.OWNER;
+  // Chat INFO BAN in attesa di una risposta (badge della scheda).
+  const [banWaiting, setBanWaiting] = useState(0);
   const unreadCount = messages.filter((m) => !m.letto).length;
   const openReportsCount = reports.filter((r) => r.stato === 'aperto').length;
 
-  const refreshAccounts = () => getAccounts().then(setAccounts);
   const refreshMessages = () => getMailboxMessages().then(setMessages);
   const refreshReports = () => getReports().then(setReports);
   const refreshAuditLog = () => getAuditLog().then(setAuditLog);
   const refreshSponsorships = () => listAllSponsorships().then(setSponsorships);
 
   useEffect(() => {
-    refreshAccounts();
     refreshMessages();
     refreshReports();
     refreshAuditLog();
     refreshSponsorships();
   }, []);
-
-  const changeRole = async (accountId, newRole) => {
-    const { error } = await updateAccountRole(accountId, newRole);
-    if (!error) {
-      refreshAccounts();
-      await logAdminAction('cambio_ruolo', accountId, { nuovoRuolo: newRole });
-      refreshAuditLog();
-    }
-  };
-
-  const toggleVerified = async (account) => {
-    const nuovoStato = !account.verificato;
-    const { error } = await setAccountVerified(account.id, nuovoStato);
-    if (!error) {
-      refreshAccounts();
-      await logAdminAction('verifica_documento', account.id, { verificato: nuovoStato });
-      refreshAuditLog();
-    }
-  };
-
-  const doResetPassword = async (account) => {
-    const { error } = await resetAccountPassword(account.email);
-    if (!error) {
-      setResetSentTo(account);
-      await logAdminAction('reset_password', account.id, {});
-      refreshAuditLog();
-    }
-  };
-
-  const banUser = async (account, motivo, finoAl) => {
-    const { error } = await banAccount(account.id, motivo, finoAl);
-    if (!error) {
-      refreshAccounts();
-      await logAdminAction('ban_account', account.id, { motivo: motivo || null, finoAl });
-      refreshAuditLog();
-    }
-  };
-
-  const unbanUser = async (account) => {
-    const { error } = await unbanAccount(account.id);
-    if (!error) {
-      refreshAccounts();
-      await logAdminAction('unban_account', account.id, {});
-      refreshAuditLog();
-    }
-  };
 
   const markRead = async (messageId) => {
     await markMessageRead(messageId);
@@ -611,125 +483,23 @@ export default function AdminPanel({ user, onClose }) {
               {t.id === 'moderazione' && openReportsCount > 0 && (
                 <span className="rb-admin-tab-badge">{openReportsCount}</span>
               )}
+              {t.id === 'infoban' && banWaiting > 0 && <span className="rb-admin-tab-badge">{banWaiting}</span>}
             </button>
           ))}
         </div>
 
-        {tab === 'utenti' && (
-          <>
-            <p className="rb-admin-hint">
-              {isOwner
-                ? 'Elenco di chi si è registrato. Puoi cambiare ruolo, verificare un documento o inviare una mail di reset password.'
-                : "Elenco di chi si è registrato. Puoi verificare un documento o inviare una mail di reset password; solo l'owner cambia i ruoli."}
-            </p>
-
-            <div className="rb-admin-table-wrap">
-              <table className="rb-admin-table">
-                <thead>
-                  <tr>
-                    <th>Nome utente</th>
-                    <th>Nickname</th>
-                    <th>Nome e cognome</th>
-                    <th>Mail</th>
-                    <th>Cellulare</th>
-                    <th>Mail di backup</th>
-                    <th>Età</th>
-                    <th>Allegati</th>
-                    <th>Verifica</th>
-                    <th>Ruolo</th>
-                    <th>Password</th>
-                    <th>Ban</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((a) => {
-                    const isOwnerRow = a.ruolo === ROLES.OWNER;
-                    const canManageRow = isOwner || !isOwnerRow;
-                    const age = computeAge(a.dataNascita);
-                    return (
-                      <tr key={a.id}>
-                        <td>{a.username}</td>
-                        <td>{a.nickname}</td>
-                        <td>{[a.nome, a.cognome].filter(Boolean).join(' ') || '—'}</td>
-                        <td>{a.email}</td>
-                        <td>{a.phone || '—'}</td>
-                        <td>{a.backupEmail || '—'}</td>
-                        <td>{age ?? '—'}</td>
-                        <td>
-                          {a.attachments?.length > 0 ? (
-                            <div className="rb-admin-attachments">
-                              {a.attachments.map((att, i) => (
-                                <button key={i} type="button" onClick={() => openAttachment(att)} title={att.name}>
-                                  📎{i + 1}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className={`rb-admin-verified-btn ${a.verificato ? 'active' : ''}`}
-                            onClick={() => toggleVerified(a)}
-                            disabled={!canManageRow}
-                          >
-                            {a.verificato ? '✓ Verificato' : 'Non verificato'}
-                          </button>
-                          {/* Aziende: esito della verifica automatica della P.IVA
-                              (VIES) e nome trovato nel registro. */}
-                          {a.tipoAccount === 'azienda' && a.aziendaVerifica?.stato && (
-                            <div className="rb-admin-piva-stato" title={aziendaVerificaTesto(a.aziendaVerifica.stato, a.aziendaVerifica.nome_registro)}>
-                              P.IVA: {a.aziendaVerifica.stato}
-                              {a.aziendaVerifica.nome_registro ? ` · ${a.aziendaVerifica.nome_registro}` : ''}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          {isOwner && !isOwnerRow ? (
-                            <select value={a.ruolo} onChange={(e) => changeRole(a.id, e.target.value)}>
-                              <option value={ROLES.USER}>{ROLE_LABELS[ROLES.USER]}</option>
-                              <option value={ROLES.MODERATOR}>{ROLE_LABELS[ROLES.MODERATOR]}</option>
-                            </select>
-                          ) : (
-                            <span className={`rb-admin-role-badge ${a.ruolo}`}>{ROLE_LABELS[a.ruolo] ?? a.ruolo}</span>
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="rb-admin-reset-btn"
-                            onClick={() => doResetPassword(a)}
-                            disabled={!canManageRow}
-                          >
-                            Reset
-                          </button>
-                        </td>
-                        <td>
-                          <BanCell
-                            account={a}
-                            canBan={!isOwnerRow && (a.ruolo !== ROLES.MODERATOR || isOwner)}
-                            onBan={banUser}
-                            onUnban={unbanUser}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {accounts.length === 0 && (
-                    <tr>
-                      <td colSpan={12} className="rb-admin-empty">Nessuno si è ancora registrato.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+        {tab === 'utenti' && <AdminUsersPane user={user} onAuditChanged={refreshAuditLog} />}
 
         {tab === 'posta' && <MailboxPane messages={messages} onMarkRead={markRead} />}
         {tab === 'moderazione' && <ReportsPane reports={reports} onChangeStatus={changeReportStatus} />}
+        {/* Montata sempre (nascosta fuori dalla sua scheda): il badge "in
+            attesa" resta aggiornato anche guardando le altre schede. */}
+        <div hidden={tab !== 'infoban'}>
+          <p className="rb-admin-hint">
+            Chat con gli account bloccati. Chi aspetta una risposta è in cima; tocca il profilo dell'utente per sbloccarlo o eliminarlo.
+          </p>
+          <InfoBanStaffView compact onWaitingChange={setBanWaiting} />
+        </div>
         {tab === 'sponsorizzazioni' && (
           <SponsorshipsPane
             sponsorships={sponsorships}
@@ -750,18 +520,6 @@ export default function AdminPanel({ user, onClose }) {
         {tab === 'log' && <AuditLogPane entries={auditLog} />}
       </div>
 
-      {resetSentTo && (
-        <ModalOverlay onClose={() => setResetSentTo(null)} className="rb-admin-reset-overlay">
-          <div className="rb-admin-reset-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Mail di reset inviata</h3>
-            <p>
-              A {resetSentTo.nickname} ({resetSentTo.email}) è arrivata una mail con il link per scegliere una
-              nuova password — nessuna password passa da qui, in chiaro o no.
-            </p>
-            <button type="button" onClick={() => setResetSentTo(null)}>Ho preso nota, chiudi</button>
-          </div>
-        </ModalOverlay>
-      )}
     </ModalOverlay>
   );
 }

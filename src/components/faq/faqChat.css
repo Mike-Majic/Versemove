@@ -1,0 +1,238 @@
+/* --- Chat del mondo FAQ (FaqChatColumn.jsx) ---
+   Un pannello unico e opaco come la Stanza MOD (stessa posizione sotto la
+   barra in alto), ma con l'accento azzurro della chat (--a, vedi
+   shared/chat/chat.css) invece del rosso dello staff. */
+
+.rb-faqchat-panel {
+  position: absolute;
+  top: 62px;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  background: rgba(12, 12, 17, 0.97);
+  border: 1px solid color-mix(in srgb, var(--a) 40%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 34px color-mix(in srgb, var(--a) 10%, transparent);
+}
+
+@media (min-width: 1100px) {
+  .rb-faqchat-panel {
+    left: 50%;
+    right: auto;
+    width: min(880px, calc(100vw - 36px));
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 760px) {
+  .rb-faqchat-panel {
+    top: 120px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+}
+
+.rb-faqchat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--a) 14%, transparent), transparent);
+}
+
+.rb-faqchat-head-title {
+  min-width: 0;
+}
+
+.rb-faqchat-head-title h2 {
+  margin: 0;
+  font-size: 19px;
+  color: color-mix(in srgb, var(--a) 55%, #fff);
+}
+
+.rb-faqchat-head-title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #a4a4b8;
+}
+
+.rb-faqchat-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rb-faqchat-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f1f5;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.rb-faqchat-btn:hover,
+.rb-faqchat-btn.on {
+  background: color-mix(in srgb, var(--a) 22%, transparent);
+  border-color: color-mix(in srgb, var(--a) 60%, transparent);
+}
+
+.rb-faqchat-search {
+  width: min(240px, 42vw);
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f1f1f5;
+  font: inherit;
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .rb-faqchat-head {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+  }
+  .rb-faqchat-head-title h2 {
+    font-size: 17px;
+  }
+  .rb-faqchat-head-title p {
+    display: none;
+  }
+  .rb-faqchat-search {
+    width: min(170px, 46vw);
+  }
+}
+
+.rb-faqchat-search-note {
+  margin: 8px 18px 0;
+  font-size: 12px;
+  color: #a4a4b8;
+}
+
+.rb-faqchat-loading,
+.rb-faqchat-empty {
+  flex: 1;
+  padding: 18px;
+}
+
+.rb-faqchat-tick {
+  font-weight: 700;
+  color: rgba(241, 241, 245, 0.55);
+}
+
+/* Citazione del messaggio a cui si risponde, dentro la bolla. */
+.rb-faqchat-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px;
+  padding: 5px 9px;
+  border-left: 3px solid var(--a);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: rgba(241, 241, 245, 0.75);
+}
+
+.rb-faqchat-quote strong {
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--a) 55%, #fff);
+}
+
+.rb-faqchat-quote span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.rb-faqchat-notice,
+.rb-faqchat-replybar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 14px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.rb-faqchat-notice {
+  background: rgba(255, 77, 109, 0.14);
+  border: 1px solid rgba(255, 77, 109, 0.45);
+  color: #ffd0d8;
+}
+
+.rb-faqchat-replybar {
+  background: color-mix(in srgb, var(--a) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a) 40%, transparent);
+  color: #e6e8f2;
+}
+
+.rb-faqchat-notice span,
+.rb-faqchat-replybar span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-faqchat-notice button,
+.rb-faqchat-replybar button {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+}
+
+.rb-faqchat-confirm {
+  margin: 8px 14px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #16161f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+}
+
+.rb-faqchat-confirm p {
+  margin: 0 0 10px;
+}
+
+.rb-faqchat-confirm div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rb-faqchat-confirm button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f1f5;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rb-faqchat-confirm button.primary.danger {
+  background: #e5484d;
+  border-color: #e5484d;
+  color: #fff;
+}

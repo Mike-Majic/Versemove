@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { isAccountBlocked } from './banStatus';
 import { rememberDeviceSession } from './accountSwitcher';
 import { safeFileName } from './storagePath';
 import { prepareUpload } from './mediaCompress';
@@ -77,6 +78,7 @@ function mapProfile(row) {
     bannato: row.bannato ?? false,
     banMotivo: row.ban_motivo,
     banFinoAl: row.ban_fino_al,
+    lastSeenAt: row.last_seen_at ?? null,
     // Sospensione volontaria (30 giorni) ed eliminazione richiesta (si
     // può annullare rientrando entro la data prevista).
     sospesoFinoAl: row.sospeso_fino_al ?? null,
@@ -108,6 +110,10 @@ export function cacheProfile(account) {
       mondiAbilitati: account.mondiAbilitati,
       dataNascita: account.dataNascita,
       genere: account.genere,
+      // Il blocco vale già all'apertura, prima che arrivi il profilo vero.
+      bannato: account.bannato,
+      banFinoAl: account.banFinoAl,
+      banMotivo: account.banMotivo,
     };
     localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(safe));
   } catch {
@@ -132,47 +138,21 @@ export function clearCachedProfile() {
   }
 }
 
-// true se il ban è ancora attivo adesso (bannato=true e, se c'è una
-// scadenza, non è ancora passata — un ban con ban_fino_al nel passato
-// "scade da solo", senza bisogno di un job che lo tolga esplicitamente).
-function isCurrentlyBanned(account) {
-  if (!account?.bannato) return false;
-  return !account.banFinoAl || new Date(account.banFinoAl) > new Date();
-}
+// Account bloccato adesso: resta dentro l'app ma può aprire solo il mondo
+// FAQ e la categoria INFO BAN (vedi App.jsx). Logica in data/banStatus.js.
+export { isAccountBlocked };
 
 const BAN_NOTICE_KEY = 'rb-ban-notice';
 
-// Consumato una sola volta da App.jsx per mostrare il motivo del ban
-// dopo che l'account è già stato disconnesso (getCurrentAccount/
-// subscribeAuthChanges restituiscono solo null, mai l'account bannato).
-export function consumeBanNotice() {
+// Prima un account bloccato veniva disconnesso qui. Ora resta dentro (solo
+// FAQ › INFO BAN, vedi isAccountBlocked e App.jsx): l'avviso salvato da
+// una versione vecchia dell'app, se c'è, si toglie e basta.
+function clearLegacyBanNotice() {
   try {
-    const raw = localStorage.getItem(BAN_NOTICE_KEY);
-    if (!raw) return null;
     localStorage.removeItem(BAN_NOTICE_KEY);
-    return JSON.parse(raw);
   } catch {
-    return null;
+    // ignora
   }
-}
-
-// Disconnette subito un account bannato (lasciando un avviso da mostrare)
-// invece di restituirlo come se fosse normale: unico punto controllato,
-// così vale sia al login sia a chi era già dentro e viene bannato mentre
-// naviga (il prossimo evento di auth, es. il refresh automatico del
-// token, lo intercetta qui). Non è istantaneo come un canale realtime
-// dedicato, ma arriva comunque entro la sessione in corso senza doverne
-// aggiungere uno solo per questo.
-async function enforceBanIfNeeded(account) {
-  if (!isCurrentlyBanned(account)) return false;
-  try {
-    localStorage.setItem(BAN_NOTICE_KEY, JSON.stringify({ motivo: account.banMotivo, finoAl: account.banFinoAl }));
-  } catch {
-    // storage piena/privato: l'avviso si perde, il ban resta comunque efficace.
-  }
-  await supabase.auth.signOut();
-  clearCachedProfile();
-  return true;
 }
 
 async function fetchOwnProfile() {
@@ -189,7 +169,7 @@ async function fetchOwnProfile() {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
   if (error) return null;
   const account = mapProfile(data);
-  if (await enforceBanIfNeeded(account)) return null;
+  clearLegacyBanNotice();
   cacheProfile(account);
   return account;
 }
@@ -217,6 +197,12 @@ export function subscribeAuthChanges(callback) {
     callback(account, event);
   });
   return () => sub.subscription.unsubscribe();
+}
+
+// Stessa mappatura di una riga di profiles, per chi legge profili altrove
+// (es. la tabella Utenti del Backend, data/adminUsers.js).
+export function mapProfileRow(row) {
+  return mapProfile(row);
 }
 
 // Elenco account: la RLS di Supabase decide da sola cosa restituire (solo
@@ -363,20 +349,8 @@ export async function loginAccount(email, password) {
     return { error: 'Mail o password non corretti.' };
   }
   const account = await fetchOwnProfile();
-  if (!account) {
-    const notice = consumeBanNotice();
-    if (notice) return { error: formatBanMessage(notice) };
-    return { error: 'Account non trovato.' };
-  }
+  if (!account) return { error: 'Account non trovato.' };
   return { account };
-}
-
-function formatBanMessage({ motivo, finoAl }) {
-  const quando = finoAl
-    ? `fino al ${new Date(finoAl).toLocaleString('it-IT')}`
-    : 'senza una data di fine';
-  const dettaglio = motivo ? ` Motivo: ${motivo}.` : '';
-  return `Account sospeso da un moderatore, ${quando}.${dettaglio}`;
 }
 
 export async function logoutAccount() {

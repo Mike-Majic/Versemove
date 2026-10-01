@@ -8,7 +8,7 @@ import {
   markConversationRead,
   subscribeToConversationMessages,
   subscribeToConversationPresence,
-  getOtherParticipantLastRead,
+  getOtherParticipantReceipts,
   subscribeToParticipantUpdates,
   setConversationArchived,
   deleteMessageForAll,
@@ -65,7 +65,18 @@ function toChatMessage(a) {
 // quello attuale, sotto la bolla compare "● scritto in <Mondo>".
 // autoAnswerCall: aperta da "Rispondi" nell'avviso di chiamata in arrivo
 // (IncomingCallToast): la chiamata viene accettata appena arriva il ring.
-export default function FriendChatModal({ friendId, user, world, onClose, onMessagesRead, autoAnswerCall = false }) {
+// initialConversationId: conversazione già aperta da chi apre la chat (es.
+// lo staff con start_staff_conversation): si usa quella invece di
+// start_direct_conversation.
+export default function FriendChatModal({
+  friendId,
+  initialConversationId = null,
+  user,
+  world,
+  onClose,
+  onMessagesRead,
+  autoAnswerCall = false,
+}) {
   const activeWorld = world ?? DEFAULT_WORLD;
   const [conversationId, setConversationId] = useState(null);
   const [friend, setFriend] = useState(null);
@@ -74,8 +85,11 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
-  // last_read_at dell'altro partecipante: ✓ inviato / ✓✓ letto.
+  // Ricevute dell'altro partecipante (chat_participants): ✓ inviato,
+  // ✓✓ grigie consegnato (created_at <= last_delivered_at), ✓✓ blu letto
+  // (created_at <= last_read_at).
   const [otherLastReadAt, setOtherLastReadAt] = useState(null);
+  const [otherLastDeliveredAt, setOtherLastDeliveredAt] = useState(null);
   const [friendHere, setFriendHere] = useState(false);
   // 📹 solo se la videochiamata 1:1 è già possibile (amici o match,
   // are_connected): stessa condizione della RLS del canale della chiamata.
@@ -106,7 +120,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
 
     const load = async () => {
       const [{ conversationId: convId, error: convError }, profilesMap, connected] = await Promise.all([
-        startDirectConversation(friendId),
+        initialConversationId ? Promise.resolve({ conversationId: initialConversationId }) : startDirectConversation(friendId),
         fetchProfilesMap([friendId]),
         areConnected(friendId),
       ]);
@@ -131,8 +145,10 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
       setLoading(false);
       markConversationRead(convId);
       onMessagesRead?.();
-      getOtherParticipantLastRead(convId, user.id).then((lastReadAt) => {
-        if (!cancelled) setOtherLastReadAt(lastReadAt);
+      getOtherParticipantReceipts(convId, user.id).then(({ lastReadAt, lastDeliveredAt }) => {
+        if (cancelled) return;
+        setOtherLastReadAt(lastReadAt);
+        setOtherLastDeliveredAt(lastDeliveredAt);
       });
     };
     load();
@@ -141,7 +157,7 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [friendId]);
+  }, [friendId, initialConversationId]);
 
   useEffect(() => {
     if (!canCall || !conversationId) return undefined;
@@ -195,11 +211,14 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, user.id]);
 
-  // L'altra persona apre la chat -> i miei messaggi passano a ✓✓.
+  // All'altra persona arrivano i messaggi (✓✓ grigie) o apre la chat
+  // (✓✓ blu): chat_participants in tempo reale.
   useEffect(() => {
     if (!conversationId) return undefined;
     const channel = subscribeToParticipantUpdates(conversationId, (row) => {
-      if (row.user_id !== user.id) setOtherLastReadAt(row.last_read_at);
+      if (row.user_id === user.id) return;
+      setOtherLastReadAt(row.last_read_at ?? null);
+      setOtherLastDeliveredAt(row.last_delivered_at ?? null);
     });
     return () => {
       supabase.removeChannel(channel);
@@ -358,7 +377,12 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
   }, [messages, query, user.id]);
 
   const renderMessage = (m) => {
-    const read = m.mine && otherLastReadAt && new Date(otherLastReadAt) >= new Date(m.data);
+    const sentAt = new Date(m.data);
+    const read = m.mine && otherLastReadAt && new Date(otherLastReadAt) >= sentAt;
+    // Letto implica consegnato, anche se last_delivered_at non è ancora arrivato.
+    const delivered = m.mine && (read || (otherLastDeliveredAt && new Date(otherLastDeliveredAt) >= sentAt));
+    const tickState = read ? 'read' : delivered ? 'delivered' : 'sent';
+    const tickLabel = read ? 'Letto' : delivered ? 'Consegnato' : 'Inviato';
     const from = m.mondo && m.mondo !== activeWorld.id ? WORLD_BY_ID.get(m.mondo) : null;
     const att = m.tipo === 'posizione' ? null : toAttachment(m.tipo, m.allegato);
     const isText = !m.tipo || m.tipo === 'testo';
@@ -404,8 +428,8 @@ export default function FriendChatModal({ friendId, user, world, onClose, onMess
         <span className="rb-dm-meta">
           {timeLabel(m.data)}
           {m.mine && !m.pending && !m.failed && (
-            <span className={`rb-dm-ticks ${read ? 'read' : ''}`} aria-label={read ? 'Letto' : 'Inviato'} title={read ? 'Letto' : 'Inviato'}>
-              {read ? '✓✓' : '✓'}
+            <span className={`rb-dm-ticks ${tickState}`} aria-label={tickLabel} title={tickLabel}>
+              {tickState === 'sent' ? '✓' : '✓✓'}
             </span>
           )}
         </span>

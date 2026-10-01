@@ -50,7 +50,7 @@ import { incontriNoticeText } from './data/datingLabels';
 import { isEventExpired, fetchEvents, createEvent as createEventApi, toggleEventLike as toggleEventLikeApi, subscribeToNewEvents } from './data/events';
 import { isStaff } from './data/roles';
 import { listMyFavoriteCategories, addFavoriteCategory, removeFavoriteCategory } from './data/favoriteCategories';
-import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, consumeBanNotice, accountPause, reactivateOwnAccount } from './data/accounts';
+import { getCurrentAccount, subscribeAuthChanges, logoutAccount, getCachedProfile, clearCachedProfile, accountPause, reactivateOwnAccount, isAccountBlocked } from './data/accounts';
 import {
   getFriends,
   getSentRequests,
@@ -59,7 +59,7 @@ import {
   removeFriend as removeFriendApi,
 } from './data/friends';
 import { getReceivedFamilyRequests } from './data/family';
-import { getUnreadCounts, subscribeToOwnMessages } from './data/directChat';
+import { getUnreadCounts, subscribeToOwnMessages, markChatsDelivered } from './data/directChat';
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications, describeNotification } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
@@ -163,7 +163,10 @@ export default function App() {
   // devono cambiare mondo: alcuni giochi (es. Snake) usano le stesse frecce
   // per i propri controlli.
   const [gameplayActive, setGameplayActive] = useState(false);
-  const { index, setIndex, containerRef } = useSwipeWorld(WORLDS.length, DEFAULT_WORLD_INDEX, gameplayActive);
+  // Account bloccato (vedi accountBlocked più giù): niente swipe/frecce per
+  // cambiare mondo, resta nel mondo FAQ.
+  const [worldNavLocked, setWorldNavLocked] = useState(false);
+  const { index, setIndex, containerRef } = useSwipeWorld(WORLDS.length, DEFAULT_WORLD_INDEX, gameplayActive || worldNavLocked);
   const world = WORLDS[index];
   const baseCategorySet = CATEGORY_WORLDS[world.id] ?? null;
   // Incontri e Lavoro sono riservati ai maggiorenni: l'età è quella vera
@@ -177,6 +180,14 @@ export default function App() {
   // sessione (login/logout/refresh token), così lo stato resta sempre
   // coerente anche se scade o cambia altrove.
   const [user, setUser] = useState(null);
+  // Account bloccato: resta dentro, ma può aprire solo il mondo FAQ e la
+  // categoria INFO BAN; tutto il resto è disattivato, con la fascia
+  // "Account bloccato" in alto. Blocco scaduto o tolto: al caricamento
+  // successivo del profilo torna tutto normale (data/banStatus.js).
+  const accountBlocked = isAccountBlocked(user);
+  useEffect(() => {
+    setWorldNavLocked(accountBlocked);
+  }, [accountBlocked]);
 
   // Consenso al mondo Lavoro (nome/cognome reali visibili solo lì, vedi
   // LavoroConsentGate): null finché non si è ancora controllato (evita di
@@ -206,11 +217,11 @@ export default function App() {
   const canRecruit = canSearchCandidates(user);
   const categorySet = useMemo(() => {
     if (!baseCategorySet) return baseCategorySet;
-    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo)) };
-    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit) };
+    if (world.id === 'faq') return { ...baseCategorySet, categories: getFaqCategories(isStaff(user?.ruolo), user) };
+    if (world.id === 'lavoro') return { ...baseCategorySet, categories: getLavoroCategories(canRecruit, user) };
     return baseCategorySet;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseCategorySet, world.id, user?.ruolo, canRecruit]);
+  }, [baseCategorySet, world.id, user?.ruolo, canRecruit, accountBlocked]);
   // Lista categorie sotto al mondo (vedi rb-world-tagline-list più sotto):
   // ne mostra al massimo 5 alla volta, a PAGINE intere (non una alla volta:
   // la freccetta salta alla pagina successiva, es. 6-10, non scorre di un
@@ -250,7 +261,6 @@ export default function App() {
   // PASSWORD_RECOVERY di Supabase Auth (link "Password dimenticata?"
   // cliccato dalla mail) — mai su richiesta diretta dell'utente.
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
-  const [banNotice, setBanNotice] = useState(null); // { motivo, finoAl } | null
   const [authOpen, setAuthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Sezione da aprire subito nelle Impostazioni (evento vm:open-settings).
@@ -346,6 +356,10 @@ export default function App() {
   // reactors } quando aperto, null quando chiuso (vedi ReactorsModal).
   const [culturalReactorsView, setCulturalReactorsView] = useState(null);
   const [activeFriendChatId, setActiveFriendChatId] = useState(null);
+  // Conversazione già aperta da chi apre la chat (es. lo staff con
+  // start_staff_conversation dalla Chat FAQ): FriendChatModal la usa
+  // invece di crearne/cercarne una con start_direct_conversation.
+  const [activeFriendChatConvId, setActiveFriendChatConvId] = useState(null);
   // Chat aperta da "Rispondi" su una chiamata in arrivo: la chiamata si
   // accetta da sola (vedi IncomingCallToast / CallModal autoAnswer).
   const [answerCallFrom, setAnswerCallFrom] = useState(null);
@@ -539,10 +553,6 @@ export default function App() {
     getCurrentAccount().then((account) => {
       if (cancelled) return;
       setUser(account);
-      if (!account) {
-        const notice = consumeBanNotice();
-        if (notice) setBanNotice(notice);
-      }
       markReady();
     });
 
@@ -552,14 +562,10 @@ export default function App() {
     // mai altrove, quindi è l'unico punto in cui apriamo quella modale.
     const unsubscribe = subscribeAuthChanges((account, event) => {
       if (cancelled) return;
+      // Chi viene bloccato mentre naviga resta dentro: al prossimo evento di
+      // auth (es. il refresh del token) il profilo nuovo ha bannato=true e
+      // l'app passa da sola a FAQ › INFO BAN (vedi accountBlocked).
       setUser(account);
-      // Chi era già loggato e viene bannato mentre naviga: getCurrentAccount/
-      // fetchOwnProfile lo disconnettono da soli al prossimo evento di auth
-      // (es. il refresh automatico del token) e lasciano qui il motivo.
-      if (!account) {
-        const notice = consumeBanNotice();
-        if (notice) setBanNotice(notice);
-      }
       markReady();
       if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryOpen(true);
     });
@@ -736,11 +742,25 @@ export default function App() {
   };
   useEffect(refreshUnread, [user?.id]);
 
+  // Spunte delle chat private: "consegnato" (✓✓ grigie) per chi scrive
+  // quando i suoi messaggi arrivano qui — all'accesso, quando la scheda
+  // torna visibile e a ogni messaggio in arrivo da altri
+  // (mark_chats_delivered, al massimo una volta ogni 2 secondi, vedi
+  // markChatsDelivered in data/directChat.js).
   useEffect(() => {
     if (!user) return undefined;
-    const channel = subscribeToOwnMessages(() => refreshUnread());
+    markChatsDelivered();
+    const channel = subscribeToOwnMessages((row) => {
+      refreshUnread();
+      if (row?.sender_id && row.sender_id !== user.id) markChatsDelivered();
+    });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') markChatsDelivered();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -973,9 +993,18 @@ export default function App() {
   // Social, SocialFeed si smonta da solo (è mostrato solo quando
   // world.id === 'social'): è così che "si chiudono le colonne".
   const navigateToCategory = (worldId, categoryId, initialSubfamily = '') => {
+    if (accountBlocked && !(worldId === 'faq' && categoryId === 'info-ban')) return;
     const targetIndex = WORLDS.findIndex((w) => w.id === worldId);
     if (targetIndex === -1) return;
-    const worldCategories = worldId === 'lavoro' ? getLavoroCategories(canRecruit) : CATEGORY_WORLDS[worldId]?.categories;
+    // Stessi filtri per ruolo di categorySet: altrimenti una categoria
+    // riservata (Stanza MOD, Cerca candidati) non si troverebbe qui anche
+    // per chi la vede, e il proprietario vede sempre tutto.
+    const worldCategories =
+      worldId === 'lavoro'
+        ? getLavoroCategories(canRecruit, user)
+        : worldId === 'faq'
+        ? getFaqCategories(isStaff(user?.ruolo), user)
+        : CATEGORY_WORLDS[worldId]?.categories;
     const cat = worldCategories?.find((c) => c.id === categoryId);
     if (!cat) return;
     const sameWorld = targetIndex === index;
@@ -1014,7 +1043,9 @@ export default function App() {
     // "Rispondi" a un messaggio della casella dello staff (Stanza MOD):
     // chat diretta con chi l'ha scritto.
     const onOpenChat = (e) => {
-      if (e.detail?.userId) setActiveFriendChatId(e.detail.userId);
+      if (!e.detail?.userId) return;
+      setActiveFriendChatConvId(e.detail.conversationId ?? null);
+      setActiveFriendChatId(e.detail.userId);
     };
     window.addEventListener('vm:open-profile', onOpenProfile);
     window.addEventListener('vm:open-chat', onOpenChat);
@@ -1056,6 +1087,12 @@ export default function App() {
       setAuthOpen(true);
       return;
     }
+    // Account bloccato: i link condivisi non si aprono (solo INFO BAN).
+    if (accountBlocked) {
+      setPendingLink(null);
+      clearDeepLinkHash();
+      return;
+    }
     const link = pendingLink;
     setPendingLink(null);
     clearDeepLinkHash();
@@ -1088,6 +1125,7 @@ export default function App() {
 
   // n: la notifica (oggetto), o solo il tipo per le chiamate vecchie.
   const openNotificationTarget = (n) => {
+    if (accountBlocked) return;
     const notif = typeof n === 'string' ? { tipo: n } : n ?? {};
     const { tipo } = notif;
     setNotificationsOpen(false);
@@ -1168,6 +1206,7 @@ export default function App() {
   // finito; chiuderla (X, o ri-click sulla categoria già aperta) torna
   // subito alla vista larga.
   const toggleArteCategory = (id) => {
+    if (accountBlocked && id && id !== 'info-ban') return;
     if (pendingOpenRef.current) {
       clearTimeout(pendingOpenRef.current);
       pendingOpenRef.current = null;
@@ -1271,6 +1310,26 @@ export default function App() {
     segnaAvvisoIncontri();
   }, [incontriNoticeVisible, incontriNotice]);
 
+  // Account bloccato: sempre nel mondo FAQ, e INFO BAN si apre da sola una
+  // volta (poi si può chiudere e riaprire dalla sua nuvola o dalla lista).
+  const blockedAutoOpenRef = useRef(false);
+  useEffect(() => {
+    if (!accountBlocked) {
+      blockedAutoOpenRef.current = false;
+      return;
+    }
+    if (world.id !== 'faq') {
+      if (activeArteCategory) setActiveArteCategory(null);
+      setIndex(WORLDS.findIndex((w) => w.id === 'faq'));
+      return;
+    }
+    if (!blockedAutoOpenRef.current && activeArteCategory !== 'info-ban') {
+      blockedAutoOpenRef.current = true;
+      navigateToCategory('faq', 'info-ban');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountBlocked, world.id]);
+
   // Account sospeso o in eliminazione: al posto dell'app una schermata per
   // riattivarlo (riattiva_account) o uscire. Stesso momento del controllo
   // del ban (account caricato all'avvio o all'accesso), ma senza
@@ -1333,6 +1392,7 @@ export default function App() {
       <TopBar
         world={world}
         user={user}
+        blocked={accountBlocked}
         onOpenAuth={() => setAuthOpen(true)}
         onLogout={() => {
           logoutAccount();
@@ -1353,6 +1413,19 @@ export default function App() {
         unreadMessagesCount={totalUnreadMessages}
         unreadNotifCount={unreadNotifCount + receivedRequestsCount + receivedFamilyRequestsCount}
       />
+
+      {accountBlocked && (
+        <div className="rb-blocked-banner" role="status">
+          <strong>⛔ Account bloccato</strong>
+          {user?.banMotivo && <span>Motivo: {user.banMotivo}</span>}
+          <span>
+            {user?.banFinoAl
+              ? `Fino al ${new Date(user.banFinoAl).toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' })}`
+              : 'Senza una data di fine'}
+          </span>
+          <span className="rb-blocked-banner-hint">Puoi scrivere allo staff in FAQ › INFO BAN.</span>
+        </div>
+      )}
 
       {justConfirmedEmail && (
         <div className="rb-email-confirmed-banner">✅ Mail confermata, bentornato su Versemove!</div>
@@ -1383,7 +1456,11 @@ export default function App() {
           users={globeUsers}
           // Utenti veri: il profilo Social completo (post, Segui...), lo
           // stesso delle @menzioni; il vecchio ProfileModal resta per gli altri.
-          onSelectUser={(u) => (u?.fromDb ? openProfileInWorld(u.id) : setSelectedUser(u))}
+          onSelectUser={(u) => {
+            if (accountBlocked) return;
+            if (u?.fromDb) openProfileInWorld(u.id);
+            else setSelectedUser(u);
+          }}
           containerRef={containerRef}
           flyTo={flyTo}
           categories={categorySet?.categories ?? null}
@@ -1397,12 +1474,18 @@ export default function App() {
           }}
           warpRequest={warpRequest}
           disabledWorlds={globeDisabledWorlds}
-          onDisabledWorldClick={user ? setDisabledWorldPopover : undefined}
-          onWarpArrived={(worldId) => {
-            const i = WORLDS.findIndex((w) => w.id === worldId);
-            if (i !== -1) setIndex(i);
-            setWarpRequest(null);
-          }}
+          onDisabledWorldClick={user && !accountBlocked ? setDisabledWorldPopover : undefined}
+          // Account bloccato: senza onWarpArrived i satelliti non portano in
+          // un altro mondo (WorldGlobe non avvia il volo).
+          onWarpArrived={
+            accountBlocked
+              ? undefined
+              : (worldId) => {
+                  const i = WORLDS.findIndex((w) => w.id === worldId);
+                  if (i !== -1) setIndex(i);
+                  setWarpRequest(null);
+                }
+          }
         />
       </Suspense>
 
@@ -1641,7 +1724,10 @@ export default function App() {
       <WorldSelectorColumn
         worlds={WORLDS}
         activeWorldId={world.id}
-        onSelectWorld={(worldId) => setWarpRequest({ worldId, ts: Date.now() })}
+        disabled={accountBlocked}
+        onSelectWorld={(worldId) => {
+          if (!accountBlocked) setWarpRequest({ worldId, ts: Date.now() });
+        }}
       />
 
       {settingsOpen && (
@@ -1816,10 +1902,12 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <FriendChatModal
             friendId={activeFriendChatId}
+            initialConversationId={activeFriendChatConvId}
             user={user}
             world={world}
             onClose={() => {
               setActiveFriendChatId(null);
+              setActiveFriendChatConvId(null);
               setAnswerCallFrom(null);
             }}
             onMessagesRead={refreshUnread}
@@ -1955,24 +2043,6 @@ export default function App() {
         <Suspense fallback={<PageLoading />}>
           <PasswordRecoveryModal open={passwordRecoveryOpen} onClose={() => setPasswordRecoveryOpen(false)} />
         </Suspense>
-      )}
-
-      {banNotice && (
-        <div className="rb-adult-gate-overlay">
-          <div className="rb-adult-gate-card">
-            <h2>Account sospeso</h2>
-            <p>
-              Un moderatore ha sospeso il tuo account
-              {banNotice.finoAl ? ` fino al ${new Date(banNotice.finoAl).toLocaleString('it-IT')}` : ' senza una data di fine'}.
-              {banNotice.motivo && <> Motivo: {banNotice.motivo}.</>}
-            </p>
-            <div className="rb-adult-gate-actions">
-              <button type="button" className="rb-adult-gate-confirm" onClick={() => setBanNotice(null)}>
-                Ho capito
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       <CookieConsentBanner user={user} onOpenPrivacyInfo={() => navigateToCategory('faq', 'informazioni')} />

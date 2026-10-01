@@ -1109,10 +1109,11 @@ export function buildCategoryShell(
       group.add(mesh);
     }
 
+    // cat.labelColor: scritta di un colore diverso (es. INFO BAN in rosso).
     const { sprite, material: labelMat, texture } = makeLabelSprite(
       cat.label,
       labelScale,
-      '#ffffff',
+      cat.labelColor ?? '#ffffff',
       vivid ? { pill: true, pillBorder: faceColor } : {}
     );
     sprite.position.copy(normal).multiplyScalar(radius + 3 + (vivid ? VIVID_SURFACE_LIFT : 0));

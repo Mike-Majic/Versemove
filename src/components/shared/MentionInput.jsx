@@ -21,6 +21,8 @@ export default function MentionInput({
   onMentionsChange,
   contesto = 'generale',
   contestoId = null,
+  // false: niente tendina "@" (dove le menzioni non vengono salvate).
+  suggest = true,
   multiline = false,
   inputRef,
   onKeyDown,
@@ -61,6 +63,10 @@ export default function MentionInput({
   }, [query, contesto, contestoId]);
 
   const detect = (text, caret) => {
+    if (!suggest) {
+      setQuery(null);
+      return;
+    }
     const m = text.slice(0, caret).match(TRIGGER);
     if (m) {
       triggerStartRef.current = caret - m[2].length - 1;

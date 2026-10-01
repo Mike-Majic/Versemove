@@ -42,7 +42,8 @@ function useAnimatedNumber(target) {
   return shown;
 }
 
-export default function WorldStats({ world }) {
+// locked: account bloccato (pulsanti della barra spenti, vedi TopBar).
+export default function WorldStats({ world, locked = false }) {
   const [stats, setStats] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const iscritti = useAnimatedNumber(stats?.iscritti ?? null);
@@ -82,6 +83,7 @@ export default function WorldStats({ world }) {
       type="button"
       className={`rb-world-stats ${expanded ? 'expanded' : ''}`}
       onClick={() => setExpanded((v) => !v)}
+      disabled={locked}
       aria-label={`${stats.iscritti} iscritti, ${stats.online} online`}
       title={`${stats.iscritti.toLocaleString('it-IT')} iscritti · ${stats.online.toLocaleString('it-IT')} online`}
     >

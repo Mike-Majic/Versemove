@@ -41,8 +41,10 @@ export function canSearchCandidates(user) {
 // per chi non può cercare) — usato ovunque al posto dell'array completo,
 // così la categoria nascosta non compare né sul globo né nella lista né
 // nella ricerca testuale né nei preferiti.
-export function getLavoroCategories(canRecruit) {
-  return canRecruit ? LAVORO_CATEGORIES : LAVORO_CATEGORIES.filter((c) => !c.recruiterOnly);
+// Il proprietario (user.ruolo === 'owner') vede sempre tutte le categorie.
+export function getLavoroCategories(canRecruit, user = null) {
+  if (user?.ruolo === 'owner' || canRecruit) return LAVORO_CATEGORIES;
+  return LAVORO_CATEGORIES.filter((c) => !c.recruiterOnly);
 }
 
 export function resolveCategoryQuery(query, categories = getLavoroCategories(false)) {

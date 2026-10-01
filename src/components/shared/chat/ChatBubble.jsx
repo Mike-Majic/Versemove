@@ -9,6 +9,10 @@ const LONG_PRESS_MS = 480;
 // onAvatarClick: avatar cliccabile (es. apre il profilo).
 // menu: [{ label, onClick, danger }] — azioni sul messaggio: pulsante "⋯"
 // al passaggio del mouse, pressione lunga (o tasto destro) sul telefono.
+// authorMenu: [{ label, onClick }] — avatar E nome diventano un pulsante
+// che apre un menu sull'autore (es. "Vedi profilo", "Scrivi in privato",
+// solo per lo staff nella chat FAQ). Senza, avatar e nome non sono
+// cliccabili (salvo onAvatarClick).
 export default function ChatBubble({
   mine = false,
   author,
@@ -21,24 +25,30 @@ export default function ChatBubble({
   footer = null,
   onAvatarClick = null,
   menu = null,
+  authorMenu = null,
   children,
 }) {
   const name = mine ? 'Tu' : author?.name ?? 'Utente';
   const letter = (author?.name ?? 'U').charAt(0).toUpperCase();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authorMenuOpen, setAuthorMenuOpen] = useState(false);
   const pressTimer = useRef(null);
   const rowRef = useRef(null);
   const hasMenu = Array.isArray(menu) && menu.length > 0 && !pending;
+  const hasAuthorMenu = !mine && Array.isArray(authorMenu) && authorMenu.length > 0;
 
-  // Chiude il menu toccando fuori.
+  // Chiude i menu toccando fuori.
   useEffect(() => {
-    if (!menuOpen) return undefined;
+    if (!menuOpen && !authorMenuOpen) return undefined;
     const close = (e) => {
-      if (!rowRef.current?.contains(e.target)) setMenuOpen(false);
+      if (!rowRef.current?.contains(e.target)) {
+        setMenuOpen(false);
+        setAuthorMenuOpen(false);
+      }
     };
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
-  }, [menuOpen]);
+  }, [menuOpen, authorMenuOpen]);
 
   useEffect(() => () => clearTimeout(pressTimer.current), []);
 
@@ -62,9 +72,25 @@ export default function ChatBubble({
 
   const avatar = author?.avatar ? <img src={author.avatar} alt="" /> : letter;
 
+  const toggleAuthorMenu = () => {
+    setMenuOpen(false);
+    setAuthorMenuOpen((v) => !v);
+  };
+
   return (
     <li ref={rowRef} className={`rb-chat-row ${mine ? 'mine' : ''} ${pending ? 'pending' : ''} ${failed ? 'failed' : ''} ${hasMenu ? 'has-menu' : ''}`}>
-      {onAvatarClick ? (
+      {hasAuthorMenu ? (
+        <button
+          type="button"
+          className="rb-chat-avatar rb-chat-avatar-btn"
+          onClick={toggleAuthorMenu}
+          aria-label={`Azioni su ${author?.name ?? 'utente'}`}
+          aria-expanded={authorMenuOpen}
+          title={author?.name ?? 'Utente'}
+        >
+          {avatar}
+        </button>
+      ) : onAvatarClick ? (
         <button
           type="button"
           className="rb-chat-avatar rb-chat-avatar-btn"
@@ -84,7 +110,19 @@ export default function ChatBubble({
           <div className="rb-chat-bubble" {...pressHandlers}>
             {showHeader && (
               <div className="rb-chat-head">
-                <strong>{name}</strong>
+                {hasAuthorMenu ? (
+                  <button
+                    type="button"
+                    className="rb-chat-name-btn"
+                    onClick={toggleAuthorMenu}
+                    aria-expanded={authorMenuOpen}
+                    aria-label={`Azioni su ${name}`}
+                  >
+                    <strong>{name}</strong>
+                  </button>
+                ) : (
+                  <strong>{name}</strong>
+                )}
                 {badge && <span className={`rb-chat-badge ${badge.toLowerCase()}`}>{badge}</span>}
                 {time && <span className="rb-chat-time">{time}</span>}
               </div>
@@ -102,6 +140,23 @@ export default function ChatBubble({
             >
               ⋯
             </button>
+          )}
+          {hasAuthorMenu && authorMenuOpen && (
+            <div className="rb-chat-msg-menu rb-chat-author-menu" role="menu">
+              {authorMenu.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAuthorMenuOpen(false);
+                    item.onClick();
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           )}
           {hasMenu && menuOpen && (
             <div className="rb-chat-msg-menu" role="menu">
