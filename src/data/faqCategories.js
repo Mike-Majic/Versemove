@@ -24,10 +24,10 @@ export const FAQ_CATEGORIES = [
     // Stanza unica stile gruppo fra utenti e staff (FaqChatColumn):
     // visibile a chiunque abbia accesso al mondo FAQ.
     id: 'chat',
-    label: 'Chat',
+    label: 'Assistenza',
     icon: '💬',
     anchor: { lat: -28, lng: -15 }, // Atlantico del sud, lontano dalle altre nuvole
-    aliases: ['chat', 'chat staff', 'parla con lo staff', 'assistenza', 'supporto'],
+    aliases: ['chat', 'chat pubblica', 'chat staff', 'parla con lo staff', 'assistenza', 'supporto'],
     subfamilies: [],
   },
   {
