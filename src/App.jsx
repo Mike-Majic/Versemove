@@ -389,7 +389,7 @@ export default function App() {
     worldIdRef.current = world.id;
   }, [world.id]);
   const openProfileInWorld = (id) => {
-    if (!id) return;
+    if (!id || accountBlocked) return;
     if (worldIdRef.current === 'incontri') setDatingCardId(id);
     else setMentionProfileId(id);
   };
@@ -1978,7 +1978,7 @@ export default function App() {
 
       {/* Dopo la chat: il profilo aperto dall'avatar di un contatto deve
           stare sopra la finestra della chat (stesso z-index, vince l'ordine). */}
-      {datingCardId && (
+      {datingCardId && !accountBlocked && (
         <Suspense fallback={<PageLoading />}>
           <DatingCardModal
             userId={datingCardId}
@@ -1998,7 +1998,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {mentionProfileId && (
+      {mentionProfileId && !accountBlocked && (
         <Suspense fallback={<PageLoading />}>
           <MentionProfileViewer
             userId={mentionProfileId}
@@ -2030,7 +2030,9 @@ export default function App() {
         </Suspense>
       )}
 
-      {profileSettingsOpen && (
+      {/* Account bloccato: niente "Il mio profilo" (né l'onboarding), da
+          qualsiasi pulsante o evento arrivi: resta solo FAQ › INFO BAN. */}
+      {profileSettingsOpen && !accountBlocked && (
         <Suspense fallback={<PageLoading />}>
           <ProfileSettingsPanel
             open={profileSettingsOpen}
@@ -2046,7 +2048,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {profileOnboardingOpen && user && (
+      {profileOnboardingOpen && user && !accountBlocked && (
         <Suspense fallback={<PageLoading />}>
           <ProfileSettingsPanel
             open
