@@ -71,6 +71,9 @@ const CATEGORY_LOOK_BY_WORLD = {
   bambini: { sizeFactor: 0.72 },
   // Mondo Rosa: 14 triangoli, erano ammassati.
   vetrina: { sizeFactor: 0.7 },
+  // Intrattenimento: stelle più luminose (col viola del mondo al 20% si
+  // vedevano poco dalla panoramica). Solo il riempimento.
+  arte: { fillColor: '#a78bfa', fillOpacity: 0.42, activeOpacity: 0.7 },
   // Mondo Rosso: i cuori erano enormi e quasi attaccati.
   incontri: { sizeFactor: 0.62 },
   faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
