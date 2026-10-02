@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBackLayer } from '../../../hooks/useBackLayer';
+import './Lightbox.css';
 
 // Foto (o video, kind='video') a schermo intero. Livello "viewer" della
 // pila di Indietro: sul telefono la freccia indietro chiude prima la foto,

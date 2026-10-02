@@ -13,7 +13,6 @@ import SocialProfileModal from './SocialProfileModal';
 import TrendingGroups from './TrendingGroups';
 import EmptyState from '../EmptyState';
 import Skeleton from '../Skeleton';
-import { computeRelevance } from '../../data/socialPosts';
 import {
   fetchFeed,
   fetchComments,
@@ -42,11 +41,6 @@ import {
 import { getCityInfo } from '../../data/geo';
 import './SocialFeed.css';
 
-// Ogni tot post "di zona" (tab Per te, con un filtro Dove attivo), si
-// intercala il prossimo post in classifica per numero di mi piace (1°, poi
-// 2°, ...) tra TUTTI i post esistenti — così chi filtra per regione vede
-// comunque cosa va per la maggiore nel resto del mondo Social.
-const TRENDING_EVERY = 3;
 
 // Una card sponsorizzata ogni 8 post del feed, mai la prima — richiesta esplicita.
 const SPONSOR_FEED_EVERY = 7;
@@ -69,27 +63,9 @@ function matchesLocation(post, locationFilters) {
   return true;
 }
 
-// Intercala, ogni TRENDING_EVERY post "di zona", il prossimo post più
-// popolare in classifica (per numero di mi piace) tra tutti i post
-// esistenti — saltando quelli già presenti nella lista di zona, per non
-// mostrare lo stesso post due volte di fila.
-function interleaveTrending(regionalPosts, allPosts) {
-  const alreadyShown = new Set(regionalPosts.map((p) => p.id));
-  const ranking = [...allPosts]
-    .filter((p) => !alreadyShown.has(p.id))
-    .sort((a, b) => b.mi_piace.length - a.mi_piace.length);
-
-  const items = [];
-  let rankIdx = 0;
-  regionalPosts.forEach((post, i) => {
-    items.push({ post, trendingRank: null });
-    if ((i + 1) % TRENDING_EVERY === 0 && rankIdx < ranking.length) {
-      items.push({ post: ranking[rankIdx], trendingRank: rankIdx + 1 });
-      rankIdx += 1;
-    }
-  });
-  return items;
-}
+// Post sempre dal più recente, in tutte le schede (niente riordini per
+// pertinenza o popolarità).
+const byNewest = (a, b) => new Date(b.data) - new Date(a.data);
 
 const FEED_TABS = [
   { id: 'foryou', label: 'Per te' },
@@ -554,7 +530,7 @@ export default function SocialFeed({
     const target = posts.find((p) => p.id === focusPost.postId);
     if (!target) {
       if (focusFetchRef.current === focusPost.seq) {
-        showActionError('Questo post non è più disponibile.');
+        showActionError('Post non più disponibile.');
         return undefined;
       }
       focusFetchRef.current = focusPost.seq;
@@ -624,11 +600,8 @@ export default function SocialFeed({
   const isGroupView = Boolean(activeGroupId);
   const activeGroup = isGroupView ? groupsList.find((g) => g.id === activeGroupId) ?? null : null;
 
-  // Feed "Per te": i post restano ordinati per pertinenza tra loro.
-  const forYouList = useMemo(() => {
-    const byRelevance = (a, b) => computeRelevance(b, comments) - computeRelevance(a, comments);
-    return [...posts].sort(byRelevance);
-  }, [posts, comments]);
+  // Feed "Per te": sempre dal più recente (come in tutti i mondi).
+  const forYouList = useMemo(() => [...posts].sort(byNewest), [posts]);
 
   const hasLocationFilter = Boolean(locationFilters.city || locationFilters.region || locationFilters.continent);
 
@@ -638,13 +611,12 @@ export default function SocialFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forYouList, locationFilters.city, locationFilters.region, locationFilters.continent, hasLocationFilter]);
 
-  // Con un filtro di zona attivo, il tab "Per te" mostra i post della zona
-  // con i più popolari di tutto il mondo Social intercalati ogni 3; senza
-  // filtro resta il feed per pertinenza di sempre.
-  const forYouItems = useMemo(() => {
-    if (!hasLocationFilter) return forYouList.map((post) => ({ post, trendingRank: null }));
-    return interleaveTrending(regionalForYou, posts);
-  }, [hasLocationFilter, forYouList, regionalForYou, posts]);
+  // Con un filtro di zona attivo, il tab "Per te" mostra solo i post della
+  // zona, sempre dal più recente.
+  const forYouItems = useMemo(
+    () => (hasLocationFilter ? regionalForYou : forYouList).map((post) => ({ post, trendingRank: null })),
+    [hasLocationFilter, forYouList, regionalForYou]
+  );
 
   const followingList = useMemo(
     () =>
@@ -662,11 +634,9 @@ export default function SocialFeed({
   const groupList = useMemo(
     () =>
       activeGroupId
-        ? posts
-            .filter((p) => p.gruppo_id === activeGroupId)
-            .sort((a, b) => computeRelevance(b, comments) - computeRelevance(a, comments))
+        ? posts.filter((p) => p.gruppo_id === activeGroupId).sort(byNewest)
         : [],
-    [posts, comments, activeGroupId]
+    [posts, activeGroupId]
   );
 
   // Calcolato dal feed già in stato (non dallo snapshot di listGroups):

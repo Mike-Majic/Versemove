@@ -388,7 +388,7 @@ export default function VideoColumn({ user, onOpenAuth }) {
             </p>
           )}
 
-          {analyzing && <p className="rb-video-trim-hint">Sto analizzando il contenuto (gratis, nel browser)...</p>}
+          {analyzing && <p className="rb-video-trim-hint">Sto analizzando il contenuto...</p>}
           {!analyzing && suggestedTags.length > 0 && (
             <p className="rb-video-trim-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>
           )}

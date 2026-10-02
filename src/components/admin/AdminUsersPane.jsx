@@ -10,6 +10,9 @@ import {
   lastSeenLabel,
   notifyBan,
   deleteUserForever,
+  parseDateRange,
+  formatDateRange,
+  formatDateTime,
   mailLabel,
 } from '../../data/adminUsers';
 import { logAdminAction } from '../../data/adminAuditLog';
@@ -67,7 +70,29 @@ function HeaderCell({ col, open, onToggle, value, onChange, sort, onSort, classN
         </button>
       </div>
       {open &&
-        (col.kind === 'select' ? (
+        (col.kind === 'daterange' ? (
+          <div className="rb-admin-th-range">
+            <label>
+              dal
+              <input
+                className="rb-admin-th-input"
+                type="date"
+                value={parseDateRange(value).from}
+                onChange={(e) => onChange(formatDateRange(e.target.value, parseDateRange(value).to))}
+                autoFocus
+              />
+            </label>
+            <label>
+              al
+              <input
+                className="rb-admin-th-input"
+                type="date"
+                value={parseDateRange(value).to}
+                onChange={(e) => onChange(formatDateRange(parseDateRange(value).from, e.target.value))}
+              />
+            </label>
+          </div>
+        ) : col.kind === 'select' ? (
           <select className="rb-admin-th-input" value={value ?? ''} onChange={(e) => onChange(e.target.value)} autoFocus>
             {col.options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -550,6 +575,7 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
               {header('backup_email')}
               {header('eta')}
               {header('online')}
+              {header('created_at')}
               <th>
                 <div className="rb-admin-th plain">Allegati</div>
               </th>
@@ -588,6 +614,7 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
                       </span>
                     )}
                   </td>
+                  <td className="rb-admin-created">{formatDateTime(a.createdAt)}</td>
                   <td>
                     {a.attachments?.length > 0 ? (
                       <div className="rb-admin-attachments">
@@ -652,7 +679,7 @@ export default function AdminUsersPane({ user, onAuditChanged }) {
             })}
             {rows !== null && rows.length === 0 && (
               <tr>
-                <td colSpan={13} className="rb-admin-empty">
+                <td colSpan={14} className="rb-admin-empty">
                   {hasFilters ? 'Nessun utente corrisponde alla ricerca.' : 'Nessuno si è ancora registrato.'}
                 </td>
               </tr>

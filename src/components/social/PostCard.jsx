@@ -18,6 +18,7 @@ import { COSPLAY_POST_TAGS } from '../../data/cosplay';
 import './PostCard.css';
 import AvatarImg from '../shared/AvatarImg';
 import GameScoreCard from './GameScoreCard';
+import ZoomableMedia from '../shared/ZoomableMedia';
 import { scoreFromOldText } from './gameScore';
 
 // Stesse emoji ammesse dal server (comment_reactions).
@@ -26,10 +27,14 @@ const REACTION_EMOJIS = COMMENT_REACTION_EMOJIS;
 // GIF salvate come URL (niente vero upload su server per le GIF): se quel
 // link smette di funzionare (CDN, scadenza, rete) l'utente deve vedere un
 // avviso chiaro, non un'area vuota senza spiegazione.
-function MediaImage({ src, alt, errorText, className }) {
+// zoomable: la foto (o il video, kind 'video') si apre nel Lightbox.
+function MediaImage({ src, alt, errorText, className, zoomable = false, kind = 'image', caption = null }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return <p className="rb-gif-load-error">⚠️ {errorText}</p>;
+  }
+  if (zoomable) {
+    return <ZoomableMedia className={className} src={src} kind={kind} alt={alt} caption={caption} onError={() => setFailed(true)} />;
   }
   return <img className={className} src={src} alt={alt} onError={() => setFailed(true)} />;
 }
@@ -120,6 +125,8 @@ export default function PostCard({
   const [editText, setEditText] = useState(post.testo);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const author = post.author ?? { name: 'Utente', avatar: '' };
+  // Didascalia del Lightbox: autore e inizio del testo.
+  const mediaCaption = `${author.name}${post.testo ? ` — ${post.testo.slice(0, 120)}` : ''}`;
   const isOwn = Boolean(user) && post.autoreId === user.id;
   const canModeratePost = !isOwn && isStaff(user?.ruolo);
   // I post con foto/video autotaggato hanno un contentId condiviso con le
@@ -264,10 +271,10 @@ export default function PostCard({
         <MediaImage className="rb-post-gif" src={post.gif} alt="GIF" errorText="GIF non disponibile (il link non si è caricato)" />
       )}
       {post.mediaUrl && post.mediaType === 'video' && (
-        <video className="rb-post-video" src={post.mediaUrl} controls />
+        <MediaImage className="rb-post-video" src={post.mediaUrl} kind="video" alt="Video" caption={mediaCaption} errorText="Video non disponibile" zoomable />
       )}
       {post.mediaUrl && post.mediaType === 'foto' && (
-        <MediaImage className="rb-post-photo" src={post.mediaUrl} alt="Foto" errorText="Foto non disponibile" />
+        <MediaImage className="rb-post-photo" src={post.mediaUrl} alt="Foto" caption={mediaCaption} errorText="Foto non disponibile" zoomable />
       )}
       {post.contentTags?.length > 0 && (
         <p className="rb-post-photo-tags">{post.contentTags.map((t) => `#${t}`).join(' ')}</p>

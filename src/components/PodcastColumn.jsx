@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { listContentsForPlacement, toggleContentLike } from '../data/contents';
+import { listContentsForPlacement, toggleContentLike, CONTENTS_CHANGED_EVENT } from '../data/contents';
+import ZoomableMedia from './shared/ZoomableMedia';
 import { searchRadioStations } from '../data/radioBrowser';
 import '../components/cultural/cultural.css';
 import './PodcastColumn.css';
@@ -96,7 +97,14 @@ function PodcastTab({ user, onOpenAuth }) {
   const [contents, setContents] = useState(null);
 
   useEffect(() => {
-    listContentsForPlacement({ world: 'arte', category: 'podcast' }).then(setContents);
+    const load = () => listContentsForPlacement({ world: 'arte', category: 'podcast' }).then(setContents);
+    load();
+    // Dopo una pubblicazione nel Podcast l'elenco si ricarica.
+    const onChanged = (e) => {
+      if ((e.detail?.placements ?? []).some((p) => p.world_id === 'arte' && p.category_id === 'podcast')) load();
+    };
+    window.addEventListener(CONTENTS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONTENTS_CHANGED_EVENT, onChanged);
   }, []);
 
   const handleLike = async (c) => {
@@ -118,7 +126,7 @@ function PodcastTab({ user, onOpenAuth }) {
     <ul className="rb-cultural-list">
       {contents.map((c) => (
         <li key={c.id} className="rb-cultural-card">
-          {c.type === 'video' ? <video src={c.url} controls /> : <img src={c.url} alt={c.caption || 'Puntata'} />}
+          <ZoomableMedia src={c.url} kind={c.type === 'video' ? 'video' : 'image'} alt={c.caption || 'Puntata'} caption={c.caption || null} />
           <div className="rb-cultural-card-info">
             {c.caption && <strong>{c.caption}</strong>}
             {c.tags?.length > 0 && <p className="rb-cultural-card-meta">{c.tags.map((t) => `#${t}`).join(' ')}</p>}

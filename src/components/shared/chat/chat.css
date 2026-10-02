@@ -476,61 +476,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Visore foto -------------------------------------------------------- */
-.rb-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: grid;
-  place-items: center;
-  padding: 50px 16px 70px;
-  background: rgba(0, 0, 0, 0.92);
-}
-
-.rb-lightbox img,
-.rb-lightbox video {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-}
-
-.rb-lightbox-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-  color: #fff;
-  font-size: 13px;
-}
-
-.rb-lightbox-bar span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rb-lightbox-bar a {
-  color: #fff;
-  font-weight: 700;
-}
-
-.rb-lightbox-bar button {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  cursor: pointer;
-}
-
 /* --- Barra di scrittura ------------------------------------------------- */
 .rb-composer {
   position: relative;

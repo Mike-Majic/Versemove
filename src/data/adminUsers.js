@@ -58,6 +58,9 @@ export const USER_COLUMNS = [
       { value: 'no', label: 'Non verificati' },
     ],
   },
+  // Data di registrazione: filtro "dal … al …" (valore 'AAAA-MM-GG|AAAA-MM-GG',
+  // uno dei due può mancare).
+  { key: 'created_at', label: 'Registrato il', kind: 'daterange', sort: 'created_at' },
   {
     key: 'bannato',
     label: 'Bloccato',
@@ -100,6 +103,32 @@ function ageRange(text) {
   return { from: isoDate(earliest), to: isoDate(latest) };
 }
 
+// Filtro di date: 'AAAA-MM-GG|AAAA-MM-GG' -> { from, to } (stringhe o '').
+export function parseDateRange(value) {
+  const [from = '', to = ''] = String(value ?? '').split('|');
+  const ok = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '');
+  return { from: ok(from), to: ok(to) };
+}
+
+export function formatDateRange(from, to) {
+  return from || to ? `${from}|${to}` : '';
+}
+
+// Mezzanotte locale del giorno 'AAAA-MM-GG'.
+function localDayStart(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// gg/mm/aaaa hh:mm (ora locale).
+export function formatDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function applyFilters(query, filters) {
   let q = query;
   for (const col of USER_COLUMNS) {
@@ -114,6 +143,14 @@ function applyFilters(query, filters) {
     } else if (col.kind === 'age') {
       const range = ageRange(value);
       if (range) q = q.gte('data_nascita', range.from).lte('data_nascita', range.to);
+    } else if (col.kind === 'daterange') {
+      const { from, to } = parseDateRange(value);
+      if (from) q = q.gte(col.key, localDayStart(from).toISOString());
+      if (to) {
+        const end = localDayStart(to);
+        end.setDate(end.getDate() + 1);
+        q = q.lt(col.key, end.toISOString());
+      }
     } else if (col.key === 'online') {
       if (value === 'ora') q = q.gte('last_seen_at', new Date(Date.now() - ONLINE_WINDOW_MS).toISOString());
       else if (value === '24h') q = q.gte('last_seen_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());

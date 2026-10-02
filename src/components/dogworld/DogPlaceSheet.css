@@ -319,3 +319,12 @@
   color: inherit;
   text-decoration: underline;
 }
+
+/* Foto apribili nel Lightbox (ZoomableMedia). */
+.rb-dogsheet-photos .rb-zoom-media {
+  flex-shrink: 0;
+  border-radius: 12px;
+}
+.rb-dogsheet-photos-sm .rb-zoom-media {
+  border-radius: 8px;
+}
