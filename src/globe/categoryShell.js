@@ -7,6 +7,7 @@ import { createModelKit } from './categoryModels3d.js';
 import { createBriefcase3D } from './briefcase3d.js';
 import { createAnnunciModel } from './annunciModels3d.js';
 import { createVetrinaModel } from './vetrinaModels3d.js';
+import { createNerdModel, hasNerdModel } from './nerdModels3d.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -625,7 +626,9 @@ const GOTHIC_RENDER_ORDER = 2;
 // hover/categoria attiva crescono al massimo dell'8% (interpolato,
 // istantaneo con "riduci animazioni").
 const MODEL_EMPHASIS_SCALE = 1.08;
-const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f', vetrina: '#ec4899' };
+const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f', vetrina: '#ec4899', ufo: '#d4f634' };
+// Luci e schermi accesi per mondo (default del kit: #ffe2b0).
+const MODEL_LIGHT_BY_SHAPE = { vetrina: '#ffd6ea', ufo: '#eaffa0' };
 // Mondo Vetrina: nessuna sagoma piatta, si parte dal triangolo (vedi
 // 'vetrina' in buildCategoryShell); il modello non supera l'ingombro del
 // triangolo, così le 14 categorie non si toccano.
@@ -633,7 +636,12 @@ const MODEL_FACTORY_BY_SHAPE = {
   briefcase: (kit) => createBriefcase3D(kit),
   annunci: (kit, id) => createAnnunciModel(kit, id),
   vetrina: (kit, id) => createVetrinaModel(kit, id),
+  // Nerd: il modello va sopra all'UFO piatto (che diventa invisibile).
+  ufo: (kit, id) => createNerdModel(kit, id),
 };
+// Mondi in cui non tutte le categorie hanno un modello: quelle senza restano
+// sulla sagoma di sempre, e se nessuna lo ha non si crea nemmeno il kit.
+const MODEL_AVAILABLE_BY_SHAPE = { ufo: hasNerdModel };
 // Uscita/rientro delle lettere sul bordo del globo (facing = coseno fra la
 // normale della lettera e la direzione della camera). L'uscita parte a
 // ~81° (0.15): con la rotazione automatica (3°/s) i 2,2 s dell'animazione
@@ -1173,7 +1181,7 @@ export function buildCategoryShell(
     if (gothicM && shapeCenter && GOTHIC_LETTERS[cat.id]) {
       gothicTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
     }
-    if (model3d && shapeCenter) {
+    if (model3d && shapeCenter && (MODEL_AVAILABLE_BY_SHAPE[shapeType]?.(cat.id) ?? true)) {
       modelTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatBox, triangleCorners, flatMesh: mesh, sprite });
     }
   });
@@ -1185,7 +1193,7 @@ export function buildCategoryShell(
   if (modelTargets.length > 0) {
     modelKit = createModelKit(renderer, {
       outline: MODEL_OUTLINE_BY_SHAPE[shapeType],
-      ...(shapeType === 'vetrina' ? { light: '#ffd6ea' } : {}),
+      ...(MODEL_LIGHT_BY_SHAPE[shapeType] ? { light: MODEL_LIGHT_BY_SHAPE[shapeType] } : {}),
     });
     modelTargets.forEach((t) => {
       const model = MODEL_FACTORY_BY_SHAPE[shapeType](modelKit, t.id);
