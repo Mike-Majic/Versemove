@@ -29,3 +29,10 @@ se non è chiesto in modo esplicito.
   Match, Mi piace ricevuti, Preferiti, Videochiamata e schede aperte da un
   link c'è il pannello "cosa manca" (`IncontriGatePanel`). Il proprietario
   (`ruolo === 'owner'`) vede sempre tutto.
+- **Nessun utente sul globo in Vetrina, Animali e Annunci:** in questi mondi
+  (`noGlobeUsers: true` in `src/data/worlds.js`) niente avatar, grumi né
+  pallini utenti, a qualsiasi zoom, e nessuna chiamata a `fetchGlobeUsers`.
+  Restano marker di eventi/annunci/luoghi, categorie e contatore in alto.
+- **Icona del mondo "Work in progress" nel selettore:** blu elettrico
+  `selectorColor: '#0a84ff'`; il `color` del mondo resta `#ffffff` (puntini
+  bianchi del satellite).

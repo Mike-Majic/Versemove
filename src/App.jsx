@@ -914,7 +914,9 @@ export default function App() {
   // ricaricano a ogni cambio di mondo o di account.
   const [dbWorldUsers, setDbWorldUsers] = useState({ worldId: null, users: [] });
   useEffect(() => {
-    if (!user) {
+    // Mondi senza utenti sul globo (Vetrina, Animali, Annunci): nessuna
+    // chiamata, lista vuota.
+    if (!user || world.noGlobeUsers) {
       setDbWorldUsers({ worldId: null, users: [] });
       return undefined;
     }
@@ -935,9 +937,11 @@ export default function App() {
     // Mondo rosso con il proprio Profilo Incontri incompleto: nessun
     // pallino né avatar (vedi datingGate).
     if (incontriHidden) return [];
+    // Vetrina, Animali, Annunci: nessun utente (world.noGlobeUsers).
+    if (world.noGlobeUsers) return [];
     const fromDb = dbWorldUsers.worldId === world.id ? dbWorldUsers.users : [];
     return [...usersForWorld(world.id), ...fromDb];
-  }, [world.id, dbWorldUsers, incontriHidden]);
+  }, [world.id, world.noGlobeUsers, dbWorldUsers, incontriHidden]);
 
   // Il proprio marker (quando si condivide la posizione in tempo reale) si
   // aggiunge SOPRA ai risultati già filtrati, non dentro: i propri filtri
@@ -947,7 +951,7 @@ export default function App() {
   // marker non deve comparire lì per nessuno: disattivare un mondo vuol
   // dire anche sparire da quel mondo agli occhi degli altri.
   const globeUsers = useMemo(() => {
-    if (incontriHidden) return worldUsers;
+    if (incontriHidden || world.noGlobeUsers) return worldUsers;
     if (!user || !visibility.shareLiveLocation || !ownPosition) return worldUsers;
     if (!(user.mondiAbilitati ?? []).includes(world.id)) return worldUsers;
     // Con la posizione in tempo reale il proprio marker "di città" sparisce:
@@ -964,7 +968,7 @@ export default function App() {
       isLive: true,
     };
     return [...others, ownMarker];
-  }, [worldUsers, user, visibility.shareLiveLocation, ownPosition, incontriHidden]);
+  }, [worldUsers, user, visibility.shareLiveLocation, ownPosition, incontriHidden, world.noGlobeUsers]);
 
   // Il volo sulla città salvata in "Chi vedo" parte dal caricamento delle
   // preferenze dopo VISTA_SAVED_EVENT (vedi load(true) più su), mai da un
