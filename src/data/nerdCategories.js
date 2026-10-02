@@ -15,10 +15,12 @@ export const NERD_CATEGORIES = [
   },
   {
     id: 'giochi-tavolo',
-    label: 'Giochi da tavolo & carte',
+    label: 'Giochi da tavolo',
     icon: '🎲',
     anchor: { lat: 35.5, lng: -20.5 }, // distribuzione uniforme sull'oceano
-    aliases: ['giochi da tavolo', 'giochi di carte', 'boardgame', 'board game', 'carte collezionabili'],
+    // 'carte': la categoria si chiamava "Giochi da tavolo & carte", la ricerca
+    // la trova ancora così.
+    aliases: ['giochi da tavolo', 'giochi di carte', 'carte', 'boardgame', 'board game', 'carte collezionabili'],
     subfamilies: ['Strategici', 'Party game', 'Carte collezionabili', 'Cooperativi', 'Giochi di ruolo da tavolo'],
   },
   {

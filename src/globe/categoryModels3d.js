@@ -71,6 +71,8 @@ export function createModelKit(renderer, { outline = '#08090c', t = 0.06, light 
     glass: chrome('#0c1220', 0.05, 1.6),
     light: new THREE.MeshBasicMaterial({ color: light }),
     red: new THREE.MeshBasicMaterial({ color: '#ff3b30' }),
+    // Nerd: pallino rosso del Live (lucido, non piatto come i fanali).
+    liveRed: new THREE.MeshStandardMaterial({ color: '#ff3b30', metalness: 0.3, roughness: 0.3, envMap, envMapIntensity: 1.1 }),
     slot: new THREE.MeshBasicMaterial({ color: '#08090c' }),
     // Accento del colore del mondo (Vetrina: stella della borsa, punta del
     // rossetto).

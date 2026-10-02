@@ -53,3 +53,8 @@ se non è chiesto in modo esplicito.
   inclinato verso chi guarda (rotation.x = 0.75).
 - **Stelle Intrattenimento:** fillColor #a78bfa, fillOpacity 0.42,
   activeOpacity 0.7 (`CATEGORY_LOOK_BY_WORLD.arte` in `src/components/WorldGlobe.jsx`).
+- **Categorie mondo Nerd: modelli 3D cromo con contorno lime #d4f634, fermi,
+  senza marchi sui modelli console:** i 9 modelli del riferimento approvato
+  (`src/globe/nerdModels3d.js`) sopra agli UFO piatti (invisibili ma
+  cliccabili). Stesso kit `categoryModels3d.js`; joystick arcade inclinato
+  (rotation.x = 0.65) e dado ruotato su tre facce restano così.

@@ -51,7 +51,7 @@ const DIFFICULTIES = [
 const START_HAND = { scopa: startScopaHand, burraco: startBurracoHand, trentuno: startTrentunoHand, cosmopoli: startCosmopoliGame };
 const TABLES = { scopa: ScopaTable, burraco: BurracoTable, trentuno: TrentunoTable, cosmopoli: CosmopoliTable };
 
-// Guscio "Giochi da tavolo & carte" del mondo Nerd: lobby (partite aperte a
+// Guscio "Giochi da tavolo" del mondo Nerd: lobby (partite aperte a
 // cui unirsi + crea nuova, per qualunque gioco del catalogo GAMES), sala
 // d'attesa (pronto/via, bot e posti a sedere) e, quando la stanza passa
 // "in_corso", il tavolo del gioco scelto (vedi TABLES). Tutte le regole
@@ -159,7 +159,7 @@ function LobbyView({ user, onOpenAuth, onEnterRoom }) {
   return (
     <div className="rb-giochi-tavolo rb-giochi-tavolo--lobby">
       <div className="rb-lobby-head">
-        <h3>Giochi da tavolo & carte</h3>
+        <h3>Giochi da tavolo</h3>
         <span className="rb-lobby-head-spacer" />
         <button type="button" className="rb-lobby-btn" onClick={() => (user ? setCreateOpen('bots') : onOpenAuth?.())}>
           🤖 Gioca col computer
