@@ -40,3 +40,8 @@ se non è chiesto in modo esplicito.
   `src/globe/briefcase3d.js`, montata da `categoryShell.js` al posto della
   sagoma piatta 'briefcase'. Si muove solo col globo (hover/attiva: +8% al
   massimo). Env map solo sui suoi materiali, mai `scene.environment`.
+- **Categorie mondo Annunci: modelli 3D cromo con contorno arancione
+  #ff8a1f, fermi:** auto, moto, bici, barca a vela, casa, maglietta, pacco
+  (`src/globe/annunciModels3d.js`, misure del riferimento approvato). Stesso
+  sistema della valigetta: kit condiviso `src/globe/categoryModels3d.js`
+  (env map unica, materiali, helper), mai `scene.environment`.
