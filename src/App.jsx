@@ -36,7 +36,7 @@ import { INCONTRI_CATEGORIES, resolveCategoryQuery as resolveIncontriCategoryQue
 import { SOCIAL_CATEGORIES, resolveCategoryQuery as resolveSocialCategoryQuery } from './data/socialCategories';
 import { getLavoroCategories, canSearchCandidates, resolveCategoryQuery as resolveLavoroCategoryQuery } from './data/lavoroCategories';
 import { VETRINA_CATEGORIES, resolveCategoryQuery as resolveVetrinaCategoryQuery } from './data/vetrinaCategories';
-import { getFaqCategories, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
+import { getFaqCategories, GUEST_OR_BLOCKED_IDS, resolveCategoryQuery as resolveFaqCategoryQuery } from './data/faqCategories';
 import { ANNUNCI_CATEGORIES, resolveCategoryQuery as resolveAnnunciCategoryQuery } from './data/annunciCategories';
 import { ANIMALI_CATEGORIES, resolveCategoryQuery as resolveAnimaliCategoryQuery } from './data/animaliCategories';
 import AccessGate from './components/AccessGate';
@@ -63,7 +63,7 @@ import { getUnreadCounts, subscribeToOwnMessages, markChatsDelivered } from './d
 import { touchLastSeen } from './data/incontri';
 import { getMyNotifications, subscribeToOwnNotifications, describeNotification } from './data/notifications';
 import { fetchProfilesMap } from './data/posts';
-import { supabase } from './data/supabaseClient';
+import { supabase, setApiBlocked } from './data/supabaseClient';
 import PageLoading from './components/PageLoading';
 import { useGlobeCover } from './fx/globeCover';
 import './App.css';
@@ -176,6 +176,10 @@ export default function App() {
   // "Account bloccato" in alto. Blocco scaduto o tolto: al caricamento
   // successivo del profilo torna tutto normale (data/banStatus.js).
   const accountBlocked = isAccountBlocked(user);
+  // Subito, durante il render: gli effetti dei componenti figli (che
+  // partono prima di quelli di App) trovano già il client Supabase fermo
+  // sulle chiamate che il server rifiuterebbe (vedi data/supabaseClient.js).
+  setApiBlocked(accountBlocked);
   useEffect(() => {
     setWorldNavLocked(accountBlocked);
   }, [accountBlocked]);
@@ -688,13 +692,18 @@ export default function App() {
   // Eventi del mondo Social: ricaricati ad ogni login/logout (la RLS decide
   // cosa si vede, in base a fascia d'età/blocchi), poi tenuti aggiornati in
   // tempo reale così un evento creato da un altro utente compare da solo.
+  // Senza account il server non dà gli eventi (e il mondo Social non si
+  // apre): nessuna chiamata.
+  const signedInId = user?.id ?? null;
   useEffect(() => {
+    if (!signedInId) return;
     fetchEvents({ mondo: 'social' }).then(({ events: list }) => {
       if (list) setEvents(list);
     });
-  }, [user?.id]);
+  }, [signedInId]);
 
   useEffect(() => {
+    if (!signedInId) return undefined;
     const channel = subscribeToNewEvents('social', () => {
       fetchEvents({ mondo: 'social' }).then(({ events: list }) => {
         if (list) setEvents(list);
@@ -703,7 +712,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [signedInId]);
 
   // Amicizie/richieste reali (Supabase): ricaricate ad ogni cambio utente
   // (login/logout), e su richiesta esplicita dopo un'azione da ContactsPanel
@@ -1037,7 +1046,7 @@ export default function App() {
   // Social, SocialFeed si smonta da solo (è mostrato solo quando
   // world.id === 'social'): è così che "si chiudono le colonne".
   const navigateToCategory = (worldId, categoryId, initialSubfamily = '') => {
-    if (accountBlocked && !(worldId === 'faq' && categoryId === 'info-ban')) return;
+    if (accountBlocked && !(worldId === 'faq' && GUEST_OR_BLOCKED_IDS.has(categoryId))) return;
     const targetIndex = WORLDS.findIndex((w) => w.id === worldId);
     if (targetIndex === -1) return;
     // Stessi filtri per ruolo di categorySet: altrimenti una categoria
@@ -1253,7 +1262,7 @@ export default function App() {
   // finito; chiuderla (X, o ri-click sulla categoria già aperta) torna
   // subito alla vista larga.
   const toggleArteCategory = (id) => {
-    if (accountBlocked && id && id !== 'info-ban') return;
+    if (accountBlocked && id && !GUEST_OR_BLOCKED_IDS.has(id)) return;
     if (pendingOpenRef.current) {
       clearTimeout(pendingOpenRef.current);
       pendingOpenRef.current = null;
@@ -1724,7 +1733,9 @@ export default function App() {
           disabledByUser={worldDisabledByUser}
           onOpenAuth={() => setAuthOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
-          onDecline={() => setIndex(DEFAULT_WORLD_INDEX)}
+          // Senza account l'unico mondo aperto è FAQ: "Torna indietro" porta
+          // lì (il mondo di partenza chiederebbe di nuovo l'accesso).
+          onDecline={() => setIndex(user ? DEFAULT_WORLD_INDEX : WORLDS.findIndex((w) => w.id === 'faq'))}
         />
       )}
 

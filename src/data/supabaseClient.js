@@ -42,6 +42,46 @@ const authStorage = {
   removeItem: (key) => (rememberMeEnabled() ? window.localStorage : window.sessionStorage).removeItem(key),
 };
 
+// Account bloccato (App.jsx lo segnala con setApiBlocked): il server
+// risponde 403 'account_bannato' a tutto tranne il proprio profilo, la guida
+// FAQ e la chat INFO BAN (gate_account_bannato lato database). Le altre
+// chiamate si fermano qui con la stessa risposta, senza andare in rete:
+// niente traffico inutile né tentativi ripetuti da parte di aggiornamenti
+// periodici e simili. Il login/logout (auth) passa sempre.
+let apiBlocked = false;
+export function setApiBlocked(blocked) {
+  apiBlocked = Boolean(blocked);
+}
+
+const BLOCKED_READ_RE = /\/rest\/v1\/(profiles|faq_articles)\/?(\?|$)/;
+const BLOCKED_RPC_RE = /\/rest\/v1\/rpc\/(get_ban_chat|send_ban_chat_message|ban_chat_rimasti|is_banned)\/?(\?|$)/;
+
+function allowedWhileBlocked(url, method) {
+  if (!url.startsWith(SUPABASE_URL)) return true;
+  if (url.includes('/auth/v1/')) return true;
+  if (BLOCKED_RPC_RE.test(url)) return true;
+  return (method === 'GET' || method === 'HEAD') && BLOCKED_READ_RE.test(url);
+}
+
+function blockedResponse() {
+  const body = JSON.stringify({
+    code: '42501',
+    message: 'account_bannato',
+    details: null,
+    hint: 'Account bloccato: è disponibile solo la chat INFO BAN nel mondo FAQ.',
+  });
+  return new Response(body, { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+function guardedFetch(input, init) {
+  if (apiBlocked) {
+    const url = typeof input === 'string' ? input : input?.url ?? String(input);
+    const method = (init?.method ?? (typeof input === 'object' && input?.method) ?? 'GET').toUpperCase();
+    if (!allowedWhileBlocked(url, method)) return Promise.resolve(blockedResponse());
+  }
+  return fetch(input, init);
+}
+
 // persistSession/autoRefreshToken/detectSessionInUrl sono già i default di
 // supabase-js, scritti qui solo per essere espliciti: la sessione va
 // salvata nel browser e rinnovata da sola prima di scadere, così un
@@ -54,4 +94,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: true,
     storage: authStorage,
   },
+  global: { fetch: guardedFetch },
 });

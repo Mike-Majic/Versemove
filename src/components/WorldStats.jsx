@@ -48,12 +48,14 @@ function useAnimatedNumber(target) {
 }
 
 // locked: account bloccato (pulsanti della barra spenti, vedi TopBar).
-export default function WorldStats({ world, locked = false }) {
+// signedIn: senza accesso (e da bloccato) il server non risponde a
+// world_stats: niente chiamate e niente contatore.
+export default function WorldStats({ world, locked = false, signedIn = false }) {
   const [stats, setStats] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const iscritti = useAnimatedNumber(stats?.iscritti ?? null);
   const online = useAnimatedNumber(stats?.online ?? null);
-  const disabled = world.id === 'bambini';
+  const disabled = world.id === 'bambini' || !signedIn || locked;
   const { t, i18n } = useTranslation();
   const buttonRef = useRef(null);
 

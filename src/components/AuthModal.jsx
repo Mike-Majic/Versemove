@@ -126,7 +126,7 @@ export default function AuthModal({ open, onClose, onLogin }) {
     let cancelled = false;
     const timer = setTimeout(async () => {
       const taken = await isNicknameTaken(clean);
-      if (!cancelled) setNicknameStatus(taken ? 'taken' : 'available');
+      if (!cancelled) setNicknameStatus(taken === null ? 'unknown' : taken ? 'taken' : 'available');
     }, 400);
     return () => {
       cancelled = true;
@@ -136,7 +136,8 @@ export default function AuthModal({ open, onClose, onLogin }) {
 
   const nicknameLength = nickname.trim().length;
   const nicknameLengthValid = nicknameLength >= 2 && nicknameLength <= 30;
-  const nicknameValid = nicknameLengthValid && nicknameStatus === 'available';
+  // 'unknown': controllo non riuscito, si lascia provare (decide il server).
+  const nicknameValid = nicknameLengthValid && (nicknameStatus === 'available' || nicknameStatus === 'unknown');
 
   if (!open) return null;
 
