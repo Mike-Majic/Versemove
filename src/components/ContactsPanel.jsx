@@ -8,11 +8,14 @@ import {
   getFriends,
   removeFriend,
 } from '../data/friends';
+import { listFollowingProfiles, unfollowUser } from '../data/follows';
+import { openProfileFromMention } from '../data/mentions';
 import './FriendsModal.css';
 import AvatarImg from './shared/AvatarImg';
 
 const TABS = [
   { id: 'amici', label: 'Amici' },
+  { id: 'seguiti', label: 'Seguiti' },
   { id: 'cerca', label: 'Cerca' },
 ];
 
@@ -32,6 +35,8 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
+  // Scheda "Seguiti": chi seguo (null = non ancora caricato).
+  const [followingList, setFollowingList] = useState(null);
 
   const loadAll = async () => {
     setLoading(true);
@@ -68,6 +73,22 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
     }, 300);
     return () => clearTimeout(timer);
   }, [query, friendsList]);
+
+  useEffect(() => {
+    if (tab !== 'seguiti' || followingList !== null) return;
+    listFollowingProfiles().then(setFollowingList);
+  }, [tab, followingList]);
+
+  const handleUnfollow = async (id) => {
+    setBusyId(id);
+    const { error: err } = await unfollowUser(id);
+    setBusyId(null);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setFollowingList((prev) => (prev ?? []).filter((p) => p.id !== id));
+  };
 
   const handleSendRequest = async (id) => {
     setBusyId(id);
@@ -164,6 +185,27 @@ export default function ContactsPanel({ onOpenChat, onFriendsChanged }) {
                 })}
               </ul>
             </>
+          )}
+
+          {tab === 'seguiti' && (
+            <ul className="rb-friends-list">
+              {followingList === null && <p className="rb-friends-empty">Caricamento...</p>}
+              {followingList?.length === 0 && <p className="rb-friends-empty">Non segui ancora nessuno.</p>}
+              {(followingList ?? []).map((p) => (
+                <li key={p.id} className="rb-friends-row rb-friends-row--wrap">
+                  <button type="button" className="rb-friends-profile-link" onClick={() => openProfileFromMention(p.id)} title="Apri profilo">
+                    <AvatarImg src={p.avatar} name={p.name} seed={p.id} alt="" />
+                    <strong>{p.name}</strong>
+                  </button>
+                  <div className="rb-friends-row-actions">
+                    <button type="button" onClick={() => onOpenChat(p.id)}>Messaggio</button>
+                    <button type="button" className="rb-friends-decline" disabled={busyId === p.id} onClick={() => handleUnfollow(p.id)}>
+                      Smetti di seguire
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
 
           {tab === 'amici' && (

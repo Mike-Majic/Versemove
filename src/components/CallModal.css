@@ -151,3 +151,18 @@
 .rb-call-ctrl-btn.is-on {
   background: #2f80ff;
 }
+
+/* Microfono e fotocamera (⚙️): sopra ai controlli. */
+.rb-call-devices {
+  position: absolute;
+  bottom: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+@media (max-width: 420px) {
+  .rb-call-controls {
+    gap: 10px;
+  }
+}

@@ -49,6 +49,12 @@
   animation: rb-fade-in 0.15s ease;
 }
 
+/* Pannello che deve stare sopra a un altro pannello aperto insieme a lui
+   (es. la modifica del profilo sopra la sua anteprima). */
+.rb-modal-overlay.rb-modal-overlay--above {
+  z-index: 1061;
+}
+
 @keyframes rb-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

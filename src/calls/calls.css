@@ -177,3 +177,80 @@
 .rb-vroom-host {
   display: contents;
 }
+
+/* Scelta di microfono/fotocamera e livello del microfono (DevicePicker). */
+.rb-device-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(16, 17, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f5f5f7;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.rb-device-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rb-device-picker-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f5f7;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.rb-mic-level {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.rb-mic-level-bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #22c55e, #ffd60a, #ff3b30);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.08s linear;
+}
+
+.rb-mic-level.is-off .rb-mic-level-bar {
+  transform: scaleX(0) !important;
+}
+
+.rb-device-picker-warn {
+  margin: 0;
+  color: #ffb86b;
+  font-size: 12px;
+}
+
+/* Avviso dispositivo mancante durante la chiamata (es. solo microfono). */
+.rb-call-media-warning {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: calc(100% - 32px);
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffd6a8;
+  font-size: 12.5px;
+  text-align: center;
+}

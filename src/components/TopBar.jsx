@@ -44,7 +44,7 @@ export default function TopBar({
           <img className="rb-logo-icon" src={`${import.meta.env.BASE_URL}icons/logo-160.png`} alt="" />
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
-        <span className="rb-world-pill">{translateWorld(t, world).label}</span>
+        <span className={`rb-world-pill ${world.selectorRing === 'multicolor' ? 'rb-world-pill--multi' : ''}`}>{translateWorld(t, world).label}</span>
         <WorldStats world={world} locked={blocked} />
       </div>
 

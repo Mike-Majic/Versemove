@@ -700,3 +700,10 @@
   border-color: var(--accent, #f5c542);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #f5c542) 45%, transparent);
 }
+
+/* Microfono e fotocamera (⚙️): pannello sotto ai controlli. */
+.rb-vroom-devices {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}

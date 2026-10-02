@@ -162,3 +162,114 @@
   flex-direction: column;
   gap: 14px;
 }
+
+/* "Aggiungi agli amici" accanto a Segui (FriendButton.jsx). */
+.rb-social-profile-follow-btn.rb-social-profile-friend-btn {
+  margin-left: 0;
+}
+
+.rb-social-profile-follow-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Contatori seguiti/follower (FollowStats.jsx). */
+.rb-social-profile-stats {
+  display: flex;
+  gap: 16px;
+  margin: -6px 0 14px;
+}
+
+.rb-social-profile-stats button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(245, 245, 247, 0.7);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rb-social-profile-stats button strong {
+  color: #fff;
+}
+
+.rb-social-profile-stats button:hover {
+  text-decoration: underline;
+}
+
+.rb-social-follow-list-card {
+  position: relative;
+  width: min(380px, 92vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #131318;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 20px;
+  color: #f5f5f7;
+}
+
+.rb-social-follow-list-card .rb-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.rb-social-follow-list-card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.rb-social-follow-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rb-social-follow-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-social-follow-list button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rb-social-follow-list img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.rb-social-follow-list-empty {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+/* Schermi stretti: Segui / Amici / Condividi vanno a capo sotto al nome
+   invece di uscire dalla scheda. */
+@media (max-width: 560px) {
+  .rb-social-profile-head {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .rb-social-profile-head .rb-social-profile-follow-btn:not(.rb-social-profile-friend-btn) {
+    margin-left: 0;
+  }
+}

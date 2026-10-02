@@ -19,7 +19,8 @@ const STATO_LABELS = {
 // bio, gamertag, informazioni e familiari. Usato dal profilo pubblico
 // (SocialProfileModal, con Segui e condividi in `actions`) e dall'anteprima
 // di Il mio profilo (senza azioni). I campi vuoti non compaiono.
-export default function SocialProfileView({ profile, gamertags, family = [], actions = null }) {
+// stats: contatori seguiti/follower (FollowStats), sotto la testata.
+export default function SocialProfileView({ profile, gamertags, family = [], actions = null, stats = null }) {
   return (
     <>
       <div className="rb-social-profile-head">
@@ -30,6 +31,7 @@ export default function SocialProfileView({ profile, gamertags, family = [], act
         </div>
         {actions}
       </div>
+      {stats}
 
       {profile.bio && <p className="rb-social-profile-bio">{profile.bio}</p>}
       <GamertagChips gamertags={gamertags} />

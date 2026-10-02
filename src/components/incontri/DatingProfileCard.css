@@ -443,3 +443,16 @@
     transition: none;
   }
 }
+
+/* Scheda mostrata perché sono finiti i profili vicini (fuori_preferenze). */
+.rb-dpc-outzone {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 184, 107, 0.16);
+  border: 1px solid rgba(255, 184, 107, 0.55);
+  color: #ffd6a8;
+  font-size: 12px;
+  font-weight: 600;
+}

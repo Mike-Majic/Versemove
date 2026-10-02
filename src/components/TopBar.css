@@ -67,6 +67,28 @@
   transition: color 0.4s ease, border-color 0.4s ease;
 }
 
+/* Mondo FAQ: contorno multicolore (stesso anello dell'icona del selettore,
+   selectorRing 'multicolor' in worlds.js). Il bordo è un anello disegnato
+   con la maschera, così l'interno resta trasparente come le altre pillole. */
+.rb-world-pill--multi {
+  position: relative;
+  border-color: transparent;
+}
+
+.rb-world-pill--multi::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, #ff3b30, #ff8a1f, #ffd60a, #22c55e, #1d9bf0, #8b5cf6, #ec4899, #ff3b30);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 .rb-topbar-actions {
   display: flex;
   align-items: center;

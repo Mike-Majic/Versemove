@@ -119,7 +119,7 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
   const [zona, setZona] = useState({ text: '', geo: null });
   const [distanza, setDistanza] = useState(50);
   const [ovunque, setOvunque] = useState(false);
-  const [espandiDistanza, setEspandiDistanza] = useState(true);
+  const [espandiDistanza, setEspandiDistanza] = useState(false);
   const [etaMin, setEtaMin] = useState(ETA_MIN);
   const [etaMax, setEtaMax] = useState(45);
   const [espandiEta, setEspandiEta] = useState(false);
@@ -149,7 +149,7 @@ export default function DatingProfileEditor({ user, onUpdateUser, variant = 'set
       setZona({ text: pr.geo_nome ?? '', geo: pr.geo ?? null });
       setOvunque(pr.distanza_km == null);
       setDistanza(pr.distanza_km ?? 50);
-      setEspandiDistanza(pr.espandi_distanza ?? true);
+      setEspandiDistanza(pr.espandi_distanza ?? false);
       setEtaMin(pr.eta_min ?? ETA_MIN);
       setEtaMax(pr.eta_max ?? 45);
       setEspandiEta(Boolean(pr.espandi_eta));

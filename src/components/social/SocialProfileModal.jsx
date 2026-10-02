@@ -20,6 +20,8 @@ import { toggleContentLike as toggleContentLikeApi } from '../../data/contents';
 import { getFamily } from '../../data/family';
 import { fetchGamertagsMap } from '../../data/gaming';
 import SocialProfileView from './SocialProfileView';
+import FriendButton from './FriendButton';
+import FollowStats from './FollowStats';
 import './SocialProfileModal.css';
 import LoadMoreButton from '../shared/LoadMoreButton';
 import Icon from '../shared/Icon';
@@ -141,6 +143,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
               profile={profile}
               gamertags={gamertags}
               family={family}
+              stats={<FollowStats userId={userId} refreshKey={isFollowing} />}
               actions={
                 <>
                   <button
@@ -150,6 +153,7 @@ export default function SocialProfileModal({ userId, user, following, onToggleFo
                   >
                     {isFollowing ? 'Segui già' : '+ Segui'}
                   </button>
+                  <FriendButton userId={userId} user={user} onOpenAuth={onOpenAuth} onError={setError} />
                   {profile.nickname && (
                     <ShareLinkButton
                       className="rb-social-profile-share-btn"

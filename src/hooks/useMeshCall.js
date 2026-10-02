@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openPrivateChannel, getIceServers, logIceRoute, PEER_CONNECT_TIMEOUT_MS } from '../data/calls';
 import { supabase } from '../data/supabaseClient';
+import { acquireLocalMedia, switchLocalDevice } from '../calls/localMedia';
 
 // Videochiamata di gruppo "mesh" WebRTC: una RTCPeerConnection per ogni
 // coppia di partecipanti, niente server media. Un canale Realtime privato
@@ -36,6 +37,11 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
   const [micLocked, setMicLocked] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [error, setError] = useState('');
+  // Microfono/fotocamera disponibili (si entra anche con uno solo dei due,
+  // vedi calls/localMedia.js) e avviso su quello che manca.
+  const [hasAudio, setHasAudio] = useState(true);
+  const [hasVideo, setHasVideo] = useState(true);
+  const [mediaWarning, setMediaWarning] = useState('');
   // Schermo condiviso al posto della webcam (stessa traccia video inviata a
   // tutti con replaceTrack): screenStream serve per l'anteprima locale.
   const [screenStream, setScreenStream] = useState(null);
@@ -307,12 +313,18 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
       // getIceServers non fallisce mai (al peggio solo STUN).
       const icePromise = getIceServers();
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
+        // Audio e video chiesti separatamente: basta uno dei due per entrare.
+        const media = await acquireLocalMedia();
+        localStreamRef.current = media.stream;
+        setLocalStream(media.stream);
+        setHasAudio(media.hasAudio);
+        setHasVideo(media.hasVideo);
+        setMicOn(media.hasAudio);
+        setCameraOn(media.hasVideo);
+        setMediaWarning(media.warnings.join(' '));
         iceServersRef.current = await icePromise;
-      } catch {
-        setError('Non riesco ad accedere a fotocamera/microfono.');
+      } catch (err) {
+        setError(err?.message || 'Non riesco ad accedere a fotocamera/microfono.');
         setJoining(false);
         return false;
       }
@@ -402,6 +414,7 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
     setJoined(false);
     setMicOn(true);
     setCameraOn(true);
+    setMediaWarning('');
   }, []);
 
   const setMicEnabled = (on) => {
@@ -412,11 +425,12 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
   };
 
   const toggleMic = () => {
-    if (micLocked) return;
+    if (micLocked || !hasAudio) return;
     setMicEnabled(!micOn);
   };
 
   const toggleCamera = () => {
+    if (!hasVideo) return;
     const next = !cameraOn;
     localStreamRef.current?.getVideoTracks().forEach((t) => {
       t.enabled = next;
@@ -436,9 +450,44 @@ export function useMeshCall({ topic, user, allowedUserIds = null, mutedUserIds =
     }
   }, []);
 
+  // Cambio di microfono o fotocamera durante la chiamata (anche il primo,
+  // se si era entrati senza): replaceTrack su tutte le connessioni.
+  const switchDevice = useCallback(
+    async (kind, deviceId) => {
+      const stream = localStreamRef.current;
+      if (!stream) return { error: 'Non sei nella chiamata.' };
+      const senders = [];
+      peersRef.current.forEach((entry) => senders.push(...entry.pc.getSenders()));
+      const res = await switchLocalDevice(stream, kind, deviceId, senders, {
+        skipSenders: kind === 'video' && Boolean(screenTrackRef.current),
+      });
+      if (res.error) return res;
+      if (kind === 'audio') {
+        res.track.enabled = !micLocked && (hasAudio ? micOn : true);
+        setHasAudio(true);
+        setMicOn(res.track.enabled);
+      } else {
+        res.track.enabled = hasVideo ? cameraOn : true;
+        setHasVideo(true);
+        setCameraOn(res.track.enabled);
+      }
+      setMediaWarning('');
+      // Stream nuovo (stesse tracce) per far ridisegnare l'anteprima.
+      const next = new MediaStream(stream.getTracks());
+      localStreamRef.current = next;
+      setLocalStream(next);
+      return {};
+    },
+    [micLocked, micOn, cameraOn, hasAudio, hasVideo]
+  );
+
   return {
     members,
     joined,
+    hasAudio,
+    hasVideo,
+    mediaWarning,
+    switchDevice,
     joining,
     error,
     localStream,

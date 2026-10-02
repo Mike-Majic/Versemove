@@ -1646,10 +1646,13 @@ const PROFILE_ITEMS = [
 
 // Finestra di modifica di un profilo, sopra la sua anteprima: i moduli che
 // esistono già. Chiudendola si torna all'anteprima, che si ricarica.
+// Sempre sopra all'anteprima (rb-modal-overlay--above): aperta insieme a
+// lei (es. "Completa il Profilo Incontri") il suo portal finirebbe prima di
+// quello del pannello, e a pari z-index l'anteprima la coprirebbe.
 function ProfileEditWindow({ profilo, user, onUpdateUser, onClose }) {
   const { t } = useTranslation();
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={onClose} className="rb-modal-overlay rb-modal-overlay--above">
       <div className="rb-profile-settings-card" onClick={(e) => e.stopPropagation()}>
         <div className="rb-myprof-edit-head">
           <h2>Modifica {PROFILE_TITLES[profilo]}</h2>
