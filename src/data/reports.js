@@ -61,3 +61,21 @@ export async function updateReportStatus(reportId, stato) {
   if (error) return { error: error.message };
   return {};
 }
+
+// Etichette per il Backend (Moderazione e finestra di dettaglio).
+export const REPORT_TARGET_LABELS = {
+  post: 'Post',
+  commento: 'Commento',
+  profilo: 'Profilo',
+  gruppo: 'Gruppo',
+  live: 'Live',
+  evento: 'Evento',
+  annuncio: 'Annuncio',
+  vetrina_offerta: 'Offerta (Vetrina)',
+  tattoo_post: 'Post tatuaggio',
+  dog_luogo: 'Luogo (Animali)',
+  dog_recensione: 'Recensione (Animali)',
+  app: 'App (segnalazione generale)',
+};
+
+export const REPORT_STATO_LABELS = { aperto: 'Aperto', in_lavorazione: 'In lavorazione', chiuso: 'Chiuso' };

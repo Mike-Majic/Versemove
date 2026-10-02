@@ -164,3 +164,9 @@
   object-fit: cover;
   border-radius: 10px;
 }
+
+/* Foto/video apribili nel Lightbox (ZoomableMedia): a tutta larghezza. */
+.rb-cultural-card .rb-zoom-media {
+  width: 100%;
+  border-radius: 10px;
+}

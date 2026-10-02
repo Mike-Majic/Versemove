@@ -1230,7 +1230,10 @@ export default function App() {
       return;
     }
     if (tipo === 'new_post') {
-      setIndex(DEFAULT_WORLD_INDEX);
+      // Come le menzioni: il post stesso nel feed Social (se non esiste più,
+      // SocialFeed avvisa "Post non più disponibile").
+      if (notif.riferimentoId) setFocusPost({ postId: notif.riferimentoId, seq: Date.now() });
+      navigateToCategory('social', 'world');
       return;
     }
     setIncontriInitialTab(tipo === 'super_like' ? 'likesYou' : 'matches');

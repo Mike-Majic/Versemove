@@ -1,5 +1,6 @@
 import './EventCard.css';
 import PublishedAt from '../shared/PublishedAt';
+import ZoomableMedia from '../shared/ZoomableMedia';
 
 function formatEventDate(dataEventoISO) {
   const d = new Date(dataEventoISO);
@@ -29,7 +30,7 @@ export default function EventCard({ event, user, onOpenAuth, onToggleLike, onOpe
   return (
     <li className="rb-event-card" data-event-id={event.id}>
       {event.fotoUrl ? (
-        <img className="rb-event-card-photo" src={event.fotoUrl} alt={event.titolo} />
+        <ZoomableMedia className="rb-event-card-photo" src={event.fotoUrl} alt={event.titolo} caption={event.titolo} />
       ) : (
         <div className="rb-event-card-photo rb-event-card-photo-gradient" />
       )}

@@ -267,7 +267,7 @@ export default function PostComposer({
             <button type="button" onClick={removeMedia} aria-label="Rimuovi foto o video">✕</button>
           </div>
 
-          {analyzing && <p className="rb-composer-media-hint">Sto analizzando il contenuto (gratis, nel browser)...</p>}
+          {analyzing && <p className="rb-composer-media-hint">Sto analizzando il contenuto...</p>}
 
           {!analyzing && suggestedTags.length > 0 && (
             <p className="rb-composer-media-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>

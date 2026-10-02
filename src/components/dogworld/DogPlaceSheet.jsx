@@ -8,6 +8,7 @@ import Icon from '../shared/Icon';
 import './DogPlaceSheet.css';
 import AvatarImg from '../shared/AvatarImg';
 import PublishedAt from '../shared/PublishedAt';
+import ZoomableMedia from '../shared/ZoomableMedia';
 
 function Stars({ value }) {
   return (
@@ -217,7 +218,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
               {detail.foto.length > 0 && (
                 <div className="rb-dogsheet-photos">
                   {detail.foto.map((url) => (
-                    <img key={url} src={url} alt={detail.nome} loading="lazy" />
+                    <ZoomableMedia key={url} src={url} alt={detail.nome} caption={detail.nome} loading="lazy" />
                   ))}
                 </div>
               )}
@@ -293,7 +294,7 @@ export default function DogPlaceSheet({ place, user, onOpenAuth, onClose }) {
                       {r.foto.length > 0 && (
                         <div className="rb-dogsheet-photos rb-dogsheet-photos-sm">
                           {r.foto.map((url) => (
-                            <img key={url} src={url} alt="" loading="lazy" />
+                            <ZoomableMedia key={url} src={url} alt="Foto della recensione" caption={detail.nome} loading="lazy" />
                           ))}
                         </div>
                       )}

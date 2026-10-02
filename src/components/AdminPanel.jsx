@@ -1,24 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useFormDirty } from '../hooks/useUnsavedChanges';
 import { getMailboxMessages, markMessageRead } from '../data/modMailbox';
-import { getReports, updateReportStatus } from '../data/reports';
+import { getReports, updateReportStatus, REPORT_TARGET_LABELS, REPORT_STATO_LABELS } from '../data/reports';
 import { getAuditLog, logAdminAction, AUDIT_LABELS } from '../data/adminAuditLog';
 import { listAllSponsorships, createSponsorship, updateSponsorship } from '../data/sponsorships';
 import ModalOverlay from './ModalOverlay';
 import './AdminPanel.css';
 import AdminUsersPane from './admin/AdminUsersPane';
 import InfoBanStaffView from './infoban/InfoBanStaffView';
+import { ReportDetailDialog, AuditDetailDialog } from './admin/AdminDetailDialogs';
 
-const REPORT_TARGET_LABELS = {
-  post: 'Post',
-  commento: 'Commento',
-  profilo: 'Profilo',
-  gruppo: 'Gruppo',
-  live: 'Live',
-  evento: 'Evento',
-};
-
-const REPORT_STATO_LABELS = { aperto: 'Aperto', in_lavorazione: 'In lavorazione', chiuso: 'Chiuso' };
+// Riga cliccabile anche da tastiera (Invio/Spazio).
+const clickableRow = (onOpen) => ({
+  className: 'rb-admin-clickable',
+  role: 'button',
+  tabIndex: 0,
+  onClick: onOpen,
+  onKeyDown: (e) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onOpen();
+    }
+  },
+});
 
 const ADMIN_TABS = [
   { id: 'utenti', label: 'Utenti' },
@@ -340,7 +345,7 @@ function MailboxPane({ messages, onMarkRead }) {
 // (la rimozione del contenuto segnalato si fa dal mondo dove vive, non da
 // qui) — servono soprattutto a tracciare chi si sta occupando di cosa,
 // specialmente nel mondo Bambini dove la moderazione è prioritaria.
-function ReportsPane({ reports, onChangeStatus }) {
+function ReportsPane({ reports, onChangeStatus, onOpenReport }) {
   const [filtro, setFiltro] = useState('aperto');
   const visibili = filtro === 'tutti' ? reports : reports.filter((r) => r.stato === filtro);
 
@@ -359,7 +364,7 @@ function ReportsPane({ reports, onChangeStatus }) {
       {visibili.length === 0 && <p className="rb-admin-empty">Nessuna segnalazione.</p>}
       <ul className="rb-admin-mail-list">
         {visibili.map((r) => (
-          <li key={r.id} className="rb-admin-mail-item">
+          <li key={r.id} {...clickableRow(() => onOpenReport(r.id))} className="rb-admin-mail-item rb-admin-clickable" aria-label={`Apri la segnalazione: ${REPORT_TARGET_LABELS[r.targetType] ?? r.targetType}, ${r.motivo}`}>
             <div className="rb-admin-mail-head">
               <strong>{REPORT_TARGET_LABELS[r.targetType] ?? r.targetType}</strong>
               <span>{new Date(r.data).toLocaleString('it-IT')}</span>
@@ -373,7 +378,7 @@ function ReportsPane({ reports, onChangeStatus }) {
             </p>
             <p className="rb-admin-mail-body">{r.motivo}</p>
             {r.dettagli && <p className="rb-admin-mail-body">{r.dettagli}</p>}
-            <div className="rb-admin-report-actions">
+            <div className="rb-admin-report-actions" onClick={(e) => e.stopPropagation()}>
               {r.stato === 'aperto' && (
                 <button type="button" onClick={() => onChangeStatus(r.id, 'in_lavorazione')}>
                   Prendi in carico
@@ -395,7 +400,7 @@ function ReportsPane({ reports, onChangeStatus }) {
 // Log di sola lettura delle azioni di owner/moderatori (cambio ruolo,
 // verifica documento, reset password, gestione segnalazione): serve per
 // accountability, non è modificabile da qui.
-function AuditLogPane({ entries }) {
+function AuditLogPane({ entries, onOpenEntry }) {
   return (
     <div>
       <p className="rb-admin-hint">Ogni azione di owner e moderatori, per tenerne traccia.</p>
@@ -412,7 +417,7 @@ function AuditLogPane({ entries }) {
           </thead>
           <tbody>
             {entries.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} {...clickableRow(() => onOpenEntry(e.id))}>
                 <td>{new Date(e.data).toLocaleString('it-IT')}</td>
                 <td>{e.staffNickname ?? 'Account eliminato'}</td>
                 <td>{AUDIT_LABELS[e.azione] ?? e.azione}</td>
@@ -440,6 +445,11 @@ export default function AdminPanel({ user, onClose }) {
   const [sponsorships, setSponsorships] = useState([]);
   // Chat INFO BAN in attesa di una risposta (badge della scheda).
   const [banWaiting, setBanWaiting] = useState(0);
+  // Finestre di dettaglio aperte (id della segnalazione / della riga del log).
+  const [openReportId, setOpenReportId] = useState(null);
+  const [openAuditId, setOpenAuditId] = useState(null);
+  const openReport = reports.find((r) => r.id === openReportId) ?? null;
+  const openAudit = auditLog.find((e) => e.id === openAuditId) ?? null;
   const unreadCount = messages.filter((m) => !m.letto).length;
   const openReportsCount = reports.filter((r) => r.stato === 'aperto').length;
 
@@ -491,7 +501,7 @@ export default function AdminPanel({ user, onClose }) {
         {tab === 'utenti' && <AdminUsersPane user={user} onAuditChanged={refreshAuditLog} />}
 
         {tab === 'posta' && <MailboxPane messages={messages} onMarkRead={markRead} />}
-        {tab === 'moderazione' && <ReportsPane reports={reports} onChangeStatus={changeReportStatus} />}
+        {tab === 'moderazione' && <ReportsPane reports={reports} onChangeStatus={changeReportStatus} onOpenReport={setOpenReportId} />}
         {/* Montata sempre (nascosta fuori dalla sua scheda): il badge "in
             attesa" resta aggiornato anche guardando le altre schede. */}
         <div hidden={tab !== 'infoban'}>
@@ -517,8 +527,21 @@ export default function AdminPanel({ user, onClose }) {
             }}
           />
         )}
-        {tab === 'log' && <AuditLogPane entries={auditLog} />}
+        {tab === 'log' && <AuditLogPane entries={auditLog} onOpenEntry={setOpenAuditId} />}
       </div>
+
+      {openReport && <ReportDetailDialog key={openReport.id} report={openReport} onClose={() => setOpenReportId(null)} onChangeStatus={changeReportStatus} />}
+      {openAudit && (
+        <AuditDetailDialog
+          entry={openAudit}
+          onClose={() => setOpenAuditId(null)}
+          onOpenReport={(reportId) => {
+            setOpenAuditId(null);
+            setTab('moderazione');
+            setOpenReportId(reportId);
+          }}
+        />
+      )}
 
     </ModalOverlay>
   );

@@ -235,7 +235,7 @@ export default function FotografiaColumn({ user, onOpenAuth }) {
             <Icon name="pencil" size={16} className="rb-icon--inline" /> Modifica
           </button>
 
-          {analyzing && <p className="rb-foto-form-hint">Sto analizzando il contenuto (gratis, nel browser)...</p>}
+          {analyzing && <p className="rb-foto-form-hint">Sto analizzando il contenuto...</p>}
           {!analyzing && suggestedTags.length > 0 && (
             <p className="rb-foto-form-hint">Tag suggeriti: {suggestedTags.map((t) => `#${t}`).join(' ')}</p>
           )}

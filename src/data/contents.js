@@ -34,6 +34,10 @@ export function translateUploadError(error) {
 // proprio uid, come richiedono le policy di storage) e crea la riga in
 // contents + una riga in content_placements per ogni posizionamento
 // scelto/confermato (sempre almeno quello nel mondo Social).
+// Evento (window) dopo una pubblicazione riuscita: detail.placements =
+// righe di content_placements ({ world_id, category_id, ... }).
+export const CONTENTS_CHANGED_EVENT = 'rb:contents-changed';
+
 export async function publishContent({ file, type, caption, tags, placements }) {
   try {
     const { data: auth } = await supabase.auth.getUser();
@@ -71,6 +75,9 @@ export async function publishContent({ file, type, caption, tags, placements }) 
     const { error: placementError } = await supabase.from('content_placements').insert(rows);
     if (placementError) return { error: placementError.message };
 
+    // Le colonne che mostrano i contenuti (CategoryColumn, Podcast) ricaricano
+    // l'elenco: il nuovo contenuto compare subito in cima.
+    window.dispatchEvent(new CustomEvent(CONTENTS_CHANGED_EVENT, { detail: { placements: rows } }));
     return { content, url: getContentUrl(path) };
   } catch (err) {
     return { error: err?.message ?? 'Errore di rete durante la pubblicazione.' };

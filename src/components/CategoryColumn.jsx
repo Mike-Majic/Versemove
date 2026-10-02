@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { MOCK_USERS } from '../data/mockUsers';
 import { CONTENT_INTERACTIONS } from '../data/contentInteractions';
 import { findCityMatch, getCityInfo, distanceKm, isUnlimitedDistance } from '../data/geo';
-import { listContentsForPlacement, toggleContentLike } from '../data/contents';
+import { listContentsForPlacement, toggleContentLike, CONTENTS_CHANGED_EVENT } from '../data/contents';
+import ZoomableMedia from './shared/ZoomableMedia';
 import { useIsDesktopLayout } from '../hooks/useIsDesktopLayout';
 import TwoColumnSwitcher from './layout/TwoColumnSwitcher';
 import EmptyState from './EmptyState';
@@ -55,8 +56,16 @@ export default function CategoryColumn({
   // dai risultati "editoriali" (allResults) sopra, ancora placeholder.
   const [uploadedContents, setUploadedContents] = useState([]);
   useEffect(() => {
-    if (!world) return;
-    listContentsForPlacement({ world, category: category.id }).then(setUploadedContents);
+    if (!world) return undefined;
+    const load = () => listContentsForPlacement({ world, category: category.id }).then(setUploadedContents);
+    load();
+    // Dopo una pubblicazione in questa categoria l'elenco si ricarica.
+    const onChanged = (e) => {
+      const placements = e.detail?.placements ?? [];
+      if (placements.some((p) => p.world_id === world && (p.category_id ?? null) === category.id)) load();
+    };
+    window.addEventListener(CONTENTS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONTENTS_CHANGED_EVENT, onChanged);
   }, [world, category.id]);
 
   const handleContentLike = async (content) => {
@@ -163,7 +172,7 @@ export default function CategoryColumn({
           <ul className="rb-arte-uploaded-list">
             {uploadedContents.map((c) => (
               <li key={c.id} className="rb-arte-uploaded-card">
-                {c.type === 'video' ? <video src={c.url} controls /> : <img src={c.url} alt={c.caption || 'Contenuto'} />}
+                <ZoomableMedia src={c.url} kind={c.type === 'video' ? 'video' : 'image'} alt={c.caption || 'Contenuto'} caption={c.caption || null} />
                 <div className="rb-arte-uploaded-info">
                   {c.caption && <p>{c.caption}</p>}
                   {c.tags?.length > 0 && <span className="rb-arte-uploaded-tags">{c.tags.map((t) => `#${t}`).join(' ')}</span>}

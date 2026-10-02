@@ -96,3 +96,10 @@
   box-shadow: 0 0 0 2px #7cc0ff, 0 0 22px rgba(124, 192, 255, 0.45);
   transition: box-shadow 0.3s ease;
 }
+
+/* Foto dell'evento apribile nel Lightbox (ZoomableMedia). */
+.rb-zoom-media.rb-event-card-photo > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

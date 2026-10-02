@@ -238,3 +238,8 @@
   margin-bottom: 14px;
   cursor: pointer;
 }
+
+/* Foto/video apribili nel Lightbox (ZoomableMedia): a tutta larghezza. */
+.rb-arte-uploaded-card .rb-zoom-media {
+  width: 100%;
+}

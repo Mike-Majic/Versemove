@@ -424,3 +424,25 @@
   background: #16161f;
   color: #f5f5f7;
 }
+
+/* Colonna "Registrato il": filtro dal/al e data su una riga. */
+.rb-admin-th-range {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  text-transform: none;
+  font-weight: 500;
+}
+.rb-admin-th-range label {
+  display: flex;
+  flex-direction: column;
+}
+.rb-admin-th-range .rb-admin-th-input {
+  margin-top: 2px;
+  color-scheme: dark;
+}
+.rb-admin-created {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
