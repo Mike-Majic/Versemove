@@ -30,6 +30,11 @@ export default {
     settings: 'الإعدادات',
     logout: 'تسجيل الخروج',
     login: 'تسجيل الدخول',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: 'مشترك',
+    statsSubscribersInWorld: 'مشترك في هذا العالم',
+    statsOnline: 'متصل',
+    statsLabel: '{{subscribers}} مشترك في هذا العالم · {{online}} متصل',
   },
   categories: {
     vetrina: {

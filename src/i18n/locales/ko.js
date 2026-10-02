@@ -26,6 +26,11 @@ export default {
     settings: '설정',
     logout: '로그아웃',
     login: '로그인',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: '명 가입',
+    statsSubscribersInWorld: '명이 이 세계에 가입',
+    statsOnline: '온라인',
+    statsLabel: '{{subscribers}} 명이 이 세계에 가입 · {{online}} 온라인',
   },
   categories: {
     vetrina: {

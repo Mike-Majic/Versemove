@@ -64,6 +64,18 @@
   }
 }
 
+/* Forma lunga "iscritti in questo mondo"; corta "iscritti" quando la lunga
+   arriverebbe sopra ai pulsanti a destra (data-short, vedi WorldStats.jsx). */
+.rb-world-stats-label-short {
+  display: none;
+}
+.rb-world-stats[data-short] .rb-world-stats-label-long {
+  display: none;
+}
+.rb-world-stats[data-short] .rb-world-stats-label-short {
+  display: inline;
+}
+
 /* Schermi stretti: solo pallino e online; gli iscritti al tocco. */
 @media (max-width: 560px) {
   .rb-world-stats {

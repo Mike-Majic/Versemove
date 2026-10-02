@@ -26,6 +26,11 @@ export default {
     settings: '設定',
     logout: 'ログアウト',
     login: 'ログイン',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: '人の登録者',
+    statsSubscribersInWorld: '人がこの世界に登録',
+    statsOnline: 'オンライン',
+    statsLabel: '{{subscribers}} 人がこの世界に登録 · {{online}} オンライン',
   },
   categories: {
     vetrina: {

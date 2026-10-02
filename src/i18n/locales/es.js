@@ -26,6 +26,11 @@ export default {
     settings: 'Ajustes',
     logout: 'Salir',
     login: 'Acceder',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: 'miembros',
+    statsSubscribersInWorld: 'miembros en este mundo',
+    statsOnline: 'en línea',
+    statsLabel: '{{subscribers}} miembros en este mundo · {{online}} en línea',
   },
   categories: {
     vetrina: {

@@ -68,3 +68,11 @@ se non è chiesto in modo esplicito.
   dove sono.
 - **Mondo FAQ:** nuvole fillOpacity 0.9 / activeOpacity 1 con bordo
   arcobaleno fermo; icona FAQ del selettore con anello multicolore.
+- **Modelli 3D più piccoli in Annunci, Vetrina e Nerd:** fattore 0.65 sulla
+  scala del modello (`MODEL_SIZE_FACTOR_BY_SHAPE` in
+  `src/globe/categoryShell.js`); la valigetta di Lavoro resta a 1.
+  Etichetta subito sotto il modello.
+- **Modelli 3D sempre rivolti alla camera:** il perno di ogni modello prende
+  l'orientamento della camera × `MODEL_TILT` (Y -0.45 rad, poi X 0.22 rad,
+  vista di tre quarti), ricalcolato quando camera o globo si muovono; vale
+  anche con "riduci animazioni". La posizione sul globo non cambia.
