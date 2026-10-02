@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js';
 import { createGothicLetter, loadGothicFont } from './gothicLetter.js';
 import { createModelKit } from './categoryModels3d.js';
 import { createBriefcase3D } from './briefcase3d.js';
 import { createAnnunciModel } from './annunciModels3d.js';
 import { createVetrinaModel } from './vetrinaModels3d.js';
 import { createNerdModel, hasNerdModel } from './nerdModels3d.js';
+import { createAnimaliModel } from './animaliModels3d.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -485,12 +487,13 @@ function buildLetterVShape() {
 
 // Stella a 5 punte (mondo Intrattenimento): poligono standard, raggio
 // esterno/interno alternati.
-function buildStarShape(spikes = 5, outerRadius = 1, innerRadius = 0.42) {
+// startAngle: direzione della prima punta (di default in basso; π/2 = in alto).
+function buildStarShape(spikes = 5, outerRadius = 1, innerRadius = 0.42, startAngle = -Math.PI / 2) {
   const shape = new THREE.Shape();
   const step = Math.PI / spikes;
   for (let i = 0; i < spikes * 2; i++) {
     const r = i % 2 === 0 ? outerRadius : innerRadius;
-    const angle = i * step - Math.PI / 2;
+    const angle = i * step + startAngle;
     const x = Math.cos(angle) * r;
     const y = Math.sin(angle) * r;
     if (i === 0) shape.moveTo(x, y);
@@ -626,9 +629,9 @@ const GOTHIC_RENDER_ORDER = 2;
 // hover/categoria attiva crescono al massimo dell'8% (interpolato,
 // istantaneo con "riduci animazioni").
 const MODEL_EMPHASIS_SCALE = 1.08;
-const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f', vetrina: '#ec4899', ufo: '#d4f634' };
+const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f', vetrina: '#ec4899', ufo: '#d4f634', dog: '#c2a878' };
 // Luci e schermi accesi per mondo (default del kit: #ffe2b0).
-const MODEL_LIGHT_BY_SHAPE = { vetrina: '#ffd6ea', ufo: '#eaffa0' };
+const MODEL_LIGHT_BY_SHAPE = { vetrina: '#ffd6ea', ufo: '#eaffa0', dog: '#ffffff' };
 // Mondo Vetrina: nessuna sagoma piatta, si parte dal triangolo (vedi
 // 'vetrina' in buildCategoryShell); il modello non supera l'ingombro del
 // triangolo, così le 14 categorie non si toccano.
@@ -638,11 +641,20 @@ const MODEL_FACTORY_BY_SHAPE = {
   vetrina: (kit, id) => createVetrinaModel(kit, id),
   // Nerd: il modello va sopra all'UFO piatto (che diventa invisibile).
   ufo: (kit, id) => createNerdModel(kit, id),
+  // Animali: il cane va sopra alla sagoma piatta del cane (invisibile).
+  dog: (kit, id) => createAnimaliModel(kit, id),
 };
+// Larghezza fissa del modello (unità del globo) invece di quella della
+// sagoma piatta, che per il cane verrebbe troppo grande: un quarto del
+// raggio del globo (100).
+const MODEL_FIXED_WIDTH_BY_SHAPE = { dog: 25 };
 // Grandezza dei modelli rispetto alla sagoma (o al triangolo) che
 // sostituiscono: in Annunci, Vetrina e Nerd più piccoli, la valigetta di
 // Lavoro resta com'è (1).
 const MODEL_SIZE_FACTOR_BY_SHAPE = { annunci: 0.65, vetrina: 0.65, ufo: 0.65 };
+// In più, per singola categoria: casa e pacco di Annunci sono stretti e alti,
+// portati alla larghezza della sagoma venivano più grandi e sporgenti.
+const MODEL_EXTRA_FACTOR_BY_SHAPE = { annunci: { case: 0.7, 'oggetti-vari': 0.7 } };
 // I modelli guardano sempre chi guarda (orientamento della camera), con una
 // leggera vista di tre quarti: prima Y di -0.45 rad, poi X di 0.22 rad
 // (l'angolo delle foto approvate). Non è un'animazione: segue solo la
@@ -686,7 +698,13 @@ function buildCategoryFaceShape(shapeType, index, categoryId) {
       // La Stanza MOD (solo staff, vedi faqCategories.js) resta una nuvola
       // ROSSA distinta dalle altre nuvole grigie/bianche del mondo FAQ —
       // unica eccezione colore in questo mondo, richiesta esplicita.
-      return { shape: buildCloudShape(), color: categoryId === 'mod-room' ? '#ff3b30' : null };
+      // La Stanza MOD è una stella a 5 punte (una punta in alto), sempre
+      // rossa; al polo la punta guarda il lato opposto alla vista frontale
+      // (tipAwayFromFront), così inclinando il globo si legge dritta.
+      if (categoryId === 'mod-room') {
+        return { shape: buildStarShape(5, 1, 0.47, Math.PI / 2), color: '#ff3b30', tipAwayFromFront: true };
+      }
+      return { shape: buildCloudShape(), color: null };
     case 'kids':
       return {
         shape: KIDS_SHAPES[index % KIDS_SHAPES.length](),
@@ -744,6 +762,58 @@ function placeShapeOnSphere(geometry, normal, shapeCenter, scale) {
   return geometry;
 }
 
+// Sagome curve (opzione curved: FAQ, Intrattenimento, Incontri): invece di
+// stare piatte a raggio 122.6, sotto la rete del globo (raggio 128, vedi
+// networkOverlay.js) che le attraversava, seguono la sfera a raggio 131
+// (rete + 3). La geometria si spezza in triangoli piccoli (lato massimo ~4)
+// e ogni punto si porta sulla sfera conservando la sua distanza dal centro
+// della sagoma come arco: posizione e dimensione restano quelle di prima.
+// Bordo arcobaleno (FAQ) appena sopra, etichetta a 134. Disegnate prima
+// della rete e con depth write, così le linee dietro non si vedono.
+const CURVED_SHAPE_RADIUS = 131;
+const CURVED_RAINBOW_RADIUS = 131.5;
+const CURVED_LABEL_RADIUS = 134;
+const CURVED_MAX_EDGE = 4;
+const CURVED_RENDER_ORDER = -0.5;
+// Vista frontale iniziale: lat 0, lng 0 (vedi polarToVector).
+const FRONT_DIR = polarToVector(0, 0);
+function bendOntoSphere(p, normal, planeCenter, sphereRadius, out = new THREE.Vector3()) {
+  const off = new THREE.Vector3().subVectors(p, planeCenter);
+  off.addScaledVector(normal, -off.dot(normal));
+  const len = off.length();
+  if (len < 1e-9) return out.copy(normal).multiplyScalar(sphereRadius);
+  const angle = len / sphereRadius;
+  return out
+    .copy(normal)
+    .multiplyScalar(Math.cos(angle))
+    .addScaledVector(off, Math.sin(angle) / len)
+    .multiplyScalar(sphereRadius);
+}
+function bendGeometryOntoSphere(geometry, normal, planeCenter, sphereRadius) {
+  const tessellated = new TessellateModifier(CURVED_MAX_EDGE, 10).modify(geometry);
+  const pos = tessellated.getAttribute('position');
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    bendOntoSphere(v, normal, planeCenter, sphereRadius, v);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  pos.needsUpdate = true;
+  tessellated.computeVertexNormals();
+  tessellated.computeBoundingBox();
+  tessellated.computeBoundingSphere();
+  return tessellated;
+}
+// Rotazione della sagoma nel suo piano perché la sua "alto" (+y) guardi la
+// direzione dir (proiettata sul piano tangente), con la stessa base di
+// placeShapeOnSphere.
+function shapeRotationToward(normal, dir) {
+  const worldUp = Math.abs(normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+  const up = new THREE.Vector3().crossVectors(normal, right).normalize();
+  return Math.atan2(-dir.dot(right), dir.dot(up));
+}
+
 // Bordo arcobaleno delle nuvole del mondo FAQ (opzione rainbowEdge): solo
 // il perimetro esterno della sagoma, a "fat lines" (larghezza in pixel reali
 // a schermo, vedi update()), colore per vertice in base all'angolo attorno
@@ -754,8 +824,9 @@ const RAINBOW_EDGE_WIDTH_PX = 2.5;
 const RAINBOW_EDGE_LIFT = 0.15;
 const RAINBOW_EDGE_SATURATION = 1;
 const RAINBOW_EDGE_LIGHTNESS = 0.55;
-function buildRainbowEdgeGeometry(shape, dx, dy, normal, shapeCenter, scale) {
-  const points = shape.extractPoints(24).shape.map((p) => new THREE.Vector2(p.x + dx, p.y + dy));
+function buildRainbowEdgeGeometry(shape, dx, dy, normal, shapeCenter, scale, { rotation = 0, curvedRadius = 0 } = {}) {
+  const zero = new THREE.Vector2();
+  const points = shape.extractPoints(24).shape.map((p) => new THREE.Vector2(p.x + dx, p.y + dy).rotateAround(zero, rotation));
   if (points.length > 2 && points[0].distanceTo(points[points.length - 1]) < 1e-6) points.pop();
   const n = points.length;
   const center = new THREE.Vector2();
@@ -767,6 +838,35 @@ function buildRainbowEdgeGeometry(shape, dx, dy, normal, shapeCenter, scale) {
   const up = new THREE.Vector3().crossVectors(normal, right).normalize();
   const origin = shapeCenter.clone().addScaledVector(normal, SHAPE_SURFACE_OFFSET + RAINBOW_EDGE_LIFT);
   const world = points.map((p) => origin.clone().addScaledVector(right, p.x * scale).addScaledVector(up, p.y * scale));
+  if (curvedRadius > 0) {
+    // Sagoma curva: lati spezzati in tratti corti, poi sulla sfera.
+    const positions = [];
+    const colors = [];
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const rgbOf = (p) => {
+      const hue = (Math.atan2(p.y - center.y, p.x - center.x) / (Math.PI * 2) + 1) % 1;
+      return new THREE.Color().setHSL(hue, RAINBOW_EDGE_SATURATION, RAINBOW_EDGE_LIGHTNESS);
+    };
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const steps = Math.max(1, Math.ceil(world[i].distanceTo(world[j]) / CURVED_MAX_EDGE));
+      for (let k = 0; k < steps; k++) {
+        const t0 = k / steps;
+        const t1 = (k + 1) / steps;
+        bendOntoSphere(a.lerpVectors(world[i], world[j], t0), normal, origin, curvedRadius, a);
+        bendOntoSphere(b.lerpVectors(world[i], world[j], t1), normal, origin, curvedRadius, b);
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        const ca = rgbOf(new THREE.Vector2().lerpVectors(points[i], points[j], t0));
+        const cb = rgbOf(new THREE.Vector2().lerpVectors(points[i], points[j], t1));
+        colors.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
+      }
+    }
+    const geometry = new LineSegmentsGeometry();
+    geometry.setPositions(positions);
+    geometry.setColors(colors);
+    return geometry;
+  }
   const color = new THREE.Color();
   const rgb = points.map((p) => {
     const hue = (Math.atan2(p.y - center.y, p.x - center.x) / (Math.PI * 2) + 1) % 1;
@@ -926,6 +1026,8 @@ export function buildCategoryShell(
     renderer = null,
     // Bordo arcobaleno fermo attorno alle sagome (mondo FAQ, nuvole).
     rainbowEdge = false,
+    // Sagome curve sopra la rete (FAQ, Intrattenimento, Incontri).
+    curved = false,
   } = {}
 ) {
   const detail = pickDetailLevel(categories.length);
@@ -1119,6 +1221,7 @@ export function buildCategoryShell(
     let shapeScale = 0;
     let flatBox = null;
     let triangleCorners = null;
+    let faceCurved = false;
     if (face) {
       shapeCenter = normal.clone().multiplyScalar(radius);
       shapeScale = uniformShapeRadius * sizeFactor;
@@ -1141,8 +1244,14 @@ export function buildCategoryShell(
         shapeShiftY = -(box.min.y + box.max.y) / 2;
         faceGeo.translate(shapeShiftX, shapeShiftY, 0);
       }
+      const shapeRotation = face.tipAwayFromFront ? shapeRotationToward(normal, FRONT_DIR.clone().negate()) : 0;
+      if (shapeRotation) faceGeo.rotateZ(shapeRotation);
+      faceCurved = curved && !vivid && !model3d;
       if (rainbowMaterial && !vivid && !model3d) {
-        const rainbowGeo = buildRainbowEdgeGeometry(face.shape, shapeShiftX, shapeShiftY, normal, shapeCenter, shapeScale);
+        const rainbowGeo = buildRainbowEdgeGeometry(face.shape, shapeShiftX, shapeShiftY, normal, shapeCenter, shapeScale, {
+          rotation: shapeRotation,
+          curvedRadius: faceCurved ? CURVED_RAINBOW_RADIUS : 0,
+        });
         const rainbowLines = new LineSegments2(rainbowGeo, rainbowMaterial);
         group.add(rainbowLines);
         disposables.push(rainbowGeo);
@@ -1157,6 +1266,11 @@ export function buildCategoryShell(
         faceGeo.scale(shapeScale, shapeScale, 1);
       } else {
         placeShapeOnSphere(faceGeo, normal, shapeCenter, shapeScale);
+        if (faceCurved) {
+          const flat = faceGeo;
+          faceGeo = bendGeometryOntoSphere(flat, normal, shapeCenter.clone().addScaledVector(normal, SHAPE_SURFACE_OFFSET), CURVED_SHAPE_RADIUS);
+          flat.dispose();
+        }
       }
     } else {
       faceGeo = new THREE.BufferGeometry();
@@ -1181,8 +1295,10 @@ export function buildCategoryShell(
       side: THREE.DoubleSide,
       depthWrite: false,
     });
+    if (faceCurved) material.depthWrite = true;
     const mesh = new THREE.Mesh(faceGeo, material);
     mesh.userData.categoryId = cat.id;
+    if (faceCurved) mesh.renderOrder = CURVED_RENDER_ORDER;
     faceMeshes.push(mesh);
     disposables.push(faceGeo, material);
 
@@ -1251,7 +1367,7 @@ export function buildCategoryShell(
       cat.labelColor ?? '#ffffff',
       vivid ? { pill: true, pillBorder: faceColor } : {}
     );
-    sprite.position.copy(normal).multiplyScalar(radius + 3 + (vivid ? VIVID_SURFACE_LIFT : 0));
+    sprite.position.copy(normal).multiplyScalar(faceCurved ? CURVED_LABEL_RADIUS : radius + 3 + (vivid ? VIVID_SURFACE_LIFT : 0));
     if (vivid) sprite.renderOrder = VIVID_RENDER_ORDER + 1;
     sprite.userData.categoryId = cat.id;
     group.add(sprite);
@@ -1313,7 +1429,8 @@ export function buildCategoryShell(
           .addScaledVector(right, ((t.flatBox.min.x + t.flatBox.max.x) / 2) * t.shapeScale)
           .addScaledVector(up, ((t.flatBox.min.y + t.flatBox.max.y) / 2) * t.shapeScale);
       }
-      k *= MODEL_SIZE_FACTOR_BY_SHAPE[shapeType] ?? 1;
+      if (MODEL_FIXED_WIDTH_BY_SHAPE[shapeType]) k = MODEL_FIXED_WIDTH_BY_SHAPE[shapeType] / model.width;
+      k *= (MODEL_SIZE_FACTOR_BY_SHAPE[shapeType] ?? 1) * (MODEL_EXTRA_FACTOR_BY_SHAPE[shapeType]?.[t.id] ?? 1);
       model.group.scale.setScalar(k);
       const pivot = new THREE.Group();
       pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, t.normal));

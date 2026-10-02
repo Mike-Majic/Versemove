@@ -76,3 +76,18 @@ se non è chiesto in modo esplicito.
   l'orientamento della camera × `MODEL_TILT` (Y -0.45 rad, poi X 0.22 rad,
   vista di tre quarti), ricalcolato quando camera o globo si muovono; vale
   anche con "riduci animazioni". La posizione sul globo non cambia.
+- **Stanza MOD a stella:** nel mondo FAQ la categoria 'mod-room' è una
+  stella a 5 punte (raggi 1 / 0.47, punta in alto) rossa #ff3b30 con bordo
+  arcobaleno, al polo nord, con la punta verso il lato opposto alla vista
+  frontale. Le altre categorie FAQ restano nuvole.
+- **Sagome curve sopra la rete in FAQ, Intrattenimento e Incontri:**
+  opzione `curved: true` in `CATEGORY_LOOK_BY_WORLD`; le sagome seguono la
+  sfera a raggio 131 (rete 128 + 3), bordo arcobaleno a 131.5, etichetta a
+  134. Bambini e mondi con modelli 3D non la usano.
+- **Annunci, Case e Oggetti vari:** fattore 0.7 in più sulla scala del
+  modello (`MODEL_EXTRA_FACTOR_BY_SHAPE`), oltre allo 0.65 del mondo.
+- **Categoria mondo Animali:** cane 3D cromo con contorno sabbia #c2a878,
+  larghezza circa 1/4 del raggio del globo (`MODEL_FIXED_WIDTH_BY_SHAPE.dog`
+  in `src/globe/categoryShell.js`, modello in `src/globe/animaliModels3d.js`),
+  sopra alla sagoma piatta (invisibile ma cliccabile), rivolto alla camera
+  come gli altri modelli.

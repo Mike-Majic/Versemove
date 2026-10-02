@@ -9,7 +9,8 @@ import { isAccountBlocked } from './banStatus';
 //
 // Posizioni sul globo (sull'oceano: un riquadro grande su terraferma
 // finirebbe sopra ai pallini degli utenti di quella zona):
-// - Stanza MOD (solo staff) esattamente al polo nord;
+// - Stanza MOD (solo staff) esattamente al polo nord, a stella rossa con la
+//   punta verso il lato opposto alla vista frontale (le altre sono nuvole);
 // - Suggerimenti al centro della vista frontale, sull'equatore (lng -20);
 // - Community sul lato opposto, sempre sull'equatore (lng 160);
 // - INFO BAN, Segnalazioni, Informazioni a latitudine -35.3°.
