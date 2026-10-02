@@ -139,16 +139,6 @@ const CATEGORY_WORLDS = {
   animali: { categories: ANIMALI_CATEGORIES, resolveQuery: resolveAnimaliCategoryQuery },
 };
 
-// Aspetta che l'utente finisca di digitare prima di far "volare" il globo sulla città cercata.
-function useDebouncedValue(value, delayMs) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(t);
-  }, [value, delayMs]);
-  return debounced;
-}
-
 function loadStored(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -304,6 +294,8 @@ export default function App() {
   // Impostazioni. globe_users applica già zona, distanza ed età; qui serve
   // solo il "centro" per eventi, annunci e simili (locationFilters).
   const [vista, setVista] = useState(null);
+  // Ultima vista caricata, per capire se un salvataggio ha cambiato la città.
+  const vistaRef = useRef(null);
   const [globeUsersVersion, setGlobeUsersVersion] = useState(0);
   const [activeArteCategory, setActiveArteCategory] = useState(null);
   // Vero solo quando il pannello categoria appena aperto arriva da un volo
@@ -643,17 +635,34 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!user) {
+      vistaRef.current = null;
       setVista(null);
       return undefined;
     }
     let cancelled = false;
-    const load = () =>
+    // fromUserSave: l'utente ha appena salvato "Chi vedo" (VISTA_SAVED_EVENT).
+    // SOLO in quel caso, se la città del mondo attuale è cambiata, il globo
+    // vola sulla nuova città. Il primo caricamento dal server (dopo login o
+    // refresh) e il cambio di mondo (vista.social / vista.lavoro) non fanno
+    // mai volare la camera: la vista iniziale resta la panoramica di tutti
+    // i mondi (vedi WorldGlobe startupPointOfView e CLAUDE.md).
+    const load = (fromUserSave = false) =>
       getVistaPreferenze().then((v) => {
-        if (!cancelled) setVista(v);
+        if (cancelled) return;
+        const prev = vistaRef.current;
+        vistaRef.current = v;
+        setVista(v);
+        if (!fromUserSave || !v) return;
+        const ambito = worldIdRef.current === 'lavoro' ? 'lavoro' : 'social';
+        const before = prev ? locationFiltersFrom(prev[ambito]).city : '';
+        const after = locationFiltersFrom(v[ambito]).city;
+        if (!after || after === before) return;
+        const match = findCityMatch(after);
+        if (match) setFlyTo({ lat: match.lat, lng: match.lng, key: `city-${match.name}` });
       });
     load();
     const onSaved = () => {
-      load();
+      load(true);
       setGlobeUsersVersion((n) => n + 1);
     };
     window.addEventListener(VISTA_SAVED_EVENT, onSaved);
@@ -957,22 +966,10 @@ export default function App() {
     return [...others, ownMarker];
   }, [worldUsers, user, visibility.shareLiveLocation, ownPosition, incontriHidden]);
 
-  // Quando la città cercata nei filtri (globali, validi per tutti i mondi) corrisponde
-  // a una città nota, il globo ci "vola" sopra.
-  // Solo quando l'utente CAMBIA la città: il valore salvato in localStorage
-  // non deve far volare la camera all'avvio (la vista iniziale è sempre la
-  // panoramica di tutti i mondi, vedi WorldGlobe startupPointOfView).
-  const debouncedCityQuery = useDebouncedValue(locationFilters.city, 500);
-  // (Confronto col valore iniziale, non un "primo giro": in sviluppo
-  // StrictMode esegue gli effect due volte.)
-  const startupCityRef = useRef(locationFilters.city);
-  const cityChangedRef = useRef(false);
-  useEffect(() => {
-    if (debouncedCityQuery !== startupCityRef.current) cityChangedRef.current = true;
-    if (!cityChangedRef.current) return;
-    const match = findCityMatch(debouncedCityQuery);
-    if (match) setFlyTo({ lat: match.lat, lng: match.lng, key: `city-${match.name}` });
-  }, [debouncedCityQuery]);
+  // Il volo sulla città salvata in "Chi vedo" parte dal caricamento delle
+  // preferenze dopo VISTA_SAVED_EVENT (vedi load(true) più su), mai da un
+  // effetto che osserva la città: quella cambia anche al primo caricamento
+  // dal server e al cambio di mondo, e la camera non deve muoversi da sola.
 
   // Fa volare la camera sulla categoria e apre il pannello solo a volo
   // finito (stessa durata dell'animazione in WorldGlobe): prima si vede il
