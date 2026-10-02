@@ -263,7 +263,9 @@ export default function MusicaClip({ user, onOpenAuth }) {
   const [fullscreenId, setFullscreenId] = useState(null);
   useBackLayer(fullscreenId !== null, () => setFullscreenId(null), 'viewer:clip');
 
-  const refresh = () => listClips().then(setClips);
+  const refresh = () => {
+    listClips().then(setClips);
+  };
   useEffect(refresh, []);
 
   const handleLike = async (clip) => {

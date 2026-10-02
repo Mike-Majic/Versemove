@@ -44,7 +44,9 @@ function ArticleEditForm({ initial, onCancel, onSave }) {
 // Guida dell'app: fisarmonica per sezione, ricerca testuale in alto, CRUD
 // (Nuovo/Modifica/Nascondi) visibile solo allo staff — la RLS impone
 // comunque che solo owner/moderatori possano scrivere.
-export default function InformazioniColumn({ staff, closing = false, onOpenCategory }) {
+// canReport: la categoria Segnalazioni è raggiungibile (non per chi non ha
+// un account né per gli account bloccati); senza, niente colonna "Aiuto".
+export default function InformazioniColumn({ staff, closing = false, onOpenCategory, canReport = false }) {
   const [articles, setArticles] = useState(null);
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
@@ -52,7 +54,12 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
   const [termsOpen, setTermsOpen] = useState(false);
 
   const refresh = () => listFaqArticles({ includeUnpublished: staff }).then(setArticles);
-  useEffect(refresh, [staff]);
+  // Senza graffe l'effetto restituirebbe la promessa e React, chiudendo la
+  // colonna, la chiamerebbe come funzione di pulizia (crash dell'app).
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff]);
 
   const bySezione = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -150,10 +157,12 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
     </div>
   );
 
-  const helpPanel = (
+  // Le idee hanno già la loro categoria (Suggerimenti): qui resta solo
+  // "Segnala un problema".
+  const helpPanel = canReport ? (
     <div className="rb-faq-column">
       <h3 className="rb-faq-title">Non trovi la risposta?</h3>
-      <p className="rb-faq-hint">Scrivi allo staff o proponi un miglioramento: rispondiamo dalla Stanza MOD.</p>
+      <p className="rb-faq-hint">Scrivi allo staff: rispondiamo dalla Stanza MOD.</p>
       <button type="button" className="rb-faq-help-card" onClick={() => onOpenCategory?.('segnalazioni')}>
         <span className="rb-faq-help-icon">🚩</span>
         <span>
@@ -161,15 +170,8 @@ export default function InformazioniColumn({ staff, closing = false, onOpenCateg
           <small>Bug, contenuti offensivi, problemi con l'account</small>
         </span>
       </button>
-      <button type="button" className="rb-faq-help-card" onClick={() => onOpenCategory?.('suggerimenti')}>
-        <span className="rb-faq-help-icon">💡</span>
-        <span>
-          <strong>Proponi un'idea</strong>
-          <small>Vota e suggerisci nuove funzioni</small>
-        </span>
-      </button>
     </div>
-  );
+  ) : null;
 
   return (
     <TwoColumnSwitcher

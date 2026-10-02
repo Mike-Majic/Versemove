@@ -13,7 +13,8 @@ import { isAccountBlocked } from './banStatus';
 //   punta verso il lato opposto alla vista frontale (le altre sono nuvole);
 // - Suggerimenti al centro della vista frontale, sull'equatore (lng -20);
 // - Community sul lato opposto, sempre sull'equatore (lng 160);
-// - INFO BAN, Segnalazioni, Informazioni a latitudine -35.3°.
+// - INFO BAN a latitudine -35.3°; Segnalazioni e Informazioni un po' più
+//   in alto, a -22° (stessa longitudine di prima, esattamente sull'anchor).
 // exactAnchor: la nuvola sta esattamente sull'anchor e non al centro della
 // faccia del guscio più vicina (come Match nel mondo Incontri).
 export const FAQ_CATEGORIES = [
@@ -55,7 +56,8 @@ export const FAQ_CATEGORIES = [
     id: 'segnalazioni',
     label: 'Segnalazioni',
     icon: '🚩',
-    anchor: { lat: -35.3, lng: 70 }, // Oceano Indiano
+    anchor: { lat: -22, lng: 70 }, // Oceano Indiano
+    exactAnchor: true,
     aliases: ['segnalazioni', 'segnala', 'problema', 'bug'],
     subfamilies: [],
   },
@@ -72,7 +74,8 @@ export const FAQ_CATEGORIES = [
     id: 'informazioni',
     label: 'Informazioni',
     icon: 'ℹ️',
-    anchor: { lat: -35.3, lng: -110 }, // Pacifico del sud
+    anchor: { lat: -22, lng: -110 }, // Pacifico del sud
+    exactAnchor: true,
     aliases: ['informazioni', 'guida', 'aiuto', 'come funziona'],
     subfamilies: [],
   },
@@ -84,11 +87,14 @@ export const FAQ_CATEGORIES = [
 // nella ricerca testuale. Il proprietario (user.ruolo === 'owner') vede
 // sempre tutto, qualunque sia il primo argomento.
 //
-// Account bloccato (non owner): solo INFO BAN. Staff: tutto. Gli altri:
-// tutto tranne Stanza MOD e INFO BAN.
+// Senza account e account bloccato (non owner): solo INFO BAN e
+// Informazioni (il server lascia leggere solo la guida e, al bloccato, la
+// chat INFO BAN). Staff: tutto. Gli altri: tutto tranne Stanza MOD e INFO BAN.
+export const GUEST_OR_BLOCKED_IDS = new Set(['info-ban', 'informazioni']);
+
 export function getFaqCategories(isStaffUser, user = null) {
   if (user?.ruolo === 'owner') return FAQ_CATEGORIES;
-  if (isAccountBlocked(user)) return FAQ_CATEGORIES.filter((c) => c.id === 'info-ban');
+  if (!user || isAccountBlocked(user)) return FAQ_CATEGORIES.filter((c) => GUEST_OR_BLOCKED_IDS.has(c.id));
   if (isStaffUser) return FAQ_CATEGORIES;
   return FAQ_CATEGORIES.filter((c) => !c.staffOnly && !c.blockedOrStaffOnly);
 }

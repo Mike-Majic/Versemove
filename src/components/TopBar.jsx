@@ -45,7 +45,7 @@ export default function TopBar({
           <span className="rb-logo-text notranslate" translate="no">Versemove</span>
         </span>
         <span className={`rb-world-pill ${world.selectorRing === 'multicolor' ? 'rb-world-pill--multi' : ''}`}>{translateWorld(t, world).label}</span>
-        <WorldStats world={world} locked={blocked} />
+        <WorldStats world={world} locked={blocked} signedIn={Boolean(user)} />
       </div>
 
       <div className="rb-topbar-actions" ref={actionsRef}>

@@ -556,15 +556,18 @@ export async function updateNickname(accountId, newNickname) {
 // registrazione, prima ancora di creare l'account). In caso di errore di
 // rete si preferisce non bloccare la UI: il controllo definitivo resta
 // comunque lato server alla creazione dell'account.
+// -> true (occupato) | false (libero) | null (il server non ha risposto:
+// non lo si spaccia per "libero"; il doppione lo ferma comunque l'indice
+// unico su profiles.nickname al momento della registrazione).
 export async function isNicknameTaken(nickname) {
   const clean = (nickname ?? '').trim();
   if (!clean) return false;
   try {
     const { data, error } = await supabase.rpc('is_nickname_taken', { p_nickname: clean });
-    if (error) return false;
-    return Boolean(data);
+    if (error || typeof data !== 'boolean') return null;
+    return data;
   } catch {
-    return false;
+    return null;
   }
 }
 

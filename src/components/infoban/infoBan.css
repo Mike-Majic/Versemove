@@ -433,6 +433,26 @@
   }
 }
 
+/* Senza account: niente chat, solo l'invito ad accedere (pannello basso). */
+.rb-infoban-panel.guest {
+  bottom: auto;
+}
+
+.rb-infoban-guest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+}
+
+.rb-infoban-guest p {
+  margin: 0;
+  color: #e4e4ee;
+  font-size: 14px;
+}
+
 .rb-infoban-panel-head {
   display: flex;
   align-items: center;

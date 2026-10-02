@@ -64,8 +64,13 @@ se non è chiesto in modo esplicito.
 - **Posizioni categorie FAQ** (`src/data/faqCategories.js`, `exactAnchor: true`):
   Stanza MOD al polo nord (lat 90, lng 0, rossa, solo staff), Suggerimenti
   al centro della vista frontale (lat 0, lng -20), Community sul lato
-  opposto (lat 0, lng 160). INFO BAN, Segnalazioni e Informazioni restano
-  dove sono.
+  opposto (lat 0, lng 160). Segnalazioni a lat -22, lng 70 e Informazioni
+  a lat -22, lng -110 (entrambe `exactAnchor: true`). INFO BAN resta dove è.
+- **Mondo FAQ per chi non ha un account e per gli account bloccati:** solo
+  le categorie INFO BAN e Informazioni (`getFaqCategories`); l'ospite in
+  INFO BAN vede l'invito ad accedere, non la chat. Con l'account bloccato
+  il client Supabase ferma in partenza le chiamate che il server
+  rifiuterebbe (`setApiBlocked` in `src/data/supabaseClient.js`).
 - **Mondo FAQ:** nuvole fillOpacity 0.9 / activeOpacity 1 con bordo
   arcobaleno fermo; icona FAQ del selettore con anello multicolore.
 - **Modelli 3D più piccoli in Annunci, Vetrina e Nerd:** fattore 0.65 sulla

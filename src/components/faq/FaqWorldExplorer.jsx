@@ -100,7 +100,7 @@ export default function FaqWorldExplorer({
               del mondo, apertura olografica, chiusura in particelle) —
               prima i contenuti erano disegnati "nudi" sopra al globo. */}
           {category.id === 'mod-room' && staff && <ModRoomColumn user={user} onOpenCategory={onToggleCategory} />}
-          {category.id === 'info-ban' && <InfoBanColumn user={user} onClose={() => onToggleCategory(null)} />}
+          {category.id === 'info-ban' && <InfoBanColumn user={user} onOpenAuth={onOpenAuth} onClose={() => onToggleCategory(null)} />}
           {category.id === 'chat' && (
             <FaqChatColumn user={user} onOpenAuth={onOpenAuth} onClose={() => onToggleCategory(null)} />
           )}
@@ -111,7 +111,12 @@ export default function FaqWorldExplorer({
             <SuggerimentiColumn user={user} onOpenAuth={onOpenAuth} staff={staff} closing={isClosing} />
           )}
           {category.id === 'informazioni' && (
-            <InformazioniColumn staff={staff} closing={isClosing} onOpenCategory={onToggleCategory} />
+            <InformazioniColumn
+              staff={staff}
+              closing={isClosing}
+              onOpenCategory={onToggleCategory}
+              canReport={categories.some((c) => c.id === 'segnalazioni')}
+            />
           )}
         </>
       )}
