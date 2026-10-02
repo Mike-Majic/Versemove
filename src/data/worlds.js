@@ -165,6 +165,8 @@ export const WORLDS = [
     // puntini si accendono sul lato colpito da una luce fissa rispetto alla
     // camera (in alto a sinistra) e sfumano verso il nero sul lato in ombra.
     nodeShading: 'luce-laterale',
+    // Icona del selettore con anello multicolore (vedi WorldSelectorColumn.css).
+    selectorRing: 'multicolor',
   },
   {
     id: 'wip',

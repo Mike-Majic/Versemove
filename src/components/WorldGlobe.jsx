@@ -74,9 +74,12 @@ const CATEGORY_LOOK_BY_WORLD = {
   // Intrattenimento: stelle più luminose (col viola del mondo al 20% si
   // vedevano poco dalla panoramica). Solo il riempimento.
   arte: { fillColor: '#a78bfa', fillOpacity: 0.42, activeOpacity: 0.7 },
-  // Mondo Rosso: i cuori erano enormi e quasi attaccati.
-  incontri: { sizeFactor: 0.62 },
-  faq: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
+  // Mondo Rosso: i cuori erano enormi e quasi attaccati. Più pieni e
+  // luminosi, sempre nel rosso puro del mondo (niente fillColor).
+  incontri: { sizeFactor: 0.62, fillOpacity: 0.5, activeOpacity: 0.8 },
+  // FAQ: nuvole bianche quasi piene con bordo arcobaleno fermo (la Stanza
+  // MOD resta rossa, vedi buildCategoryFaceShape 'cloud').
+  faq: { fillColor: '#ffffff', fillOpacity: 0.9, activeOpacity: 1, rainbowEdge: true },
   animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };
 
@@ -84,6 +87,9 @@ const CATEGORY_LOOK_BY_WORLD = {
 // su un guscio con parecchie facce libere, vedi marginRings in
 // categoryShell.js): gli altri mondi restano sul margine storico.
 const CATEGORY_MARGIN_RINGS_BY_WORLD = { annunci: 2, incontri: 2 };
+
+// Latitudine massima del volo verso una categoria (vedi l'effect di flyTo).
+const POLE_FLY_MAX_LAT = 88;
 
 // Il pallino nell'angolo della foto è verde e "vivo" solo per il proprio
 // marker quando si condivide la posizione in tempo reale (vedi App.jsx,
@@ -1838,6 +1844,14 @@ export default function WorldGlobe({
     if (local && local.lat !== undefined && local.lng !== undefined) {
       const container = flyTo.categoryId ? categoryShellRef.current?.group : undefined;
       Object.assign(pov, toWorldLatLng(local.lat, local.lng, container));
+      // Categoria su un polo (Stanza MOD del mondo FAQ, lat 90): la camera
+      // sale sopra il polo restando alla longitudine attuale, senza girare
+      // attorno all'asse né capovolgersi (esattamente a ±90° lookAt è
+      // indeterminato). 88° è già "sopra al polo" a schermo.
+      if (Math.abs(pov.lat) > POLE_FLY_MAX_LAT) {
+        pov.lat = Math.sign(pov.lat) * POLE_FLY_MAX_LAT;
+        pov.lng = g.pointOfView().lng;
+      }
     }
     g.pointOfView(pov, CATEGORY_FLY_MS);
 

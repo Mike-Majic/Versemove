@@ -735,6 +735,48 @@ function placeShapeOnSphere(geometry, normal, shapeCenter, scale) {
   return geometry;
 }
 
+// Bordo arcobaleno delle nuvole del mondo FAQ (opzione rainbowEdge): solo
+// il perimetro esterno della sagoma, a "fat lines" (larghezza in pixel reali
+// a schermo, vedi update()), colore per vertice in base all'angolo attorno
+// al centro della sagoma. Fermo: niente animazione. Sta poco sopra alla
+// sagoma (le linee non hanno polygonOffset), con il depth test attivo, così
+// dietro al globo non si vede.
+const RAINBOW_EDGE_WIDTH_PX = 2.5;
+const RAINBOW_EDGE_LIFT = 0.15;
+const RAINBOW_EDGE_SATURATION = 1;
+const RAINBOW_EDGE_LIGHTNESS = 0.55;
+function buildRainbowEdgeGeometry(shape, dx, dy, normal, shapeCenter, scale) {
+  const points = shape.extractPoints(24).shape.map((p) => new THREE.Vector2(p.x + dx, p.y + dy));
+  if (points.length > 2 && points[0].distanceTo(points[points.length - 1]) < 1e-6) points.pop();
+  const n = points.length;
+  const center = new THREE.Vector2();
+  points.forEach((p) => center.add(p));
+  center.divideScalar(n);
+  // Stessa base e stesso distacco di placeShapeOnSphere, un filo più in alto.
+  const worldUp = Math.abs(normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+  const up = new THREE.Vector3().crossVectors(normal, right).normalize();
+  const origin = shapeCenter.clone().addScaledVector(normal, SHAPE_SURFACE_OFFSET + RAINBOW_EDGE_LIFT);
+  const world = points.map((p) => origin.clone().addScaledVector(right, p.x * scale).addScaledVector(up, p.y * scale));
+  const color = new THREE.Color();
+  const rgb = points.map((p) => {
+    const hue = (Math.atan2(p.y - center.y, p.x - center.x) / (Math.PI * 2) + 1) % 1;
+    color.setHSL(hue, RAINBOW_EDGE_SATURATION, RAINBOW_EDGE_LIGHTNESS);
+    return [color.r, color.g, color.b];
+  });
+  const positions = [];
+  const colors = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    positions.push(world[i].x, world[i].y, world[i].z, world[j].x, world[j].y, world[j].z);
+    colors.push(...rgb[i], ...rgb[j]);
+  }
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions(positions);
+  geometry.setColors(colors);
+  return geometry;
+}
+
 // Tra tutti i punti in cui si può spezzare il testo in due (a uno spazio),
 // sceglie quello che bilancia meglio le due righe (minimizza la più larga
 // delle due), invece di riempire la prima riga fino al massimo consentito.
@@ -873,6 +915,8 @@ export function buildCategoryShell(
     onAnimatedReady = null,
     // Serve solo alla valigetta 3D del mondo Lavoro (env map del cromo).
     renderer = null,
+    // Bordo arcobaleno fermo attorno alle sagome (mondo FAQ, nuvole).
+    rainbowEdge = false,
   } = {}
 ) {
   const detail = pickDetailLevel(categories.length);
@@ -948,6 +992,23 @@ export function buildCategoryShell(
       })
     : null;
   if (edgeMaterial) disposables.push(edgeMaterial);
+  // Un solo materiale per tutti i bordi arcobaleno (colori per vertice).
+  const rainbowMaterial = rainbowEdge
+    ? new LineMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        linewidth: RAINBOW_EDGE_WIDTH_PX,
+        // Opaco e con depth write: la nuvola (trasparente, disegnata dopo)
+        // non ci passa sopra, così il bordo resta netto.
+        depthTest: true,
+        depthWrite: true,
+      })
+    : null;
+  if (rainbowMaterial) {
+    if (renderer) renderer.getSize(rainbowMaterial.resolution);
+    disposables.push(rainbowMaterial);
+  }
+  let rainbowEdgeCount = 0;
   const usedFaces = new Set();
   const blockedFaces = new Set();
   const gothicM = shapeType === 'letterM';
@@ -1053,6 +1114,8 @@ export function buildCategoryShell(
       shapeCenter = normal.clone().multiplyScalar(radius);
       shapeScale = uniformShapeRadius * sizeFactor;
       faceGeo = new THREE.ShapeGeometry(face.shape, 24);
+      let shapeShiftX = 0;
+      let shapeShiftY = 0;
       // Riquadro della sagoma (unità della sagoma), prima di metterla sulla
       // sfera: serve ai modelli 3D per avere la stessa larghezza e centro.
       if (model3d) {
@@ -1065,7 +1128,16 @@ export function buildCategoryShell(
         // cade esattamente sull'anchor.
         faceGeo.computeBoundingBox();
         const box = faceGeo.boundingBox;
-        faceGeo.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, 0);
+        shapeShiftX = -(box.min.x + box.max.x) / 2;
+        shapeShiftY = -(box.min.y + box.max.y) / 2;
+        faceGeo.translate(shapeShiftX, shapeShiftY, 0);
+      }
+      if (rainbowMaterial && !vivid && !model3d) {
+        const rainbowGeo = buildRainbowEdgeGeometry(face.shape, shapeShiftX, shapeShiftY, normal, shapeCenter, shapeScale);
+        const rainbowLines = new LineSegments2(rainbowGeo, rainbowMaterial);
+        group.add(rainbowLines);
+        disposables.push(rainbowGeo);
+        rainbowEdgeCount++;
       }
       if (vivid) {
         // Geometria lasciata LOCALE (piana, centrata nell'origine): la
@@ -1454,6 +1526,9 @@ export function buildCategoryShell(
         item.pivot.scale.setScalar(1 + (MODEL_EMPHASIS_SCALE - 1) * item.emphasis);
       }
     }
+    if (rainbowMaterial && viewportSize && !rainbowMaterial.resolution.equals(viewportSize)) {
+      rainbowMaterial.resolution.copy(viewportSize);
+    }
     if (!vivid) return;
     if (viewportSize && !lastViewport.equals(viewportSize)) {
       lastViewport.copy(viewportSize);
@@ -1512,7 +1587,9 @@ export function buildCategoryShell(
     update,
     supportsHover: vivid || modelItems.length > 0,
     // Forme che si animano nel giro di disegno (Bambini, M gotica Social).
-    animated: vivid || gothicM || modelItems.length > 0,
+    // Il bordo arcobaleno è fermo, ma la sua larghezza in pixel segue il
+    // canvas: per questo passa anche lui da update().
+    animated: vivid || gothicM || modelItems.length > 0 || rainbowEdgeCount > 0,
     dispose,
   };
 }
