@@ -6,6 +6,7 @@ import { createGothicLetter, loadGothicFont } from './gothicLetter.js';
 import { createModelKit } from './categoryModels3d.js';
 import { createBriefcase3D } from './briefcase3d.js';
 import { createAnnunciModel } from './annunciModels3d.js';
+import { createVetrinaModel } from './vetrinaModels3d.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -624,7 +625,15 @@ const GOTHIC_RENDER_ORDER = 2;
 // hover/categoria attiva crescono al massimo dell'8% (interpolato,
 // istantaneo con "riduci animazioni").
 const MODEL_EMPHASIS_SCALE = 1.08;
-const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f' };
+const MODEL_OUTLINE_BY_SHAPE = { briefcase: '#08090c', annunci: '#ff8a1f', vetrina: '#ec4899' };
+// Mondo Vetrina: nessuna sagoma piatta, si parte dal triangolo (vedi
+// 'vetrina' in buildCategoryShell); il modello non supera l'ingombro del
+// triangolo, così le 14 categorie non si toccano.
+const MODEL_FACTORY_BY_SHAPE = {
+  briefcase: (kit) => createBriefcase3D(kit),
+  annunci: (kit, id) => createAnnunciModel(kit, id),
+  vetrina: (kit, id) => createVetrinaModel(kit, id),
+};
 // Uscita/rientro delle lettere sul bordo del globo (facing = coseno fra la
 // normale della lettera e la direzione della camera). L'uscita parte a
 // ~81° (0.15): con la rotazione automatica (3°/s) i 2,2 s dell'animazione
@@ -1012,7 +1021,8 @@ export function buildCategoryShell(
     // Triangoli semplici (niente sagoma): sizeFactor li rimpicciolisce
     // direttamente (es. Vetrina, 14 categorie: più spazio fra l'una e
     // l'altra). Con una sagoma la grandezza la decide shapeScale sotto.
-    const triFactor = shapeType === 'triangle' ? TRIANGLE_SHRINK * sizeFactor : TRIANGLE_SHRINK;
+    // Vetrina ('vetrina') resta sul triangolo di sempre, sotto ai modelli 3D.
+    const triFactor = shapeType === 'triangle' || shapeType === 'vetrina' ? TRIANGLE_SHRINK * sizeFactor : TRIANGLE_SHRINK;
     const sa = shrinkVertex(a, centroid, radius, triFactor);
     const sb = shrinkVertex(b, centroid, radius, triFactor);
     const sc = shrinkVertex(c, centroid, radius, triFactor);
@@ -1030,6 +1040,7 @@ export function buildCategoryShell(
     let shapeCenter = null;
     let shapeScale = 0;
     let flatBox = null;
+    let triangleCorners = null;
     if (face) {
       shapeCenter = normal.clone().multiplyScalar(radius);
       shapeScale = uniformShapeRadius * sizeFactor;
@@ -1062,6 +1073,13 @@ export function buildCategoryShell(
       faceGeo = new THREE.BufferGeometry();
       faceGeo.setAttribute('position', new THREE.Float32BufferAttribute([sa.x, sa.y, sa.z, sb.x, sb.y, sb.z, sc.x, sc.y, sc.z], 3));
       faceGeo.computeVertexNormals();
+      // Vetrina: il triangolo resta (cliccabile) e sopra ci va il modello 3D:
+      // servono centro e scala come per le sagome.
+      if (shapeType === 'vetrina') {
+        shapeCenter = normal.clone().multiplyScalar(radius);
+        shapeScale = uniformShapeRadius * sizeFactor;
+        triangleCorners = [sa.clone(), sb.clone(), sc.clone()];
+      }
     }
 
     const faceColor = face?.color ?? fillColor ?? color;
@@ -1156,19 +1174,22 @@ export function buildCategoryShell(
       gothicTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
     }
     if (model3d && shapeCenter) {
-      modelTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatBox, flatMesh: mesh, sprite });
+      modelTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatBox, triangleCorners, flatMesh: mesh, sprite });
     }
   });
 
-  // Modelli 3D (Lavoro, Annunci): un kit per guscio (geometrie, materiali,
+  // Modelli 3D (Lavoro, Annunci, Vetrina): un kit per guscio (geometrie, materiali,
   // env map condivisa) creato una volta e liberato in dispose().
   const modelItems = [];
   let modelKit = null;
   if (modelTargets.length > 0) {
-    modelKit = createModelKit(renderer, { outline: MODEL_OUTLINE_BY_SHAPE[shapeType] });
+    modelKit = createModelKit(renderer, {
+      outline: MODEL_OUTLINE_BY_SHAPE[shapeType],
+      ...(shapeType === 'vetrina' ? { light: '#ffd6ea' } : {}),
+    });
     modelTargets.forEach((t) => {
-      const model = shapeType === 'briefcase' ? createBriefcase3D(modelKit) : createAnnunciModel(modelKit, t.id);
-      if (!model) return; // categoria senza modello: resta la sagoma piatta
+      const model = MODEL_FACTORY_BY_SHAPE[shapeType](modelKit, t.id);
+      if (!model) return; // categoria senza modello: resta la sagoma (o il triangolo) visibile
       const worldUp = Math.abs(t.normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
       const right = new THREE.Vector3().crossVectors(worldUp, t.normal).normalize();
       const up = new THREE.Vector3().crossVectors(t.normal, right).normalize();
@@ -1177,7 +1198,25 @@ export function buildCategoryShell(
       // centro dal riquadro di ogni sagoma (anche se fatta di più pezzi).
       let k;
       const center = t.shapeCenter.clone();
-      if (shapeType === 'briefcase' || !t.flatBox) {
+      if (t.triangleCorners) {
+        // Vetrina: larghezza 2 × shapeScale, ma mai oltre il riquadro del
+        // triangolo (in larghezza e in altezza) visto dal suo centro.
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        const d = new THREE.Vector3();
+        t.triangleCorners.forEach((v) => {
+          d.copy(v).sub(t.shapeCenter);
+          const x = d.dot(right);
+          const y = d.dot(up);
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        });
+        k = Math.min((2 * t.shapeScale) / model.width, (maxX - minX) / model.width, (maxY - minY) / (2 * model.halfHeight));
+      } else if (shapeType === 'briefcase' || !t.flatBox) {
         k = (2 * t.shapeScale) / model.width;
       } else {
         k = ((t.flatBox.max.x - t.flatBox.min.x) * t.shapeScale) / model.width;

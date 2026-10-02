@@ -45,3 +45,9 @@ se non è chiesto in modo esplicito.
   (`src/globe/annunciModels3d.js`, misure del riferimento approvato). Stesso
   sistema della valigetta: kit condiviso `src/globe/categoryModels3d.js`
   (env map unica, materiali, helper), mai `scene.environment`.
+- **Categorie mondo Vetrina: modelli 3D cromo con contorno rosa #ec4899,
+  fermi:** i 14 modelli del riferimento approvato
+  (`src/globe/vetrinaModels3d.js`; maglietta e auto sono quelle di Annunci),
+  sopra al triangolo di sempre (invisibile ma cliccabile), mai più grandi
+  del triangolo. Stesso kit `categoryModels3d.js`; il portatile resta
+  inclinato verso chi guarda (rotation.x = 0.75).

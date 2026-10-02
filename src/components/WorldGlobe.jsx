@@ -48,8 +48,9 @@ function findGlobeRootObject(scene) {
 const USE_REALISTIC_CONTINENTS = true;
 
 // Sagoma delle categorie per mondo (vedi categoryShell.js buildCategoryShell
-// shapeType): un mondo non elencato qui resta sul triangolo di sempre
-// (es. Vetrina, non ancora decisa).
+// shapeType): un mondo non elencato qui resta sul triangolo di sempre.
+// Vetrina tiene il triangolo (invisibile e cliccabile) con sopra un modello
+// 3D per categoria.
 const CATEGORY_SHAPE_BY_WORLD = {
   nerd: 'ufo',
   incontri: 'heart',
@@ -60,6 +61,7 @@ const CATEGORY_SHAPE_BY_WORLD = {
   faq: 'cloud',
   annunci: 'annunci',
   animali: 'dog',
+  vetrina: 'vetrina',
 };
 
 // Aspetto delle sagome per mondo, oltre alla forma (vedi categoryShell.js):
@@ -1324,7 +1326,7 @@ export default function WorldGlobe({
     // con forme piene e luminose, bordo bianco, alone, pulsazione e hover
     // (il guscio "vivace", vedi buildCategoryShell e l'update nel giro di
     // disegno più giù).
-    // Vetrina non ha ancora una sagoma decisa: resta il triangolo.
+    // Vetrina: triangoli con sopra i modelli 3D (vedi categoryShell.js).
     const shell = buildCategoryShell(categories, {
       radius: 122,
       color: world.color,
