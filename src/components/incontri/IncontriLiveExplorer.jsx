@@ -99,6 +99,7 @@ export default function IncontriLiveExplorer({
               onOpenProfile={onOpenProfile}
               initialTab={initialMatchTab}
               onConsumeInitialTab={onConsumeInitialMatchTab}
+              onOpenMyDatingProfile={onOpenMyDatingProfile}
             />
           )}
           {/* In fondo alla colonna, non sopra ai contenuti: richiesta esplicita. */}

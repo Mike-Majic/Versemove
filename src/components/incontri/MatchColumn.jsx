@@ -64,7 +64,8 @@ function ContactButton({ profile, onOpen, children }) {
   );
 }
 
-export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab }) {
+// onOpenMyDatingProfile: apre il Profilo Incontri (Chi vedo) per allargare il raggio.
+export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfile, initialTab, onConsumeInitialTab, onOpenMyDatingProfile }) {
   const [deck, setDeck] = useState([]);
   const [deckLoading, setDeckLoading] = useState(true);
   const [swiping, setSwiping] = useState(null); // { direction: 'left'|'right' }
@@ -396,8 +397,9 @@ export default function MatchColumn({ user, onOpenAuth, onOpenChat, onOpenProfil
       ) : (
         <EmptyState
           icon="💔"
-          title="Nessun profilo in questa zona"
-          subtitle="Prova ad allargare la ricerca dalle Impostazioni → Luogo e Mostrami."
+          title="Nessun profilo nel raggio che hai scelto"
+          subtitle="Prova ad allargare il raggio di ricerca, oppure attiva «mostra persone più lontane» nel Profilo Incontri → Chi vedo."
+          actions={onOpenMyDatingProfile ? [{ label: 'Allarga il raggio', onClick: onOpenMyDatingProfile, primary: true }] : []}
         />
       )}
     </div>
