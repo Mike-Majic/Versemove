@@ -1333,6 +1333,8 @@ export default function WorldGlobe({
       ...(CATEGORY_LOOK_BY_WORLD[world.id] ?? {}),
       // M gotica pronta (font caricato): pieno regime per l'intro a particelle.
       onAnimatedReady: () => globeActivity.wake(3000),
+      // Valigetta 3D del mondo Lavoro: env map del cromo (solo sui suoi materiali).
+      renderer: g.renderer(),
     });
     scene.add(shell.group);
     categoryShellRef.current = shell;

@@ -36,3 +36,7 @@ se non è chiesto in modo esplicito.
 - **Icona del mondo "Work in progress" nel selettore:** blu elettrico
   `selectorColor: '#0a84ff'`; il `color` del mondo resta `#ffffff` (puntini
   bianchi del satellite).
+- **Valigetta mondo Lavoro: 3D cromo con contorno nero (A2), ferma:** in
+  `src/globe/briefcase3d.js`, montata da `categoryShell.js` al posto della
+  sagoma piatta 'briefcase'. Si muove solo col globo (hover/attiva: +8% al
+  massimo). Env map solo sui suoi materiali, mai `scene.environment`.
