@@ -101,6 +101,9 @@ export const WORLDS = [
   },
   {
     id: 'arte',
+    // Nessun utente sul globo (niente avatar, grumi né pallini), a
+    // qualsiasi zoom: vedi noGlobeUsers in App.jsx.
+    noGlobeUsers: true,
     label: 'Intrattenimento',
     tagline: 'Musica, cinema, teatro, arte',
     color: '#8b5cf6',

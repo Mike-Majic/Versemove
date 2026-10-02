@@ -29,7 +29,7 @@ se non è chiesto in modo esplicito.
   Match, Mi piace ricevuti, Preferiti, Videochiamata e schede aperte da un
   link c'è il pannello "cosa manca" (`IncontriGatePanel`). Il proprietario
   (`ruolo === 'owner'`) vede sempre tutto.
-- **Nessun utente sul globo in Vetrina, Animali e Annunci:** in questi mondi
+- **Nessun utente sul globo in Vetrina, Animali, Annunci e Intrattenimento:** in questi mondi
   (`noGlobeUsers: true` in `src/data/worlds.js`) niente avatar, grumi né
   pallini utenti, a qualsiasi zoom, e nessuna chiamata a `fetchGlobeUsers`.
   Restano marker di eventi/annunci/luoghi, categorie e contatore in alto.
@@ -51,3 +51,5 @@ se non è chiesto in modo esplicito.
   sopra al triangolo di sempre (invisibile ma cliccabile), mai più grandi
   del triangolo. Stesso kit `categoryModels3d.js`; il portatile resta
   inclinato verso chi guarda (rotation.x = 0.75).
+- **Stelle Intrattenimento:** fillColor #a78bfa, fillOpacity 0.42,
+  activeOpacity 0.7 (`CATEGORY_LOOK_BY_WORLD.arte` in `src/components/WorldGlobe.jsx`).
