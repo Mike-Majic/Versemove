@@ -7,20 +7,21 @@ import { isAccountBlocked } from './banStatus';
 // liste categoria (LAVORO_CATEGORIES ecc.), stesso meccanismo di forme sul
 // globo (nuvole, vedi App.jsx CATEGORY_SHAPE_BY_WORLD e globe/categoryShell.js).
 //
-// Anchor distribuiti su tutto il globo, sull'oceano (un riquadro grande su
-// terraferma finirebbe sopra ai pallini degli utenti di quella zona): sei
-// vertici di un cubo, a latitudine ±35.3° e longitudini a passi di 90°.
-// Le quattro categorie che vede ogni utente (Community, Segnalazioni,
-// Suggerimenti, Informazioni) stanno su un tetraedro, la disposizione più
-// larga possibile per quattro punti (109° l'una dall'altra); Stanza MOD e
-// INFO BAN, solo per lo staff, su due vertici liberi del cubo (almeno 70°
-// da tutte le altre).
+// Posizioni sul globo (sull'oceano: un riquadro grande su terraferma
+// finirebbe sopra ai pallini degli utenti di quella zona):
+// - Stanza MOD (solo staff) esattamente al polo nord;
+// - Suggerimenti al centro della vista frontale, sull'equatore (lng -20);
+// - Community sul lato opposto, sempre sull'equatore (lng 160);
+// - INFO BAN, Segnalazioni, Informazioni a latitudine -35.3°.
+// exactAnchor: la nuvola sta esattamente sull'anchor e non al centro della
+// faccia del guscio più vicina (come Match nel mondo Incontri).
 export const FAQ_CATEGORIES = [
   {
     id: 'mod-room',
     label: 'Stanza MOD',
     icon: '🛡️',
-    anchor: { lat: -35.3, lng: -20 }, // Atlantico del sud
+    anchor: { lat: 90, lng: 0 }, // polo nord
+    exactAnchor: true,
     aliases: ['stanza mod', 'mod room', 'staff'],
     subfamilies: [],
     staffOnly: true,
@@ -31,7 +32,8 @@ export const FAQ_CATEGORIES = [
     id: 'chat',
     label: 'Community',
     icon: '💬',
-    anchor: { lat: 35.3, lng: 160 }, // Pacifico del nord
+    anchor: { lat: 0, lng: 160 }, // Pacifico, equatore
+    exactAnchor: true,
     aliases: ['community', 'comunità', 'chat', 'chat pubblica', 'chat staff', 'parla con lo staff', 'assistenza', 'supporto'],
     subfamilies: [],
   },
@@ -60,7 +62,8 @@ export const FAQ_CATEGORIES = [
     id: 'suggerimenti',
     label: 'Suggerimenti',
     icon: '💡',
-    anchor: { lat: 35.3, lng: -20 }, // Atlantico del nord
+    anchor: { lat: 0, lng: -20 }, // Atlantico, equatore (centro della vista frontale)
+    exactAnchor: true,
     aliases: ['suggerimenti', 'idee', 'proposte'],
     subfamilies: [],
   },

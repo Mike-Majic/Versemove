@@ -83,6 +83,23 @@
   transform: scale(1.12);
 }
 
+/* Icona FAQ: anello multicolore (selectorRing: 'multicolor' in worlds.js).
+   Dopo .rb-world-dot.active, così vince anche sull'icona attiva. */
+.rb-world-dot--multi {
+  border: 2px solid transparent;
+  background: linear-gradient(#131218, #131218) padding-box,
+    conic-gradient(from 0deg, #ff3b30, #ff8a1f, #ffd60a, #22c55e,
+    #1d9bf0, #8b5cf6, #ec4899, #ff3b30) border-box;
+  color: #f2f2f5;
+}
+.rb-world-dot--multi.active {
+  border-color: transparent;
+  background: linear-gradient(#1c1b22, #1c1b22) padding-box,
+    conic-gradient(from 0deg, #ff3b30, #ff8a1f, #ffd60a, #22c55e,
+    #1d9bf0, #8b5cf6, #ec4899, #ff3b30) border-box;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.4);
+}
+
 .rb-world-selector-fade {
   position: absolute;
   left: 0;

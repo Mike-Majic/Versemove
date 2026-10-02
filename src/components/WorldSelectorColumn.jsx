@@ -178,7 +178,7 @@ export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWor
           <div key={w.id} className="rb-world-selector-item">
             <button
               type="button"
-              className={`rb-world-dot ${w.id === activeWorldId ? 'active' : ''}`}
+              className={`rb-world-dot ${w.selectorRing === 'multicolor' ? 'rb-world-dot--multi' : ''} ${w.id === activeWorldId ? 'active' : ''}`}
               style={{ '--dot-color': w.selectorColor ?? w.color }}
               onClick={() => handleWorldClick(w.id)}
               role="option"

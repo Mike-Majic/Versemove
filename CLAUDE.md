@@ -58,3 +58,13 @@ se non è chiesto in modo esplicito.
   (`src/globe/nerdModels3d.js`) sopra agli UFO piatti (invisibili ma
   cliccabili). Stesso kit `categoryModels3d.js`; joystick arcade inclinato
   (rotation.x = 0.65) e dado ruotato su tre facce restano così.
+- **Cuori mondo Incontri:** sizeFactor 0.62, fillOpacity 0.5,
+  activeOpacity 0.8, rosso puro del mondo (#ff0000, niente fillColor)
+  (`CATEGORY_LOOK_BY_WORLD.incontri` in `src/components/WorldGlobe.jsx`).
+- **Posizioni categorie FAQ** (`src/data/faqCategories.js`, `exactAnchor: true`):
+  Stanza MOD al polo nord (lat 90, lng 0, rossa, solo staff), Suggerimenti
+  al centro della vista frontale (lat 0, lng -20), Community sul lato
+  opposto (lat 0, lng 160). INFO BAN, Segnalazioni e Informazioni restano
+  dove sono.
+- **Mondo FAQ:** nuvole fillOpacity 0.9 / activeOpacity 1 con bordo
+  arcobaleno fermo; icona FAQ del selettore con anello multicolore.
