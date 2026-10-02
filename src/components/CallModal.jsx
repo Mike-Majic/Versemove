@@ -6,6 +6,8 @@ import { useCalls } from '../calls/CallProvider';
 import { MiniCallMonitor, MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../calls/CallSurface';
 import './CallModal.css';
 import AvatarImg from './shared/AvatarImg';
+import { acquireLocalMedia, switchLocalDevice } from '../calls/localMedia';
+import DevicePicker from '../calls/DevicePicker';
 
 // Videochiamata 1:1 via WebRTC, senza server proprio: il canale Realtime
 // privato "call:<conversationId>" (autorizzato dal DB ai soli 2
@@ -26,6 +28,12 @@ export default function CallModal({ conversationId, user, friend, registerStart,
   const [incomingFrom, setIncomingFrom] = useState(null);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  // Microfono/fotocamera: si entra anche con uno solo (calls/localMedia.js).
+  const [hasAudio, setHasAudio] = useState(true);
+  const [hasVideo, setHasVideo] = useState(true);
+  const [mediaWarning, setMediaWarning] = useState('');
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [mediaVersion, setMediaVersion] = useState(0);
   // Stream dell'altra persona in stato (non solo nel ref): serve all'audio
   // sempre acceso (RemoteAudio) e al mini-monitor.
   const [remoteStream, setRemoteStream] = useState(null);
@@ -112,6 +120,8 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     remoteStreamRef.current = null;
+    setMediaWarning('');
+    setDevicesOpen(false);
     pendingIceRef.current = [];
     pendingOfferRef.current = null;
     icePromiseRef.current = null;
@@ -158,11 +168,46 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     return pc;
   };
 
+  // Audio e video chiesti separatamente: basta uno dei due. Al posto di
+  // quello che manca c'è una traccia segnaposto (vedi localMedia.js).
   const getLocalStream = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    const media = await acquireLocalMedia();
+    const stream = media.stream;
     localStreamRef.current = stream;
+    setHasAudio(media.hasAudio);
+    setHasVideo(media.hasVideo);
+    setMuted(!media.hasAudio);
+    setCameraOff(!media.hasVideo);
+    setMediaWarning(media.warnings.join(' '));
+    setMediaVersion((n) => n + 1);
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     return stream;
+  };
+
+  // Cambio di microfono o fotocamera durante la chiamata.
+  const switchDevice = async (kind, deviceId) => {
+    const stream = localStreamRef.current;
+    if (!stream) return { error: 'Nessuna chiamata in corso.' };
+    const res = await switchLocalDevice(stream, kind, deviceId, pcRef.current?.getSenders() ?? [], {
+      skipSenders: kind === 'video' && Boolean(screenTrackRef.current),
+    });
+    if (res.error) return res;
+    if (kind === 'audio') {
+      res.track.enabled = hasAudio ? !muted : true;
+      setHasAudio(true);
+      setMuted(!res.track.enabled);
+    } else {
+      res.track.enabled = hasVideo ? !cameraOff : true;
+      setHasVideo(true);
+      setCameraOff(!res.track.enabled);
+    }
+    setMediaWarning('');
+    setMediaVersion((n) => n + 1);
+    if (localVideoRef.current && !screenTrackRef.current) {
+      localVideoRef.current.srcObject = null;
+      localVideoRef.current.srcObject = stream;
+    }
+    return {};
   };
 
   // Chi risponde e chi chiama fanno la stessa cosa una volta accettata la
@@ -242,9 +287,9 @@ export default function CallModal({ conversationId, user, friend, registerStart,
     let pc;
     try {
       pc = await setupMediaAndPeer();
-    } catch {
+    } catch (err) {
       send('hangup');
-      endWithMessage('Non riesco ad accedere a fotocamera/microfono.');
+      endWithMessage(err?.message || 'Non riesco ad accedere a fotocamera/microfono.');
       return;
     }
     const early = pendingOfferRef.current;
@@ -299,9 +344,9 @@ export default function CallModal({ conversationId, user, friend, registerStart,
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         send('offer', { sdp: offer });
-      } catch {
+      } catch (err) {
         send('hangup');
-        endWithMessage('Non riesco ad accedere a fotocamera/microfono.');
+        endWithMessage(err?.message || 'Non riesco ad accedere a fotocamera/microfono.');
       }
     });
 
@@ -420,7 +465,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
   const toggleMuted = () => {
     const stream = localStreamRef.current;
-    if (!stream) return;
+    if (!stream || !hasAudio) return;
     const next = !muted;
     stream.getAudioTracks().forEach((t) => { t.enabled = !next; });
     setMuted(next);
@@ -428,7 +473,7 @@ export default function CallModal({ conversationId, user, friend, registerStart,
 
   const toggleCamera = () => {
     const stream = localStreamRef.current;
-    if (!stream) return;
+    if (!stream || !hasVideo) return;
     const next = !cameraOff;
     stream.getVideoTracks().forEach((t) => { t.enabled = !next; });
     setCameraOff(next);
@@ -495,6 +540,12 @@ export default function CallModal({ conversationId, user, friend, registerStart,
           <video ref={remoteVideoRef} className="rb-call-remote-video" autoPlay playsInline muted />
           <video ref={localVideoRef} className={`rb-call-local-video ${screenStream ? 'is-screen' : ''}`} autoPlay playsInline muted />
           <MinimizeCallButton kind="direct" className="rb-call-minimize" />
+          {mediaWarning && !devicesOpen && <p className="rb-call-media-warning">⚠️ {mediaWarning}</p>}
+          {devicesOpen && (
+            <div className="rb-call-devices">
+              <DevicePicker stream={localStreamRef.current} onSwitch={switchDevice} version={mediaVersion} warning={mediaWarning} />
+            </div>
+          )}
           <div className="rb-call-controls">
             <button type="button" className={`rb-call-ctrl-btn ${muted ? 'active' : ''}`} onClick={toggleMuted} aria-label="Muto">
               {muted ? '🔇' : '🎙️'}
@@ -504,6 +555,16 @@ export default function CallModal({ conversationId, user, friend, registerStart,
               {cameraOff ? '🚫' : '📷'}
             </button>
             <ScreenShareButton className="rb-call-ctrl-btn" sharing={Boolean(screenStream)} onStart={startScreenShare} onStop={stopScreenShare} size={22} />
+            <button
+              type="button"
+              className={`rb-call-ctrl-btn ${devicesOpen ? 'active' : ''}`}
+              onClick={() => setDevicesOpen((v) => !v)}
+              aria-expanded={devicesOpen}
+              aria-label="Microfono e fotocamera"
+              title="Scegli microfono e fotocamera"
+            >
+              ⚙️
+            </button>
           </div>
         </div>
       )}

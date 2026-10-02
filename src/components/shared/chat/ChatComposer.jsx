@@ -8,6 +8,7 @@ import { prepareUpload } from '../../../data/mediaCompress';
 
 // Barra di scrittura condivisa (Stanza MOD e chat dirette):
 // - 📎 con "Foto/Video", "Documento" e le voci extra (es. "Posizione");
+//   quelle con quick: true hanno anche un pulsante diretto nella barra;
 //   file anche trascinati sul pannello (dropTargetRef) o incollati con
 //   Ctrl+V; anteprime con la X prima dell'invio, massimo 10, tipo e
 //   dimensione controllati prima dell'upload, barra di avanzamento;
@@ -328,6 +329,22 @@ export default function ChatComposer({
               }}
             />
           </div>
+          {/* Voci "quick" (es. 📍 Posizione) anche come pulsante diretto. */}
+          {extraMenuItems
+            .filter((it) => it.quick)
+            .map((it) => (
+              <button
+                key={`quick-${it.label}`}
+                type="button"
+                className="rb-composer-icon rb-composer-quick"
+                onClick={it.onClick}
+                aria-label={it.label}
+                title={it.label}
+                disabled={disabled || busy}
+              >
+                {it.icon}
+              </button>
+            ))}
           <span className="rb-composer-emoji">
             <EmojiPicker onSelect={(emoji) => setText((t) => t + emoji)} />
           </span>

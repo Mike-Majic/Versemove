@@ -616,7 +616,7 @@ export default function FriendChatModal({
           upload={upload}
           onSend={onSend}
           onDirtyChange={setDirty}
-          extraMenuItems={[{ label: 'Posizione', icon: '📍', onClick: () => setConfirmLocation(true) }]}
+          extraMenuItems={[{ label: 'Posizione', icon: '📍', quick: true, onClick: () => setConfirmLocation(true) }]}
         />
       </div>
 

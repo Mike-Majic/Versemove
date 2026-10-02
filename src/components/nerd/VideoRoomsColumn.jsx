@@ -23,6 +23,7 @@ import { getLavoroProfiles, lavoroBirthLabel } from '../../data/lavoro';
 import { useMeshCall } from '../../hooks/useMeshCall';
 import { useCalls } from '../../calls/CallProvider';
 import CallSurface, { MinimizeCallButton, RemoteAudio, ScreenShareButton } from '../../calls/CallSurface';
+import DevicePicker from '../../calls/DevicePicker';
 import Icon from '../shared/Icon';
 import { useBackLayer } from '../../hooks/useBackLayer';
 import { useGlobeCover } from '../../fx/globeCover';
@@ -677,6 +678,8 @@ export function RoomView({ roomId, source, user, onExit }) {
   const [members, setMembers] = useState(null);
   const [bans, setBans] = useState([]);
   const [error, setError] = useState('');
+  // Pannello microfono/fotocamera (DevicePicker).
+  const [devicesOpen, setDevicesOpen] = useState(false);
   const [menuFor, setMenuFor] = useState(null);
   // Lavoro: nome e cognome al posto del nickname (anche il mio).
   const { names: realNames, births: realBirths } = useRealNames([...(members ?? []).map((m) => m.userId), ...bans.map((b) => b.userId)], preset.realNames);
@@ -1082,11 +1085,29 @@ export function RoomView({ roomId, source, user, onExit }) {
         {call.joined && (
           <ScreenShareButton className="rb-vroom-ctrl" sharing={call.sharingScreen} onStart={call.startScreenShare} onStop={call.stopScreenShare} />
         )}
+        {call.joined && (
+          <button
+            type="button"
+            className={`rb-vroom-ctrl ${devicesOpen ? 'is-on' : ''}`}
+            onClick={() => setDevicesOpen((v) => !v)}
+            aria-expanded={devicesOpen}
+            aria-label="Microfono e fotocamera"
+            title="Scegli microfono e fotocamera"
+          >
+            ⚙️
+          </button>
+        )}
         <button type="button" className="rb-vroom-ctrl rb-vroom-ctrl--leave" onClick={askLeave} aria-label="Esci dalla stanza">
           📞
         </button>
       </div>
       {micLocked && <p className="rb-vroom-locked">Mutato dal proprietario</p>}
+      {call.joined && call.mediaWarning && !devicesOpen && <p className="rb-vroom-locked">⚠️ {call.mediaWarning}</p>}
+      {call.joined && devicesOpen && (
+        <div className="rb-vroom-devices">
+          <DevicePicker stream={call.localStream} onSwitch={call.switchDevice} version={call.localStream?.id} warning={call.mediaWarning} />
+        </div>
+      )}
 
       {isOwner && bans.length > 0 && (
         <section className="rb-vroom-bans">

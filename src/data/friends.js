@@ -166,3 +166,32 @@ export async function removeFriend(otherId) {
     return { error: err?.message ?? 'Errore di rete.' };
   }
 }
+
+// Stato dell'amicizia con un'altra persona, per il pulsante del profilo:
+// { status: 'none' | 'sent' | 'received' | 'friends', requestId }.
+export async function getFriendStatus(otherId) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user || !otherId || auth.user.id === otherId) return { status: 'none', requestId: null };
+    const myId = auth.user.id;
+    const [friendsRes, reqRes] = await Promise.all([
+      supabase
+        .from('friendships')
+        .select('user_a')
+        .or(`and(user_a.eq.${myId},user_b.eq.${otherId}),and(user_a.eq.${otherId},user_b.eq.${myId})`)
+        .limit(1),
+      supabase
+        .from('friend_requests')
+        .select('id, from_id, to_id')
+        .eq('stato', 'in_attesa')
+        .or(`and(from_id.eq.${myId},to_id.eq.${otherId}),and(from_id.eq.${otherId},to_id.eq.${myId})`)
+        .limit(1),
+    ]);
+    if (friendsRes.data?.length) return { status: 'friends', requestId: null };
+    const req = reqRes.data?.[0];
+    if (req) return { status: req.from_id === myId ? 'sent' : 'received', requestId: req.id };
+    return { status: 'none', requestId: null };
+  } catch {
+    return { status: 'none', requestId: null };
+  }
+}

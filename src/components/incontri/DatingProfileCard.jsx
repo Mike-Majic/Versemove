@@ -136,6 +136,11 @@ export default function DatingProfileCard({ card, mode = 'single', isSelf = fals
           <span className="rb-dpc-nick">{card.nickname}</span>
           {card.eta ? <span className="rb-dpc-age">{card.eta}</span> : null}
         </h2>
+        {card.fuoriPreferenze && (
+          <p className="rb-dpc-outzone">
+            Fuori dalla tua zona{card.distanzaKm != null ? ` · ${card.distanzaKm} km` : ''}
+          </p>
+        )}
         {luogo && <p className="rb-dpc-place">📍 {luogo}</p>}
         {card.bio && <p className="rb-dpc-bio">{card.bio}</p>}
         {card.cosaCerca?.length > 0 && (

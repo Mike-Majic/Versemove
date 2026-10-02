@@ -214,6 +214,11 @@ export async function getAccounts() {
   return data.map(mapProfile);
 }
 
+export const TEMP_EMAIL_ERROR = 'Le email temporanee non sono accettate: usa un indirizzo personale';
+// Rifiuto lato server di un'email usa e getta (trigger/funzione di
+// registrazione): il messaggio può arrivare con parole diverse.
+const TEMP_EMAIL_SERVER_RE = /email[_ ]?(temporane|usa e getta|non consentita)|email_consentita|disposable|temporary email/i;
+
 // Registra un nuovo account con Supabase Auth (email+password reale). Il
 // ruolo (owner per m.colurci@gmail.com, altrimenti utente) e la riga in
 // profiles li crea da soli un trigger lato server alla registrazione.
@@ -267,6 +272,16 @@ export async function registerAccount({
     return { error: 'Inserisci la ragione sociale per un account azienda.' };
   }
 
+  // Niente email temporanee (usa e getta): lo decide il server con la RPC
+  // email_consentita. Se la RPC non c'è ancora o dà errore si procede come
+  // sempre; il server può comunque rifiutare la registrazione (vedi sotto).
+  try {
+    const { data: allowed, error: checkError } = await supabase.rpc('email_consentita', { p_email: cleanEmail });
+    if (!checkError && allowed === false) return { error: TEMP_EMAIL_ERROR };
+  } catch {
+    // rete o RPC assente: si prosegue
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: cleanEmail,
     password,
@@ -311,6 +326,9 @@ export async function registerAccount({
     // (nessun dettaglio nel messaggio): il controllo sull'età prima di
     // chiamare signUp (vedi AuthModal) intercetta già il caso comune, qui
     // resta solo un messaggio comprensibile per quello che sfugge.
+    if (TEMP_EMAIL_SERVER_RE.test(error.message ?? '')) {
+      return { error: TEMP_EMAIL_ERROR };
+    }
     if (/database error saving new user/i.test(error.message ?? '')) {
       return { error: 'Registrazione non riuscita: controlla la data di nascita.' };
     }

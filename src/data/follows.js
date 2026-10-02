@@ -75,3 +75,33 @@ export async function listSuggestedProfiles(excludeIds = [], limit = 4) {
     return [];
   }
 }
+
+// Quanti segue e quanti lo seguono (follows è leggibile da tutti, RLS
+// follows_select_all). -> { following, followers } (null se non si sa).
+export async function getFollowCounts(userId) {
+  try {
+    const [a, b] = await Promise.all([
+      supabase.from('follows').select('followee_id', { count: 'exact', head: true }).eq('follower_id', userId),
+      supabase.from('follows').select('follower_id', { count: 'exact', head: true }).eq('followee_id', userId),
+    ]);
+    return { following: a.error ? null : a.count ?? 0, followers: b.error ? null : b.count ?? 0 };
+  } catch {
+    return { following: null, followers: null };
+  }
+}
+
+// Elenco di chi segue (kind 'following') o di chi lo segue ('followers')
+// un utente qualsiasi, con nickname/avatar pubblici.
+export async function listFollowProfiles(userId, kind = 'following') {
+  try {
+    const [mine, other] = kind === 'followers' ? ['followee_id', 'follower_id'] : ['follower_id', 'followee_id'];
+    const { data, error } = await supabase.from('follows').select(other).eq(mine, userId).limit(500);
+    if (error || !data?.length) return [];
+    const ids = data.map((r) => r[other]);
+    const { data: profiles, error: pErr } = await supabase.from('public_profiles').select('id, nickname, username, avatar_url').in('id', ids);
+    if (pErr || !profiles) return [];
+    return profiles.map((p) => ({ id: p.id, name: displayName(p), avatar: p.avatar_url || '' }));
+  } catch {
+    return [];
+  }
+}

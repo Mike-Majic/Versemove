@@ -160,3 +160,35 @@
   font-size: 11px;
   color: rgba(245, 245, 247, 0.5);
 }
+
+/* Scheda "Seguiti": avatar e nome aprono il profilo. */
+.rb-friends-row button.rb-friends-profile-link {
+  flex: 1;
+  flex-shrink: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rb-friends-row button.rb-friends-profile-link:hover strong {
+  text-decoration: underline;
+}
+
+/* Righe con due pulsanti lunghi (Seguiti): sugli schermi stretti i
+   pulsanti vanno a capo sotto al nome. */
+.rb-friends-row--wrap {
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  .rb-friends-row--wrap .rb-friends-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

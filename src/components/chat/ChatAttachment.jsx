@@ -78,15 +78,25 @@ function FileAttachment({ allegato }) {
   );
 }
 
+// Link alle mappe per un punto: sul telefono l'app mappe del dispositivo
+// (Android: geo:, iPhone/iPad: Apple Maps, che apre l'app), sul computer
+// Google Maps in una nuova scheda.
+function mapsLinkFor(lat, lng, ua = typeof navigator !== 'undefined' ? navigator.userAgent : '') {
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
+  if (/Android/i.test(ua)) return { href: `geo:${lat},${lng}?q=${lat},${lng}`, newTab: false };
+  if (isIOS) return { href: `https://maps.apple.com/?q=${lat},${lng}&ll=${lat},${lng}`, newTab: false };
+  return { href: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, newTab: true };
+}
+
 function LocationAttachment({ allegato }) {
   const lat = Number(allegato.lat);
   const lng = Number(allegato.lng);
   const tile = osmTile(lat, lng);
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  const osmUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
+  const maps = mapsLinkFor(lat, lng);
+  const linkProps = maps.newTab ? { href: maps.href, target: '_blank', rel: 'noopener noreferrer' } : { href: maps.href };
   return (
     <div className="rb-chat-att-location">
-      <a className="rb-chat-att-map" href={osmUrl} target="_blank" rel="noopener noreferrer" title="Apri la mappa">
+      <a className="rb-chat-att-map" {...linkProps} title="Apri nelle mappe">
         <img src={tile.url} alt="Mappa della posizione" loading="lazy" />
         <span className="rb-chat-att-pin" style={{ left: `${tile.left}%`, top: `${tile.top}%` }}>📍</span>
         <span className="rb-chat-att-osm">© OpenStreetMap</span>
@@ -96,7 +106,7 @@ function LocationAttachment({ allegato }) {
           📍 Posizione
           {allegato.precisione ? <small> · ±{Math.round(allegato.precisione)} m</small> : null}
         </span>
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer">Portami qui</a>
+        <a {...linkProps}>Apri nelle mappe</a>
       </div>
     </div>
   );
