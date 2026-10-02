@@ -26,6 +26,11 @@ export default {
     settings: 'सेटिंग्स',
     logout: 'लॉगआउट',
     login: 'लॉगिन',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: 'सदस्य',
+    statsSubscribersInWorld: 'सदस्य इस दुनिया में',
+    statsOnline: 'ऑनलाइन',
+    statsLabel: '{{subscribers}} सदस्य इस दुनिया में · {{online}} ऑनलाइन',
   },
   categories: {
     vetrina: {

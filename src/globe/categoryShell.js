@@ -639,6 +639,15 @@ const MODEL_FACTORY_BY_SHAPE = {
   // Nerd: il modello va sopra all'UFO piatto (che diventa invisibile).
   ufo: (kit, id) => createNerdModel(kit, id),
 };
+// Grandezza dei modelli rispetto alla sagoma (o al triangolo) che
+// sostituiscono: in Annunci, Vetrina e Nerd più piccoli, la valigetta di
+// Lavoro resta com'è (1).
+const MODEL_SIZE_FACTOR_BY_SHAPE = { annunci: 0.65, vetrina: 0.65, ufo: 0.65 };
+// I modelli guardano sempre chi guarda (orientamento della camera), con una
+// leggera vista di tre quarti: prima Y di -0.45 rad, poi X di 0.22 rad
+// (l'angolo delle foto approvate). Non è un'animazione: segue solo la
+// camera e il globo, anche con "riduci animazioni".
+const MODEL_TILT = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.22, -0.45, 0, 'XYZ'));
 // Mondi in cui non tutte le categorie hanno un modello: quelle senza restano
 // sulla sagoma di sempre, e se nessuna lo ha non si crea nemmeno il kit.
 const MODEL_AVAILABLE_BY_SHAPE = { ufo: hasNerdModel };
@@ -1304,6 +1313,7 @@ export function buildCategoryShell(
           .addScaledVector(right, ((t.flatBox.min.x + t.flatBox.max.x) / 2) * t.shapeScale)
           .addScaledVector(up, ((t.flatBox.min.y + t.flatBox.max.y) / 2) * t.shapeScale);
       }
+      k *= MODEL_SIZE_FACTOR_BY_SHAPE[shapeType] ?? 1;
       model.group.scale.setScalar(k);
       const pivot = new THREE.Group();
       pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, t.normal));
@@ -1331,7 +1341,12 @@ export function buildCategoryShell(
       t.sprite.userData.model3d = true;
       faceMeshes.push(t.sprite);
 
-      modelItems.push({ id: t.id, pivot, model, sprite: t.sprite, flatMesh: t.flatMesh, emphasis: 0, hovered: false, active: false, hit: true });
+      // Etichetta rispetto al perno (nel suo sistema, senza la scala
+      // dell'hover): sotto al modello e alla quota del fronte. Quando il
+      // modello si gira verso la camera (update) l'etichetta lo segue.
+      const labelOffset = new THREE.Vector3(0, -(model.halfHeight * k + labelScale * 0.95), model.frontZ * k);
+
+      modelItems.push({ id: t.id, pivot, model, sprite: t.sprite, flatMesh: t.flatMesh, labelOffset, emphasis: 0, hovered: false, active: false, hit: true });
     });
   }
 
@@ -1437,6 +1452,10 @@ export function buildCategoryShell(
   // si fa nulla. viewportSize (larghezza/altezza del canvas in px CSS)
   // serve alla larghezza in pixel del bordo bianco.
   const lastViewport = new THREE.Vector2(-1, -1);
+  const cameraQuat = new THREE.Quaternion();
+  const parentQuat = new THREE.Quaternion();
+  const lastCameraQuat = new THREE.Quaternion(0, 0, 0, 0);
+  const lastParentQuat = new THREE.Quaternion(0, 0, 0, 0);
   const worldPos = new THREE.Vector3();
   const toCamera = new THREE.Vector3();
   const worldNormal = new THREE.Vector3();
@@ -1502,8 +1521,24 @@ export function buildCategoryShell(
     }
     if (modelItems.length > 0) {
       const easeStep = reduceMotion ? 1 : Math.min(1, deltaSec * 8);
+      // Orientamento verso la camera: si ricalcola solo se camera o globo
+      // (rotazione del guscio) si sono mossi.
+      let facingQuat = null;
+      if (camera) {
+        camera.getWorldQuaternion(cameraQuat);
+        group.getWorldQuaternion(parentQuat);
+        if (!cameraQuat.equals(lastCameraQuat) || !parentQuat.equals(lastParentQuat)) {
+          lastCameraQuat.copy(cameraQuat);
+          lastParentQuat.copy(parentQuat);
+          facingQuat = parentQuat.invert().multiply(cameraQuat).multiply(MODEL_TILT);
+        }
+      }
       for (let i = 0; i < modelItems.length; i++) {
         const item = modelItems[i];
+        if (facingQuat) {
+          item.pivot.quaternion.copy(facingQuat);
+          item.sprite.position.copy(item.labelOffset).applyQuaternion(facingQuat).add(item.pivot.position);
+        }
         // Dietro al globo non si clicca (resta solo l'occlusione del globo).
         if (camera) {
           item.pivot.getWorldPosition(worldPos);

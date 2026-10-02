@@ -26,6 +26,11 @@ export default {
     settings: '设置',
     logout: '退出登录',
     login: '登录',
+    // Contatore accanto al nome del mondo (WorldStats.jsx).
+    statsSubscribers: '位成员',
+    statsSubscribersInWorld: '位本世界成员',
+    statsOnline: '在线',
+    statsLabel: '{{subscribers}} 位本世界成员 · {{online}} 在线',
   },
   categories: {
     vetrina: {
