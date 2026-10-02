@@ -3,6 +3,7 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { createGothicLetter, loadGothicFont } from './gothicLetter.js';
+import { createBriefcase3D, createBriefcaseResources } from './briefcase3d.js';
 
 // Stessa formula di conversione lat/lng -> vettore usata da three-globe (vedi networkOverlay.js).
 function polarToVector(lat, lng, radius = 1) {
@@ -608,6 +609,13 @@ const GOTHIC_LETTERS = {
   },
 };
 const GOTHIC_RENDER_ORDER = 2;
+
+// Mondo Lavoro: la sagoma piatta 'briefcase' diventa una valigetta 3D
+// cromata con contorno nero (vedi briefcase3d.js), stesso schema delle
+// lettere gotiche: pivot orientato come la sagoma, sagoma piatta invisibile
+// ma cliccabile, etichetta sotto. Ferma; su hover/categoria attiva cresce
+// al massimo dell'8% (interpolato, istantaneo con "riduci animazioni").
+const BRIEFCASE_EMPHASIS_SCALE = 1.08;
 // Uscita/rientro delle lettere sul bordo del globo (facing = coseno fra la
 // normale della lettera e la direzione della camera). L'uscita parte a
 // ~81° (0.15): con la rotazione automatica (3°/s) i 2,2 s dell'animazione
@@ -837,6 +845,8 @@ export function buildCategoryShell(
     fillOpacity = 0.2,
     activeOpacity = 0.45,
     onAnimatedReady = null,
+    // Serve solo alla valigetta 3D del mondo Lavoro (env map del cromo).
+    renderer = null,
   } = {}
 ) {
   const detail = pickDetailLevel(categories.length);
@@ -916,6 +926,8 @@ export function buildCategoryShell(
   const blockedFaces = new Set();
   const gothicM = shapeType === 'letterM';
   const gothicTargets = [];
+  const briefcase3d = shapeType === 'briefcase';
+  const briefcaseTargets = [];
 
   // Le facce dell'icosaedro suddiviso non sono tutte uguali (quelle vicino
   // ai 12 vertici originali sono più piccole): con la scala presa dalla
@@ -1127,7 +1139,54 @@ export function buildCategoryShell(
     if (gothicM && shapeCenter && GOTHIC_LETTERS[cat.id]) {
       gothicTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
     }
+    if (briefcase3d && shapeCenter) {
+      briefcaseTargets.push({ id: cat.id, normal: normal.clone(), shapeCenter, shapeScale, flatMesh: mesh, sprite });
+    }
   });
+
+  // Valigette 3D (mondo Lavoro): risorse condivise (geometrie, materiali,
+  // env map) create una volta per guscio e liberate in dispose().
+  const briefcaseItems = [];
+  let briefcaseResources = null;
+  if (briefcaseTargets.length > 0) {
+    briefcaseResources = createBriefcaseResources(renderer);
+    briefcaseTargets.forEach((t) => {
+      const bag = createBriefcase3D(briefcaseResources);
+      // Larghezza finale = larghezza della sagoma piatta (2 * shapeScale).
+      const k = (2 * t.shapeScale) / bag.width;
+      bag.group.scale.setScalar(k);
+      const worldUp = Math.abs(t.normal.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+      const right = new THREE.Vector3().crossVectors(worldUp, t.normal).normalize();
+      const up = new THREE.Vector3().crossVectors(t.normal, right).normalize();
+      const pivot = new THREE.Group();
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, t.normal));
+      // Il retro della valigetta appena sopra la sagoma piatta.
+      const lift = SHAPE_SURFACE_OFFSET + bag.halfDepth * k + 1;
+      pivot.position.copy(t.shapeCenter).addScaledVector(t.normal, lift);
+      pivot.add(bag.group);
+      group.add(pivot);
+
+      // Sagoma piatta invisibile ma cliccabile; si clicca anche la valigetta.
+      t.flatMesh.material.visible = false;
+      bag.meshes.forEach((m) => {
+        m.userData.categoryId = t.id;
+        m.userData.briefcase = true;
+        faceMeshes.push(m);
+      });
+
+      // Etichetta sotto la valigetta, alla quota del fronte. Un po' più
+      // staccata che per le lettere gotiche: le etichette su due righe
+      // ("Stanza conferenze") toccavano i paraspigoli in basso.
+      const below = t.shapeCenter.clone().addScaledVector(up, -(bag.halfHeight * k + labelScale * 0.95));
+      t.sprite.position.copy(below.normalize()).multiplyScalar(radius + lift + bag.frontZ * k);
+      // Spostata sotto, l'etichetta non sta più sopra la sagoma piatta che
+      // riceveva il click: si clicca lei stessa (raycast sugli sprite).
+      t.sprite.userData.briefcase = true;
+      faceMeshes.push(t.sprite);
+
+      briefcaseItems.push({ id: t.id, pivot, bag, sprite: t.sprite, flatMesh: t.flatMesh, emphasis: 0, hovered: false, active: false, hit: true });
+    });
+  }
 
   // M gotica: si costruisce quando il font è pronto (o dopo il timeout, col
   // fallback serif), senza mai bloccare il globo. Nel frattempo resta la M
@@ -1201,8 +1260,12 @@ export function buildCategoryShell(
       });
       return;
     }
+    briefcaseItems.forEach((item) => {
+      item.active = item.id === activeId;
+    });
     faceMeshes.forEach((mesh) => {
       if (Array.isArray(mesh.material)) return; // M gotica: vedi sotto
+      if (mesh.userData.briefcase) return; // valigetta 3D: vedi update
       mesh.material.opacity = mesh.userData.categoryId === activeId ? activeOpacity : fillOpacity;
     });
     gothicItems.forEach((item) => item.letter.setEmphasis(item.id === activeId ? 1 : 0));
@@ -1212,6 +1275,9 @@ export function buildCategoryShell(
   // Hover del mouse su una forma (solo mondo vivace; altrove non fa nulla):
   // la forma cresce a 1.15 e l'alone si accende di più, vedi update().
   function setHovered(hoveredId) {
+    briefcaseItems.forEach((item) => {
+      item.hovered = item.id === hoveredId;
+    });
     if (!vivid) return;
     vividItems.forEach((item) => {
       item.hovered = item.id === hoveredId;
@@ -1287,6 +1353,32 @@ export function buildCategoryShell(
         });
       }
     }
+    if (briefcaseItems.length > 0) {
+      const easeStep = reduceMotion ? 1 : Math.min(1, deltaSec * 8);
+      for (let i = 0; i < briefcaseItems.length; i++) {
+        const item = briefcaseItems[i];
+        // Dietro al globo non si clicca (resta solo l'occlusione del globo).
+        if (camera) {
+          item.pivot.getWorldPosition(worldPos);
+          worldNormal.copy(worldPos).normalize();
+          toCamera.copy(camera.position).sub(worldPos).normalize();
+          const hit = worldNormal.dot(toCamera) > 0;
+          if (hit !== item.hit) {
+            item.hit = hit;
+            item.flatMesh.userData.noHit = !hit;
+            item.sprite.userData.noHit = !hit;
+            item.bag.meshes.forEach((m) => {
+              m.userData.noHit = !hit;
+            });
+          }
+        }
+        const target = item.hovered || item.active ? 1 : 0;
+        if (item.emphasis === target) continue;
+        item.emphasis += (target - item.emphasis) * easeStep;
+        if (Math.abs(target - item.emphasis) < 0.002) item.emphasis = target;
+        item.pivot.scale.setScalar(1 + (BRIEFCASE_EMPHASIS_SCALE - 1) * item.emphasis);
+      }
+    }
     if (!vivid) return;
     if (viewportSize && !lastViewport.equals(viewportSize)) {
       lastViewport.copy(viewportSize);
@@ -1329,6 +1421,8 @@ export function buildCategoryShell(
     disposed = true;
     gothicItems.forEach((item) => item.letter.dispose());
     gothicItems.length = 0;
+    briefcaseResources?.dispose();
+    briefcaseItems.length = 0;
     disposables.forEach((d) => d.dispose && d.dispose());
   }
 
@@ -1341,9 +1435,9 @@ export function buildCategoryShell(
     setActive,
     setHovered,
     update,
-    supportsHover: vivid,
+    supportsHover: vivid || briefcaseItems.length > 0,
     // Forme che si animano nel giro di disegno (Bambini, M gotica Social).
-    animated: vivid || gothicM,
+    animated: vivid || gothicM || briefcaseItems.length > 0,
     dispose,
   };
 }
