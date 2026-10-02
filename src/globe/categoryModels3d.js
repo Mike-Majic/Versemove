@@ -71,6 +71,10 @@ export function createModelKit(renderer, { outline = '#08090c', t = 0.06 } = {})
     light: new THREE.MeshBasicMaterial({ color: '#ffe2b0' }),
     red: new THREE.MeshBasicMaterial({ color: '#ff3b30' }),
     slot: new THREE.MeshBasicMaterial({ color: '#08090c' }),
+    // Vetrina: accento rosa (stella della borsa, punta del rossetto) e
+    // schermo acceso del portatile.
+    accent: new THREE.MeshStandardMaterial({ color: '#ec4899', metalness: 0.35, roughness: 0.3, envMap, envMapIntensity: ENV_INTENSITY }),
+    screen: new THREE.MeshBasicMaterial({ color: '#ffd6ea' }),
     out: outline === null ? null : new THREE.MeshBasicMaterial({ color: outline, side: THREE.BackSide }),
   };
 
@@ -249,6 +253,34 @@ export function createModelKit(renderer, { outline = '#08090c', t = 0.06 } = {})
       Object.values(MAT).forEach((m) => m && m.dispose());
       releaseEnvMap(envMap);
     },
+  };
+}
+
+// Un modello di categoria pronto per il guscio: costruito col kit, pezzi
+// uniti per materiale (poche chiamate di disegno), centrato e portato a un
+// ingombro standard di 2.7 x 2.1 (fit del riferimento). Restituisce il
+// gruppo, i mesh (da rendere cliccabili) e le misure finali in unità locali.
+const FIT_W = 2.7;
+const FIT_H = 2.1;
+export function fitCategoryModel(kit, build) {
+  const model = kit.mergeByMaterial(build(kit));
+  const b = new THREE.Box3().setFromObject(model);
+  const c = b.getCenter(new THREE.Vector3());
+  const size = b.getSize(new THREE.Vector3());
+  model.position.sub(c);
+  const s = 1 / Math.max(size.x / FIT_W, size.y / FIT_H);
+  const group = new THREE.Group();
+  const wrap = new THREE.Group();
+  wrap.scale.setScalar(s);
+  wrap.add(model);
+  group.add(wrap);
+  return {
+    group,
+    meshes: collectMeshes(group),
+    width: size.x * s,
+    halfHeight: (size.y * s) / 2,
+    halfDepth: (size.z * s) / 2,
+    frontZ: (size.z * s) / 2,
   };
 }
 

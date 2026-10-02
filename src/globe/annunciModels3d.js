@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fitCategoryModel } from './categoryModels3d.js';
 
 // Modelli 3D "cromo + contorno arancione" delle sette categorie del mondo
 // Annunci, al posto delle sagome piatte (vedi categoryShell.js). Misure e
@@ -199,7 +200,9 @@ function parcel(k) {
   return g;
 }
 
-const BUILDERS = {
+// Costruttori per categoria (usati anche dal mondo Vetrina per maglietta e
+// auto, vedi vetrinaModels3d.js).
+export const ANNUNCI_BUILDERS = {
   auto: car,
   moto,
   biciclette: bike,
@@ -209,40 +212,7 @@ const BUILDERS = {
   'oggetti-vari': parcel,
 };
 
-export function hasAnnunciModel(categoryId) {
-  return Boolean(BUILDERS[categoryId]);
-}
-
-// Centra il modello e lo porta a un ingombro standard (2.7 x 2.1), come il
-// riferimento. Restituisce le misure finali in unità locali.
-const FIT_W = 2.7;
-const FIT_H = 2.1;
 export function createAnnunciModel(kit, categoryId) {
-  const build = BUILDERS[categoryId];
-  if (!build) return null;
-  // Pezzi uniti per materiale (vedi kit.mergeByMaterial): stesso aspetto,
-  // poche chiamate di disegno, più leggero sul telefono.
-  const model = kit.mergeByMaterial(build(kit));
-  const b = new THREE.Box3().setFromObject(model);
-  const c = b.getCenter(new THREE.Vector3());
-  const size = b.getSize(new THREE.Vector3());
-  model.position.sub(c);
-  const s = 1 / Math.max(size.x / FIT_W, size.y / FIT_H);
-  const group = new THREE.Group();
-  const wrap = new THREE.Group();
-  wrap.scale.setScalar(s);
-  wrap.add(model);
-  group.add(wrap);
-  const meshes = [];
-  group.traverse((o) => {
-    if (o.isMesh) meshes.push(o);
-  });
-  return {
-    group,
-    meshes,
-    width: size.x * s,
-    halfHeight: (size.y * s) / 2,
-    halfDepth: (size.z * s) / 2,
-    frontZ: (size.z * s) / 2,
-  };
+  const build = ANNUNCI_BUILDERS[categoryId];
+  return build ? fitCategoryModel(kit, build) : null;
 }
