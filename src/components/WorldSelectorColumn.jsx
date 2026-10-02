@@ -179,7 +179,7 @@ export default function WorldSelectorColumn({ worlds, activeWorldId, onSelectWor
             <button
               type="button"
               className={`rb-world-dot ${w.id === activeWorldId ? 'active' : ''}`}
-              style={{ '--dot-color': w.color }}
+              style={{ '--dot-color': w.selectorColor ?? w.color }}
               onClick={() => handleWorldClick(w.id)}
               role="option"
               aria-selected={w.id === activeWorldId}

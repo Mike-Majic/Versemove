@@ -19,6 +19,9 @@ export const WORLDS = [
   },
   {
     id: 'vetrina',
+    // Nessun utente sul globo (niente avatar, grumi né pallini), a
+    // qualsiasi zoom: vedi noGlobeUsers in App.jsx.
+    noGlobeUsers: true,
     label: 'Vetrina',
     tagline: 'Novità in mostra',
     color: '#ec4899',
@@ -29,6 +32,9 @@ export const WORLDS = [
   },
   {
     id: 'animali',
+    // Nessun utente sul globo (niente avatar, grumi né pallini), a
+    // qualsiasi zoom: vedi noGlobeUsers in App.jsx.
+    noGlobeUsers: true,
     label: 'Animali',
     tagline: 'Luoghi pet-friendly vicino a te',
     // Richiesta esplicita: color sabbia (non chiaro), linee verde scuro,
@@ -67,6 +73,9 @@ export const WORLDS = [
   },
   {
     id: 'annunci',
+    // Nessun utente sul globo (niente avatar, grumi né pallini), a
+    // qualsiasi zoom: vedi noGlobeUsers in App.jsx.
+    noGlobeUsers: true,
     label: 'Annunci',
     tagline: 'Auto, moto, biciclette, barche e case',
     color: '#ff8a1f',
@@ -161,6 +170,9 @@ export const WORLDS = [
     // Guscio e reticolo blu elettrico, puntini bianchi e contorni dei
     // continenti bianchi (richiesta di Mike).
     color: '#ffffff',
+    // Icona nel selettore dei mondi (colonna a destra): blu elettrico. Il
+    // color resta bianco per i puntini del satellite.
+    selectorColor: '#0a84ff',
     satelliteContinentColor: '#ffffff',
     colorSoft: 'rgba(10, 132, 255, 0.18)',
     globeColor: '#02132e',
