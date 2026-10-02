@@ -73,13 +73,15 @@ const CATEGORY_LOOK_BY_WORLD = {
   vetrina: { sizeFactor: 0.7 },
   // Intrattenimento: stelle più luminose (col viola del mondo al 20% si
   // vedevano poco dalla panoramica). Solo il riempimento.
-  arte: { fillColor: '#a78bfa', fillOpacity: 0.42, activeOpacity: 0.7 },
+  // curved: sagome curve sopra la rete del globo (raggio 131, vedi
+  // categoryShell.js), così le linee della rete non le attraversano.
+  arte: { fillColor: '#a78bfa', fillOpacity: 0.42, activeOpacity: 0.7, curved: true },
   // Mondo Rosso: i cuori erano enormi e quasi attaccati. Più pieni e
   // luminosi, sempre nel rosso puro del mondo (niente fillColor).
-  incontri: { sizeFactor: 0.62, fillOpacity: 0.5, activeOpacity: 0.8 },
+  incontri: { sizeFactor: 0.62, fillOpacity: 0.5, activeOpacity: 0.8, curved: true },
   // FAQ: nuvole bianche quasi piene con bordo arcobaleno fermo (la Stanza
-  // MOD resta rossa, vedi buildCategoryFaceShape 'cloud').
-  faq: { fillColor: '#ffffff', fillOpacity: 0.9, activeOpacity: 1, rainbowEdge: true },
+  // MOD è una stella rossa, vedi buildCategoryFaceShape 'cloud').
+  faq: { fillColor: '#ffffff', fillOpacity: 0.9, activeOpacity: 1, rainbowEdge: true, curved: true },
   animali: { fillColor: '#ffffff', fillOpacity: 0.7, activeOpacity: 0.9 },
 };
 
