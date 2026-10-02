@@ -56,7 +56,8 @@ const ENV_INTENSITY = 1.25;
 // Un kit per guscio: materiali e geometrie creati una volta, condivisi fra
 // i modelli dello stesso guscio, liberati tutti insieme con kit.dispose().
 // outline: colore del contorno (null = nessun contorno); t: spessore.
-export function createModelKit(renderer, { outline = '#08090c', t = 0.06 } = {}) {
+// light: colore di luci e finestre (Annunci #ffe2b0, Vetrina #ffd6ea).
+export function createModelKit(renderer, { outline = '#08090c', t = 0.06, light = '#ffe2b0' } = {}) {
   const envMap = acquireEnvMap(renderer);
   const chrome = (color, roughness, env = ENV_INTENSITY) =>
     new THREE.MeshStandardMaterial({ color, metalness: 1, roughness, envMap, envMapIntensity: env });
@@ -68,13 +69,12 @@ export function createModelKit(renderer, { outline = '#08090c', t = 0.06 } = {})
     dark: chrome('#1a1b21', 0.25),
     rubber: new THREE.MeshStandardMaterial({ color: '#121317', metalness: 0.2, roughness: 0.65, envMap, envMapIntensity: ENV_INTENSITY }),
     glass: chrome('#0c1220', 0.05, 1.6),
-    light: new THREE.MeshBasicMaterial({ color: '#ffe2b0' }),
+    light: new THREE.MeshBasicMaterial({ color: light }),
     red: new THREE.MeshBasicMaterial({ color: '#ff3b30' }),
     slot: new THREE.MeshBasicMaterial({ color: '#08090c' }),
-    // Vetrina: accento rosa (stella della borsa, punta del rossetto) e
-    // schermo acceso del portatile.
-    accent: new THREE.MeshStandardMaterial({ color: '#ec4899', metalness: 0.35, roughness: 0.3, envMap, envMapIntensity: ENV_INTENSITY }),
-    screen: new THREE.MeshBasicMaterial({ color: '#ffd6ea' }),
+    // Accento del colore del mondo (Vetrina: stella della borsa, punta del
+    // rossetto).
+    accent: new THREE.MeshStandardMaterial({ color: outline ?? '#ffffff', metalness: 0.35, roughness: 0.3, envMap, envMapIntensity: 1.1 }),
     out: outline === null ? null : new THREE.MeshBasicMaterial({ color: outline, side: THREE.BackSide }),
   };
 
@@ -196,8 +196,11 @@ export function createModelKit(renderer, { outline = '#08090c', t = 0.06 } = {})
   // forma, molte meno chiamate di disegno (da ~20 a ~6 per modello), e
   // meno mesh da controllare al click/hover.
   function mergeByMaterial(root) {
+    // Si tiene anche la trasformazione del modello stesso (es. il portatile
+    // inclinato, rotation.x = 0.75): si toglie solo quella dell'eventuale
+    // genitore.
     root.updateMatrixWorld(true);
-    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const inv = root.parent ? root.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
     const byMaterial = new Map();
     root.traverse((o) => {
       if (!o.isMesh) return;

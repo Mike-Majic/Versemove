@@ -1183,7 +1183,10 @@ export function buildCategoryShell(
   const modelItems = [];
   let modelKit = null;
   if (modelTargets.length > 0) {
-    modelKit = createModelKit(renderer, { outline: MODEL_OUTLINE_BY_SHAPE[shapeType] });
+    modelKit = createModelKit(renderer, {
+      outline: MODEL_OUTLINE_BY_SHAPE[shapeType],
+      ...(shapeType === 'vetrina' ? { light: '#ffd6ea' } : {}),
+    });
     modelTargets.forEach((t) => {
       const model = MODEL_FACTORY_BY_SHAPE[shapeType](modelKit, t.id);
       if (!model) return; // categoria senza modello: resta la sagoma (o il triangolo) visibile
